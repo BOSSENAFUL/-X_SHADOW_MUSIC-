@@ -101,7 +101,7 @@ export default function RadioPage() {
         
         // Fetch stations with geo info
         const stationsResponse = await fetch(
-          "https://de1.api.radio-browser.info/json/stations/search?limit=1000&has_geo_info=true&hidebroken=true&order=clickcount&reverse=true"
+          "https://fi1.api.radio-browser.info/json/stations/search?limit=1000&has_geo_info=true&hidebroken=true&order=clickcount&reverse=true"
         );
         const stationsData = await stationsResponse.json();
         
@@ -117,21 +117,21 @@ export default function RadioPage() {
 
         // Fetch countries
         const countriesResponse = await fetch(
-          "https://de1.api.radio-browser.info/json/countries?hidebroken=true"
+          "https://fi1.api.radio-browser.info/json/countries?hidebroken=true"
         );
         const countriesData = await countriesResponse.json();
         setCountries(countriesData.slice(0, 50)); // Limit to top 50 countries
 
         // Fetch languages
         const languagesResponse = await fetch(
-          "https://de1.api.radio-browser.info/json/languages?hidebroken=true"
+          "https://fi1.api.radio-browser.info/json/languages?hidebroken=true"
         );
         const languagesData = await languagesResponse.json();
         setLanguages(languagesData.slice(0, 30)); // Limit to top 30 languages
 
         // Fetch tags
         const tagsResponse = await fetch(
-          "https://de1.api.radio-browser.info/json/tags?hidebroken=true"
+          "https://fi1.api.radio-browser.info/json/tags?hidebroken=true"
         );
         const tagsData = await tagsResponse.json();
         setTags(tagsData.slice(0, 50)); // Limit to top 50 tags
@@ -182,7 +182,7 @@ export default function RadioPage() {
     try {
       // Click counter for the station and get the proper stream URL
       const clickResponse = await fetch(
-        `https://de1.api.radio-browser.info/json/url/${station.stationuuid}`,
+        `https://fi1.api.radio-browser.info/json/url/${station.stationuuid}`,
         {
           headers: {
             'User-Agent': 'Jammify/1.0'
