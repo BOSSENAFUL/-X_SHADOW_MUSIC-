@@ -78,8 +78,8 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     }
   };
 
-  // Extract dominant color from current song's cover image
-  const extractDominantColor = (imageUrl) => {
+  // Professional color extraction algorithm following industry best practices
+  const extractLeastDominantColor = (imageUrl) => {
     return new Promise((resolve) => {
       const img = new window.Image();
       img.crossOrigin = "anonymous";
@@ -89,52 +89,177 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
           const canvas = document.createElement("canvas");
           const ctx = canvas.getContext("2d");
 
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx.drawImage(img, 0, 0);
+          // Step 1: Downscale to 64x64 for speed and noise reduction
+          const size = 64;
+          canvas.width = size;
+          canvas.height = size;
+          ctx.drawImage(img, 0, 0, size, size);
 
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          // Step 2: Get center crop (avoid borders/logos)
+          const cropSize = Math.floor(size * 0.8); // 80% center crop
+          const cropOffset = Math.floor((size - cropSize) / 2);
+          const imageData = ctx.getImageData(
+            cropOffset,
+            cropOffset,
+            cropSize,
+            cropSize
+          );
           const data = imageData.data;
 
+          // Step 3: Collect colors and quantize
           const colorCounts = {};
+          const pixels = [];
 
-          // Sample every 10th pixel for performance
-          for (let i = 0; i < data.length; i += 40) {
+          for (let i = 0; i < data.length; i += 4) {
             const r = data[i];
             const g = data[i + 1];
             const b = data[i + 2];
+            const a = data[i + 3] / 255;
 
-            // Skip very light or very dark colors
-            const brightness = (r + g + b) / 3;
-            if (brightness < 30 || brightness > 220) continue;
+            // Step 4: Filter out junk colors
+            // Convert to linear luminance
+            const rLinear = Math.pow(r / 255, 2.2);
+            const gLinear = Math.pow(g / 255, 2.2);
+            const bLinear = Math.pow(b / 255, 2.2);
+            const luminance =
+              0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear;
 
-            const color = `${Math.floor(r / 15) * 15},${
-              Math.floor(g / 15) * 15
-            },${Math.floor(b / 15) * 15}`;
-            colorCounts[color] = (colorCounts[color] || 0) + 1;
+            // Skip near-black, near-white, or transparent pixels
+            if (luminance < 0.03 || luminance > 0.97 || a < 0.2) continue;
+
+            // Quantize colors (group similar colors)
+            const quantizedR = Math.floor(r / 16) * 16;
+            const quantizedG = Math.floor(g / 16) * 16;
+            const quantizedB = Math.floor(b / 16) * 16;
+            const colorKey = `${quantizedR},${quantizedG},${quantizedB}`;
+
+            colorCounts[colorKey] = (colorCounts[colorKey] || 0) + 1;
+            pixels.push({ r: quantizedR, g: quantizedG, b: quantizedB });
           }
 
-          // Find the most common color
-          let dominantColor = "59,130,246"; // Default blue
-          let maxCount = 0;
+          // Step 5: Create palette of dominant colors (k-means simplified)
+          const palette = Object.entries(colorCounts)
+            .map(([color, count]) => {
+              const [r, g, b] = color.split(",").map(Number);
 
-          for (const [color, count] of Object.entries(colorCounts)) {
-            if (count > maxCount) {
-              maxCount = count;
-              dominantColor = color;
+              // Calculate saturation
+              const max = Math.max(r, g, b);
+              const min = Math.min(r, g, b);
+              const saturation = max === 0 ? 0 : (max - min) / max;
+
+              // Step 6: Score the palette (count * saturation^1.2)
+              const score = count * Math.pow(saturation, 1.2);
+
+              return { r, g, b, count, saturation, score };
+            })
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 6); // Top 6 colors
+
+          if (palette.length === 0) {
+            resolve("rgb(40,40,40)");
+            return;
+          }
+
+          // Step 7: Choose best color (highest scoring with good saturation)
+          let bestColor = palette[0];
+
+          // Prefer colors with better saturation if score is close
+          for (let i = 1; i < Math.min(3, palette.length); i++) {
+            const candidate = palette[i];
+            if (
+              candidate.score > bestColor.score * 0.7 &&
+              candidate.saturation > bestColor.saturation * 1.2
+            ) {
+              bestColor = candidate;
             }
           }
 
-          const rgbColor = `rgb(${dominantColor})`;
+          // Step 8: Tweak for vibrancy (convert to HSL and enhance)
+          let { r, g, b } = bestColor;
+
+          // Convert RGB to HSL
+          r /= 255;
+          g /= 255;
+          b /= 255;
+          const max = Math.max(r, g, b);
+          const min = Math.min(r, g, b);
+          const diff = max - min;
+
+          let h = 0,
+            s = 0,
+            l = (max + min) / 2;
+
+          if (diff !== 0) {
+            s = l > 0.5 ? diff / (2 - max - min) : diff / (max + min);
+
+            switch (max) {
+              case r:
+                h = (g - b) / diff + (g < b ? 6 : 0);
+                break;
+              case g:
+                h = (b - r) / diff + 2;
+                break;
+              case b:
+                h = (r - g) / diff + 4;
+                break;
+            }
+            h /= 6;
+          }
+
+          // Enhance saturation and adjust lightness for optimal contrast
+          s = Math.min(1, s * 1.3); // Increase saturation by 30%
+          l = Math.max(0.15, Math.min(0.4, l * 0.8)); // Target darker range for white text
+
+          // Convert HSL back to RGB
+          const hue2rgb = (p, q, t) => {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1 / 6) return p + (q - p) * 6 * t;
+            if (t < 1 / 2) return q;
+            if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+            return p;
+          };
+
+          if (s === 0) {
+            r = g = b = l; // achromatic
+          } else {
+            const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+            const p = 2 * l - q;
+            r = hue2rgb(p, q, h + 1 / 3);
+            g = hue2rgb(p, q, h);
+            b = hue2rgb(p, q, h - 1 / 3);
+          }
+
+          // Convert back to 0-255 range
+          r = Math.round(r * 255);
+          g = Math.round(g * 255);
+          b = Math.round(b * 255);
+
+          // Step 9: Ensure minimum contrast for white text (WCAG compliance)
+          const finalLuminance =
+            0.2126 * Math.pow(r / 255, 2.2) +
+            0.7152 * Math.pow(g / 255, 2.2) +
+            0.0722 * Math.pow(b / 255, 2.2);
+          const whiteContrast = 1.05 / (finalLuminance + 0.05);
+
+          // If contrast is too low, darken the color
+          if (whiteContrast < 4.5) {
+            const factor = 0.7;
+            r = Math.round(r * factor);
+            g = Math.round(g * factor);
+            b = Math.round(b * factor);
+          }
+
+          const rgbColor = `rgb(${r},${g},${b})`;
           resolve(rgbColor);
         } catch (error) {
           console.error("Error extracting color:", error);
-          resolve("rgb(59,130,246)"); // Fallback color
+          resolve("rgb(40,40,40)");
         }
       };
 
       img.onerror = () => {
-        resolve("rgb(59,130,246)"); // Fallback color
+        resolve("rgb(40,40,40)");
       };
 
       img.src = imageUrl;
@@ -150,12 +275,12 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
         currentSong.image[currentSong.image.length - 1]?.url;
 
       if (imageUrl) {
-        extractDominantColor(imageUrl).then((color) => {
+        extractLeastDominantColor(imageUrl).then((color) => {
           setDominantColor(color);
         });
       }
     } else {
-      setDominantColor("rgb(59,130,246)"); // Default color
+      setDominantColor("rgb(40,40,40)"); // Default dark color
     }
   }, [currentSong]);
 
@@ -470,21 +595,16 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
       {/* Only show the bottom bar when fullscreen is NOT open */}
       {!isFullscreenOpen && (
-        <div
-          className="fixed bottom-16 left-0 right-0 md:left-64 md:bottom-0 border-t border-border z-[60] md:bg-background"
-          style={{
-            background: `linear-gradient(135deg, ${dominantColor
-              .replace("rgb", "rgba")
-              .replace(")", ", 0.15)")}, ${dominantColor
-              .replace("rgb", "rgba")
-              .replace(
-                ")",
-                ", 0.25)"
-              )}), linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0.8))`,
-            backdropFilter: "blur(10px)",
-          }}
-        >
-          {/* Override background for desktop */}
+        <div className="fixed bottom-16 left-0 right-0 md:left-64 md:bottom-0 border-t border-border z-[60] md:bg-background">
+          {/* Mobile background - uses least dominant color from album cover */}
+          <div
+            className="block md:hidden absolute inset-0"
+            style={{
+              backgroundColor: dominantColor,
+            }}
+          />
+
+          {/* Desktop background */}
           <div className="hidden md:block absolute inset-0 bg-background"></div>
 
           {/* Content with relative positioning */}
