@@ -18,7 +18,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.7);
-  const [dominantColor, setDominantColor] = useState("rgb(59, 130, 246)"); // Default blue
+  const [dominantColor, setDominantColor] = useState("rgb(40, 40, 40)"); // Default dark color
   const audioRef = useRef(null);
 
   // Find current song index in playlist

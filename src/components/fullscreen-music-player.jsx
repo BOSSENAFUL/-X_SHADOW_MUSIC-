@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -506,32 +506,70 @@ export function FullscreenMusicPlayer({
     }
   };
 
-  const handleLikeToggle = async () => {
-    if (!currentSong) return;
+  // Optimized like toggle with debouncing and optimistic updates
+  const [isLikeLoading, setIsLikeLoading] = useState(false);
+  const [optimisticLikeState, setOptimisticLikeState] = useState(null);
+  const likeTimeoutRef = useRef(null);
 
-    try {
-      const songData = {
-        id: currentSong.id,
-        name: currentSong.name || currentSong.title,
-        title: currentSong.name || currentSong.title,
-        artists: currentSong.artists || { primary: [] },
-        primaryArtists:
-          currentSong.primaryArtists || getArtistNames(currentSong),
-        album: currentSong.album || { id: "", name: "" },
-        duration: currentSong.duration || 0,
-        image: currentSong.image || [],
-        releaseDate: currentSong.releaseDate || "",
-        language: currentSong.language || "",
-        playCount: currentSong.playCount || 0,
-        downloadUrl: currentSong.downloadUrl || [],
-        url: currentSong.url || "",
-        type: "song",
-      };
-      await toggleLike(songData);
-    } catch (error) {
-      console.error("Error toggling like:", error);
+  const handleLikeToggle = useCallback(async () => {
+    if (!currentSong || isLikeLoading) return;
+
+    // Clear any pending timeout
+    if (likeTimeoutRef.current) {
+      clearTimeout(likeTimeoutRef.current);
     }
-  };
+
+    // Optimistic update - immediately update UI
+    const currentLikeState = isLiked(currentSong.id);
+    setOptimisticLikeState(!currentLikeState);
+    setIsLikeLoading(true);
+
+    // Debounce the actual API call
+    likeTimeoutRef.current = setTimeout(async () => {
+      try {
+        const songData = {
+          id: currentSong.id,
+          name: currentSong.name || currentSong.title,
+          title: currentSong.name || currentSong.title,
+          artists: currentSong.artists || { primary: [] },
+          primaryArtists:
+            currentSong.primaryArtists || getArtistNames(currentSong),
+          album: currentSong.album || { id: "", name: "" },
+          duration: currentSong.duration || 0,
+          image: currentSong.image || [],
+          releaseDate: currentSong.releaseDate || "",
+          language: currentSong.language || "",
+          playCount: currentSong.playCount || 0,
+          downloadUrl: currentSong.downloadUrl || [],
+          url: currentSong.url || "",
+          type: "song",
+        };
+        await toggleLike(songData);
+        setOptimisticLikeState(null); // Reset optimistic state
+      } catch (error) {
+        console.error("Error toggling like:", error);
+        // Revert optimistic update on error
+        setOptimisticLikeState(null);
+      } finally {
+        setIsLikeLoading(false);
+      }
+    }, 300); // 300ms debounce
+  }, [currentSong, isLiked, toggleLike, isLikeLoading]);
+
+  // Get current like state (optimistic or actual)
+  const getCurrentLikeState = useCallback(() => {
+    if (optimisticLikeState !== null) return optimisticLikeState;
+    return isLiked(currentSong?.id);
+  }, [optimisticLikeState, isLiked, currentSong?.id]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (likeTimeoutRef.current) {
+        clearTimeout(likeTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const toggleRepeat = () => {
     const modes = ["off", "all", "one"];
@@ -1009,53 +1047,41 @@ export function FullscreenMusicPlayer({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-white hover:bg-white/10 rounded-full p-2"
+                  className="text-white hover:bg-white/10 rounded-full p-2 transform-gpu will-change-transform"
+                  style={{
+                    backfaceVisibility: 'hidden',
+                    WebkitBackfaceVisibility: 'hidden',
+                  }}
                 >
                   <MoreHorizontal className="w-6 h-6" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="w-48"
-                style={{ zIndex: 10001 }}
+                className="w-48 transform-gpu will-change-transform backdrop-blur-sm"
+                style={{ 
+                  zIndex: 10001,
+                  backfaceVisibility: 'hidden',
+                  WebkitBackfaceVisibility: 'hidden',
+                }}
+                sideOffset={8}
               >
                 <DropdownMenuItem
                   onClick={async () => {
                     if (!currentSong) return;
-                    try {
-                      const songData = {
-                        id: currentSong.id,
-                        name: currentSong.name || currentSong.title,
-                        title: currentSong.name || currentSong.title,
-                        artists: currentSong.artists || { primary: [] },
-                        primaryArtists:
-                          currentSong.primaryArtists ||
-                          getArtistNames(currentSong),
-                        album: currentSong.album || { id: "", name: "" },
-                        duration: currentSong.duration || 0,
-                        image: currentSong.image || [],
-                        releaseDate: currentSong.releaseDate || "",
-                        language: currentSong.language || "",
-                        playCount: currentSong.playCount || 0,
-                        downloadUrl: currentSong.downloadUrl || [],
-                        url: currentSong.url || "",
-                        type: "song",
-                      };
-                      await toggleLike(songData);
-                    } catch (error) {
-                      console.error("Error toggling like:", error);
-                    }
+                    handleLikeToggle();
                   }}
-                  className={isLiked(currentSong?.id) ? "text-red-500" : ""}
+                  className={`transform-gpu will-change-transform ${getCurrentLikeState() ? "text-red-500" : ""}`}
+                  disabled={isLikeLoading}
                 >
                   <Heart
-                    className={`w-4 h-4 mr-2 ${
-                      isLiked(currentSong?.id)
+                    className={`w-4 h-4 mr-2 transition-colors duration-150 ${
+                      getCurrentLikeState()
                         ? "fill-red-500 text-red-500"
                         : ""
                     }`}
                   />
-                  {isLiked(currentSong?.id) ? "Unlike" : "Like"}
+                  {isLikeLoading ? "..." : getCurrentLikeState() ? "Unlike" : "Like"}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => handleAddToPlaylist(null, currentSong)}
@@ -1237,15 +1263,20 @@ export function FullscreenMusicPlayer({
                     variant="ghost"
                     size="sm"
                     onClick={handleLikeToggle}
-                    className={`flex-shrink-0 ml-4 p-2 ${
-                      isLiked(currentSong.id)
+                    disabled={isLikeLoading}
+                    className={`flex-shrink-0 ml-4 p-2 transform-gpu will-change-transform ${
+                      getCurrentLikeState()
                         ? "text-green-500"
                         : "text-white/60"
                     }`}
+                    style={{
+                      backfaceVisibility: 'hidden',
+                      WebkitBackfaceVisibility: 'hidden',
+                    }}
                   >
                     <Heart
-                      className={`w-5 h-5 sm:w-6 sm:h-6 ${
-                        isLiked(currentSong.id) ? "fill-green-500" : ""
+                      className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors duration-150 ${
+                        getCurrentLikeState() ? "fill-green-500" : ""
                       }`}
                     />
                   </Button>
@@ -1401,15 +1432,20 @@ export function FullscreenMusicPlayer({
                         variant="ghost"
                         size="sm"
                         onClick={handleLikeToggle}
-                        className={`flex-shrink-0 text-white hover:bg-white/10 rounded-full p-3 ${
-                          isLiked(currentSong.id)
+                        disabled={isLikeLoading}
+                        className={`flex-shrink-0 text-white hover:bg-white/10 rounded-full p-3 transform-gpu will-change-transform ${
+                          getCurrentLikeState()
                             ? "text-green-500"
                             : "text-white/60"
                         }`}
+                        style={{
+                          backfaceVisibility: 'hidden',
+                          WebkitBackfaceVisibility: 'hidden',
+                        }}
                       >
                         <Heart
-                          className={`w-7 h-7 ${
-                            isLiked(currentSong.id) ? "fill-green-500" : ""
+                          className={`w-7 h-7 transition-colors duration-150 ${
+                            getCurrentLikeState() ? "fill-green-500" : ""
                           }`}
                         />
                       </Button>
