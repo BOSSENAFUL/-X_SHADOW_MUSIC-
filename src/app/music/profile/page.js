@@ -89,8 +89,8 @@ export default function ProfilePage() {
             </Breadcrumb>
           </div>
         </header>
-        
-        <div className="flex flex-1 flex-col p-4 md:p-6 pb-20 md:pb-6">
+
+        <div className="flex flex-1 flex-col p-4 md:p-6 pb-32 md:pb-6">
           <div className="max-w-2xl mx-auto w-full space-y-6">
             {/* Profile Header */}
             <Card>
@@ -126,7 +126,7 @@ export default function ProfilePage() {
                     <p className="text-sm text-muted-foreground">{session?.user?.name || 'Not provided'}</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
                   <Mail className="w-5 h-5 text-muted-foreground" />
                   <div>
@@ -140,12 +140,12 @@ export default function ProfilePage() {
                   <div>
                     <p className="font-medium">Member Since</p>
                     <p className="text-sm text-muted-foreground">
-                      {session?.user?.createdAt 
+                      {session?.user?.createdAt
                         ? new Date(session.user.createdAt).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                          })
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })
                         : 'Unknown'
                       }
                     </p>
@@ -163,27 +163,27 @@ export default function ProfilePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start" 
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
                   onClick={() => window.location.href = "/music/library"}
                 >
                   <User className="w-4 h-4 mr-2" />
                   View Your Library
                 </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start" 
+
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
                   onClick={() => window.location.href = "/music/playlists"}
                 >
                   <Settings className="w-4 h-4 mr-2" />
                   Manage Playlists
                 </Button>
-                
-                <Button 
-                  variant="destructive" 
-                  className="w-full justify-start" 
+
+                <Button
+                  variant="destructive"
+                  className="w-full justify-start"
                   onClick={handleSignOut}
                 >
                   <LogOut className="w-4 h-4 mr-2" />

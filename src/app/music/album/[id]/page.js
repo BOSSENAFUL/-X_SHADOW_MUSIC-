@@ -600,7 +600,7 @@ export default function AlbumPage() {
           </div>
 
           {/* Songs List */}
-          <div className="px-3 md:px-6 pb-24">
+          <div className="px-3 md:px-6 pb-32 md:pb-24">
             {/* Desktop Table Header */}
             <div className="hidden md:grid grid-cols-[auto_1fr_auto] gap-4 items-center text-sm text-muted-foreground border-b pb-2 mb-4">
               <div className="w-8 text-center">#</div>

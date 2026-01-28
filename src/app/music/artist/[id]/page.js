@@ -563,7 +563,7 @@ export default function ArtistPage() {
             </div>
           </div>
 
-          <div className="px-3 md:px-6 pb-24 space-y-6 md:space-y-8">
+          <div className="px-3 md:px-6 pb-32 md:pb-24 space-y-6 md:space-y-8">
             {/* Popular Songs */}
             {artist.topSongs && artist.topSongs.length > 0 && (
               <div>

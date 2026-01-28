@@ -187,7 +187,7 @@ export default function ArtistsPage() {
           </div>
         </header>
 
-        <div className="flex flex-1 flex-col p-3 md:p-6">
+        <div className="flex flex-1 flex-col p-3 md:p-6 pb-32 md:pb-6">
           <div className="mb-4 md:mb-6">
             <h1 className="text-2xl md:text-3xl font-bold mb-2">Your Favorite Artists</h1>
             <p className="text-sm md:text-base text-muted-foreground">

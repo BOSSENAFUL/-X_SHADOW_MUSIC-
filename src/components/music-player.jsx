@@ -8,10 +8,17 @@ import { useMusicPlayer } from "@/contexts/music-player-context";
 import { FullscreenMusicPlayer } from "@/components/fullscreen-music-player";
 
 export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
-  const { isPlaying, setIsPlaying, isRadioPlaying, isFullscreenOpen, setIsFullscreenOpen } = useMusicPlayer();
+  const {
+    isPlaying,
+    setIsPlaying,
+    isRadioPlaying,
+    isFullscreenOpen,
+    setIsFullscreenOpen,
+  } = useMusicPlayer();
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.7);
+  const [dominantColor, setDominantColor] = useState("rgb(59, 130, 246)"); // Default blue
   const audioRef = useRef(null);
 
   // Find current song index in playlist
@@ -70,6 +77,87 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       audioRef.current.volume = newVolume;
     }
   };
+
+  // Extract dominant color from current song's cover image
+  const extractDominantColor = (imageUrl) => {
+    return new Promise((resolve) => {
+      const img = new window.Image();
+      img.crossOrigin = "anonymous";
+
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imageData.data;
+
+          const colorCounts = {};
+
+          // Sample every 10th pixel for performance
+          for (let i = 0; i < data.length; i += 40) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+
+            // Skip very light or very dark colors
+            const brightness = (r + g + b) / 3;
+            if (brightness < 30 || brightness > 220) continue;
+
+            const color = `${Math.floor(r / 15) * 15},${
+              Math.floor(g / 15) * 15
+            },${Math.floor(b / 15) * 15}`;
+            colorCounts[color] = (colorCounts[color] || 0) + 1;
+          }
+
+          // Find the most common color
+          let dominantColor = "59,130,246"; // Default blue
+          let maxCount = 0;
+
+          for (const [color, count] of Object.entries(colorCounts)) {
+            if (count > maxCount) {
+              maxCount = count;
+              dominantColor = color;
+            }
+          }
+
+          const rgbColor = `rgb(${dominantColor})`;
+          resolve(rgbColor);
+        } catch (error) {
+          console.error("Error extracting color:", error);
+          resolve("rgb(59,130,246)"); // Fallback color
+        }
+      };
+
+      img.onerror = () => {
+        resolve("rgb(59,130,246)"); // Fallback color
+      };
+
+      img.src = imageUrl;
+    });
+  };
+
+  // Extract color when current song changes
+  useEffect(() => {
+    if (currentSong?.image?.length > 0) {
+      const imageUrl =
+        currentSong.image.find((img) => img.quality === "500x500")?.url ||
+        currentSong.image.find((img) => img.quality === "150x150")?.url ||
+        currentSong.image[currentSong.image.length - 1]?.url;
+
+      if (imageUrl) {
+        extractDominantColor(imageUrl).then((color) => {
+          setDominantColor(color);
+        });
+      }
+    } else {
+      setDominantColor("rgb(59,130,246)"); // Default color
+    }
+  }, [currentSong]);
 
   useEffect(() => {
     if (currentSong && audioRef.current) {
@@ -379,211 +467,245 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     <>
       {/* Audio element - always present */}
       <audio ref={audioRef} />
-      
+
       {/* Only show the bottom bar when fullscreen is NOT open */}
       {!isFullscreenOpen && (
-        <div className="fixed bottom-16 left-0 right-0 md:left-64 md:bottom-0 bg-background border-t border-border z-[60]">
+        <div
+          className="fixed bottom-16 left-0 right-0 md:left-64 md:bottom-0 border-t border-border z-[60] md:bg-background"
+          style={{
+            background: `linear-gradient(135deg, ${dominantColor
+              .replace("rgb", "rgba")
+              .replace(")", ", 0.15)")}, ${dominantColor
+              .replace("rgb", "rgba")
+              .replace(
+                ")",
+                ", 0.25)"
+              )}), linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0.8))`,
+            backdropFilter: "blur(10px)",
+          }}
+        >
+          {/* Override background for desktop */}
+          <div className="hidden md:block absolute inset-0 bg-background"></div>
 
-        {/* Mobile Layout */}
-        <div className="block md:hidden">
-          {/* Top row: Song info and main controls */}
-          <div className="flex items-center justify-between p-3 pb-2">
-            <div
-              className={`flex items-center gap-3 min-w-0 flex-1 ${!isRadioPlaying ? 'cursor-pointer' : 'cursor-default'}`}
-              onClick={() => !isRadioPlaying && setIsFullscreenOpen(true)}
-            >
-              <div className="w-10 h-10 rounded bg-gradient-to-br from-purple-500 to-pink-500 flex-shrink-0 overflow-hidden">
-                {currentSong.image?.length > 0 ? (
-                  <img
-                    src={
-                      currentSong.image.find((img) => img.quality === "500x500")
-                        ?.url ||
-                      currentSong.image.find((img) => img.quality === "150x150")
-                        ?.url ||
-                      currentSong.image[currentSong.image.length - 1]?.url
-                    }
-                    alt={currentSong.name}
-                    className="w-full h-full object-cover rounded"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Play className="w-3 h-3 opacity-50 text-white" />
+          {/* Content with relative positioning */}
+          <div className="relative">
+            {/* Mobile Layout */}
+            <div className="block md:hidden">
+              {/* Top row: Song info and main controls */}
+              <div className="flex items-center justify-between p-3 pb-2">
+                <div
+                  className={`flex items-center gap-3 min-w-0 flex-1 ${
+                    !isRadioPlaying ? "cursor-pointer" : "cursor-default"
+                  }`}
+                  onClick={() => !isRadioPlaying && setIsFullscreenOpen(true)}
+                >
+                  <div className="w-10 h-10 rounded bg-gradient-to-br from-purple-500 to-pink-500 flex-shrink-0 overflow-hidden">
+                    {currentSong.image?.length > 0 ? (
+                      <img
+                        src={
+                          currentSong.image.find(
+                            (img) => img.quality === "500x500"
+                          )?.url ||
+                          currentSong.image.find(
+                            (img) => img.quality === "150x150"
+                          )?.url ||
+                          currentSong.image[currentSong.image.length - 1]?.url
+                        }
+                        alt={currentSong.name}
+                        className="w-full h-full object-cover rounded"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Play className="w-3 h-3 opacity-50 text-white" />
+                      </div>
+                    )}
                   </div>
-                )}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium truncate text-sm text-white drop-shadow-lg">
+                      {decodeHtmlEntities(currentSong.name)}
+                    </p>
+                    <p className="text-xs text-white/80 truncate drop-shadow-md">
+                      {currentSong.artists?.primary?.[0]?.name ||
+                        "Unknown Artist"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Mobile Controls */}
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handlePrevious}
+                    disabled={playlist.length === 0}
+                    className="h-8 w-8 p-0 text-white hover:bg-white/20 hover:text-white"
+                  >
+                    <SkipBack className="w-4 h-4" />
+                  </Button>
+
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={togglePlayPause}
+                    className="rounded-full w-10 h-10 p-0 bg-white/90 hover:bg-white text-black hover:text-black"
+                  >
+                    {isPlaying ? (
+                      <Pause className="w-4 h-4" />
+                    ) : (
+                      <Play className="w-4 h-4 ml-0.5" />
+                    )}
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleNext}
+                    disabled={playlist.length === 0}
+                    className="h-8 w-8 p-0 text-white hover:bg-white/20 hover:text-white"
+                  >
+                    <SkipForward className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-medium truncate text-sm">
-                  {decodeHtmlEntities(currentSong.name)}
-                </p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {currentSong.artists?.primary?.[0]?.name || "Unknown Artist"}
-                </p>
+
+              {/* Bottom row: Progress bar - Hidden on mobile */}
+              <div className="px-3 pb-3 hidden">
+                <div className="flex items-center gap-2 w-full">
+                  <span className="text-xs text-white/90 min-w-[30px] text-center drop-shadow-md">
+                    {formatTime(currentTime)}
+                  </span>
+                  <Slider
+                    value={[currentTime]}
+                    max={duration || 100}
+                    step={1}
+                    onValueChange={handleSeek}
+                    className="flex-1 [&_[role=slider]]:bg-white [&_[role=slider]]:border-white/50 [&_.bg-primary]:bg-white/90"
+                  />
+                  <span className="text-xs text-white/90 min-w-[30px] text-center drop-shadow-md">
+                    {currentSong?.isRadio || !isFinite(duration)
+                      ? "LIVE"
+                      : formatTime(duration)}
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Mobile Controls */}
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handlePrevious}
-                disabled={playlist.length === 0}
-                className="h-8 w-8 p-0"
-              >
-                <SkipBack className="w-4 h-4" />
-              </Button>
+            {/* Desktop Layout */}
+            <div className="hidden md:block p-3">
+              <div className="flex items-center gap-4 w-full">
+                {/* Song Info */}
+                <div
+                  className={`flex items-center gap-3 min-w-0 flex-1 rounded-lg p-2 -m-2 transition-colors ${
+                    !isRadioPlaying
+                      ? "cursor-pointer hover:bg-muted/50"
+                      : "cursor-default"
+                  }`}
+                  onClick={() => !isRadioPlaying && setIsFullscreenOpen(true)}
+                >
+                  <div className="w-12 h-12 rounded bg-gradient-to-br from-purple-500 to-pink-500 flex-shrink-0 overflow-hidden">
+                    {currentSong.image?.length > 0 ? (
+                      <img
+                        src={
+                          currentSong.image.find(
+                            (img) => img.quality === "500x500"
+                          )?.url ||
+                          currentSong.image.find(
+                            (img) => img.quality === "150x150"
+                          )?.url ||
+                          currentSong.image[currentSong.image.length - 1]?.url
+                        }
+                        alt={currentSong.name}
+                        className="w-full h-full object-cover rounded"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Play className="w-4 h-4 opacity-50 text-white" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium truncate text-sm">
+                      {decodeHtmlEntities(currentSong.name)}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {currentSong.artists?.primary?.[0]?.name ||
+                        "Unknown Artist"}
+                    </p>
+                  </div>
+                </div>
 
-              <Button
-                variant="default"
-                size="sm"
-                onClick={togglePlayPause}
-                className="rounded-full w-10 h-10 p-0"
-              >
-                {isPlaying ? (
-                  <Pause className="w-4 h-4" />
-                ) : (
-                  <Play className="w-4 h-4 ml-0.5" />
-                )}
-              </Button>
+                {/* Controls */}
+                <div className="flex flex-col items-center gap-2 flex-1 max-w-md">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handlePrevious}
+                      disabled={playlist.length === 0}
+                    >
+                      <SkipBack className="w-4 h-4" />
+                    </Button>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleNext}
-                disabled={playlist.length === 0}
-                className="h-8 w-8 p-0"
-              >
-                <SkipForward className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={togglePlayPause}
+                      className="rounded-full w-8 h-8"
+                    >
+                      {isPlaying ? (
+                        <Pause className="w-4 h-4" />
+                      ) : (
+                        <Play className="w-4 h-4 ml-0.5" />
+                      )}
+                    </Button>
 
-          {/* Bottom row: Progress bar */}
-          <div className="px-3 pb-3">
-            <div className="flex items-center gap-2 w-full">
-              <span className="text-xs text-muted-foreground min-w-[30px] text-center">
-                {formatTime(currentTime)}
-              </span>
-              <Slider
-                value={[currentTime]}
-                max={duration || 100}
-                step={1}
-                onValueChange={handleSeek}
-                className="flex-1"
-              />
-              <span className="text-xs text-muted-foreground min-w-[30px] text-center">
-                {currentSong?.isRadio || !isFinite(duration) ? "LIVE" : formatTime(duration)}
-              </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleNext}
+                      disabled={playlist.length === 0}
+                    >
+                      <SkipForward className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="flex items-center gap-2 w-full">
+                    <span className="text-xs text-muted-foreground min-w-[35px]">
+                      {formatTime(currentTime)}
+                    </span>
+                    <Slider
+                      value={[currentTime]}
+                      max={duration || 100}
+                      step={1}
+                      onValueChange={handleSeek}
+                      className="flex-1"
+                    />
+                    <span className="text-xs text-muted-foreground min-w-[35px]">
+                      {currentSong?.isRadio || !isFinite(duration)
+                        ? "LIVE"
+                        : formatTime(duration)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Volume */}
+                <div className="flex items-center gap-2 flex-1 justify-end">
+                  <Volume2 className="w-4 h-4" />
+                  <Slider
+                    value={[volume]}
+                    max={1}
+                    step={0.1}
+                    onValueChange={handleVolumeChange}
+                    className="w-24"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
-
-        {/* Desktop Layout */}
-        <div className="hidden md:block p-3">
-          <div className="flex items-center gap-4 w-full">
-            {/* Song Info */}
-            <div
-              className={`flex items-center gap-3 min-w-0 flex-1 rounded-lg p-2 -m-2 transition-colors ${!isRadioPlaying ? 'cursor-pointer hover:bg-muted/50' : 'cursor-default'}`}
-              onClick={() => !isRadioPlaying && setIsFullscreenOpen(true)}
-            >
-              <div className="w-12 h-12 rounded bg-gradient-to-br from-purple-500 to-pink-500 flex-shrink-0 overflow-hidden">
-                {currentSong.image?.length > 0 ? (
-                  <img
-                    src={
-                      currentSong.image.find((img) => img.quality === "500x500")
-                        ?.url ||
-                      currentSong.image.find((img) => img.quality === "150x150")
-                        ?.url ||
-                      currentSong.image[currentSong.image.length - 1]?.url
-                    }
-                    alt={currentSong.name}
-                    className="w-full h-full object-cover rounded"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Play className="w-4 h-4 opacity-50 text-white" />
-                  </div>
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-medium truncate text-sm">
-                  {decodeHtmlEntities(currentSong.name)}
-                </p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {currentSong.artists?.primary?.[0]?.name || "Unknown Artist"}
-                </p>
-              </div>
-            </div>
-
-            {/* Controls */}
-            <div className="flex flex-col items-center gap-2 flex-1 max-w-md">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handlePrevious}
-                  disabled={playlist.length === 0}
-                >
-                  <SkipBack className="w-4 h-4" />
-                </Button>
-
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={togglePlayPause}
-                  className="rounded-full w-8 h-8"
-                >
-                  {isPlaying ? (
-                    <Pause className="w-4 h-4" />
-                  ) : (
-                    <Play className="w-4 h-4 ml-0.5" />
-                  )}
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleNext}
-                  disabled={playlist.length === 0}
-                >
-                  <SkipForward className="w-4 h-4" />
-                </Button>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="flex items-center gap-2 w-full">
-                <span className="text-xs text-muted-foreground min-w-[35px]">
-                  {formatTime(currentTime)}
-                </span>
-                <Slider
-                  value={[currentTime]}
-                  max={duration || 100}
-                  step={1}
-                  onValueChange={handleSeek}
-                  className="flex-1"
-                />
-                <span className="text-xs text-muted-foreground min-w-[35px]">
-                  {currentSong?.isRadio || !isFinite(duration) ? "LIVE" : formatTime(duration)}
-                </span>
-              </div>
-            </div>
-
-            {/* Volume */}
-            <div className="flex items-center gap-2 flex-1 justify-end">
-              <Volume2 className="w-4 h-4" />
-              <Slider
-                value={[volume]}
-                max={1}
-                step={0.1}
-                onValueChange={handleVolumeChange}
-                className="w-24"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
       )}
 
       {/* Fullscreen Music Player - Always render when there's a current song */}

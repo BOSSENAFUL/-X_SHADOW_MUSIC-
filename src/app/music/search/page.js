@@ -910,7 +910,7 @@ function SearchPageContent() {
           </div>
         </header>
 
-        <div className="flex flex-1 flex-col pb-20 md:pb-6">
+        <div className="flex flex-1 flex-col pb-32 md:pb-6">
           {/* Search Input */}
           <div className="p-4 sm:p-6 pb-4">
             <div className="relative w-full max-w-2xl mx-auto">

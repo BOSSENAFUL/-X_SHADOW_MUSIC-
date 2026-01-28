@@ -224,10 +224,10 @@ export default function PlaylistsPage() {
             </Button>
           </div>
         </header>
-        <div className="flex flex-1 flex-col p-4 md:p-6 pb-20 md:pb-6">
+        <div className="flex flex-1 flex-col p-4 md:p-6 pb-32 md:pb-6">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-             
+
             </div>
           ) : hasLoaded && playlists.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">

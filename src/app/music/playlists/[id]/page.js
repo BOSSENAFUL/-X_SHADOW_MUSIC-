@@ -69,6 +69,7 @@ import {
   Disc
 } from "lucide-react";
 import { useMusicPlayer } from "@/contexts/music-player-context";
+import { useLikedSongs } from "@/hooks/useLikedSongs";
 
 export default function PlaylistDetailPage({ params }) {
   const router = useRouter();
@@ -86,9 +87,14 @@ export default function PlaylistDetailPage({ params }) {
   const [accessDenied, setAccessDenied] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [likingInProgress, setLikingInProgress] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // Initialize music player
   const { playSong, currentSong, isPlaying } = useMusicPlayer();
+
+  // Initialize liked songs hook
+  const { toggleLike: toggleSongLike, isLiked: isSongLiked } = useLikedSongs(session?.user?.id);
 
   // Function to decode HTML entities
   const decodeHtmlEntities = (text) => {
@@ -783,6 +789,19 @@ export default function PlaylistDetailPage({ params }) {
     }
   };
 
+  // Handle individual song like/unlike
+  const handleToggleSongLike = async (song) => {
+    if (!session?.user?.id) {
+      return;
+    }
+
+    try {
+      await toggleSongLike(song);
+    } catch (error) {
+      console.error('Error toggling song like:', error);
+    }
+  };
+
   const formatDuration = (duration) => {
     if (!duration) return "0:00";
     const minutes = Math.floor(duration / 60);
@@ -1471,7 +1490,7 @@ export default function PlaylistDetailPage({ params }) {
               >
                 <Download className="w-5 h-5 md:w-6 md:h-6" />
               </Button>
-              <DropdownMenu>
+              <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
                     <MoreVertical className="w-5 h-5 md:w-6 md:h-6" />
@@ -1512,34 +1531,16 @@ export default function PlaylistDetailPage({ params }) {
                   {isOwner && (
                     <>
                       <DropdownMenuSeparator />
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <DropdownMenuItem
-                            onSelect={(e) => e.preventDefault()}
-                            className="text-red-500 hover:text-red-600 focus:text-red-600 hover:bg-red-50 focus:bg-red-50 dark:hover:bg-red-950 dark:focus:bg-red-950"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete playlist
-                          </DropdownMenuItem>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete playlist</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete "{playlist.name}"? This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={handleDeletePlaylist}
-                              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
-                            >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setDropdownOpen(false); // Close dropdown first
+                          setDeleteDialogOpen(true); // Then open delete dialog
+                        }}
+                        className="text-red-500 hover:text-red-600 focus:text-red-600 hover:bg-red-50 focus:bg-red-50 dark:hover:bg-red-950 dark:focus:bg-red-950"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete playlist
+                      </DropdownMenuItem>
                     </>
                   )}
                 </DropdownMenuContent>
@@ -1548,7 +1549,7 @@ export default function PlaylistDetailPage({ params }) {
           </div>
 
           {/* Songs List */}
-          <div className="px-3 md:px-6 pb-24">
+          <div className="px-3 md:px-6 pb-32 md:pb-24">
             {songs.length > 0 ? (
               <>
                 {/* Desktop Table Header */}
@@ -1651,6 +1652,14 @@ export default function PlaylistDetailPage({ params }) {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-48 z-[9999]">
+                                <DropdownMenuItem onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleSongLike(song);
+                                }}>
+                                  <Heart className={`w-4 h-4 mr-2 ${isSongLiked(song.id) ? 'fill-current text-red-500' : ''}`} />
+                                  {isSongLiked(song.id) ? 'Unlike' : 'Like'}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
                                 {isOwner && (
                                   <>
                                     <DropdownMenuItem
@@ -1809,6 +1818,14 @@ export default function PlaylistDetailPage({ params }) {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-48 z-[9999]">
+                                <DropdownMenuItem onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleSongLike(song);
+                                }}>
+                                  <Heart className={`w-4 h-4 mr-2 ${isSongLiked(song.id) ? 'fill-current text-red-500' : ''}`} />
+                                  {isSongLiked(song.id) ? 'Unlike' : 'Like'}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
                                 {isOwner && (
                                   <>
                                     <DropdownMenuItem
@@ -1919,6 +1936,27 @@ export default function PlaylistDetailPage({ params }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Playlist Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete playlist</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{playlist?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeletePlaylist}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SidebarProvider>
   );
 }
