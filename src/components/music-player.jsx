@@ -492,7 +492,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
             {/* Mobile Layout */}
             <div className="block md:hidden">
               {/* Top row: Song info and main controls */}
-              <div className="flex items-center justify-between p-3">
+              <div className="flex items-center justify-between p-2">
                 <div
                   className={`flex items-center gap-3 min-w-0 flex-1 ${
                     !isRadioPlaying ? "cursor-pointer" : "cursor-default"
