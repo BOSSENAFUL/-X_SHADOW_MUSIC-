@@ -120,39 +120,60 @@ export default function AlbumsPage() {
             </p>
           </div>
 
-          {hasLoaded && likedAlbumsData.length === 0 ? (
-            <div className="text-center py-12">
-              <Disc className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">No liked albums yet</h3>
-              <p className="text-muted-foreground mb-4">
-                Albums you like will appear here
-              </p>
-              <Button onClick={() => router.push('/music/discover')}>
-                Discover Music
-              </Button>
+          {!hasLoaded ? (
+            // Loading skeleton
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
+              {Array.from({ length: 12 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="p-3 rounded-lg"
+                >
+                  <div className="relative mb-3">
+                    <div className="aspect-square rounded-lg bg-muted animate-pulse"></div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="h-4 bg-muted rounded animate-pulse"></div>
+                    <div className="h-3 bg-muted rounded w-3/4 animate-pulse"></div>
+                    <div className="h-3 bg-muted rounded w-1/2 animate-pulse"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : hasLoaded && likedAlbumsData.length === 0 ? (
+            <div className="flex items-center justify-center min-h-[60vh]">
+              <div className="text-center py-12">
+                <Disc className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-xl font-semibold mb-2">No liked albums yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  Albums you like will appear here
+                </p>
+                <Button onClick={() => router.push('/music')}>
+                  Discover Music
+                </Button>
+              </div>
             </div>
           ) : likedAlbumsData.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
               {likedAlbumsData.map((album) => (
                 <div
                   key={album.id}
-                  className="group cursor-pointer p-2 md:p-3 rounded-lg hover:bg-muted/50 transition-colors"
+                  className="group cursor-pointer p-3 rounded-lg hover:bg-muted/50 transition-all duration-200"
                   onClick={() => handleAlbumClick(album.albumId)}
                 >
-                  <div className="relative mb-2 md:mb-3">
-                    <div className="aspect-square rounded-lg overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500">
+                  <div className="relative mb-3">
+                    <div className="aspect-square rounded-lg overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500 shadow-md group-hover:shadow-lg transition-shadow duration-200">
                       {album.albumData?.image?.[2]?.url || album.albumData?.image?.[1]?.url || album.albumData?.image?.[0]?.url ? (
                         <img
                           src={album.albumData.image[2]?.url || album.albumData.image[1]?.url || album.albumData.image[0]?.url}
                           alt={album.albumData?.name || 'Album'}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           onError={(e) => {
                             e.target.style.display = 'none';
                           }}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <Disc className="w-8 h-8 md:w-12 md:h-12 opacity-50 text-white" />
+                          <Disc className="w-8 h-8 opacity-50 text-white" />
                         </div>
                       )}
                     </div>
@@ -161,13 +182,13 @@ export default function AlbumsPage() {
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 md:group-hover:opacity-100 transition-opacity bg-black/20 rounded-lg">
                       <Button
                         size="sm"
-                        className="rounded-full w-10 h-10 md:w-12 md:h-12 bg-green-500 hover:bg-green-600 text-black shadow-lg"
+                        className="rounded-full w-12 h-12 bg-green-500 hover:bg-green-600 text-black shadow-lg hover:scale-105 transition-all duration-200"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleAlbumClick(album.albumId);
                         }}
                       >
-                        <Play className="w-4 h-4 md:w-5 md:h-5 ml-0.5" />
+                        <Play className="w-5 h-5 ml-0.5" />
                       </Button>
                     </div>
 
@@ -175,21 +196,21 @@ export default function AlbumsPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="absolute top-1 right-1 md:top-2 md:right-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 h-6 w-6 md:h-8 md:w-8 bg-black/50 hover:bg-black/70 text-red-500"
+                      className="absolute top-2 right-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity h-8 w-8 p-0 bg-black/60 hover:bg-black/80 backdrop-blur-sm border-0 rounded-full"
                       onClick={(e) => handleUnlikeAlbum(album, e)}
                     >
-                      <Heart className="w-3 h-3 md:w-4 md:h-4 fill-current" />
+                      <Heart className="w-4 h-4 fill-red-500 text-red-500" />
                     </Button>
                   </div>
 
                   <div className="space-y-1">
-                    <h3 className="font-medium text-sm md:text-base truncate">
+                    <h3 className="font-semibold text-sm truncate group-hover:text-primary transition-colors duration-200">
                       {decodeHtmlEntities(album.albumData?.name) || 'Unknown Album'}
                     </h3>
-                    <p className="text-xs md:text-sm text-muted-foreground truncate">
+                    <p className="text-xs text-muted-foreground truncate">
                       {album.albumData?.artists?.primary?.map(artist => artist.name).join(', ') || 'Unknown Artist'}
                     </p>
-                    <div className="flex items-center gap-1 md:gap-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       {album.albumData?.year && (
                         <div className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />

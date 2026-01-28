@@ -289,7 +289,85 @@ function SearchPageContent() {
       }
 
       if (data.success) {
-        setPublicPlaylists(data.data);
+        // Fetch detailed playlist data for each playlist to get song information for covers
+        const playlistsWithSongs = await Promise.all(
+          data.data.map(async (playlist) => {
+            try {
+              console.log(`Fetching playlist details for ${playlist.id}...`);
+
+              // Fetch playlist metadata (which includes songIds)
+              const playlistResponse = await fetch(`/api/playlists/${playlist.id}`);
+              const playlistData = await playlistResponse.json();
+
+              if (playlistData.success && playlistData.data) {
+                console.log(`Successfully fetched playlist ${playlist.id} metadata`);
+
+                // Get the first 4 song IDs for the cover
+                const songIds = playlistData.data.songIds || [];
+                const firstFourSongIds = songIds.slice(0, 4);
+
+                if (firstFourSongIds.length > 0) {
+                  console.log(`Fetching first 4 songs for playlist ${playlist.id}:`, firstFourSongIds);
+
+                  // Fetch actual song data for the first 4 songs
+                  const songPromises = firstFourSongIds.map(async (songId) => {
+                    try {
+                      const songResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs?ids=${songId}`);
+                      const songData = await songResponse.json();
+
+                      if (songData.success && songData.data && songData.data.length > 0) {
+                        return songData.data[0];
+                      }
+                      return null;
+                    } catch (error) {
+                      console.error(`Error fetching song ${songId}:`, error);
+                      return null;
+                    }
+                  });
+
+                  const fetchedSongs = await Promise.all(songPromises);
+                  const validSongs = fetchedSongs.filter(song => song !== null);
+
+                  console.log(`Successfully fetched ${validSongs.length} songs for playlist ${playlist.id}`);
+
+                  // Return the playlist with song data for cover generation
+                  return {
+                    ...playlist,
+                    songs: validSongs,
+                    // Also include other playlist details that might be useful
+                    name: playlistData.data.name || playlist.title,
+                    title: playlistData.data.title || playlist.title
+                  };
+                } else {
+                  console.log(`Playlist ${playlist.id} has no songs`);
+                  // Return playlist without songs (will show gradient fallback)
+                  return {
+                    ...playlist,
+                    songs: [],
+                    name: playlistData.data.name || playlist.title,
+                    title: playlistData.data.title || playlist.title
+                  };
+                }
+              } else {
+                console.warn(`Failed to fetch playlist details for ${playlist.id}:`, playlistData.error || 'Unknown error');
+              }
+            } catch (error) {
+              console.error(`Error fetching playlist details for ${playlist.id}:`, error);
+            }
+
+            // Return original playlist if detailed fetch fails
+            console.log(`Using fallback for playlist ${playlist.id}`);
+            return playlist;
+          })
+        );
+
+        console.log('Final playlists with songs:', playlistsWithSongs.map(p => ({
+          id: p.id,
+          title: p.title,
+          songsCount: p.songs?.length || 0
+        })));
+
+        setPublicPlaylists(playlistsWithSongs);
       } else {
         console.error('Public playlists search failed:', data.error || data.message || 'Unknown error');
         setPublicPlaylists([]);
@@ -810,12 +888,12 @@ function SearchPageContent() {
 
   return (
     <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
+      <AppSidebar className="hidden md:flex" />
+      <SidebarInset className="md:ml-0">
         <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2 px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
+            <SidebarTrigger className="-ml-1 hidden md:flex" />
+            <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:block" />
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
@@ -832,11 +910,12 @@ function SearchPageContent() {
           </div>
         </header>
 
-        <div className="flex flex-1 flex-col pb-24">
+        <div className="flex flex-1 flex-col pb-20 md:pb-6">
           {/* Search Input */}
           <div className="p-4 sm:p-6 pb-4">
             <div className="relative w-full max-w-2xl mx-auto">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+              <Search className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 transition-colors ${loading ? 'text-primary animate-pulse' : 'text-muted-foreground'
+                }`} />
               <Input
                 ref={searchInputRef}
                 placeholder="What do you want to listen to?"
@@ -844,16 +923,30 @@ function SearchPageContent() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-12 pr-4 bg-muted/50 border-0 h-12 sm:h-14 text-base sm:text-lg rounded-full focus:bg-muted/70 transition-colors"
               />
+              {loading && (
+                <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-primary border-t-transparent"></div>
+                </div>
+              )}
             </div>
+
+
           </div>
+
+
 
           {combinedSearchResults && (
             <div className="px-4 sm:px-6 relative">
-              {loading && (
-                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              {/* Overlay loading state for when results are updating */}
+              {loading && combinedSearchResults && (
+                <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-lg">
+                  <div className="bg-card border rounded-lg p-4 shadow-lg flex items-center space-x-3">
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-primary border-t-transparent"></div>
+                    <span className="text-sm font-medium">Updating results...</span>
+                  </div>
                 </div>
               )}
+
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <div className="overflow-x-auto scrollbar-hide mb-6">
                   <TabsList className="grid w-full min-w-[400px] sm:max-w-2xl grid-cols-5 h-10 sm:h-12">
@@ -1206,10 +1299,6 @@ function SearchPageContent() {
                                     playlist={playlist}
                                     className="w-full aspect-square mb-3 shadow-md group-hover:shadow-lg"
                                   />
-                                  {/* User-created badge */}
-                                  <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full font-medium">
-                                    {playlist.songCount || 0}
-                                  </div>
                                 </div>
                                 <p className="font-medium truncate text-xs sm:text-sm mb-1">
                                   {decodeHtmlEntities(playlist.title)}
@@ -1557,10 +1646,6 @@ function SearchPageContent() {
                                     playlist={playlist}
                                     className="w-full aspect-square mb-3 shadow-lg group-hover:shadow-xl"
                                   />
-                                  {/* Song count badge */}
-                                  <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full font-medium">
-                                    {playlist.songCount || 0}
-                                  </div>
                                   {/* User avatar */}
                                   {playlist.userImage && (
                                     <div className="absolute bottom-2 left-2 w-6 h-6 rounded-full overflow-hidden border-2 border-white">

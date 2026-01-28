@@ -53,7 +53,6 @@ The project prioritizes **clean architecture, UI/UX quality, and modern developm
 | 🎨 **Modern Interface** | Sleek UI powered by Radix components and Tailwind CSS |
 | 🔍 **Smart Discovery** | Advanced search with intelligent music recommendations |
 | 📚 **Personal Library** | Create playlists, save favorites, track listening history |
-| 🎙️ **Podcast Support** | Discover and stream your favorite podcasts |
 | 🎵 **Smart Lyrics Search** | Find songs even with misspelled lyrics |
 
 ---

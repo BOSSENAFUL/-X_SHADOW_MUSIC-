@@ -2,6 +2,7 @@
 
 import { ChevronRight } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import {
   Collapsible,
@@ -23,15 +24,33 @@ export function NavMain({
   items
 }) {
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Prevent hydration mismatch by not showing active states until mounted
+  const getActiveState = (url) => {
+    if (!mounted) return false;
+    return pathname === url;
+  };
+
+  const getParentActiveState = (item) => {
+    if (!mounted) return false;
+    const isActive = pathname === item.url;
+    const hasActiveSubItem = item.items?.some(subItem => pathname === subItem.url);
+    const isParentActive = pathname.startsWith(item.url) && item.url !== "#";
+    return isActive || hasActiveSubItem || isParentActive;
+  };
 
   return (
     <SidebarGroup>
       <SidebarGroupLabel>Platform</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => {
-          const isActive = pathname === item.url;
-          const hasActiveSubItem = item.items?.some(subItem => pathname === subItem.url);
-          const isParentActive = pathname.startsWith(item.url) && item.url !== "#";
+          const isActive = getActiveState(item.url);
+          const isParentOrChildActive = getParentActiveState(item);
           
           // If item has no subitems, render as simple link
           if (!item.items || item.items.length === 0) {
@@ -52,11 +71,11 @@ export function NavMain({
             <Collapsible
               key={item.title}
               asChild
-              defaultOpen={isActive || hasActiveSubItem || isParentActive}
+              defaultOpen={isParentOrChildActive}
               className="group/collapsible">
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
-                  <SidebarMenuButton tooltip={item.title} isActive={isActive || isParentActive}>
+                  <SidebarMenuButton tooltip={item.title} isActive={isActive}>
                     {item.icon && <item.icon />}
                     <span>{item.title}</span>
                     <ChevronRight
@@ -67,7 +86,7 @@ export function NavMain({
                   <SidebarMenuSub>
                     {item.items?.map((subItem) => (
                       <SidebarMenuSubItem key={subItem.title}>
-                        <SidebarMenuSubButton asChild isActive={pathname === subItem.url}>
+                        <SidebarMenuSubButton asChild isActive={getActiveState(subItem.url)}>
                           <a href={subItem.url}>
                             <span>{subItem.title}</span>
                           </a>

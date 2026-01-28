@@ -180,13 +180,13 @@ export default function PlaylistsPage() {
 
   return (
     <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
+      <AppSidebar className="hidden md:flex" />
+      <SidebarInset className="md:ml-0">
         <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center justify-between w-full px-4">
             <div className="flex items-center gap-2">
-              <SidebarTrigger className="-ml-1" />
-              <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
+              <SidebarTrigger className="-ml-1 hidden md:flex" />
+              <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:block" />
               <Breadcrumb>
                 <BreadcrumbList>
                   <BreadcrumbItem className="hidden md:block">
@@ -224,7 +224,7 @@ export default function PlaylistsPage() {
             </Button>
           </div>
         </header>
-        <div className="flex flex-1 flex-col p-4 md:p-6">
+        <div className="flex flex-1 flex-col p-4 md:p-6 pb-20 md:pb-6">
           {loading ? (
             <div className="flex items-center justify-center py-12">
              

@@ -58,10 +58,6 @@ const data = {
       icon: ListMusic,
       items: [
         {
-          title: "Recently Played",
-          url: "/music/library/recently-played",
-        },
-        {
           title: "Liked Songs",
           url: "/music/favorites",
         },
@@ -89,16 +85,8 @@ const data = {
           url: "/music/discover/new-releases",
         },
         {
-          title: "Top Charts",
-          url: "/music/discover/top-charts",
-        },
-        {
           title: "Genres",
           url: "/music/discover/genres",
-        },
-        {
-          title: "Podcasts",
-          url: "/music/discover/podcasts",
         },
       ],
     },

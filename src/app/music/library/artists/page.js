@@ -195,70 +195,91 @@ export default function ArtistsPage() {
             </p>
           </div>
 
-          {artistsWithData.length === 0 && hasInitialized ? (
-            <div className="flex flex-1 flex-col items-center justify-center">
-              <Music className="h-16 w-16 text-muted-foreground mb-4" />
-              <h2 className="text-2xl font-semibold mb-2">No favorite artists yet</h2>
-              <p className="text-muted-foreground mb-4 text-center">
-                Start exploring music and like your favorite artists to see them here.
-              </p>
-              <Link href="/music/discover">
-                <Button>Discover Music</Button>
-              </Link>
+          {!hasInitialized ? (
+            // Loading skeleton
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
+              {Array.from({ length: 12 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="p-3 rounded-lg"
+                >
+                  <div className="relative mb-3">
+                    <div className="aspect-square rounded-full bg-muted animate-pulse"></div>
+                  </div>
+                  <div className="space-y-2 text-center">
+                    <div className="h-4 bg-muted rounded animate-pulse"></div>
+                    <div className="h-3 bg-muted rounded w-3/4 mx-auto animate-pulse"></div>
+                    <div className="h-3 bg-muted rounded w-1/2 mx-auto animate-pulse"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : artistsWithData.length === 0 && hasInitialized ? (
+            <div className="flex items-center justify-center min-h-[60vh]">
+              <div className="text-center py-12">
+                <User className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-xl font-semibold mb-2">No favorite artists yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  Start exploring music and like your favorite artists to see them here.
+                </p>
+                <Link href="/music">
+                  <Button>Discover Music</Button>
+                </Link>
+              </div>
             </div>
           ) : artistsWithData.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3 md:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
               {artistsWithData.map((artist) => {
                 const artistData = artist.artistData;
 
                 return (
                   <Link key={artist.artistId} href={`/music/artist/${artist.artistId}`} className="group cursor-pointer block">
-                    <div className="relative aspect-square mb-2 md:mb-3 overflow-hidden rounded-xl bg-gradient-to-br from-muted/50 to-muted shadow-sm hover:shadow-md transition-all duration-200">
-                      {artistData?.image?.length > 0 ? (
-                        <Image
-                          src={artistData.image.find(img => img.quality === "500x500")?.url ||
-                            artistData.image.find(img => img.quality === "150x150")?.url ||
-                            artistData.image[0]?.url}
-                          alt={artistData.name || 'Artist'}
-                          fill
-                          className="object-cover group-hover:scale-105 transition-transform duration-300"
-                          sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1200px) 25vw, 12.5vw"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-muted/50 to-muted flex items-center justify-center">
-                          <User className="h-8 w-8 md:h-10 md:w-10 text-muted-foreground/60" />
+                    <div className="p-3 rounded-lg hover:bg-muted/50 transition-all duration-200">
+                      <div className="relative mb-3">
+                        <div className="aspect-square rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-purple-600 shadow-md group-hover:shadow-lg transition-shadow duration-200">
+                          {artistData?.image?.length > 0 ? (
+                            <img
+                              src={artistData.image.find(img => img.quality === "500x500")?.url ||
+                                artistData.image.find(img => img.quality === "150x150")?.url ||
+                                artistData.image[0]?.url}
+                              alt={artistData.name || 'Artist'}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <User className="w-8 h-8 text-white/60" />
+                            </div>
+                          )}
                         </div>
-                      )}
 
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-200 rounded-xl" />
+                        {/* Unlike button - always visible on mobile, hover on desktop */}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="absolute top-2 right-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity h-8 w-8 p-0 bg-black/60 hover:bg-black/80 backdrop-blur-sm border-0 rounded-full"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            toggleLike(artist.artistId);
+                          }}
+                        >
+                          <Heart className="w-4 h-4 fill-red-500 text-red-500" />
+                        </Button>
+                      </div>
 
-                      {/* Unlike button - always visible on mobile, hover on desktop */}
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="absolute top-2 right-2 md:top-3 md:right-3 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 h-6 w-6 md:h-8 md:w-8 p-0 bg-white/90 hover:bg-white shadow-sm border-0 z-10"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          toggleLike(artist.artistId);
-                        }}
-                      >
-                        <Heart className="h-3 w-3 md:h-3.5 md:w-3.5 fill-red-500 text-red-500" />
-                      </Button>
-                    </div>
-
-                    <div className="space-y-1">
-                      <h3 className="font-semibold text-xs md:text-sm truncate group-hover:text-primary transition-colors duration-200">
-                        {artistData?.name || `Artist ${artist.artistId}`}
-                      </h3>
-                      <p className="text-xs text-muted-foreground/80 capitalize">
-                        {artistData?.dominantType || artistData?.type || 'Artist'}
-                      </p>
-                      {artistData?.followerCount && (
-                        <p className="text-xs text-muted-foreground/60">
-                          {artistData.followerCount.toLocaleString()} followers
+                      <div className="space-y-1 text-center">
+                        <h3 className="font-semibold text-sm truncate group-hover:text-primary transition-colors duration-200">
+                          {artistData?.name || `Artist ${artist.artistId}`}
+                        </h3>
+                        <p className="text-xs text-muted-foreground capitalize">
+                          {artistData?.dominantType || artistData?.type || 'Artist'}
                         </p>
-                      )}
+                        {artistData?.followerCount && (
+                          <p className="text-xs text-muted-foreground">
+                            {artistData.followerCount.toLocaleString()} followers
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </Link>
                 );

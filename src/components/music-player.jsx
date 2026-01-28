@@ -382,7 +382,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       
       {/* Only show the bottom bar when fullscreen is NOT open */}
       {!isFullscreenOpen && (
-        <div className="fixed bottom-0 left-0 right-0 md:left-64 bg-background border-t border-border ">
+        <div className="fixed bottom-16 left-0 right-0 md:left-64 md:bottom-0 bg-background border-t border-border z-[60]">
 
         {/* Mobile Layout */}
         <div className="block md:hidden">

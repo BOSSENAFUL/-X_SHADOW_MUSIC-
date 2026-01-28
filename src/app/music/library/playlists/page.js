@@ -19,6 +19,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Heart, Play, ListMusic, Calendar } from "lucide-react";
 import { useLikedPlaylists } from "@/hooks/useLikedPlaylists";
 
@@ -246,16 +247,37 @@ export default function PlaylistsPage() {
             </p>
           </div>
 
-          {hasLoaded && likedPlaylistsData.length === 0 ? (
-            <div className="text-center py-12">
-              <ListMusic className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">No liked playlists yet</h3>
-              <p className="text-muted-foreground mb-4">
-                Playlists you like will appear here
-              </p>
-              <Button onClick={() => router.push('/music/discover')}>
-                Discover Music
-              </Button>
+          {!hasLoaded ? (
+            // Loading skeleton
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
+              {Array.from({ length: 12 }).map((_, index) => (
+                <div
+                  key={`skeleton-${index}`}
+                  className="p-3 md:p-4 rounded-xl bg-card border border-border/50"
+                >
+                  <div className="relative mb-2 md:mb-3">
+                    <Skeleton className="aspect-square rounded-lg" />
+                  </div>
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-3 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : hasLoaded && likedPlaylistsData.length === 0 ? (
+            <div className="flex items-center justify-center min-h-[60vh]">
+              <div className="text-center py-12">
+                <ListMusic className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">No liked playlists yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  Playlists you like will appear here
+                </p>
+                <Button onClick={() => router.push('/music')}>
+                  Discover Music
+                </Button>
+              </div>
             </div>
           ) : likedPlaylistsData.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">

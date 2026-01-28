@@ -363,15 +363,15 @@ export default function MusicPage() {
 
   return (
     <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
+      <AppSidebar className="hidden md:flex" />
+      <SidebarInset className="md:ml-0">
         <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center justify-between w-full gap-2 px-3 md:px-4">
             <div className="flex items-center gap-2">
-              <SidebarTrigger className="-ml-1" />
+              <SidebarTrigger className="-ml-1 hidden md:flex" />
               <Separator
                 orientation="vertical"
-                className="mr-2 data-[orientation=vertical]:h-4"
+                className="mr-2 data-[orientation=vertical]:h-4 hidden md:block"
               />
               <Breadcrumb>
                 <BreadcrumbList>
@@ -405,7 +405,7 @@ export default function MusicPage() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-6 md:space-y-8">
+        <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-6 md:space-y-8 pb-20 md:pb-6">
           {/* Quick Access Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3">
             {/* Liked Songs */}

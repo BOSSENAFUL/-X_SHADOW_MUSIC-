@@ -182,7 +182,7 @@ export function AddToPlaylistDialog({ open, onOpenChange, song }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-[500px] h-[85vh] max-h-[600px] p-0 gap-0 flex flex-col overflow-hidden">
+      <DialogContent className="w-[95vw] max-w-[500px] h-[85vh] max-h-[600px] p-0 gap-0 flex flex-col overflow-hidden z-100">
         {/* Header */}
         <DialogHeader className="flex-shrink-0 p-4 sm:p-6 pb-3 sm:pb-4 border-b">
           <DialogTitle className="text-lg sm:text-xl font-semibold">Add to playlist</DialogTitle>
