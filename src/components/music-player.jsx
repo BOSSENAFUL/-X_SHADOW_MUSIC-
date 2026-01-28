@@ -207,8 +207,8 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
           }
 
           // Enhance saturation and adjust lightness for optimal contrast
-          s = Math.min(1, s * 1.3); // Increase saturation by 30%
-          l = Math.max(0.15, Math.min(0.4, l * 0.8)); // Target darker range for white text
+          s = Math.min(1, s * 1.2); // Increase saturation by 20% (reduced from 30%)
+          l = Math.max(0.1, Math.min(0.25, l * 0.6)); // Target much darker range for white text
 
           // Convert HSL back to RGB
           const hue2rgb = (p, q, t) => {
