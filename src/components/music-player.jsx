@@ -492,7 +492,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
             {/* Mobile Layout */}
             <div className="block md:hidden">
               {/* Top row: Song info and main controls */}
-              <div className="flex items-center justify-between p-3 pb-2">
+              <div className="flex items-center justify-between p-3">
                 <div
                   className={`flex items-center gap-3 min-w-0 flex-1 ${
                     !isRadioPlaying ? "cursor-pointer" : "cursor-default"
@@ -521,11 +521,11 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                       </div>
                     )}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate text-sm text-white drop-shadow-lg">
+                  <div className="min-w-0 flex-1 flex flex-col justify-center py-1">
+                    <p className="font-medium truncate text-sm text-white drop-shadow-lg leading-none mb-0.5">
                       {decodeHtmlEntities(currentSong.name)}
                     </p>
-                    <p className="text-xs text-white/80 truncate drop-shadow-md">
+                    <p className="text-xs text-white/80 truncate drop-shadow-md leading-none">
                       {currentSong.artists?.primary?.[0]?.name ||
                         "Unknown Artist"}
                     </p>
