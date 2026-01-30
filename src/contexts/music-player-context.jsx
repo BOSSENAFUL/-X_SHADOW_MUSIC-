@@ -11,6 +11,12 @@ export function MusicPlayerProvider({ children }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
 
+  // Add audio timing states
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(1);
+  const [audioRef, setAudioRef] = useState(null);
+
   // Helper function to check if current song is a radio station
   const isRadioPlaying = currentSong?.isRadio === true;
 
@@ -30,10 +36,31 @@ export function MusicPlayerProvider({ children }) {
     setPlaylist([]);
     setIsPlayerVisible(false);
     setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
   };
 
   const togglePlayPause = () => {
     setIsPlaying(!isPlaying);
+  };
+
+  const updateCurrentTime = (time) => {
+    setCurrentTime(time);
+  };
+
+  const updateDuration = (dur) => {
+    setDuration(dur);
+  };
+
+  const updateVolume = (vol) => {
+    setVolume(vol);
+  };
+
+  const seekTo = (time) => {
+    if (audioRef && audioRef.current) {
+      audioRef.current.currentTime = time;
+      setCurrentTime(time);
+    }
   };
 
   return (
@@ -45,12 +72,21 @@ export function MusicPlayerProvider({ children }) {
         isPlaying,
         isRadioPlaying,
         isFullscreenOpen,
+        currentTime,
+        duration,
+        volume,
+        audioRef,
         setIsFullscreenOpen,
         playSong,
         handleSongChange,
         clearPlayer,
         togglePlayPause,
         setIsPlaying,
+        updateCurrentTime,
+        updateDuration,
+        updateVolume,
+        seekTo,
+        setAudioRef,
       }}
     >
       {children}
