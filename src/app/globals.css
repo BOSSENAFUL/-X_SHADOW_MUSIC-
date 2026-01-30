@@ -190,6 +190,27 @@
     letter-spacing: var(--tracking-normal);
   }
   
+  /* Disable text selection for PWA app-like behavior */
+  * {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Allow text selection for input fields and editable content */
+  input,
+  textarea,
+  [contenteditable="true"],
+  .selectable {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+  }
+  
   /* Hide scrollbars globally while keeping scroll functionality */
   * {
     scrollbar-width: none; /* Firefox */
