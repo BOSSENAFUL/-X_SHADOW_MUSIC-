@@ -11,6 +11,8 @@ const dailyActiveUserSchema = new mongoose.Schema({
       required: true
     },
     name: String,
+    country: String,
+    city: String,
     firstSeenAt: {
       type: Date,
       default: Date.now
@@ -30,11 +32,54 @@ dailyActiveUserSchema.index({ date: 1 }, { unique: true });
 // Compound index for efficient user lookup within dates
 dailyActiveUserSchema.index({ date: 1, 'users.email': 1 });
 
+// Helper function to get location data from IP
+async function getLocationFromIP(request) {
+  try {
+    // Get client IP from request headers
+    const forwarded = request.headers.get('x-forwarded-for');
+    const realIP = request.headers.get('x-real-ip');
+    const clientIP = forwarded ? forwarded.split(',')[0] : realIP;
+    
+    // For development/localhost, use the API without IP parameter
+    const apiUrl = clientIP && clientIP !== '127.0.0.1' && clientIP !== '::1' 
+      ? `https://pinip.net/api?format=json&ip=${clientIP}`
+      : 'https://pinip.net/api?format=json';
+    
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Jammify-Analytics/1.0'
+      }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        country: data.country || 'Unknown',
+        city: data.city || 'Unknown'
+      };
+    }
+  } catch (error) {
+    console.warn('Failed to fetch location data:', error.message);
+  }
+  
+  return {
+    country: 'Unknown',
+    city: 'Unknown'
+  };
+}
+
 // Static method to record user activity
-dailyActiveUserSchema.statics.recordUserActivity = async function (userEmail, userName = null) {
+dailyActiveUserSchema.statics.recordUserActivity = async function (userEmail, userName = null, request = null) {
   const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
 
   try {
+    // Get location data if request is provided
+    let locationData = { country: 'Unknown', city: 'Unknown' };
+    if (request) {
+      locationData = await getLocationFromIP(request);
+    }
+
     // First, try to add user to existing document (if user doesn't already exist)
     const result = await this.findOneAndUpdate(
       {
@@ -46,6 +91,8 @@ dailyActiveUserSchema.statics.recordUserActivity = async function (userEmail, us
           users: {
             email: userEmail,
             name: userName,
+            country: locationData.country,
+            city: locationData.city,
             firstSeenAt: new Date()
           }
         },
@@ -73,6 +120,8 @@ dailyActiveUserSchema.statics.recordUserActivity = async function (userEmail, us
       users: [{
         email: userEmail,
         name: userName,
+        country: locationData.country,
+        city: locationData.city,
         firstSeenAt: new Date()
       }],
       totalUsers: 1
@@ -84,6 +133,11 @@ dailyActiveUserSchema.statics.recordUserActivity = async function (userEmail, us
     // Handle duplicate key error for date (if two requests try to create same date document)
     if (error.code === 11000 && error.keyPattern?.date) {
       // Document was created by another request, try to add user to it
+      let locationData = { country: 'Unknown', city: 'Unknown' };
+      if (request) {
+        locationData = await getLocationFromIP(request);
+      }
+
       const updateResult = await this.findOneAndUpdate(
         {
           date: today,
@@ -94,6 +148,8 @@ dailyActiveUserSchema.statics.recordUserActivity = async function (userEmail, us
             users: {
               email: userEmail,
               name: userName,
+              country: locationData.country,
+              city: locationData.city,
               firstSeenAt: new Date()
             }
           },

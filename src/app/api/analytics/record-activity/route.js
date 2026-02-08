@@ -19,7 +19,8 @@ export async function POST(request) {
     // Record user activity for today
     const result = await DailyActiveUser.recordUserActivity(
       session.user.email,
-      session.user.name
+      session.user.name,
+      request
     );
 
     return NextResponse.json({
