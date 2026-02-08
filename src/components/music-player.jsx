@@ -612,11 +612,10 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
             {/* Mobile Layout */}
             <div className="block md:hidden">
               {/* Top row: Song info and main controls */}
-              <div className="flex items-center justify-between pl-4 pr-3 py-2">
+              <div className="flex items-center justify-between pl-4 pr-3 py-2 pb-2.5">
                 <div
-                  className={`flex items-center gap-3 min-w-0 flex-1 ${
-                    !isRadioPlaying ? "cursor-pointer" : "cursor-default"
-                  }`}
+                  className={`flex items-center gap-3 min-w-0 flex-1 ${!isRadioPlaying ? "cursor-pointer" : "cursor-default"
+                    }`}
                   onClick={() => !isRadioPlaying && setIsFullscreenOpen(true)}
                 >
                   <div className="w-10 h-10 rounded bg-gradient-to-br from-purple-500 to-pink-500 flex-shrink-0 overflow-hidden">
@@ -689,24 +688,15 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                 </div>
               </div>
 
-              {/* Bottom row: Progress bar - Hidden on mobile */}
-              <div className="px-3 pb-3 hidden">
-                <div className="flex items-center gap-2 w-full">
-                  <span className="text-xs text-white/90 min-w-[30px] text-center drop-shadow-md">
-                    {formatTime(currentTime)}
-                  </span>
-                  <Slider
-                    value={[currentTime]}
-                    max={duration || 100}
-                    step={1}
-                    onValueChange={handleSeek}
-                    className="flex-1 [&_[role=slider]]:bg-white [&_[role=slider]]:border-white/50 [&_.bg-primary]:bg-white/90"
+              {/* Bottom row: Thin progress bar for mobile */}
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 z-10 px-4">
+                <div className="w-full h-full bg-white/10">
+                  <div
+                    className="h-full bg-white transition-all duration-300 ease-out"
+                    style={{
+                      width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%`
+                    }}
                   />
-                  <span className="text-xs text-white/90 min-w-[30px] text-center drop-shadow-md">
-                    {currentSong?.isRadio || !isFinite(duration)
-                      ? "LIVE"
-                      : formatTime(duration)}
-                  </span>
                 </div>
               </div>
             </div>
@@ -716,11 +706,10 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
               <div className="flex items-center gap-4 w-full">
                 {/* Song Info */}
                 <div
-                  className={`flex items-center gap-3 min-w-0 flex-1 rounded-lg p-2 -m-2 transition-colors ${
-                    !isRadioPlaying
+                  className={`flex items-center gap-3 min-w-0 flex-1 rounded-lg p-2 -m-2 transition-colors ${!isRadioPlaying
                       ? "cursor-pointer hover:bg-muted/50"
                       : "cursor-default"
-                  }`}
+                    }`}
                   onClick={() => !isRadioPlaying && setIsFullscreenOpen(true)}
                 >
                   <div className="w-12 h-12 rounded bg-gradient-to-br from-purple-500 to-pink-500 flex-shrink-0 overflow-hidden">
