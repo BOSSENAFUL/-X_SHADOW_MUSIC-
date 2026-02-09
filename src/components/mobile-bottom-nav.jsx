@@ -38,7 +38,7 @@ export function MobileBottomNav() {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-black/95 backdrop-blur-lg border-t border-white/5 md:hidden pb-safe">
-      <nav className="flex items-center justify-around h-[70px] pb-3">
+      <nav className="flex items-center justify-around h-[64px] ">
         {navItems.map((item) => {
           // Logic for active state
           const isActive = pathname === item.href ||
