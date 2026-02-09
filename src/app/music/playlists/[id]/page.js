@@ -52,6 +52,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Play,
+  Pause,
   ArrowLeft,
   MoreVertical,
   Clock,
@@ -91,7 +92,7 @@ export default function PlaylistDetailPage({ params }) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // Initialize music player
-  const { playSong, currentSong, isPlaying } = useMusicPlayer();
+  const { playSong, currentSong, isPlaying, togglePlayPause, currentPlaylistId: activePlaylistId } = useMusicPlayer();
 
   // Initialize liked songs hook
   const { toggleLike: toggleSongLike, isLiked: isSongLiked } = useLikedSongs(session?.user?.id);
@@ -379,6 +380,13 @@ export default function PlaylistDetailPage({ params }) {
 
   const handlePlayAll = () => {
     if (songs.length > 0) {
+      const isPlaylistPlaying = activePlaylistId === playlistId;
+
+      if (isPlaylistPlaying) {
+        togglePlayPause();
+        return;
+      }
+
       // Convert first song to standard format
       const firstSong = {
         id: songs[0].id,
@@ -407,7 +415,7 @@ export default function PlaylistDetailPage({ params }) {
         downloadUrl: playlistSong.downloadUrl
       }));
 
-      playSong(firstSong, playlistData);
+      playSong(firstSong, playlistData, playlistId);
       setCurrentlyPlaying({ song: songs[0], index: 0 });
       console.log('Playing all songs from playlist starting with:', songs[0]);
     }
@@ -1444,7 +1452,11 @@ export default function PlaylistDetailPage({ params }) {
                 onClick={handlePlayAll}
                 disabled={songs.length === 0}
               >
-                <Play className="w-5 h-5 md:w-6 md:h-6 ml-0.5 md:ml-1" />
+                {activePlaylistId === playlistId && isPlaying ? (
+                  <Pause className="w-5 h-5 md:w-6 md:h-6" />
+                ) : (
+                  <Play className="w-5 h-5 md:w-6 md:h-6 ml-0.5 md:ml-1" />
+                )}
               </Button>
 
               {/* Heart Button - Only show for non-owners and public playlists */}
