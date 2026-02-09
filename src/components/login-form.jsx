@@ -36,7 +36,7 @@ export default function LoginForm() {
         callbackUrl: "/music",
         redirect: false,
       });
-      
+
       if (result?.error) {
         setError("Authentication failed. Please try again.");
       } else if (result?.ok) {
@@ -50,7 +50,7 @@ export default function LoginForm() {
   const onSubmit = async (data) => {
     try {
       setError("");
-      
+
       const result = await signIn("credentials", {
         email: data.email,
         password: data.password,
@@ -78,18 +78,18 @@ export default function LoginForm() {
 
       {/* Social login buttons */}
       <div className="space-y-3">
-        <Button 
-          variant="outline" 
-          className="w-full h-11" 
+        <Button
+          variant="outline"
+          className="w-full h-11"
           type="button"
           onClick={() => handleSocialLogin("google")}
         >
           <Mail className="w-4 h-4 mr-2" />
           Continue with Google
         </Button>
-        <Button 
-          variant="outline" 
-          className="w-full h-11" 
+        <Button
+          variant="outline"
+          className="w-full h-11"
           type="button"
           onClick={() => handleSocialLogin("github")}
         >
@@ -182,7 +182,7 @@ export default function LoginForm() {
 
       {/* Sign up link */}
       <p className="text-center text-sm text-muted-foreground">
-        Don't have an account?{" "}
+        Don&apos;t have an account?{" "}
         <a
           href="/signup"
           className="font-medium text-primary hover:text-primary/80"

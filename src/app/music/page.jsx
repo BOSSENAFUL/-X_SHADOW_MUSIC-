@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Play, Heart, List, Search } from "lucide-react";
 import { useLikedPlaylists } from "@/hooks/useLikedPlaylists";
+import { PlaylistSection } from "@/components/music/playlist-section";
 
 export default function MusicPage() {
   const router = useRouter();
@@ -36,6 +37,25 @@ export default function MusicPage() {
   const [topHitsLoading, setTopHitsLoading] = useState(true);
   const [englishTopLoading, setEnglishTopLoading] = useState(true);
   const [playlistColors, setPlaylistColors] = useState({});
+  const [hoveredColor, setHoveredColor] = useState(null);
+
+  useEffect(() => {
+    // Set default color only on desktop
+    if (window.innerWidth >= 768) {
+      setHoveredColor("rgb(69, 10, 245)");
+    }
+
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        if (!hoveredColor) setHoveredColor("rgb(69, 10, 245)");
+      } else {
+        setHoveredColor(null);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Initialize liked playlists hook
   const { likedPlaylists, loading: playlistsLoading } = useLikedPlaylists(
@@ -143,6 +163,14 @@ export default function MusicPage() {
     router.push("/music/discover/new-releases");
   };
 
+  const handleMouseLeave = () => {
+    if (window.innerWidth >= 768) {
+      setHoveredColor("rgb(69, 10, 245)");
+    } else {
+      setHoveredColor(null);
+    }
+  };
+
   // Extract dominant color from image
   const extractDominantColor = (imageUrl, playlistId) => {
     return new Promise((resolve) => {
@@ -173,9 +201,8 @@ export default function MusicPage() {
             const brightness = (r + g + b) / 3;
             if (brightness < 30 || brightness > 220) continue;
 
-            const color = `${Math.floor(r / 15) * 15},${
-              Math.floor(g / 15) * 15
-            },${Math.floor(b / 15) * 15}`;
+            const color = `${Math.floor(r / 15) * 15},${Math.floor(g / 15) * 15
+              },${Math.floor(b / 15) * 15}`;
             colorCounts[color] = (colorCounts[color] || 0) + 1;
           }
 
@@ -278,6 +305,27 @@ export default function MusicPage() {
                     const validSongs = fetchedSongs.filter(
                       (song) => song !== null
                     );
+
+                    // Extract color for user playlist from the first song's image
+                    if (validSongs.length > 0) {
+                      const firstSong = validSongs[0];
+                      const coverImageForColor =
+                        firstSong.image?.find((img) => img.quality === "500x500")
+                          ?.url ||
+                        firstSong.image?.find((img) => img.quality === "150x150")
+                          ?.url ||
+                        firstSong.image?.[firstSong.image.length - 1]?.url;
+
+                      if (
+                        coverImageForColor &&
+                        !playlistColors[playlist.playlistId]
+                      ) {
+                        extractDominantColor(
+                          coverImageForColor,
+                          playlist.playlistId
+                        );
+                      }
+                    }
 
                     return {
                       ...playlist,
@@ -405,519 +453,280 @@ export default function MusicPage() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-6 md:space-y-8 pb-20 md:pb-6">
+        <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-6 md:space-y-8 pb-20 md:pb-6 relative">
+          {/* Ambient Background Gradient */}
+          <div
+            className="absolute h-[15%] w-full top-0 left-0 pointer-events-none transition-colors duration-1000 ease-in-out z-0"
+            style={{
+              backgroundColor: hoveredColor
+                ? hoveredColor.replace("rgb", "rgba").replace(")", ", 0.35)")
+                : "transparent",
+              maskImage: "linear-gradient(to bottom, black, transparent)",
+              WebkitMaskImage: "linear-gradient(to bottom, black, transparent)",
+            }}
+          />
+
+
           {/* Quick Access Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3">
             {/* Liked Songs */}
             <div
-              className="rounded-lg p-3 md:p-4 relative overflow-hidden cursor-pointer transition-all duration-300 flex items-center gap-2 md:gap-3 h-16 md:h-20 group"
-              style={{
-                backgroundColor: "rgba(147, 51, 234, 0.15)", // Purple ambient
-                "--hover-color": "rgba(147, 51, 234, 0.25)",
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = "rgba(147, 51, 234, 0.25)";
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = "rgba(147, 51, 234, 0.15)";
-              }}
+              className="group relative flex items-center bg-white/5 hover:bg-white/10 transition-colors rounded-[4px] overflow-hidden cursor-pointer h-14 md:h-20 z-10 "
               onClick={() => router.push("/music/favorites")}
+              onMouseEnter={() => setHoveredColor("rgb(69, 10, 245)")}
+              onMouseLeave={handleMouseLeave}
             >
               <div
-                className="w-12 h-12 rounded-sm flex items-center justify-center shrink-0 shadow-lg overflow-hidden"
+                className="h-full aspect-square flex items-center justify-center shrink-0"
                 style={{
                   background:
-                    "linear-gradient(135deg, rgb(147, 51, 234), rgba(147, 51, 234, 0.8))",
+                    "linear-gradient(135deg, rgb(69, 10, 245), rgb(166, 174, 219))",
                 }}
               >
-                <Heart className="w-6 h-6 fill-current text-white" />
+                <Heart className="w-5 h-5 md:w-8 md:h-8 fill-white text-white " />
               </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="font-semibold text-sm text-foreground">
+              <div className="min-w-0 flex-1 px-2 md:px-3 py-2 flex items-center">
+                <h3 className="font-bold text-[13px] md:text-base text-white line-clamp-2 leading-tight">
                   Liked Songs
                 </h3>
               </div>
 
               {/* Play button overlay */}
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button
-                  size="sm"
-                  className="rounded-full w-10 h-10 bg-green-500 hover:bg-green-600 text-black shadow-lg"
+              <div className="absolute right-2 md:right-3 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-20">
+                <div
+                  className="rounded-full w-8 h-8 md:w-12 md:h-12 bg-green-500 hover:bg-green-400 flex items-center justify-center text-black shadow-lg hover:scale-105 transition-transform"
                   onClick={(e) => {
                     e.stopPropagation();
                     handlePlayClick({ type: "liked-songs" }, "liked-songs");
                   }}
                 >
-                  <Play className="w-4 h-4 ml-0.5" />
-                </Button>
+                  <Play className="w-4 h-4 md:w-6 md:h-6 fill-black translate-x-0.5" />
+                </div>
               </div>
             </div>
 
             {/* Dynamic Liked Playlists */}
             {playlistsLoading
               ? // Loading skeleton for playlists
-                Array.from({ length: 3 }).map((_, index) => (
-                  <div
-                    key={`skeleton-${index}`}
-                    className="bg-muted/50 rounded-lg p-3 md:p-4 flex items-center gap-2 md:gap-3 h-16 md:h-20 animate-pulse"
-                  >
-                    <div className="w-10 h-10 md:w-12 md:h-12 bg-muted rounded-sm shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <div className="h-3 md:h-4 bg-muted rounded w-3/4" />
-                    </div>
+              Array.from({ length: 5 }).map((_, index) => (
+                <div
+                  key={`skeleton-${index}`}
+                  className="flex items-center bg-white/5 rounded-[4px] h-14 md:h-20 overflow-hidden animate-pulse"
+                >
+                  <div className="h-full aspect-square bg-muted shrink-0" />
+                  <div className="min-w-0 flex-1 px-2 md:px-3">
+                    <div className="h-4 bg-muted rounded w-3/4" />
                   </div>
-                ))
+                </div>
+              ))
               : (playlistsWithCovers.length > 0
-                  ? playlistsWithCovers
-                  : likedPlaylists
-                )
-                  .slice(0, 5)
-                  .map((playlist) => {
-                    const dominantColor =
-                      playlistColors[playlist.playlistId] || "rgb(59,130,246)";
-                    const rgbValues = dominantColor.match(/\d+/g);
-                    const ambientColor = rgbValues
-                      ? `rgba(${rgbValues[0]}, ${rgbValues[1]}, ${rgbValues[2]}, 0.15)`
-                      : "rgba(59,130,246,0.15)";
-                    const hoverColor = rgbValues
-                      ? `rgba(${rgbValues[0]}, ${rgbValues[1]}, ${rgbValues[2]}, 0.25)`
-                      : "rgba(59,130,246,0.25)";
+                ? playlistsWithCovers
+                : likedPlaylists
+              )
+                .slice(0, 5)
+                .map((playlist) => {
+                  const dominantColor =
+                    playlistColors[playlist.playlistId] || "rgb(59,130,246)";
 
-                    return (
-                      <div
-                        key={playlist.playlistId}
-                        className="rounded-lg p-3 md:p-4 relative overflow-hidden cursor-pointer transition-all duration-300 flex items-center gap-2 md:gap-3 h-16 md:h-20 group"
-                        style={{
-                          backgroundColor: ambientColor,
-                          "--hover-color": hoverColor,
-                        }}
-                        onMouseEnter={(e) => {
-                          e.target.style.backgroundColor = hoverColor;
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.backgroundColor = ambientColor;
-                        }}
-                        onClick={() => {
-                          // Check if it's a user-created playlist (MongoDB ObjectId format) or API playlist
+                  return (
+                    <div
+                      key={playlist.playlistId}
+                      className="group relative flex items-center bg-white/5 hover:bg-white/10 transition-colors rounded-[4px] overflow-hidden cursor-pointer h-14 md:h-20 z-10"
+                      onMouseEnter={() =>
+                        setHoveredColor(
+                          playlistColors[playlist.playlistId] ||
+                          "rgb(59,130,246)"
+                        )
+                      }
+                      onMouseLeave={handleMouseLeave}
+                      onClick={() => {
+                        // Check if it's a user-created playlist (MongoDB ObjectId format) or API playlist
+                        const isUserPlaylist =
+                          playlist.playlistId &&
+                          playlist.playlistId.length === 24 &&
+                          /^[0-9a-fA-F]{24}$/.test(playlist.playlistId);
+
+                        if (isUserPlaylist) {
+                          // User-created playlist - use /music/playlists/{id}
+                          router.push(
+                            `/music/playlists/${playlist.playlistId}`
+                          );
+                        } else {
+                          // API playlist - use /music/playlist/{id}
+                          router.push(
+                            `/music/playlist/${playlist.playlistId
+                            }?songCount=${playlist.songCount || 50}`
+                          );
+                        }
+                      }}
+                    >
+                      <div className="h-full aspect-square shrink-0 relative bg-neutral-800">
+                        {(() => {
+                          // Check if it's a user-created playlist with songs data
                           const isUserPlaylist =
                             playlist.playlistId &&
                             playlist.playlistId.length === 24 &&
                             /^[0-9a-fA-F]{24}$/.test(playlist.playlistId);
 
-                          if (isUserPlaylist) {
-                            // User-created playlist - use /music/playlists/{id}
-                            router.push(
-                              `/music/playlists/${playlist.playlistId}`
-                            );
-                          } else {
-                            // API playlist - use /music/playlist/{id}
-                            router.push(
-                              `/music/playlist/${
-                                playlist.playlistId
-                              }?songCount=${playlist.songCount || 50}`
-                            );
-                          }
-                        }}
-                      >
-                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-sm shrink-0 shadow-lg overflow-hidden relative">
-                          {(() => {
-                            // Check if it's a user-created playlist with songs data
-                            const isUserPlaylist =
-                              playlist.playlistId &&
-                              playlist.playlistId.length === 24 &&
-                              /^[0-9a-fA-F]{24}$/.test(playlist.playlistId);
+                          if (isUserPlaylist && playlist.songs) {
+                            // Use dynamic cover generation for user playlists
+                            const cover = getPlaylistCover(playlist);
 
-                            if (isUserPlaylist && playlist.songs) {
-                              // Use dynamic cover generation for user playlists
-                              const cover = getPlaylistCover(playlist);
-
-                              if (cover.type === "single") {
-                                return (
-                                  <img
-                                    src={cover.src}
-                                    alt={playlist.playlistName || "Playlist"}
-                                    className="w-full h-full object-cover"
-                                    loading="lazy"
-                                    onError={(e) => {
-                                      e.target.src = "/def playlist image.jpg";
-                                    }}
-                                  />
-                                );
-                              } else if (cover.type === "collage") {
-                                return (
-                                  <div className="w-full h-full grid grid-cols-2 gap-0.5 bg-black">
-                                    {cover.images.map((imageSrc, index) => (
-                                      <div
-                                        key={index}
-                                        className="w-full h-full overflow-hidden"
-                                      >
-                                        <img
-                                          src={imageSrc}
-                                          alt={`Song ${index + 1}`}
-                                          className="w-full h-full object-cover"
-                                          loading="lazy"
-                                          onError={(e) => {
-                                            e.target.src =
-                                              "/def playlist image.jpg";
-                                          }}
-                                        />
-                                      </div>
-                                    ))}
-                                  </div>
-                                );
-                              } else {
-                                return (
-                                  <img
-                                    src="/def playlist image.jpg"
-                                    alt={playlist.playlistName || "Playlist"}
-                                    className="w-full h-full object-cover"
-                                  />
-                                );
-                              }
-                            } else if (
-                              playlist.image?.[2]?.url ||
-                              playlist.image?.[1]?.url ||
-                              playlist.image?.[0]?.url
-                            ) {
-                              // Use API playlist image for JioSaavn playlists
+                            if (cover.type === "single") {
                               return (
                                 <img
-                                  src={
-                                    playlist.image[2]?.url ||
-                                    playlist.image[1]?.url ||
-                                    playlist.image[0]?.url
-                                  }
+                                  src={cover.src}
                                   alt={playlist.playlistName || "Playlist"}
-                                  className="w-full h-full object-cover"
+                                  className="w-full h-full object-cover shadow-r-lg"
                                   loading="lazy"
                                   onError={(e) => {
-                                    e.target.style.display = "none";
-                                    const fallback =
-                                      e.target.nextElementSibling;
-                                    if (fallback) {
-                                      fallback.style.display = "flex";
-                                    }
+                                    e.target.src = "/def playlist image.jpg";
                                   }}
                                 />
                               );
-                            } else {
-                              // Fallback to default icon
+                            } else if (cover.type === "collage") {
                               return (
-                                <div
-                                  className="w-full h-full flex items-center justify-center"
-                                  style={{
-                                    background: `linear-gradient(135deg, ${dominantColor}, ${dominantColor
-                                      .replace("rgb", "rgba")
-                                      .replace(")", ", 0.8)")})`,
-                                  }}
-                                >
-                                  <List className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                                <div className="w-full h-full grid grid-cols-2 gap-0.5 bg-black">
+                                  {cover.images.map((imageSrc, index) => (
+                                    <div
+                                      key={index}
+                                      className="w-full h-full overflow-hidden"
+                                    >
+                                      <img
+                                        src={imageSrc}
+                                        alt={`Song ${index + 1}`}
+                                        className="w-full h-full object-cover"
+                                        loading="lazy"
+                                        onError={(e) => {
+                                          e.target.src =
+                                            "/def playlist image.jpg";
+                                        }}
+                                      />
+                                    </div>
+                                  ))}
                                 </div>
                               );
+                            } else {
+                              return (
+                                <img
+                                  src="/def playlist image.jpg"
+                                  alt={playlist.playlistName || "Playlist"}
+                                  className="w-full h-full object-cover"
+                                />
+                              );
                             }
-                          })()}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold text-xs md:text-sm text-foreground truncate">
-                            {playlist.playlistName}
-                          </h3>
-                        </div>
+                          } else if (
+                            playlist.image?.[2]?.url ||
+                            playlist.image?.[1]?.url ||
+                            playlist.image?.[0]?.url
+                          ) {
+                            // Use API playlist image for JioSaavn playlists
+                            return (
+                              <img
+                                src={
+                                  playlist.image[2]?.url ||
+                                  playlist.image[1]?.url ||
+                                  playlist.image[0]?.url
+                                }
+                                alt={playlist.playlistName || "Playlist"}
+                                className="w-full h-full object-cover shadow-r-lg"
+                                loading="lazy"
+                                onError={(e) => {
+                                  e.target.style.display = "none";
+                                  const fallback =
+                                    e.target.nextElementSibling;
+                                  if (fallback) {
+                                    fallback.style.display = "flex";
+                                  }
+                                }}
+                              />
+                            );
+                          } else {
+                            // Fallback to default icon
+                            return (
+                              <div
+                                className="w-full h-full flex items-center justify-center"
+                                style={{
+                                  background: `linear-gradient(135deg, ${dominantColor}, ${dominantColor
+                                    .replace("rgb", "rgba")
+                                    .replace(")", ", 0.8)")})`,
+                                }}
+                              >
+                                <List className="w-6 h-6 md:w-8 md:h-8 text-white/90" />
+                              </div>
+                            );
+                          }
+                        })()}
+                      </div>
+                      <div className="min-w-0 flex-1 px-2 md:px-3 py-2 flex items-center">
+                        <h3 className="font-bold text-[13px] md:text-base text-white line-clamp-2 leading-tight">
+                          {playlist.playlistName}
+                        </h3>
+                      </div>
 
-                        {/* Play button overlay */}
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity hidden md:block">
-                          <Button
-                            size="sm"
-                            className="rounded-full w-8 h-8 md:w-10 md:h-10 bg-green-500 hover:bg-green-600 text-black shadow-lg"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePlayClick(playlist, "playlist");
-                            }}
-                          >
-                            <Play className="w-3 h-3 md:w-4 md:h-4 ml-0.5" />
-                          </Button>
+                      {/* Play button overlay */}
+                      <div className="absolute right-2 md:right-3 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0  z-20">
+                        <div
+                          className="rounded-full w-8 h-8 md:w-12 md:h-12 bg-green-500 hover:bg-green-400 flex items-center justify-center text-black shadow-lg hover:scale-105 transition-transform"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePlayClick(playlist, "playlist");
+                          }}
+                        >
+                          <Play className="w-4 h-4 md:w-6 md:h-6 fill-black translate-x-0.5" />
                         </div>
                       </div>
-                    );
-                  })}
+                    </div>
+                  );
+                })}
           </div>
 
           {/* "New release" */}
-          <div className="space-y-3 md:space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl md:text-2xl font-bold">New Release</h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleShowAll}
-                className="text-xs md:text-sm"
-              >
-                Show all
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
-              {loading
-                ? // Loading skeleton
-                  Array.from({ length: 6 }).map((_, index) => (
-                    <div key={index} className="space-y-2">
-                      <div className="bg-muted animate-pulse rounded-lg aspect-square" />
-                      <div className="bg-muted animate-pulse h-4 rounded" />
-                      <div className="bg-muted animate-pulse h-3 rounded w-2/3" />
-                    </div>
-                  ))
-                : newReleases.map((playlist) => (
-                    <div
-                      key={playlist.id}
-                      className="group cursor-pointer hover:scale-105 transition-transform"
-                      onClick={() => handleCardClick(playlist, "playlist")}
-                    >
-                      <div className="relative rounded-lg aspect-square overflow-hidden mb-3">
-                        <img
-                          src={
-                            playlist.image?.[2]?.url ||
-                            playlist.image?.[1]?.url ||
-                            playlist.image?.[0]?.url
-                          }
-                          alt={playlist.name}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.src = "/placeholder-music.jpg";
-                          }}
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <Button
-                          size="icon"
-                          className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-green-500 hover:bg-green-600 rounded-full shadow-lg"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePlayClick(playlist, "playlist");
-                          }}
-                        >
-                          <Play className="w-4 h-4" />
-                        </Button>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium leading-tight line-clamp-2 text-foreground">
-                          {playlist.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {playlist.songCount} songs
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-            </div>
-          </div>
+          <PlaylistSection
+            title="New Release"
+            playlists={newReleases}
+            loading={loading}
+            onShowAll={handleShowAll}
+            onPlaylistClick={(playlist) => handleCardClick(playlist, "playlist")}
+            onPlayClick={(playlist) => {
+              handlePlayClick(playlist, "playlist");
+            }}
+          />
 
           {/* Trending Playlists Section */}
-          <div className="space-y-3 md:space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl md:text-2xl font-bold">
-                Trending Playlists
-              </h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push("/music/discover/playlists")}
-                className="text-xs md:text-sm"
-              >
-                Show all
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
-              {trendingLoading
-                ? // Loading skeleton
-                  Array.from({ length: 6 }).map((_, index) => (
-                    <div key={index} className="space-y-2">
-                      <div className="bg-muted animate-pulse rounded-lg aspect-square" />
-                      <div className="bg-muted animate-pulse h-4 rounded" />
-                      <div className="bg-muted animate-pulse h-3 rounded w-2/3" />
-                    </div>
-                  ))
-                : trendingPlaylists.map((playlist) => (
-                    <div
-                      key={playlist.id}
-                      className="group cursor-pointer hover:scale-105 transition-transform"
-                      onClick={() => handleCardClick(playlist, "playlist")}
-                    >
-                      <div className="relative rounded-lg aspect-square overflow-hidden mb-3">
-                        <img
-                          src={
-                            playlist.image?.[2]?.url ||
-                            playlist.image?.[1]?.url ||
-                            playlist.image?.[0]?.url
-                          }
-                          alt={playlist.name}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.src = "/placeholder-music.jpg";
-                          }}
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <Button
-                          size="icon"
-                          className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-green-500 hover:bg-green-600 rounded-full shadow-lg"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePlayClick(playlist, "playlist");
-                          }}
-                        >
-                          <Play className="w-4 h-4" />
-                        </Button>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium leading-tight line-clamp-2 text-foreground">
-                          {playlist.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {playlist.songCount} songs
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-            </div>
-          </div>
+          <PlaylistSection
+            title="Trending Playlists"
+            playlists={trendingPlaylists}
+            loading={trendingLoading}
+            onShowAll={() => router.push("/music/discover/playlists")}
+            onPlaylistClick={(playlist) => handleCardClick(playlist, "playlist")}
+            onPlayClick={(playlist) => {
+              handlePlayClick(playlist, "playlist");
+            }}
+          />
 
           {/* Top Hits Playlists Section */}
-          <div className="space-y-3 md:space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl md:text-2xl font-bold">
-                Top Hits Playlists
-              </h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push("/music/discover/top-hits")}
-                className="text-xs md:text-sm"
-              >
-                Show all
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
-              {topHitsLoading
-                ? // Loading skeleton
-                  Array.from({ length: 6 }).map((_, index) => (
-                    <div key={index} className="space-y-2">
-                      <div className="bg-muted animate-pulse rounded-lg aspect-square" />
-                      <div className="bg-muted animate-pulse h-4 rounded" />
-                      <div className="bg-muted animate-pulse h-3 rounded w-2/3" />
-                    </div>
-                  ))
-                : topHitsPlaylists.map((playlist) => (
-                    <div
-                      key={playlist.id}
-                      className="group cursor-pointer hover:scale-105 transition-transform"
-                      onClick={() => handleCardClick(playlist, "playlist")}
-                    >
-                      <div className="relative rounded-lg aspect-square overflow-hidden mb-3">
-                        <img
-                          src={
-                            playlist.image?.[2]?.url ||
-                            playlist.image?.[1]?.url ||
-                            playlist.image?.[0]?.url
-                          }
-                          alt={playlist.name}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.src = "/placeholder-music.jpg";
-                          }}
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <Button
-                          size="icon"
-                          className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-green-500 hover:bg-green-600 rounded-full shadow-lg"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePlayClick(playlist, "playlist");
-                          }}
-                        >
-                          <Play className="w-4 h-4" />
-                        </Button>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium leading-tight line-clamp-2 text-foreground">
-                          {playlist.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {playlist.songCount} songs
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-            </div>
-          </div>
+          <PlaylistSection
+            title="Top Hits Playlists"
+            playlists={topHitsPlaylists}
+            onShowAll={() => router.push("/music/discover/top-hits")}
+            onPlaylistClick={(playlist) => handleCardClick(playlist, "playlist")}
+            onPlayClick={(playlist) => {
+              handlePlayClick(playlist, "playlist");
+            }}
+          />
 
           {/* English Top Playlists Section */}
-          <div className="space-y-3 md:space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl md:text-2xl font-bold">
-                English Top Playlists
-              </h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push("/music/discover/english-top")}
-                className="text-xs md:text-sm"
-              >
-                Show all
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
-              {englishTopLoading
-                ? // Loading skeleton
-                  Array.from({ length: 6 }).map((_, index) => (
-                    <div key={index} className="space-y-2">
-                      <div className="bg-muted animate-pulse rounded-lg aspect-square" />
-                      <div className="bg-muted animate-pulse h-4 rounded" />
-                      <div className="bg-muted animate-pulse h-3 rounded w-2/3" />
-                    </div>
-                  ))
-                : englishTopPlaylists.map((playlist) => (
-                    <div
-                      key={playlist.id}
-                      className="group cursor-pointer hover:scale-105 transition-transform"
-                      onClick={() => handleCardClick(playlist, "playlist")}
-                    >
-                      <div className="relative rounded-lg aspect-square overflow-hidden mb-3">
-                        <img
-                          src={
-                            playlist.image?.[2]?.url ||
-                            playlist.image?.[1]?.url ||
-                            playlist.image?.[0]?.url
-                          }
-                          alt={playlist.name}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.src = "/placeholder-music.jpg";
-                          }}
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <Button
-                          size="icon"
-                          className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-green-500 hover:bg-green-600 rounded-full shadow-lg"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePlayClick(playlist, "playlist");
-                          }}
-                        >
-                          <Play className="w-4 h-4" />
-                        </Button>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium leading-tight line-clamp-2 text-foreground">
-                          {playlist.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {playlist.songCount} songs
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-            </div>
-          </div>
+          <PlaylistSection
+            title="English Top Playlists"
+            playlists={englishTopPlaylists}
+            loading={englishTopLoading}
+            onShowAll={() => router.push("/music/discover/english-top")}
+            onPlaylistClick={(playlist) => handleCardClick(playlist, "playlist")}
+            onPlayClick={(playlist) => {
+              handlePlayClick(playlist, "playlist");
+            }}
+          />
 
           {/* Bottom padding to prevent content being hidden behind music player */}
           <div className="pb-24" />
