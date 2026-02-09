@@ -27,7 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Play, ArrowLeft, Heart, MoreVertical, Clock, Shuffle, Download, Plus, User, Disc, Share } from "lucide-react";
+import { Play, Pause, ArrowLeft, Heart, MoreVertical, Clock, Shuffle, Download, Plus, User, Disc, Share } from "lucide-react";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { AddToPlaylistDialog } from "@/components/playlists/AddToPlaylistDialog";
@@ -43,7 +43,7 @@ export default function FavoritesPage() {
   const { likedSongs, loading, toggleLike, getLikedCount } = useLikedSongs(session?.user?.id);
 
   // Initialize music player
-  const { playSong, currentSong, isPlaying } = useMusicPlayer();
+  const { playSong, currentSong, isPlaying, togglePlayPause, currentPlaylistId } = useMusicPlayer();
 
   const handlePlayClick = (song, index) => {
     const isCurrentSong = currentSong?.id === song.songId;
@@ -81,13 +81,20 @@ export default function FavoritesPage() {
       downloadUrl: likedSong.downloadUrl
     }));
 
-    playSong(songData, playlistData);
+    playSong(songData, playlistData, 'favorites');
     setCurrentlyPlaying({ song, index });
     console.log(`Playing song:`, song);
   };
 
   const handlePlayAll = () => {
     if (likedSongs.length > 0) {
+      const isPlaylistPlaying = currentPlaylistId === 'favorites';
+
+      if (isPlaylistPlaying) {
+        togglePlayPause();
+        return;
+      }
+
       // Convert first song to standard format
       const firstSong = {
         id: likedSongs[0].songId,
@@ -116,7 +123,7 @@ export default function FavoritesPage() {
         downloadUrl: likedSong.downloadUrl
       }));
 
-      playSong(firstSong, playlistData);
+      playSong(firstSong, playlistData, 'favorites');
       setCurrentlyPlaying({ song: likedSongs[0], index: 0 });
       console.log('Playing all liked songs starting with:', likedSongs[0]);
     }
@@ -512,11 +519,11 @@ export default function FavoritesPage() {
 
         <div className="flex-1 overflow-y-auto">
           {/* Favorites Header */}
-          <div className="p-4 md:p-6 text-white bg-gradient-to-br from-purple-600 to-purple-800">
+          <div className="p-4 md:p-6 text-white" style={{ background: "linear-gradient(to bottom, rgba(69, 10, 245, 0.5) 0%, rgba(69, 10, 245, 0.2) 100%)" }}>
             {/* Mobile Layout */}
             <div className="block md:hidden">
               <div className="flex flex-col items-center text-center space-y-4">
-                <div className="w-48 h-48 rounded-lg overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500 shadow-2xl flex items-center justify-center">
+                <div className="w-48 h-48 rounded-lg overflow-hidden shadow-2xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgb(69, 10, 245), rgb(166, 174, 219))" }}>
                   <Heart className="w-16 h-16 fill-current text-white" />
                 </div>
                 <div className="space-y-2">
@@ -537,7 +544,7 @@ export default function FavoritesPage() {
 
             {/* Desktop Layout */}
             <div className="hidden md:flex gap-6 items-end">
-              <div className="w-60 h-60 rounded-lg overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500 shrink-0 shadow-2xl flex items-center justify-center">
+              <div className="w-60 h-60 rounded-lg overflow-hidden shrink-0 shadow-2xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgb(69, 10, 245), rgb(166, 174, 219))" }}>
                 <Heart className="w-20 h-20 fill-current text-white" />
               </div>
               <div className="flex-1 min-w-0">
@@ -557,7 +564,7 @@ export default function FavoritesPage() {
           </div>
 
           {/* Controls */}
-          <div className="p-4 md:p-6 bg-gradient-to-b from-purple-600/20 to-transparent">
+          <div className="p-4 md:p-6" style={{ background: "linear-gradient(to bottom, rgba(69, 10, 245, 0.2) 0%, transparent 100%)" }}>
             <div className="flex items-center gap-3 md:gap-4">
               <Button
                 size="lg"
@@ -565,7 +572,11 @@ export default function FavoritesPage() {
                 onClick={handlePlayAll}
                 disabled={likedSongs.length === 0}
               >
-                <Play className="w-5 h-5 md:w-6 md:h-6 ml-0.5 md:ml-1" />
+                {currentPlaylistId === 'favorites' && isPlaying ? (
+                  <Pause className="w-5 h-5 md:w-6 md:h-6" />
+                ) : (
+                  <Play className="w-5 h-5 md:w-6 md:h-6 ml-0.5 md:ml-1" />
+                )}
               </Button>
               <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
                 <Shuffle className="w-5 h-5 md:w-6 md:h-6" />
@@ -619,14 +630,14 @@ export default function FavoritesPage() {
                   </div>
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-0">
                   {likedSongs.map((likedSong, index) => {
                     const isCurrentSong = currentSong?.id === likedSong.songId;
                     return (
-                      <div key={likedSong.songId || index}>
+                      <div key={likedSong.songId || index} className="py-0.5 md:py-0">
                         {/* Mobile Layout */}
                         <div
-                          className={`md:hidden flex items-center gap-3 p-3 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? 'bg-muted/30' : ''
+                          className={`md:hidden flex items-center gap-3 p-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
                             }`}
                           onClick={() => handlePlayClick(likedSong, index)}
                         >
@@ -769,7 +780,7 @@ export default function FavoritesPage() {
 
                         {/* Desktop Layout */}
                         <div
-                          className={`hidden md:grid grid-cols-[auto_1fr_1fr_120px_80px] gap-4 items-center p-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? 'bg-muted/30' : ''
+                          className={`hidden md:grid grid-cols-[auto_1fr_1fr_120px_80px] gap-4 items-center p-1.5 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
                             }`}
                           onClick={() => handlePlayClick(likedSong, index)}
                         >

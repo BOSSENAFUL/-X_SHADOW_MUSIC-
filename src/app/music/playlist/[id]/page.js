@@ -27,7 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Play, ArrowLeft, Heart, MoreVertical, Clock, Shuffle, Plus, User, Disc, Download } from "lucide-react";
+import { Play, Pause, ArrowLeft, Heart, MoreVertical, Clock, Shuffle, Plus, User, Disc, Download } from "lucide-react";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useLikedPlaylists } from "@/hooks/useLikedPlaylists";
 import { useMusicPlayer } from "@/contexts/music-player-context";
@@ -59,7 +59,7 @@ function PlaylistPageContent() {
   } = useLikedPlaylists(session?.user?.id);
 
   // Initialize music player
-  const { playSong, currentSong, isPlaying } = useMusicPlayer();
+  const { playSong, currentSong, isPlaying, togglePlayPause, currentPlaylistId } = useMusicPlayer();
 
   useEffect(() => {
     const fetchPlaylistDetails = async () => {
@@ -127,16 +127,22 @@ function PlaylistPageContent() {
   }, [playlistId, songCount]);
 
   const handlePlayClick = (song, index) => {
-    playSong(song, songs);
+    playSong(song, songs, playlistId);
     setCurrentlyPlaying({ song, index });
     console.log(`Playing song:`, song);
   };
 
   const handlePlayAll = () => {
     if (songs.length > 0) {
-      playSong(songs[0], songs);
-      setCurrentlyPlaying({ song: songs[0], index: 0 });
-      console.log('Playing all songs starting with:', songs[0]);
+      const isPlaylistPlaying = currentPlaylistId === playlistId;
+
+      if (isPlaylistPlaying) {
+        togglePlayPause();
+      } else {
+        playSong(songs[0], songs, playlistId);
+        setCurrentlyPlaying({ song: songs[0], index: 0 });
+      }
+      console.log('Playlist action:', isPlaylistPlaying ? 'toggling play/pause' : 'starting from beginning');
     }
   };
 
@@ -430,7 +436,7 @@ function PlaylistPageContent() {
           <div
             className="p-4 md:p-6 text-white"
             style={{
-              background: `linear-gradient(to bottom, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.8)')}, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.9)')})`
+              background: `linear-gradient(to bottom, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.5)')} 0%, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.2)')} 100%)`
             }}
           >
             {/* Mobile Layout */}
@@ -524,7 +530,7 @@ function PlaylistPageContent() {
           <div
             className="p-4 md:p-6"
             style={{
-              background: `linear-gradient(to bottom, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.2)')}, transparent)`
+              background: `linear-gradient(to bottom, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.2)')} 0%, transparent 100%)`
             }}
           >
             <div className="flex items-center gap-3 md:gap-4">
@@ -537,7 +543,11 @@ function PlaylistPageContent() {
                 }}
                 onClick={handlePlayAll}
               >
-                <Play className="w-5 h-5 md:w-6 md:h-6 ml-0.5 md:ml-1" />
+                {currentPlaylistId === playlistId && isPlaying ? (
+                  <Pause className="w-5 h-5 md:w-6 md:h-6" />
+                ) : (
+                  <Play className="w-5 h-5 md:w-6 md:h-6 ml-0.5 md:ml-1" />
+                )}
               </Button>
               <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
                 <Shuffle className="w-5 h-5 md:w-6 md:h-6" />
@@ -582,14 +592,14 @@ function PlaylistPageContent() {
               </div>
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-0">
               {songs.map((song, index) => {
                 const isCurrentSong = currentSong?.id === song.id;
                 return (
-                  <div key={song.id || index}>
+                  <div key={song.id || index} className="py-0.5 md:py-0">
                     {/* Mobile Layout */}
                     <div
-                      className={`md:hidden flex items-center gap-3 p-3 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? 'bg-muted/30' : ''
+                      className={`md:hidden flex items-center gap-3 p-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
                         }`}
                       onClick={() => handlePlayClick(song, index)}
                     >
@@ -720,7 +730,7 @@ function PlaylistPageContent() {
 
                     {/* Desktop Layout */}
                     <div
-                      className={`hidden md:grid grid-cols-[auto_1fr_1fr_120px_80px] gap-4 items-center p-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? 'bg-muted/30' : ''
+                      className={`hidden md:grid grid-cols-[auto_1fr_1fr_120px_80px] gap-4 items-center p-1.5 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
                         }`}
                       onClick={() => handlePlayClick(song, index)}
                     >

@@ -79,7 +79,7 @@ export default function PlaylistDetailPage({ params }) {
   const [loading, setLoading] = useState(true);
   const [currentlyPlaying, setCurrentlyPlaying] = useState(null);
   const [playlistId, setPlaylistId] = useState(null);
-  const [dominantColors, setDominantColors] = useState(['#1a1a1a', '#2a2a2a']); // Default dark colors to prevent flash
+  const [dominantColors, setDominantColors] = useState('rgb(34, 197, 94)'); // Default green
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
@@ -125,61 +125,38 @@ export default function PlaylistDetailPage({ params }) {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
 
-        // Sample colors from different areas
         const colorCounts = {};
-        const sampleSize = 10; // Sample every 10th pixel for performance
 
-        for (let i = 0; i < data.length; i += 4 * sampleSize) {
+        // Sample every 10th pixel for performance
+        for (let i = 0; i < data.length; i += 40) {
           const r = data[i];
           const g = data[i + 1];
           const b = data[i + 2];
-          const alpha = data[i + 3];
-
-          // Skip transparent pixels
-          if (alpha < 128) continue;
 
           // Skip very light or very dark colors
           const brightness = (r + g + b) / 3;
-          if (brightness < 30 || brightness > 225) continue;
+          if (brightness < 50 || brightness > 200) continue;
 
-          // Group similar colors
-          const colorKey = `${Math.floor(r / 20) * 20},${Math.floor(g / 20) * 20},${Math.floor(b / 20) * 20}`;
-          colorCounts[colorKey] = (colorCounts[colorKey] || 0) + 1;
+          const color = `${Math.floor(r / 10) * 10},${Math.floor(g / 10) * 10},${Math.floor(b / 10) * 10}`;
+          colorCounts[color] = (colorCounts[color] || 0) + 1;
         }
 
-        // Get most frequent colors and darken them significantly
-        const sortedColors = Object.entries(colorCounts)
-          .sort(([, a], [, b]) => b - a)
-          .slice(0, 3)
-          .map(([color]) => {
-            const [r, g, b] = color.split(',').map(Number);
-            // Darken colors significantly for ambient effect (multiply by 0.3-0.4)
-            const darkenedR = Math.floor(r * 0.35);
-            const darkenedG = Math.floor(g * 0.35);
-            const darkenedB = Math.floor(b * 0.35);
-            return `rgb(${darkenedR}, ${darkenedG}, ${darkenedB})`;
-          });
+        // Find the most common color
+        let dominantColor = '34,197,94'; // Default green
+        let maxCount = 0;
 
-        if (sortedColors.length >= 2) {
-          // Convert to hex
-          const colors = sortedColors.slice(0, 2).map(rgbColor => {
-            const rgb = rgbColor.match(/\d+/g);
-            const hex = rgb.map(x => {
-              const hex = parseInt(x).toString(16);
-              return hex.length === 1 ? '0' + hex : hex;
-            }).join('');
-            return `#${hex}`;
-          });
-
-          resolve(colors);
-        } else {
-          // Fallback to very dark colors
-          resolve(['#1a1a1a', '#2a2a2a']);
+        for (const [color, count] of Object.entries(colorCounts)) {
+          if (count > maxCount) {
+            maxCount = count;
+            dominantColor = color;
+          }
         }
+
+        resolve(`rgb(${dominantColor})`);
       };
 
       img.onerror = () => {
-        resolve(['#1a1a1a', '#2a2a2a']); // Dark fallback
+        resolve('rgb(34, 197, 94)'); // Default green
       };
 
       img.src = imageSrc;
@@ -347,11 +324,11 @@ export default function PlaylistDetailPage({ params }) {
             imageSrc = cover.images[0];
           }
 
-          const colors = await extractColorsFromImage(imageSrc);
-          setDominantColors(colors);
+          const color = await extractColorsFromImage(imageSrc);
+          setDominantColors(color);
         } catch (error) {
           console.error('Error extracting colors:', error);
-          // Keep default colors
+          // Keep default color
         }
       };
 
@@ -1311,7 +1288,7 @@ export default function PlaylistDetailPage({ params }) {
           <div
             className="p-4 md:p-6 text-white"
             style={{
-              background: `linear-gradient(to bottom right, ${dominantColors[0]}, ${dominantColors[1]})`
+              background: `linear-gradient(to bottom, ${dominantColors.replace('rgb', 'rgba').replace(')', ', 0.5)')} 0%, ${dominantColors.replace('rgb', 'rgba').replace(')', ', 0.2)')} 100%)`
             }}
           >
             {/* Mobile Layout */}
@@ -1447,13 +1424,17 @@ export default function PlaylistDetailPage({ params }) {
           <div
             className="p-4 md:p-6"
             style={{
-              background: `linear-gradient(to bottom, ${dominantColors[0]}20, transparent)`
+              background: `linear-gradient(to bottom, ${dominantColors.replace('rgb', 'rgba').replace(')', ', 0.2)')} 0%, transparent 100%)`
             }}
           >
             <div className="flex items-center gap-3 md:gap-4">
               <Button
                 size="lg"
-                className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-transform bg-green-500 hover:bg-green-600"
+                className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-transform"
+                style={{
+                  backgroundColor: dominantColors,
+                  boxShadow: `0 8px 32px ${dominantColors.replace('rgb', 'rgba').replace(')', ', 0.3)')}`
+                }}
                 onClick={handlePlayAll}
                 disabled={songs.length === 0}
               >
@@ -1566,14 +1547,14 @@ export default function PlaylistDetailPage({ params }) {
                   </div>
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-0">
                   {songs.map((song, index) => {
                     const isCurrentSong = currentSong?.id === song.id;
                     return (
-                      <div key={song.id || index}>
+                      <div key={song.id || index} className="py-0.5 md:py-0">
                         {/* Mobile Layout */}
                         <div
-                          className={`md:hidden flex items-center gap-3 p-3 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? 'bg-muted/30' : ''}`}
+                          className={`md:hidden flex items-center gap-3 p-2 rounded hover:bg-muted/50 group cursor-pointer`}
                           onClick={() => handlePlayClick(song, index)}
                         >
                           <div className="w-6 text-center flex-shrink-0">
@@ -1598,7 +1579,7 @@ export default function PlaylistDetailPage({ params }) {
                             )}
                           </div>
 
-                          <div className="w-12 h-12 rounded bg-muted flex-shrink-0 overflow-hidden">
+                          <div className="w-12 h-12 rounded bg-gradient-to-br from-purple-500 to-pink-500 flex-shrink-0 overflow-hidden">
                             {song.image?.length > 0 ? (
                               <img
                                 src={song.image.find(img => img.quality === '500x500')?.url ||
@@ -1613,7 +1594,7 @@ export default function PlaylistDetailPage({ params }) {
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
-                                <Play className="w-4 h-4 opacity-50" />
+                                <Play className="w-4 h-4 opacity-50 text-white" />
                               </div>
                             )}
                           </div>
@@ -1708,7 +1689,7 @@ export default function PlaylistDetailPage({ params }) {
 
                         {/* Desktop Layout */}
                         <div
-                          className={`hidden md:grid grid-cols-[auto_1fr_1fr_120px_80px] gap-4 items-center p-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? 'bg-muted/30' : ''}`}
+                          className={`hidden md:grid grid-cols-[auto_1fr_1fr_120px_80px] gap-4 items-center p-1.5 rounded hover:bg-muted/50 group cursor-pointer`}
                           onClick={() => handlePlayClick(song, index)}
                         >
                           <div className="w-8 text-center">
@@ -1734,7 +1715,7 @@ export default function PlaylistDetailPage({ params }) {
                           </div>
 
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
+                            <div className="w-12 h-12 rounded bg-gradient-to-br from-purple-500 to-pink-500 shrink-0 overflow-hidden">
                               {song.image?.length > 0 ? (
                                 <img
                                   src={song.image.find(img => img.quality === '500x500')?.url ||
@@ -1749,7 +1730,7 @@ export default function PlaylistDetailPage({ params }) {
                                 />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center">
-                                  <Play className="w-4 h-4 opacity-50" />
+                                  <Play className="w-4 h-4 opacity-50 text-white" />
                                 </div>
                               )}
                             </div>
