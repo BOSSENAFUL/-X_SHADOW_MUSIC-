@@ -373,7 +373,7 @@ export default function PlaylistDetailPage({ params }) {
       downloadUrl: playlistSong.downloadUrl
     }));
 
-    playSong(songData, playlistData);
+    playSong(songData, playlistData, playlistId);
     setCurrentlyPlaying({ song, index });
     console.log(`Playing song from playlist:`, song);
   };
