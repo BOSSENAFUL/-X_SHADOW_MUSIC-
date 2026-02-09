@@ -45,7 +45,7 @@ function PlaylistPageContent() {
   const [songs, setSongs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentlyPlaying, setCurrentlyPlaying] = useState(null);
-  const [dominantColor, setDominantColor] = useState('rgb(34, 197, 94)'); // Default green
+  const [dominantColor, setDominantColor] = useState(null);
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState(null);
 
@@ -100,7 +100,7 @@ function PlaylistPageContent() {
           }
 
           // Extract dominant color from playlist image BEFORE setting playlist data
-          let extractedColor = 'rgb(34, 197, 94)'; // Default green
+          let extractedColor = 'rgb(80, 80, 80)'; // Default dark gray
           if (imageUrl) {
             try {
               extractedColor = await extractDominantColor(imageUrl);
@@ -185,7 +185,7 @@ function PlaylistPageContent() {
           }
 
           // Find the most common color
-          let dominantColor = '34,197,94'; // Default green
+          let dominantColor = '80,80,80'; // Default dark gray
           let maxCount = 0;
 
           for (const [color, count] of Object.entries(colorCounts)) {
@@ -198,7 +198,7 @@ function PlaylistPageContent() {
           resolve(`rgb(${dominantColor})`);
         } catch (error) {
           console.error('Error extracting color:', error);
-          resolve('rgb(34, 197, 94)'); // Default green
+          resolve('rgb(80, 80, 80)'); // Default dark gray
         }
       };
 
@@ -436,7 +436,9 @@ function PlaylistPageContent() {
           <div
             className="p-4 md:p-6 text-white"
             style={{
-              background: `linear-gradient(to bottom, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.5)')} 0%, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.2)')} 100%)`
+              background: dominantColor
+                ? `linear-gradient(to bottom, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.5)')} 0%, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.2)')} 100%)`
+                : 'transparent'
             }}
           >
             {/* Mobile Layout */}
@@ -530,7 +532,9 @@ function PlaylistPageContent() {
           <div
             className="p-4 md:p-6"
             style={{
-              background: `linear-gradient(to bottom, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.2)')} 0%, transparent 100%)`
+              background: dominantColor
+                ? `linear-gradient(to bottom, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.2)')} 0%, transparent 100%)`
+                : 'transparent'
             }}
           >
             <div className="flex items-center gap-3 md:gap-4">
@@ -538,8 +542,10 @@ function PlaylistPageContent() {
                 size="lg"
                 className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-transform"
                 style={{
-                  backgroundColor: dominantColor,
-                  boxShadow: `0 8px 32px ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.3)')}`
+                  backgroundColor: dominantColor || '#ffffff',
+                  boxShadow: dominantColor
+                    ? `0 8px 32px ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.3)')}`
+                    : 'none'
                 }}
                 onClick={handlePlayAll}
               >

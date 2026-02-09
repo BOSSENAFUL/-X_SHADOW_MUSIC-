@@ -79,7 +79,7 @@ export default function PlaylistDetailPage({ params }) {
   const [loading, setLoading] = useState(true);
   const [currentlyPlaying, setCurrentlyPlaying] = useState(null);
   const [playlistId, setPlaylistId] = useState(null);
-  const [dominantColors, setDominantColors] = useState('rgb(34, 197, 94)'); // Default green
+  const [dominantColors, setDominantColors] = useState(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
@@ -142,7 +142,7 @@ export default function PlaylistDetailPage({ params }) {
         }
 
         // Find the most common color
-        let dominantColor = '34,197,94'; // Default green
+        let dominantColor = '80,80,80'; // Default dark gray
         let maxCount = 0;
 
         for (const [color, count] of Object.entries(colorCounts)) {
@@ -156,7 +156,7 @@ export default function PlaylistDetailPage({ params }) {
       };
 
       img.onerror = () => {
-        resolve('rgb(34, 197, 94)'); // Default green
+        resolve('rgb(80, 80, 80)'); // Default dark gray
       };
 
       img.src = imageSrc;
@@ -1286,9 +1286,11 @@ export default function PlaylistDetailPage({ params }) {
         <div className="flex-1 overflow-y-auto">
           {/* Playlist Header */}
           <div
-            className="p-4 md:p-6 text-white"
+            className="p-4 md:p-6 text-white transition-colors duration-700"
             style={{
-              background: `linear-gradient(to bottom, ${dominantColors.replace('rgb', 'rgba').replace(')', ', 0.5)')} 0%, ${dominantColors.replace('rgb', 'rgba').replace(')', ', 0.2)')} 100%)`
+              background: dominantColors
+                ? `linear-gradient(to bottom, ${dominantColors.replace('rgb', 'rgba').replace(')', ', 0.5)')} 0%, ${dominantColors.replace('rgb', 'rgba').replace(')', ', 0.2)')} 100%)`
+                : 'transparent'
             }}
           >
             {/* Mobile Layout */}
@@ -1422,18 +1424,22 @@ export default function PlaylistDetailPage({ params }) {
 
           {/* Controls */}
           <div
-            className="p-4 md:p-6"
+            className="p-4 md:p-6 transition-colors duration-700"
             style={{
-              background: `linear-gradient(to bottom, ${dominantColors.replace('rgb', 'rgba').replace(')', ', 0.2)')} 0%, transparent 100%)`
+              background: dominantColors
+                ? `linear-gradient(to bottom, ${dominantColors.replace('rgb', 'rgba').replace(')', ', 0.2)')} 0%, transparent 100%)`
+                : 'transparent'
             }}
           >
             <div className="flex items-center gap-3 md:gap-4">
               <Button
                 size="lg"
-                className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-transform"
+                className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-all duration-500"
                 style={{
-                  backgroundColor: dominantColors,
-                  boxShadow: `0 8px 32px ${dominantColors.replace('rgb', 'rgba').replace(')', ', 0.3)')}`
+                  backgroundColor: dominantColors || '#ffffff',
+                  boxShadow: dominantColors
+                    ? `0 8px 32px ${dominantColors.replace('rgb', 'rgba').replace(')', ', 0.3)')}`
+                    : 'none'
                 }}
                 onClick={handlePlayAll}
                 disabled={songs.length === 0}
