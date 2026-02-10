@@ -644,11 +644,11 @@ export default function FavoritesPage() {
                           <div className="w-6 text-center flex-shrink-0">
                             {isCurrentSong && isPlaying ? (
                               <div className="flex items-center justify-center">
-                                <div className="flex space-x-0.5">
-                                  <div className="w-0.5 h-3 bg-green-500 animate-pulse"></div>
-                                  <div className="w-0.5 h-2 bg-green-500 animate-pulse" style={{ animationDelay: '0.1s' }}></div>
-                                  <div className="w-0.5 h-4 bg-green-500 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                                  <div className="w-0.5 h-2 bg-green-500 animate-pulse" style={{ animationDelay: '0.3s' }}></div>
+                                <div className="flex items-end justify-center gap-0.5 h-3">
+                                  <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
+                                  <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
+                                  <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
+                                  <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
                                 </div>
                               </div>
                             ) : isCurrentSong ? (
@@ -716,9 +716,7 @@ export default function FavoritesPage() {
                           </div>
 
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            <div className="text-xs text-muted-foreground min-w-[35px] text-right">
-                              {formatDuration(likedSong.duration)}
-                            </div>
+
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
@@ -787,11 +785,11 @@ export default function FavoritesPage() {
                           <div className="w-8 text-center">
                             {isCurrentSong && isPlaying ? (
                               <div className="flex items-center justify-center">
-                                <div className="flex space-x-0.5">
-                                  <div className="w-0.5 h-3 bg-green-500 animate-pulse"></div>
-                                  <div className="w-0.5 h-2 bg-green-500 animate-pulse" style={{ animationDelay: '0.1s' }}></div>
-                                  <div className="w-0.5 h-4 bg-green-500 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                                  <div className="w-0.5 h-2 bg-green-500 animate-pulse" style={{ animationDelay: '0.3s' }}></div>
+                                <div className="flex items-end justify-center gap-0.5 h-3">
+                                  <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
+                                  <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
+                                  <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
+                                  <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
                                 </div>
                               </div>
                             ) : isCurrentSong ? (
@@ -879,9 +877,7 @@ export default function FavoritesPage() {
                           </div>
 
                           <div className="flex items-center justify-end gap-1">
-                            <div className="text-sm text-muted-foreground min-w-[40px] text-right">
-                              {formatDuration(likedSong.duration)}
-                            </div>
+
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button

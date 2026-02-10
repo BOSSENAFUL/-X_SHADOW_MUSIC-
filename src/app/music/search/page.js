@@ -15,7 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, Play, Heart, Pause, MoreVertical, Plus, User, Disc, Share, Download } from "lucide-react";
+import { Search, Play, Heart, Pause, MoreVertical, Plus, User, Disc, Share, Download, Clock } from "lucide-react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -50,6 +50,17 @@ function SearchPageContent() {
   const [lyricsLoading, setLyricsLoading] = useState(false);
   const [publicPlaylistsLoading, setPublicPlaylistsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
+
+  // State for category-specific results with pagination
+  const [categoryData, setCategoryData] = useState({
+    songs: { results: [], page: 0, hasMore: true, loading: false },
+    albums: { results: [], page: 0, hasMore: true, loading: false },
+    artists: { results: [], page: 0, hasMore: true, loading: false },
+    playlists: { results: [], page: 0, hasMore: true, loading: false }
+  });
+
+  // Observer for infinite scroll
+  const observerTarget = useRef(null);
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState(null);
 
@@ -89,6 +100,21 @@ function SearchPageContent() {
       }
 
       if (data.success) {
+        // Deduplicate songs from the API to prevent key collisions
+        if (data.data.songs?.results) {
+          const uniqueSongs = [];
+          const seenSongIds = new Set();
+
+          data.data.songs.results.forEach(song => {
+            if (song.id && !seenSongIds.has(song.id)) {
+              seenSongIds.add(song.id);
+              uniqueSongs.push(song);
+            }
+          });
+
+          data.data.songs.results = uniqueSongs;
+        }
+
         // Transform the API response to match our expected structure
         const transformedData = {
           topQuery: data.data.topQuery?.results?.[0] || null,
@@ -250,6 +276,14 @@ function SearchPageContent() {
       setLyricsResults(null);
       setPublicPlaylists(null);
 
+      // Reset category data on new search
+      setCategoryData({
+        songs: { results: [], page: 0, hasMore: true, loading: false },
+        albums: { results: [], page: 0, hasMore: true, loading: false },
+        artists: { results: [], page: 0, hasMore: true, loading: false },
+        playlists: { results: [], page: 0, hasMore: true, loading: false }
+      });
+
       try {
         // Perform all searches in parallel and wait for all to complete
         await Promise.allSettled([
@@ -270,6 +304,157 @@ function SearchPageContent() {
       }
     }, 600);
   }
+
+  // Fetch category results
+  const fetchCategoryResults = useCallback(async (category, page = 1) => {
+    if (!searchQuery.trim()) return;
+
+    setCategoryData(prev => ({
+      ...prev,
+      [category]: { ...prev[category], loading: true }
+    }));
+
+    try {
+      // Use the plural endpoint
+      // Add p and n parameters for compatibility with different API versions
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/${category}?query=${encodeURIComponent(searchQuery)}&page=${page}&p=${page}&limit=40&n=40`);
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        console.log(`[Search] Fetched ${category} page ${page}. Results: ${data.data.results?.length}, Total: ${data.data.total}`);
+
+        setCategoryData(prev => {
+          // Deduplicate results for subsequent pages
+          let newResults = data.data.results;
+          if (page > 1 && prev[category].results.length > 0) {
+            const existingIds = new Set(prev[category].results.map(item => item.id));
+            newResults = data.data.results.filter(item => !existingIds.has(item.id));
+            if (newResults.length === 0 && data.data.results.length > 0) {
+              console.warn(`[Search] Page ${page} returned only duplicates. This suggests the API might be ignoring the page parameter.`);
+            }
+            console.log(`[Search] Deduplicated ${data.data.results.length - newResults.length} items. New unique items: ${newResults.length}`);
+          }
+
+          // More robust hasMore calculation using total and start if available
+          let hasMore = false;
+          // Check if start + results length < total
+          if (typeof data.data.total === 'number' && typeof data.data.start === 'number') {
+            hasMore = (data.data.start + data.data.results.length) < data.data.total;
+            console.log(`[Search] hasMore calculated using total/start: ${data.data.start} + ${data.data.results.length} < ${data.data.total} = ${hasMore}`);
+          } else {
+            // Fallback to limit check
+            hasMore = data.data.results.length === 40;
+            console.log(`[Search] hasMore calculated using limit check: ${hasMore} (based on ${data.data.results.length} results)`);
+          }
+
+          return {
+            ...prev,
+            [category]: {
+              results: page === 1 ? data.data.results : [...prev[category].results, ...newResults],
+              page: page,
+              hasMore: hasMore,
+              loading: false
+            }
+          };
+        });
+      } else {
+        console.warn(`[Search] Failed or no data for ${category} page ${page}`, data);
+        setCategoryData(prev => ({
+          ...prev,
+          [category]: { ...prev[category], loading: false, hasMore: false }
+        }));
+      }
+    } catch (error) {
+      console.error(`Error fetching ${category}:`, error);
+      setCategoryData(prev => ({
+        ...prev,
+        [category]: { ...prev[category], loading: false }
+      }));
+    }
+  }, [searchQuery]);
+
+  // Effect to fetch initial category data when switching tabs
+  useEffect(() => {
+    if (activeTab === 'all') return;
+
+    // If we have results from the main "all" search but haven't fetched specific category pages yet (page 0),
+    // and aren't currently loading, we should effectively "promote" the existing results to be page 1
+    // OR fetch page 1 if we really have nothing.
+
+    // HOWEVER, the issue described is a "switch" or "flash". 
+    // This happens because `performSearch` populates `searchResults` (songs, albums etc), but `categoryData` starts empty.
+    // When we switch tabs, `fetchCategoryResults(activeTab, 1)` runs.
+
+    // Better strategy: Initialize `categoryData` with `searchResults` data when `searchResults` changes,
+    // so the "Songs" tab already has the first batch of songs.
+
+    const currentCategoryState = categoryData[activeTab];
+
+    // Only fetch if we strictly have NO data and aren't loading.
+    // But `categoryData` is initialized to empty arrays.
+    // We should check if we need to fetch. 
+
+    // If we rely on `searchResults` to populate the initial view, we should sync `searchResults` to `categoryData`
+    // OR just use `searchResults` for the first page in the render logic (which we do).
+
+    // The problem is likely that `fetchCategoryResults(activeTab, 1)` is called, which fetches page 1 AGAIN,
+    // and the new results might be slightly different or just cause a re-render/flash.
+
+    // If we already have results in `searchResults.songs` (from the main search), 
+    // we should treat that as "Page 1" for the songs tab to avoid re-fetching the same thing.
+
+    const hasExistingResultsFromMainSearch =
+      searchResults &&
+      searchResults[activeTab] &&
+      searchResults[activeTab].results &&
+      searchResults[activeTab].results.length > 0;
+
+    if (currentCategoryState?.page === 0 && !currentCategoryState?.loading) {
+      if (hasExistingResultsFromMainSearch) {
+        console.log(`[Search] Hydrating ${activeTab} with existing results from main search`);
+        setCategoryData(prev => ({
+          ...prev,
+          [activeTab]: {
+            results: searchResults[activeTab].results,
+            page: 1, // Mark as page 1 so we don't re-fetch it
+            hasMore: true, // Assume there's more
+            loading: false
+          }
+        }));
+      } else {
+        // Genuine empty state, fetch page 1
+        console.log(`[Search] No existing results for ${activeTab}, fetching page 1`);
+        fetchCategoryResults(activeTab, 1);
+      }
+    }
+  }, [activeTab, searchResults]); // Add searchResults to dependency to sync when search finishes
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && activeTab !== 'all') {
+          console.log(`[Search] Sentinel intersected. ActiveTab: ${activeTab}, Loading: ${categoryData[activeTab]?.loading}, HasMore: ${categoryData[activeTab]?.hasMore}, Page: ${categoryData[activeTab]?.page}`);
+          const currentCategory = categoryData[activeTab];
+          if (currentCategory && !currentCategory.loading && currentCategory.hasMore && currentCategory.page > 0) {
+            console.log(`[Search] Triggering fetch for page ${currentCategory.page + 1}`);
+            fetchCategoryResults(activeTab, currentCategory.page + 1);
+          }
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => {
+      if (observerTarget.current) {
+        observer.unobserve(observerTarget.current);
+      }
+    };
+  }, [activeTab, categoryData, fetchCategoryResults]);
 
   // Public playlists search function
   const performPublicPlaylistsSearch = async (query, searchId) => {
@@ -1046,13 +1231,25 @@ function SearchPageContent() {
                             const isCurrentSong = currentSong?.id === song.id;
                             return (
                               <div
-                                key={`all-tab-${song.isLyricsMatch ? 'lyrics' : 'regular'}-${song.id || `fallback-${index}`}`}
-                                className={`flex items-center gap-3 p-2 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150 ${isCurrentSong ? 'bg-muted/40' : ''
-                                  }`}
+                                key={`all-tab-${song.isLyricsMatch ? 'lyrics' : 'regular'}-${song.id || `fallback-${index}`}-${index}`}
+                                className={`flex items-center gap-2 p-1.5 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150`}
                                 onClick={() => handlePlayClick(song, combinedSearchResults.songs.results)}
                               >
-                                <div className="text-sm text-muted-foreground w-4 text-center shrink-0">
-                                  {index + 1}
+                                <div className="text-sm text-muted-foreground w-6 text-center shrink-0">
+                                  {isCurrentSong && isPlaying ? (
+                                    <div className="flex items-center justify-center">
+                                      <div className="flex items-end justify-center gap-0.5 h-3">
+                                        <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
+                                        <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
+                                        <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
+                                        <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
+                                      </div>
+                                    </div>
+                                  ) : isCurrentSong ? (
+                                    <Play className="w-4 h-4 mx-auto text-green-500 fill-green-500" />
+                                  ) : (
+                                    index + 1
+                                  )}
                                 </div>
                                 <div className="relative shrink-0">
                                   <div className="w-12 h-12 rounded bg-muted overflow-hidden">
@@ -1071,14 +1268,10 @@ function SearchPageContent() {
                                       </div>
                                     )}
                                   </div>
-                                  {isCurrentSong && isPlaying && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded">
-                                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                    </div>
-                                  )}
+
                                 </div>
-                                <div className="flex-1 min-w-0 overflow-hidden pr-1">
-                                  <p className={`font-medium text-sm leading-tight truncate block ${isCurrentSong ? 'text-green-500' : 'text-foreground'
+                                <div className="flex-1 min-w-0 overflow-hidden pr-2">
+                                  <p className={`font-medium text-base leading-tight truncate block ${isCurrentSong ? 'text-green-500' : 'text-foreground'
                                     }`} style={{
                                       whiteSpace: 'nowrap',
                                       overflow: 'hidden',
@@ -1087,7 +1280,7 @@ function SearchPageContent() {
                                     }}>
                                     {decodeHtmlEntities(song.title || song.name)}
                                   </p>
-                                  <p className={`text-xs leading-tight truncate block ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
+                                  <p className={`text-sm leading-tight truncate block ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
                                     }`} style={{
                                       whiteSpace: 'nowrap',
                                       overflow: 'hidden',
@@ -1114,7 +1307,7 @@ function SearchPageContent() {
                                         <MoreVertical className="w-3 h-3" />
                                       </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-48 z-[9999]">
+                                    <DropdownMenuContent align="end" className="w-48 z-9999">
                                       <DropdownMenuItem
                                         onClick={async (e) => {
                                           e.stopPropagation();
@@ -1353,152 +1546,336 @@ function SearchPageContent() {
 
                 {/* Songs Tab */}
                 <TabsContent value="songs">
-                  {combinedSearchResults.songs?.results?.length > 0 ? (
+                  {categoryData.songs.results.length > 0 || (combinedSearchResults.songs?.results?.length > 0) ? (
                     <div className="space-y-1">
-                      {combinedSearchResults.songs.results.map((song, index) => {
+                      {/* Desktop Table Header */}
+                      <div className="hidden md:grid grid-cols-[auto_1fr_1fr_80px] gap-4 items-center text-sm text-muted-foreground border-b pb-2 mb-4 px-3">
+                        <div className="w-8 text-center">#</div>
+                        <div>Title</div>
+                        <div>Album</div>
+                        <div className="flex items-center justify-end gap-1">
+                          <div className="min-w-[40px] text-right">
+                            <Clock className="w-4 h-4 ml-auto" />
+                          </div>
+                          <div className="w-8"></div>
+                        </div>
+                      </div>
+
+                      {(categoryData.songs.page > 0 ? categoryData.songs.results : combinedSearchResults.songs.results).map((song, index) => {
+
                         const isCurrentSong = currentSong?.id === song.id;
                         return (
-                          <div
-                            key={`songs-tab-${song.isLyricsMatch ? 'lyrics' : 'regular'}-${song.id || `fallback-${index}`}`}
-                            className={`flex items-center gap-4 p-3 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150 ${isCurrentSong ? 'bg-muted/40' : ''
-                              }`}
-                            onClick={() => handlePlayClick(song, combinedSearchResults.songs.results)}
-                          >
-                            <div className="text-sm text-muted-foreground w-6 text-center shrink-0">
-                              {index + 1}
-                            </div>
-                            <div className="relative shrink-0">
-                              <div className="w-12 h-12 rounded bg-muted overflow-hidden">
-                                {song.image?.length > 0 ? (
-                                  <img
-                                    src={song.image.find(img => img.quality === '500x500')?.url ||
-                                      song.image.find(img => img.quality === '150x150')?.url ||
-                                      song.image[song.image.length - 1]?.url}
-                                    alt={song.title}
-                                    className="w-full h-full object-cover"
-                                    loading="lazy"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center bg-muted">
-                                    <Play className="w-4 h-4 text-muted-foreground" />
+                          <div key={`songs-tab-${song.isLyricsMatch ? 'lyrics' : 'regular'}-${song.id || `fallback-${index}`}-${index}`}>
+                            {/* Mobile Layout */}
+                            <div
+                              className={`md:hidden flex items-center gap-3 p-2 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150`}
+                              onClick={() => handlePlayClick(song, categoryData.songs.page > 0 ? categoryData.songs.results : combinedSearchResults.songs.results)}
+                            >
+                              <div className="text-sm text-muted-foreground w-6 text-center shrink-0">
+                                {isCurrentSong && isPlaying ? (
+                                  <div className="flex items-center justify-center">
+                                    <div className="flex items-end justify-center gap-0.5 h-3">
+                                      <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
+                                      <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
+                                      <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
+                                      <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
+                                    </div>
                                   </div>
+                                ) : isCurrentSong ? (
+                                  <Play className="w-4 h-4 mx-auto text-green-500 fill-green-500" />
+                                ) : (
+                                  index + 1
                                 )}
                               </div>
-                              {isCurrentSong && isPlaying && (
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded">
-                                  <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                              <div className="relative shrink-0">
+                                <div className="w-12 h-12 rounded bg-muted overflow-hidden">
+                                  {song.image?.length > 0 ? (
+                                    <img
+                                      src={song.image.find(img => img.quality === '500x500')?.url ||
+                                        song.image.find(img => img.quality === '150x150')?.url ||
+                                        song.image[song.image.length - 1]?.url}
+                                      alt={song.title}
+                                      className="w-full h-full object-cover"
+                                      loading="lazy"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-muted">
+                                      <Play className="w-4 h-4 text-muted-foreground" />
+                                    </div>
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0 overflow-hidden pr-2">
-                              <p className={`font-medium text-sm sm:text-base leading-tight truncate block ${isCurrentSong ? 'text-green-500' : 'text-foreground'
-                                }`} style={{
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  maxWidth: '100%'
-                                }}>
-                                {decodeHtmlEntities(song.title)}
-                              </p>
-                              <p className={`text-xs sm:text-sm leading-tight truncate block ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
-                                }`} style={{
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  maxWidth: '100%'
-                                }}>
-                                {getArtistNames(song)}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-3 shrink-0">
-                              {song.duration ? (
-                                <span className="text-sm text-muted-foreground min-w-[40px] text-right font-mono">
-                                  {formatDuration(song.duration)}
-                                </span>
-                              ) : null}
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1.5 h-8 w-8 text-muted-foreground"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <MoreVertical className="w-4 h-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48 z-[9999]">
-                                  <DropdownMenuItem
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      try {
-                                        // Fetch detailed song info to get complete data for liking
-                                        let detailedSong = song;
 
-                                        if (!song.downloadUrl && song.id) {
-                                          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs/${song.id}`);
-                                          const data = await response.json();
-
-                                          if (data.success && data.data && data.data.length > 0) {
-                                            detailedSong = data.data[0];
+                              </div>
+                              <div className="flex-1 min-w-0 overflow-hidden pr-2">
+                                <p className={`font-medium text-base leading-tight truncate block ${isCurrentSong ? 'text-green-500' : 'text-foreground'
+                                  }`} style={{
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    maxWidth: '100%'
+                                  }}>
+                                  {decodeHtmlEntities(song.title)}
+                                </p>
+                                <p className={`text-sm leading-tight truncate block ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
+                                  }`} style={{
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    maxWidth: '100%'
+                                  }}>
+                                  {getArtistNames(song)}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="p-1.5 h-8 w-8 text-muted-foreground"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <MoreVertical className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-48 z-9999">
+                                    <DropdownMenuItem
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        try {
+                                          let detailedSong = song;
+                                          if (!song.downloadUrl && song.id) {
+                                            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs/${song.id}`);
+                                            const data = await response.json();
+                                            if (data.success && data.data && data.data.length > 0) {
+                                              detailedSong = data.data[0];
+                                            }
                                           }
+                                          const songData = {
+                                            id: detailedSong.id,
+                                            name: detailedSong.name || detailedSong.title,
+                                            title: detailedSong.name || detailedSong.title,
+                                            artists: detailedSong.artists || { primary: [] },
+                                            primaryArtists: detailedSong.primaryArtists || getArtistNames(detailedSong),
+                                            album: detailedSong.album || { id: '', name: song.album || '' },
+                                            duration: detailedSong.duration || 0,
+                                            image: detailedSong.image || [],
+                                            releaseDate: detailedSong.releaseDate || '',
+                                            language: detailedSong.language || '',
+                                            playCount: detailedSong.playCount || 0,
+                                            downloadUrl: detailedSong.downloadUrl || [],
+                                            url: detailedSong.url || '',
+                                            type: 'song'
+                                          };
+                                          await toggleLike(songData);
+                                        } catch (error) {
+                                          console.error('Error toggling like:', error);
                                         }
+                                      }}
+                                      className={isLiked(song.id) ? "text-red-500" : ""}
+                                    >
+                                      <Heart className={`w-4 h-4 mr-2 ${isLiked(song.id) ? 'fill-red-500 text-red-500' : ''}`} />
+                                      {isLiked(song.id) ? 'Unlike' : 'Like'}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, song)}>
+                                      <Plus className="w-4 h-4 mr-2" />
+                                      Add to playlist
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={(e) => handleGoToArtist(e, song)}>
+                                      <User className="w-4 h-4 mr-2" />
+                                      Go to artist
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={(e) => handleGoToAlbum(e, song)}>
+                                      <Disc className="w-4 h-4 mr-2" />
+                                      Go to album
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={(e) => handleShare(e, song)}>
+                                      <Share className="w-4 h-4 mr-2" />
+                                      Share
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={(e) => handleDownload(e, song)}>
+                                      <Download className="w-4 h-4 mr-2" />
+                                      Download
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </div>
 
-                                        // Create proper song data structure for the like function
-                                        const songData = {
-                                          id: detailedSong.id,
-                                          name: detailedSong.name || detailedSong.title,
-                                          title: detailedSong.name || detailedSong.title,
-                                          artists: detailedSong.artists || { primary: [] },
-                                          primaryArtists: detailedSong.primaryArtists || getArtistNames(detailedSong),
-                                          album: detailedSong.album || { id: '', name: song.album || '' },
-                                          duration: detailedSong.duration || 0,
-                                          image: detailedSong.image || [],
-                                          releaseDate: detailedSong.releaseDate || '',
-                                          language: detailedSong.language || '',
-                                          playCount: detailedSong.playCount || 0,
-                                          downloadUrl: detailedSong.downloadUrl || [],
-                                          url: detailedSong.url || '',
-                                          type: 'song'
-                                        };
-                                        await toggleLike(songData);
-                                      } catch (error) {
-                                        console.error('Error toggling like:', error);
-                                      }
-                                    }}
-                                    className={isLiked(song.id) ? "text-red-500" : ""}
-                                  >
-                                    <Heart className={`w-4 h-4 mr-2 ${isLiked(song.id) ? 'fill-red-500 text-red-500' : ''}`} />
-                                    {isLiked(song.id) ? 'Unlike' : 'Like'}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, song)}>
-                                    <Plus className="w-4 h-4 mr-2" />
-                                    Add to playlist
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={(e) => handleGoToArtist(e, song)}>
-                                    <User className="w-4 h-4 mr-2" />
-                                    Go to artist
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={(e) => handleGoToAlbum(e, song)}>
-                                    <Disc className="w-4 h-4 mr-2" />
-                                    Go to album
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={(e) => handleShare(e, song)}>
-                                    <Share className="w-4 h-4 mr-2" />
-                                    Share
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={(e) => handleDownload(e, song)}>
-                                    <Download className="w-4 h-4 mr-2" />
-                                    Download
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                            {/* Desktop Layout */}
+                            <div
+                              className={`hidden md:grid grid-cols-[auto_1fr_1fr_80px] gap-4 items-center p-1 rounded hover:bg-muted/50 group cursor-pointer`}
+                              onClick={() => handlePlayClick(song, categoryData.songs.page > 0 ? categoryData.songs.results : combinedSearchResults.songs.results)}
+                            >
+                              <div className="w-8 text-center">
+                                {isCurrentSong && isPlaying ? (
+                                  <div className="flex items-center justify-center">
+                                    <div className="flex space-x-0.5">
+                                      <div className="w-0.5 h-3 bg-green-500 animate-pulse"></div>
+                                      <div className="w-0.5 h-2 bg-green-500 animate-pulse" style={{ animationDelay: '0.1s' }}></div>
+                                      <div className="w-0.5 h-4 bg-green-500 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                                      <div className="w-0.5 h-2 bg-green-500 animate-pulse" style={{ animationDelay: '0.3s' }}></div>
+                                    </div>
+                                  </div>
+                                ) : isCurrentSong ? (
+                                  <Play className="w-4 h-4 mx-auto text-green-500" />
+                                ) : (
+                                  <>
+                                    <span className="text-muted-foreground group-hover:hidden text-sm">
+                                      {index + 1}
+                                    </span>
+                                    <Play className="w-4 h-4 mx-auto hidden group-hover:block" />
+                                  </>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-12 h-12 rounded bg-muted overflow-hidden shrink-0">
+                                  {song.image?.length > 0 ? (
+                                    <img
+                                      src={song.image.find(img => img.quality === '500x500')?.url ||
+                                        song.image.find(img => img.quality === '150x150')?.url ||
+                                        song.image[song.image.length - 1]?.url}
+                                      alt={song.title}
+                                      className="w-full h-full object-cover"
+                                      loading="lazy"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-muted">
+                                      <Play className="w-5 h-5 text-muted-foreground" />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : 'text-foreground'}`}>
+                                    {decodeHtmlEntities(song.title)}
+                                  </p>
+                                  <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'}`}>
+                                    {getArtistNames(song)}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="text-sm text-muted-foreground truncate">
+                                {song.album ? (
+                                  typeof song.album === 'object' ? (
+                                    <button
+                                      className="hover:underline hover:text-foreground transition-colors"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (song.album.id) {
+                                          handleAlbumClick(song.album.id);
+                                        }
+                                      }}
+                                    >
+                                      {decodeHtmlEntities(song.album.name || song.album.title)}
+                                    </button>
+                                  ) : (
+                                    decodeHtmlEntities(song.album)
+                                  )
+                                ) : (
+                                  'Unknown Album'
+                                )}
+                              </div>
+
+                              <div className="flex items-center justify-end gap-1">
+                                {song.duration ? (
+                                  <span className="text-sm text-muted-foreground min-w-[40px] text-right font-mono">
+                                    {formatDuration(song.duration)}
+                                  </span>
+                                ) : (
+                                  <span className="w-[40px]"></span>
+                                )}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-8 w-8 text-muted-foreground"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <MoreVertical className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-48 z-9999">
+                                    <DropdownMenuItem
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        try {
+                                          let detailedSong = song;
+                                          if (!song.downloadUrl && song.id) {
+                                            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs/${song.id}`);
+                                            const data = await response.json();
+                                            if (data.success && data.data && data.data.length > 0) {
+                                              detailedSong = data.data[0];
+                                            }
+                                          }
+                                          const songData = {
+                                            id: detailedSong.id,
+                                            name: detailedSong.name || detailedSong.title,
+                                            title: detailedSong.name || detailedSong.title,
+                                            artists: detailedSong.artists || { primary: [] },
+                                            primaryArtists: detailedSong.primaryArtists || getArtistNames(detailedSong),
+                                            album: detailedSong.album || { id: '', name: song.album || '' },
+                                            duration: detailedSong.duration || 0,
+                                            image: detailedSong.image || [],
+                                            releaseDate: detailedSong.releaseDate || '',
+                                            language: detailedSong.language || '',
+                                            playCount: detailedSong.playCount || 0,
+                                            downloadUrl: detailedSong.downloadUrl || [],
+                                            url: detailedSong.url || '',
+                                            type: 'song'
+                                          };
+                                          await toggleLike(songData);
+                                        } catch (error) {
+                                          console.error('Error toggling like:', error);
+                                        }
+                                      }}
+                                      className={isLiked(song.id) ? "text-red-500" : ""}
+                                    >
+                                      <Heart className={`w-4 h-4 mr-2 ${isLiked(song.id) ? 'fill-red-500 text-red-500' : ''}`} />
+                                      {isLiked(song.id) ? 'Unlike' : 'Like'}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, song)}>
+                                      <Plus className="w-4 h-4 mr-2" />
+                                      Add to playlist
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={(e) => handleGoToArtist(e, song)}>
+                                      <User className="w-4 h-4 mr-2" />
+                                      Go to artist
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={(e) => handleGoToAlbum(e, song)}>
+                                      <Disc className="w-4 h-4 mr-2" />
+                                      Go to album
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={(e) => handleShare(e, song)}>
+                                      <Share className="w-4 h-4 mr-2" />
+                                      Share
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={(e) => handleDownload(e, song)}>
+                                      <Download className="w-4 h-4 mr-2" />
+                                      Download
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
                             </div>
                           </div>
                         );
                       })}
+
+                      {/* Songs loading sentinel */}
+                      {(categoryData.songs.hasMore && categoryData.songs.page > 0) && (
+                        <div ref={observerTarget} className="flex justify-center py-4 w-full h-10">
+                          {categoryData.songs.loading && (
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="text-center py-20">
@@ -1513,9 +1890,9 @@ function SearchPageContent() {
 
                 {/* Albums Tab */}
                 <TabsContent value="albums">
-                  {combinedSearchResults.albums?.results?.length > 0 ? (
+                  {categoryData.albums.results.length > 0 || (combinedSearchResults.albums?.results?.length > 0) ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4 sm:gap-6">
-                      {combinedSearchResults.albums.results.map((album, index) => (
+                      {(categoryData.albums.page > 0 ? categoryData.albums.results : combinedSearchResults.albums.results).map((album, index) => (
                         <div
                           key={album.id || index}
                           className="group cursor-pointer hover:scale-105 transition-transform duration-200"
@@ -1542,6 +1919,16 @@ function SearchPageContent() {
                           </p>
                         </div>
                       ))}
+
+
+                      {/* Albums loading sentinel */}
+                      {(categoryData.albums.hasMore && categoryData.albums.page > 0) && (
+                        <div ref={observerTarget} className="col-span-full flex justify-center py-4 w-full h-10">
+                          {categoryData.albums.loading && (
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="text-center py-20">
@@ -1556,9 +1943,9 @@ function SearchPageContent() {
 
                 {/* Artists Tab */}
                 <TabsContent value="artists">
-                  {combinedSearchResults.artists?.results?.length > 0 ? (
+                  {categoryData.artists.results.length > 0 || (combinedSearchResults.artists?.results?.length > 0) ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4 sm:gap-6">
-                      {combinedSearchResults.artists.results.map((artist, index) => (
+                      {(categoryData.artists.page > 0 ? categoryData.artists.results : combinedSearchResults.artists.results).map((artist, index) => (
                         <div
                           key={artist.id || index}
                           className="text-center group cursor-pointer hover:scale-105 transition-transform duration-200"
@@ -1602,6 +1989,15 @@ function SearchPageContent() {
                           <p className="text-xs sm:text-sm text-muted-foreground">Artist</p>
                         </div>
                       ))}
+
+                      {/* Artists loading sentinel */}
+                      {(categoryData.artists.hasMore && categoryData.artists.page > 0) && (
+                        <div ref={observerTarget} className="col-span-full flex justify-center py-4 w-full h-10">
+                          {categoryData.artists.loading && (
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="text-center py-20">
@@ -1616,17 +2012,18 @@ function SearchPageContent() {
 
                 {/* Playlists Tab */}
                 <TabsContent value="playlists">
-                  {publicPlaylistsLoading && (
+                  {/* Show spinner for initial load if public playlists loading OR (playlists tab active and loading first page) */}
+                  {(publicPlaylistsLoading || (activeTab === 'playlists' && categoryData.playlists.loading && categoryData.playlists.page === 0)) && (
                     <div className="flex items-center justify-center py-12">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                       <span className="ml-3 text-muted-foreground">Searching playlists...</span>
                     </div>
                   )}
 
-                  {(combinedSearchResults.playlists?.results?.length > 0 || publicPlaylists?.length > 0) ? (
+                  {(categoryData.playlists.results.length > 0 || combinedSearchResults.playlists?.results?.length > 0 || publicPlaylists?.length > 0) ? (
                     <div className="space-y-8">
-                      {/* User-created Public Playlists */}
-                      {publicPlaylists?.length > 0 && (
+                      {/* User-created Public Playlists - only show on first page or mixed view */}
+                      {publicPlaylists?.length > 0 && categoryData.playlists.page <= 1 && (
                         <div>
                           <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-semibold">Community Playlists</h3>
@@ -1675,16 +2072,16 @@ function SearchPageContent() {
                       )}
 
                       {/* JioSaavn Playlists */}
-                      {searchResults.playlists?.results?.length > 0 && (
+                      {(categoryData.playlists.page > 0 ? categoryData.playlists.results : combinedSearchResults.playlists.results).length > 0 && (
                         <div>
                           <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-semibold">Featured Playlists</h3>
                             <span className="text-sm text-muted-foreground">
-                              {combinedSearchResults.playlists.results.length} playlist{combinedSearchResults.playlists.results.length !== 1 ? 's' : ''}
+                              {(categoryData.playlists.page > 0 ? categoryData.playlists.results : combinedSearchResults.playlists.results).length} playlist{(categoryData.playlists.page > 0 ? categoryData.playlists.results : combinedSearchResults.playlists.results).length !== 1 ? 's' : ''}
                             </span>
                           </div>
                           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4 sm:gap-6">
-                            {searchResults.playlists.results.map((playlist, index) => (
+                            {(categoryData.playlists.page > 0 ? categoryData.playlists.results : combinedSearchResults.playlists.results).map((playlist, index) => (
                               <div
                                 key={`jiosaavn-${playlist.id || index}`}
                                 className="group cursor-pointer hover:scale-105 transition-transform duration-200"
@@ -1714,8 +2111,17 @@ function SearchPageContent() {
                           </div>
                         </div>
                       )}
+
+                      {/* Playlists loading sentinel */}
+                      {(categoryData.playlists.hasMore && categoryData.playlists.page > 0) && (
+                        <div ref={observerTarget} className="col-span-full flex justify-center py-4 w-full h-10">
+                          {categoryData.playlists.loading && (
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  ) : !publicPlaylistsLoading && (
+                  ) : !publicPlaylistsLoading && !categoryData.playlists.loading && (
                     <div className="text-center py-20">
                       <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/50 flex items-center justify-center">
                         <Search className="w-8 h-8 text-muted-foreground" />
@@ -1760,7 +2166,7 @@ function SearchPageContent() {
         onOpenChange={setAddToPlaylistDialogOpen}
         song={selectedSong}
       />
-    </SidebarProvider>
+    </SidebarProvider >
   );
 }
 

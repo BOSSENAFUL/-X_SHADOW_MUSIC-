@@ -27,7 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Play, ArrowLeft, Heart, MoreVertical, Clock, Shuffle, Calendar, Disc, Plus, User, Share, Download } from "lucide-react";
+import { Play, ArrowLeft, Heart, MoreVertical, Clock, Shuffle, Calendar, Disc, Plus, User, Share, Download, Pause } from "lucide-react";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useLikedAlbums } from "@/hooks/useLikedAlbums";
 import { useMusicPlayer } from "@/contexts/music-player-context";
@@ -53,7 +53,7 @@ export default function AlbumPage() {
   const { toggleLike: toggleAlbumLike, isLiked: isAlbumLiked } = useLikedAlbums(session?.user?.id);
 
   // Initialize music player
-  const { playSong, currentSong, isPlaying } = useMusicPlayer();
+  const { playSong, currentSong, isPlaying, togglePlayPause, currentPlaylistId } = useMusicPlayer();
 
   useEffect(() => {
     const fetchAlbumDetails = async () => {
@@ -95,16 +95,22 @@ export default function AlbumPage() {
   }, [albumId]);
 
   const handlePlayClick = (song, index) => {
-    playSong(song, album.songs || []);
+    playSong(song, album.songs, albumId);
     setCurrentlyPlaying({ song, index });
     console.log(`Playing song:`, song);
   };
 
   const handlePlayAll = () => {
-    if (album?.songs?.length > 0) {
-      playSong(album.songs[0], album.songs);
-      setCurrentlyPlaying({ song: album.songs[0], index: 0 });
-      console.log('Playing all songs starting with:', album.songs[0]);
+    if (album?.songs && album.songs.length > 0) {
+      const isPlaylistPlaying = currentPlaylistId === albumId;
+
+      if (isPlaylistPlaying) {
+        togglePlayPause();
+      } else {
+        playSong(album.songs[0], album.songs, albumId);
+        setCurrentlyPlaying({ song: album.songs[0], index: 0 });
+      }
+      console.log('Album action:', isPlaylistPlaying ? 'toggling play/pause' : 'starting from beginning');
     }
   };
 
@@ -438,13 +444,13 @@ export default function AlbumPage() {
           <div
             className="p-4 md:p-6 text-white"
             style={{
-              background: `linear-gradient(to bottom, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.8)')}, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.9)')})`
+              background: `linear-gradient(to bottom, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.5)')} 0%, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.2)')} 100%)`
             }}
           >
             {/* Mobile Layout */}
             <div className="block md:hidden">
               <div className="flex flex-col items-center text-center space-y-4">
-                <div className="w-48 h-48 rounded-lg overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500 shadow-2xl">
+                <div className="w-48 h-48 rounded-lg overflow-hidden bg-muted shadow-2xl">
                   {album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url ? (
                     <img
                       src={album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url}
@@ -502,7 +508,7 @@ export default function AlbumPage() {
 
             {/* Desktop Layout */}
             <div className="hidden md:flex gap-6 items-end">
-              <div className="w-60 h-60 rounded-lg overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500 shrink-0 shadow-2xl">
+              <div className="w-60 h-60 rounded-lg overflow-hidden bg-muted shrink-0 shadow-2xl">
                 {album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url ? (
                   <img
                     src={album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url}
@@ -575,7 +581,11 @@ export default function AlbumPage() {
                 }}
                 onClick={handlePlayAll}
               >
-                <Play className="w-5 h-5 md:w-6 md:h-6 ml-0.5 md:ml-1" />
+                {currentPlaylistId === albumId && isPlaying ? (
+                  <Pause className="w-5 h-5 md:w-6 md:h-6" />
+                ) : (
+                  <Play className="w-5 h-5 md:w-6 md:h-6 ml-0.5 md:ml-1" />
+                )}
               </Button>
               <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
                 <Shuffle className="w-5 h-5 md:w-6 md:h-6" />
@@ -613,25 +623,24 @@ export default function AlbumPage() {
               </div>
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-0">
               {album.songs?.map((song, index) => {
                 const isCurrentSong = currentSong?.id === song.id;
                 return (
                   <div key={song.id || index}>
                     {/* Mobile Layout */}
                     <div
-                      className={`md:hidden flex items-center gap-3 p-3 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? 'bg-muted/30' : ''
-                        }`}
+                      className="md:hidden flex items-center gap-3 p-2 rounded hover:bg-muted/50 group cursor-pointer"
                       onClick={() => handlePlayClick(song, index)}
                     >
                       <div className="w-6 text-center flex-shrink-0">
                         {isCurrentSong && isPlaying ? (
                           <div className="flex items-center justify-center">
-                            <div className="flex space-x-0.5">
-                              <div className="w-0.5 h-3 bg-green-500 animate-pulse"></div>
-                              <div className="w-0.5 h-2 bg-green-500 animate-pulse" style={{ animationDelay: '0.1s' }}></div>
-                              <div className="w-0.5 h-4 bg-green-500 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                              <div className="w-0.5 h-2 bg-green-500 animate-pulse" style={{ animationDelay: '0.3s' }}></div>
+                            <div className="flex items-end justify-center gap-0.5 h-3">
+                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
+                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
+                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
+                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
                             </div>
                           </div>
                         ) : isCurrentSong ? (
@@ -699,9 +708,7 @@ export default function AlbumPage() {
                       </div>
 
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <div className="text-xs text-muted-foreground min-w-[35px] text-right">
-                          {formatDuration(song.duration)}
-                        </div>
+
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
@@ -749,18 +756,17 @@ export default function AlbumPage() {
 
                     {/* Desktop Layout */}
                     <div
-                      className={`hidden md:grid grid-cols-[auto_1fr_auto] gap-4 items-center p-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? 'bg-muted/30' : ''
-                        }`}
+                      className="hidden md:grid grid-cols-[auto_1fr_auto] gap-4 items-center p-2 rounded hover:bg-muted/50 group cursor-pointer"
                       onClick={() => handlePlayClick(song, index)}
                     >
                       <div className="w-8 text-center">
                         {isCurrentSong && isPlaying ? (
                           <div className="flex items-center justify-center">
-                            <div className="flex space-x-0.5">
-                              <div className="w-0.5 h-3 bg-green-500 animate-pulse"></div>
-                              <div className="w-0.5 h-2 bg-green-500 animate-pulse" style={{ animationDelay: '0.1s' }}></div>
-                              <div className="w-0.5 h-4 bg-green-500 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                              <div className="w-0.5 h-2 bg-green-500 animate-pulse" style={{ animationDelay: '0.3s' }}></div>
+                            <div className="flex items-end justify-center gap-0.5 h-3">
+                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
+                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
+                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
+                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
                             </div>
                           </div>
                         ) : isCurrentSong ? (
@@ -826,9 +832,7 @@ export default function AlbumPage() {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <div className="w-12 text-center text-sm text-muted-foreground">
-                          {formatDuration(song.duration)}
-                        </div>
+
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button

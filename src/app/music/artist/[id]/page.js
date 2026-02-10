@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Play, ArrowLeft, Heart, MoreVertical, Shuffle, Users, Calendar, Plus, Disc, Share, Download } from "lucide-react";
+import { Play, ArrowLeft, Heart, MoreVertical, Shuffle, Users, Calendar, Plus, Disc, Share, Download, Pause } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,7 +51,7 @@ export default function ArtistPage() {
   const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
 
   // Initialize music player
-  const { playSong, currentSong, isPlaying } = useMusicPlayer();
+  const { playSong, currentSong, isPlaying, togglePlayPause, currentPlaylistId } = useMusicPlayer();
 
   useEffect(() => {
     const fetchArtistDetails = async () => {
@@ -112,16 +112,22 @@ export default function ArtistPage() {
   }, [session, artistId]);
 
   const handlePlayClick = (song, index) => {
-    playSong(song, artist.topSongs || []);
+    playSong(song, artist.topSongs, artistId);
     setCurrentlyPlaying({ song, index });
     console.log(`Playing song:`, song);
   };
 
   const handlePlayAll = () => {
-    if (artist?.topSongs?.length > 0) {
-      playSong(artist.topSongs[0], artist.topSongs);
-      setCurrentlyPlaying({ song: artist.topSongs[0], index: 0 });
-      console.log('Playing all songs starting with:', artist.topSongs[0]);
+    if (artist?.topSongs && artist.topSongs.length > 0) {
+      const isPlaylistPlaying = currentPlaylistId === artistId;
+
+      if (isPlaylistPlaying) {
+        togglePlayPause();
+      } else {
+        playSong(artist.topSongs[0], artist.topSongs, artistId);
+        setCurrentlyPlaying({ song: artist.topSongs[0], index: 0 });
+      }
+      console.log('Artist action:', isPlaylistPlaying ? 'toggling play/pause' : 'starting from beginning');
     }
   };
 
@@ -434,13 +440,13 @@ export default function ArtistPage() {
           <div
             className="p-4 md:p-6 text-white"
             style={{
-              background: `linear-gradient(to bottom, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.8)')}, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.9)')})`
+              background: `linear-gradient(to bottom, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.5)')} 0%, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.2)')} 100%)`
             }}
           >
             {/* Mobile Layout */}
             <div className="block md:hidden">
               <div className="flex flex-col items-center text-center space-y-4">
-                <div className="w-48 h-48 rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500">
+                <div className="w-48 h-48 rounded-full overflow-hidden bg-muted">
                   {artist.image?.[2]?.url || artist.image?.[1]?.url || artist.image?.[0]?.url ? (
                     <img
                       src={artist.image?.[2]?.url || artist.image?.[1]?.url || artist.image?.[0]?.url}
@@ -484,7 +490,7 @@ export default function ArtistPage() {
 
             {/* Desktop Layout */}
             <div className="hidden md:flex gap-6 items-end">
-              <div className="w-60 h-60 rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500 shrink-0">
+              <div className="w-60 h-60 rounded-full overflow-hidden bg-muted shrink-0">
                 {artist.image?.[2]?.url || artist.image?.[1]?.url || artist.image?.[0]?.url ? (
                   <img
                     src={artist.image?.[2]?.url || artist.image?.[1]?.url || artist.image?.[0]?.url}
@@ -543,7 +549,11 @@ export default function ArtistPage() {
                 }}
                 onClick={handlePlayAll}
               >
-                <Play className="w-5 h-5 md:w-6 md:h-6 ml-0.5 md:ml-1" />
+                {currentPlaylistId === artistId && isPlaying ? (
+                  <Pause className="w-5 h-5 md:w-6 md:h-6" />
+                ) : (
+                  <Play className="w-5 h-5 md:w-6 md:h-6 ml-0.5 md:ml-1" />
+                )}
               </Button>
               <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
                 <Shuffle className="w-5 h-5 md:w-6 md:h-6" />
@@ -568,24 +578,23 @@ export default function ArtistPage() {
             {artist.topSongs && artist.topSongs.length > 0 && (
               <div>
                 <h2 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">Popular</h2>
-                <div className="space-y-1">
+                <div className="space-y-0">
                   {artist.topSongs.slice(0, 10).map((song, index) => {
                     const isCurrentSong = currentSong?.id === song.id;
                     return (
                       <div
                         key={song.id || index}
-                        className={`flex items-center gap-3 md:gap-4 p-2 md:p-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? 'bg-muted/30' : ''
-                          }`}
+                        className="flex items-center gap-3 md:gap-4 p-2 md:p-2 rounded hover:bg-muted/50 group cursor-pointer"
                         onClick={() => handlePlayClick(song, index)}
                       >
                         <div className="w-6 md:w-8 text-center flex-shrink-0">
                           {isCurrentSong && isPlaying ? (
                             <div className="flex items-center justify-center">
-                              <div className="flex space-x-0.5">
-                                <div className="w-0.5 h-3 bg-green-500 animate-pulse"></div>
-                                <div className="w-0.5 h-2 bg-green-500 animate-pulse" style={{ animationDelay: '0.1s' }}></div>
-                                <div className="w-0.5 h-4 bg-green-500 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                                <div className="w-0.5 h-2 bg-green-500 animate-pulse" style={{ animationDelay: '0.3s' }}></div>
+                              <div className="flex items-end justify-center gap-0.5 h-3">
+                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
+                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
+                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
+                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
                               </div>
                             </div>
                           ) : isCurrentSong ? (
@@ -632,9 +641,7 @@ export default function ArtistPage() {
                         </div>
 
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <div className="text-xs md:text-sm text-muted-foreground min-w-[35px] md:min-w-[40px] text-right">
-                            {formatDuration(song.duration)}
-                          </div>
+
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button
