@@ -585,7 +585,7 @@ function PlaylistPageContent() {
           {/* Songs List */}
           <div className="px-3 md:px-6 pb-32 md:pb-24">
             {/* Desktop Table Header */}
-            <div className="hidden md:grid grid-cols-[auto_1fr_1fr_120px_80px] gap-4 items-center text-sm text-muted-foreground border-b pb-2 mb-4">
+            <div className="hidden md:grid grid-cols-[auto_1fr_1fr_120px_100px] gap-4 items-center text-sm text-muted-foreground border-b pb-2 mb-4">
               <div className="w-8 text-center">#</div>
               <div>Title</div>
               <div>Album</div>
@@ -734,7 +734,7 @@ function PlaylistPageContent() {
 
                     {/* Desktop Layout */}
                     <div
-                      className={`hidden md:grid grid-cols-[auto_1fr_1fr_120px_80px] gap-4 items-center p-1.5 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
+                      className={`hidden md:grid grid-cols-[auto_1fr_1fr_120px_100px] gap-4 items-center p-1.5 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
                         }`}
                       onClick={() => handlePlayClick(song, index)}
                     >
@@ -838,7 +838,20 @@ function PlaylistPageContent() {
                       </div>
 
                       <div className="flex items-center justify-end gap-1">
-
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={`h-8 w-8 hidden md:inline-flex shrink-0 p-0 opacity-0 group-hover:opacity-100 transition-opacity ${isLiked(song.id) ? 'text-green-500 hover:text-green-600' : 'text-muted-foreground hover:text-foreground'}`}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await toggleLike(song);
+                          }}
+                        >
+                          <Heart className={`w-4 h-4 ${isLiked(song.id) ? 'fill-current' : ''}`} />
+                        </Button>
+                        <div className="min-w-[40px] text-right text-sm text-muted-foreground font-mono hidden md:block">
+                          {formatDuration(song.duration)}
+                        </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button

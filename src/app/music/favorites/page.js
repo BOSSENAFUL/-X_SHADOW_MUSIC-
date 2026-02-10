@@ -617,7 +617,7 @@ export default function FavoritesPage() {
             ) : likedSongs.length > 0 ? (
               <>
                 {/* Desktop Table Header */}
-                <div className="hidden md:grid grid-cols-[auto_1fr_1fr_120px_80px] gap-4 items-center text-sm text-muted-foreground border-b pb-2 mb-4">
+                <div className="hidden md:grid grid-cols-[auto_1fr_1fr_120px_100px] gap-4 items-center text-sm text-muted-foreground border-b pb-2 mb-4">
                   <div className="w-8 text-center">#</div>
                   <div>Title</div>
                   <div>Album</div>
@@ -778,7 +778,7 @@ export default function FavoritesPage() {
 
                         {/* Desktop Layout */}
                         <div
-                          className={`hidden md:grid grid-cols-[auto_1fr_1fr_120px_80px] gap-4 items-center p-1.5 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
+                          className={`hidden md:grid grid-cols-[auto_1fr_1fr_120px_100px] gap-4 items-center p-1.5 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
                             }`}
                           onClick={() => handlePlayClick(likedSong, index)}
                         >
@@ -877,7 +877,32 @@ export default function FavoritesPage() {
                           </div>
 
                           <div className="flex items-center justify-end gap-1">
-
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 text-green-500 hover:text-green-600 hidden md:inline-flex shrink-0 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                const songData = {
+                                  id: likedSong.songId,
+                                  name: likedSong.songName,
+                                  artists: { primary: likedSong.artists },
+                                  album: likedSong.album,
+                                  duration: likedSong.duration,
+                                  image: likedSong.image,
+                                  releaseDate: likedSong.releaseDate,
+                                  language: likedSong.language,
+                                  playCount: likedSong.playCount,
+                                  downloadUrl: likedSong.downloadUrl
+                                };
+                                await toggleLike(songData);
+                              }}
+                            >
+                              <Heart className="w-4 h-4 fill-current" />
+                            </Button>
+                            <div className="min-w-[40px] text-right text-sm text-muted-foreground font-mono hidden md:block">
+                              {formatDuration(likedSong.duration)}
+                            </div>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button

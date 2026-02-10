@@ -640,6 +640,22 @@ export default function ArtistPage() {
                           </p>
                         </div>
 
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={`h-8 w-8 hidden md:inline-flex shrink-0 p-0 opacity-0 group-hover:opacity-100 transition-opacity ${isLiked(song.id) ? 'text-green-500 hover:text-green-600' : 'text-muted-foreground hover:text-foreground'}`}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await toggleLike(song);
+                          }}
+                        >
+                          <Heart className={`w-4 h-4 ${isLiked(song.id) ? 'fill-current' : ''}`} />
+                        </Button>
+
+                        <div className="w-12 text-center text-sm text-muted-foreground hidden md:block">
+                          {formatDuration(song.duration)}
+                        </div>
+
                         <div className="flex items-center gap-2 flex-shrink-0">
 
                           <DropdownMenu>
