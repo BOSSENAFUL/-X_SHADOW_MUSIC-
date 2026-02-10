@@ -73,6 +73,64 @@ function SearchPageContent() {
   const { playSong, currentSong, isPlaying } = useMusicPlayer();
   const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
 
+  // Ref to track if we're restoring from sessionStorage (to prevent re-searching)
+  const isRestoringFromStorage = useRef(false);
+
+  // Ref for the scrollable container
+  const scrollContainerRef = useRef(null);
+
+  // Restore search state from sessionStorage on mount
+  useEffect(() => {
+    const savedSearchState = sessionStorage.getItem('searchPageState');
+    if (savedSearchState) {
+      try {
+        const { query, results, lyricsRes, publicPlaylists: savedPublicPlaylists, tab, categoryState, scrollPosition } = JSON.parse(savedSearchState);
+        if (query) {
+          isRestoringFromStorage.current = true;
+          setSearchQuery(query);
+          if (results) setSearchResults(results);
+          if (lyricsRes) setLyricsResults(lyricsRes);
+          if (savedPublicPlaylists) setPublicPlaylists(savedPublicPlaylists);
+          if (tab) setActiveTab(tab);
+          if (categoryState) setCategoryData(categoryState);
+
+          // Restore scroll position after a short delay to ensure content is rendered
+          if (scrollPosition !== undefined) {
+            setTimeout(() => {
+              if (scrollContainerRef.current) {
+                scrollContainerRef.current.scrollTop = scrollPosition;
+              }
+            }, 100);
+          }
+
+          // Reset the flag after a short delay to allow the state updates to complete
+          setTimeout(() => {
+            isRestoringFromStorage.current = false;
+          }, 100);
+        }
+      } catch (error) {
+        console.error('Error restoring search state:', error);
+        isRestoringFromStorage.current = false;
+      }
+    }
+  }, []);
+
+  // Save search state to sessionStorage whenever it changes
+  useEffect(() => {
+    if (searchQuery || searchResults) {
+      const searchState = {
+        query: searchQuery,
+        results: searchResults,
+        lyricsRes: lyricsResults,
+        publicPlaylists: publicPlaylists,
+        tab: activeTab,
+        categoryState: categoryData,
+        scrollPosition: scrollContainerRef.current?.scrollTop || 0
+      };
+      sessionStorage.setItem('searchPageState', JSON.stringify(searchState));
+    }
+  }, [searchQuery, searchResults, lyricsResults, publicPlaylists, activeTab, categoryData]);
+
   // Debounced search function
   const debounce = useCallback((func, delay) => {
     let timeoutId;
@@ -565,6 +623,19 @@ function SearchPageContent() {
 
   // Auto-focus the search input when the page loads
   useEffect(() => {
+    // Check if we're restoring from sessionStorage (prevent focus on back navigation)
+    const savedSearchState = sessionStorage.getItem('searchPageState');
+    if (savedSearchState) {
+      try {
+        const { query } = JSON.parse(savedSearchState);
+        if (query && query.trim()) {
+          return;
+        }
+      } catch (error) {
+        // Ignore parsing errors
+      }
+    }
+
     // Small delay to ensure the component is fully mounted
     const timer = setTimeout(() => {
       if (searchInputRef.current) {
@@ -585,6 +656,12 @@ function SearchPageContent() {
 
   // Handle search query changes (both from user input and initial URL query)
   useEffect(() => {
+    // Skip search if we're restoring from sessionStorage
+    if (isRestoringFromStorage.current) {
+      console.log('Skipping search - restoring from sessionStorage');
+      return;
+    }
+
     if (searchQuery.trim()) {
       // Clear results immediately when starting a new search
       setSearchResults(null);
@@ -1095,7 +1172,7 @@ function SearchPageContent() {
           </div>
         </header>
 
-        <div className="flex flex-1 flex-col pb-32 md:pb-6">
+        <div ref={scrollContainerRef} className="flex flex-1 flex-col pb-32 md:pb-6 overflow-y-auto">
           {/* Search Input */}
           <div className="p-4 sm:p-6 pb-4">
             <div className="relative w-full max-w-2xl mx-auto">
