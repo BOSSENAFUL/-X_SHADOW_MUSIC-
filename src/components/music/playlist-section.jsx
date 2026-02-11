@@ -21,11 +21,11 @@ export function PlaylistSection({
     };
     return (
         <div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-1">
                 <h2 className="text-xl md:text-2xl font-bold">{title}</h2>
                 <div className="flex items-center gap-2">
                     {/* Navigation Buttons - Tablet and Desktop Only */}
-                    <div className="hidden md:flex items-center gap-1 mr-2 border-r pr-3 border-muted-foreground/20">
+                    <div className="hidden lg:flex items-center gap-1 mr-2 border-r pr-3 border-muted-foreground/20">
                         <Button
                             variant="ghost"
                             size="icon"
@@ -56,7 +56,7 @@ export function PlaylistSection({
 
             <div
                 ref={scrollContainerRef}
-                className="flex overflow-x-auto p-2 md:p-3 gap-4 snap-x snap-mandatory scrollbar-hide"
+                className="flex overflow-x-auto p-2 gap-4 snap-x snap-mandatory scrollbar-hide"
             >
                 {loading
                     ? // Loading skeleton
@@ -73,7 +73,7 @@ export function PlaylistSection({
                     : playlists.map((playlist) => (
                         <div
                             key={playlist.id}
-                            className="group cursor-pointer hover:scale-105 transition-transform min-w-[140px] md:min-w-[180px] snap-start"
+                            className="group cursor-pointer hover:scale-105 transition-transform min-w-[140px] md:min-w-[160px] lg:min-w-[180px] snap-start"
                             onClick={() => onPlaylistClick(playlist)}
                         >
                             <div className="relative rounded-lg aspect-square overflow-hidden mb-3">

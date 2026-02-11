@@ -412,7 +412,7 @@ export default function MusicPage() {
   return (
     <SidebarProvider>
       <AppSidebar className="hidden md:flex" />
-      <SidebarInset className="md:ml-0">
+      <SidebarInset className="md:ml-0 overflow-x-hidden">
         <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center justify-between w-full gap-2 px-3 md:px-4">
             <div className="flex items-center gap-2">
@@ -453,7 +453,7 @@ export default function MusicPage() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-6 md:space-y-8 pb-20 md:pb-6 relative">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-6 space-y-6 md:space-y-8 pb-20 md:pb-6 relative">
           {/* Ambient Background Gradient */}
           <div
             className="absolute h-[15%] w-full top-0 left-0 pointer-events-none transition-colors duration-1000 ease-in-out z-0"
@@ -468,10 +468,10 @@ export default function MusicPage() {
 
 
           {/* Quick Access Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
             {/* Liked Songs */}
             <div
-              className="group relative flex items-center bg-white/5 hover:bg-white/10 transition-colors rounded-[4px] overflow-hidden cursor-pointer h-14 md:h-20 z-10 "
+              className="group relative flex items-center bg-white/5 hover:bg-white/10 transition-colors rounded-[4px] overflow-hidden cursor-pointer h-14 md:h-16 lg:h-20 z-10 "
               onClick={() => router.push("/music/favorites")}
               onMouseEnter={() => setHoveredColor("rgb(69, 10, 245)")}
               onMouseLeave={handleMouseLeave}
@@ -486,7 +486,7 @@ export default function MusicPage() {
                 <Heart className="w-5 h-5 md:w-8 md:h-8 fill-white text-white " />
               </div>
               <div className="min-w-0 flex-1 px-2 md:px-3 py-2 flex items-center">
-                <h3 className="font-bold text-[13px] md:text-base text-white line-clamp-2 leading-tight">
+                <h3 className="font-bold text-[13px] md:text-[14px] lg:text-[16px] text-white line-clamp-2 leading-tight">
                   Liked Songs
                 </h3>
               </div>
@@ -511,7 +511,7 @@ export default function MusicPage() {
               Array.from({ length: 5 }).map((_, index) => (
                 <div
                   key={`skeleton-${index}`}
-                  className="flex items-center bg-white/5 rounded-[4px] h-14 md:h-20 overflow-hidden animate-pulse"
+                  className="flex items-center bg-white/5 rounded-[4px] h-14 md:h-16 lg:h-20 overflow-hidden animate-pulse"
                 >
                   <div className="h-full aspect-square bg-muted shrink-0" />
                   <div className="min-w-0 flex-1 px-2 md:px-3">
@@ -531,7 +531,7 @@ export default function MusicPage() {
                   return (
                     <div
                       key={playlist.playlistId}
-                      className="group relative flex items-center bg-white/5 hover:bg-white/10 transition-colors rounded-[4px] overflow-hidden cursor-pointer h-14 md:h-20 z-10"
+                      className="group relative flex items-center bg-white/5 hover:bg-white/10 transition-colors rounded-[4px] overflow-hidden cursor-pointer h-14 md:h-16 lg:h-20 z-10"
                       onMouseEnter={() =>
                         setHoveredColor(
                           playlistColors[playlist.playlistId] ||
@@ -659,7 +659,7 @@ export default function MusicPage() {
                         })()}
                       </div>
                       <div className="min-w-0 flex-1 px-2 md:px-3 py-2 flex items-center">
-                        <h3 className="font-bold text-[13px] md:text-base text-white line-clamp-2 leading-tight">
+                        <h3 className="font-bold text-[13px] md:text-[14px] lg:text-[16px] text-white line-clamp-2 leading-tight">
                           {playlist.playlistName}
                         </h3>
                       </div>
