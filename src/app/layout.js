@@ -9,6 +9,7 @@ import { GlobalOnlineTracker } from "@/components/global-online-tracker";
 import UserActivityTracker from "@/components/analytics/UserActivityTracker";
 import { Analytics } from "@vercel/analytics/next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import AppRating from "@/components/app-rating";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -83,6 +84,7 @@ export default function RootLayout({ children }) {
             <MusicPlayerProvider>
               <GlobalOnlineTracker />
               <UserActivityTracker />
+              <AppRating />
               {children}
               <Analytics />
               <SpeedInsights />

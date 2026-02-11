@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ModeToggle } from "@/components/mode-toggle";
 import { AppPreview } from "@/components/app-preview";
+import UserReviews from "@/components/user-reviews";
 import { ArrowRight, Download } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -114,6 +115,10 @@ export default function Home() {
           </motion.div>
         </div>
       </main>
+
+
+      {/* User Reviews */}
+      <UserReviews />
 
       {/* App Preview Component */}
       <AppPreview />
