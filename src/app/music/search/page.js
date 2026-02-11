@@ -15,7 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, Play, Heart, Pause, MoreVertical, Plus, User, Disc, Share, Download, Clock } from "lucide-react";
+import { Search, Play, Heart, Pause, MoreVertical, Plus, User, Disc, Share, Download, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Separator } from "@/components/ui/separator";
 import {
