@@ -1349,18 +1349,7 @@ function SearchPageContent() {
 
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <div className="relative group/tabs flex items-center mb-6">
-                  {/* Tabs Scroll Buttons - Desktop Only */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="hidden md:flex h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm border shadow-sm absolute -left-4 z-20 opacity-0 group-hover/tabs:opacity-100 transition-opacity"
-                    onClick={() => {
-                      const el = document.getElementById('search-tabs-container');
-                      if (el) el.scrollBy({ left: -200, behavior: 'smooth' });
-                    }}
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
+
 
                   <div
                     id="search-tabs-container"
@@ -1375,17 +1364,7 @@ function SearchPageContent() {
                     </TabsList>
                   </div>
 
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="hidden md:flex h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm border shadow-sm absolute -right-4 z-20 opacity-0 group-hover/tabs:opacity-100 transition-opacity"
-                    onClick={() => {
-                      const el = document.getElementById('search-tabs-container');
-                      if (el) el.scrollBy({ left: 200, behavior: 'smooth' });
-                    }}
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
+
                 </div>
 
                 <TabsContent value="all" className="space-y-6 sm:space-y-8">
