@@ -126,16 +126,14 @@ export default function NewReleasesPage() {
                     className="group cursor-pointer hover:scale-105 transition-transform"
                     onClick={() => handleCardClick(playlist)}
                   >
-                    <div className="relative rounded-lg aspect-square overflow-hidden mb-3 bg-gradient-to-br from-purple-500 to-pink-500">
+                    <div className="relative rounded-lg aspect-square overflow-hidden mb-3 bg-muted">
                       {playlist.image?.[2]?.url || playlist.image?.[1]?.url || playlist.image?.[0]?.url ? (
                         <img
                           src={playlist.image?.[2]?.url || playlist.image?.[1]?.url || playlist.image?.[0]?.url}
                           alt={playlist.name}
                           className="w-full h-full object-cover"
                           onError={(e) => {
-                            console.log('Image failed to load:', e.target.src);
-                            e.target.style.display = 'none';
-                            // Show the gradient background instead
+                            e.target.src = '/default-playlist-image.png';
                           }}
                           onLoad={() => {
                             console.log('Image loaded successfully');

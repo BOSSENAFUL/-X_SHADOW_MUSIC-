@@ -41,7 +41,7 @@ export default function ArtistPage() {
   const [artist, setArtist] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentlyPlaying, setCurrentlyPlaying] = useState(null);
-  const [dominantColor, setDominantColor] = useState('rgb(34, 197, 94)'); // Default green
+  const [dominantColor, setDominantColor] = useState('rgb(40, 40, 40)'); // Default dark gray
   const [isArtistLiked, setIsArtistLiked] = useState(false);
   const [artistLikeLoading, setArtistLikeLoading] = useState(false);
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false);
@@ -66,7 +66,7 @@ export default function ArtistPage() {
           console.log(`Fetched artist "${artistData.data.name}"`);
 
           // Extract dominant color from artist image
-          let extractedColor = 'rgb(34, 197, 94)'; // Default green
+          let extractedColor = 'rgb(40, 40, 40)'; // Default dark gray
           const imageUrl = artistData.data.image?.[2]?.url || artistData.data.image?.[1]?.url || artistData.data.image?.[0]?.url;
 
           if (imageUrl) {
@@ -170,7 +170,7 @@ export default function ArtistPage() {
           }
 
           // Find the most common color
-          let dominantColor = '34,197,94'; // Default green
+          let dominantColor = '40,40,40'; // Default dark gray
           let maxCount = 0;
 
           for (const [color, count] of Object.entries(colorCounts)) {
@@ -183,12 +183,12 @@ export default function ArtistPage() {
           resolve(`rgb(${dominantColor})`);
         } catch (error) {
           console.error('Error extracting color:', error);
-          resolve('rgb(34, 197, 94)'); // Default green
+          resolve('rgb(40, 40, 40)'); // Default dark gray
         }
       };
 
       img.onerror = () => {
-        resolve('rgb(34, 197, 94)'); // Default green
+        resolve('rgb(40, 40, 40)'); // Default dark gray
       };
 
       img.src = imageUrl;
@@ -609,7 +609,7 @@ export default function ArtistPage() {
                           )}
                         </div>
 
-                        <div className="w-12 h-12 md:w-12 md:h-12 rounded bg-gradient-to-br from-purple-500 to-pink-500 shrink-0 overflow-hidden">
+                        <div className="w-12 h-12 md:w-12 md:h-12 rounded bg-muted shrink-0 overflow-hidden">
                           {song.image?.length > 0 ? (
                             <img
                               src={song.image.find(img => img.quality === '500x500')?.url ||
@@ -719,7 +719,7 @@ export default function ArtistPage() {
                       className="group cursor-pointer hover:scale-105 transition-transform"
                       onClick={() => router.push(`/music/album/${album.id}`)}
                     >
-                      <div className="relative rounded-lg aspect-square overflow-hidden mb-2 md:mb-3 bg-gradient-to-br from-purple-500 to-pink-500">
+                      <div className="relative rounded-lg aspect-square overflow-hidden mb-2 md:mb-3 bg-muted">
                         {album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url ? (
                           <img
                             src={album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url}

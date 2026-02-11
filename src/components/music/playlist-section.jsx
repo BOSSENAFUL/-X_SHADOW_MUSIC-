@@ -1,5 +1,6 @@
+import { useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Play } from "lucide-react";
+import { Play, ChevronLeft, ChevronRight } from "lucide-react";
 
 export function PlaylistSection({
     title,
@@ -9,21 +10,54 @@ export function PlaylistSection({
     onPlaylistClick,
     onPlayClick,
 }) {
+    const scrollContainerRef = useRef(null);
+
+    const scroll = (direction) => {
+        if (scrollContainerRef.current) {
+            const container = scrollContainerRef.current;
+            const scrollAmount = direction === "left" ? -container.offsetWidth : container.offsetWidth;
+            container.scrollBy({ left: scrollAmount, behavior: "smooth" });
+        }
+    };
     return (
         <div>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl md:text-2xl font-bold">{title}</h2>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={onShowAll}
-                    className="text-xs md:text-sm"
-                >
-                    Show all
-                </Button>
+                <div className="flex items-center gap-2">
+                    {/* Navigation Buttons - Tablet and Desktop Only */}
+                    <div className="hidden md:flex items-center gap-1 mr-2 border-r pr-3 border-muted-foreground/20">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full bg-muted/30 hover:bg-muted/50"
+                            onClick={() => scroll("left")}
+                        >
+                            <ChevronLeft className="w-4 h-4" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full bg-muted/30 hover:bg-muted/50"
+                            onClick={() => scroll("right")}
+                        >
+                            <ChevronRight className="w-4 h-4" />
+                        </Button>
+                    </div>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={onShowAll}
+                        className="text-xs md:text-sm font-medium hover:bg-muted/50"
+                    >
+                        Show all
+                    </Button>
+                </div>
             </div>
 
-            <div className="flex overflow-x-auto p-2 md:p-3 gap-4 snap-x snap-mandatory scrollbar-hide">
+            <div
+                ref={scrollContainerRef}
+                className="flex overflow-x-auto p-2 md:p-3 gap-4 snap-x snap-mandatory scrollbar-hide"
+            >
                 {loading
                     ? // Loading skeleton
                     Array.from({ length: 6 }).map((_, index) => (

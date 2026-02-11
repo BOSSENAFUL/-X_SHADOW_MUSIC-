@@ -32,7 +32,7 @@ export default function ProfilePage() {
     return (
       <SidebarProvider>
         <AppSidebar className="hidden md:flex" />
-        <SidebarInset className="md:ml-0">
+        <SidebarInset>
           <div className="flex items-center justify-center h-screen">
             <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
           </div>
@@ -45,7 +45,7 @@ export default function ProfilePage() {
     return (
       <SidebarProvider>
         <AppSidebar className="hidden md:flex" />
-        <SidebarInset className="md:ml-0">
+        <SidebarInset>
           <div className="flex items-center justify-center h-screen">
             <Card className="w-full max-w-md mx-4">
               <CardHeader className="text-center">
@@ -69,7 +69,7 @@ export default function ProfilePage() {
   return (
     <SidebarProvider>
       <AppSidebar className="hidden md:flex" />
-      <SidebarInset className="md:ml-0">
+      <SidebarInset>
         <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1 hidden md:flex" />

@@ -118,7 +118,7 @@ export default function LibraryPage() {
   return (
     <SidebarProvider>
       <AppSidebar className="hidden md:flex" />
-      <SidebarInset className="md:ml-0">
+      <SidebarInset>
         <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center justify-between w-full px-4">
             <div className="flex items-center gap-2">
@@ -151,7 +151,7 @@ export default function LibraryPage() {
             </Button>
           </div>
         </header>
-        
+
         <div className="flex flex-1 flex-col pb-20 md:pb-6">
           <div className="p-4 md:p-6">
             <div className="mb-6">
@@ -167,12 +167,12 @@ export default function LibraryPage() {
                   className="group flex items-center gap-4 p-3 rounded-lg hover:bg-muted/50 transition-all duration-200 cursor-pointer"
                 >
                   {/* Icon */}
-                  <div 
+                  <div
                     className="w-12 h-12 rounded-lg flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow"
                     style={{ background: item.iconBg }}
                   >
-                    <item.icon 
-                      className="w-6 h-6" 
+                    <item.icon
+                      className="w-6 h-6"
                       style={{ color: item.iconColor }}
                       fill={item.id === 'liked-songs' ? 'currentColor' : 'none'}
                     />
@@ -198,15 +198,15 @@ export default function LibraryPage() {
             <div className="mt-8">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold">Recently Played</h2>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="sm"
                   onClick={() => router.push('/music/library/recently-played')}
                 >
                   Show all
                 </Button>
               </div>
-              
+
               <div className="text-center py-8 text-muted-foreground">
                 <Music className="w-12 h-12 mx-auto mb-3 opacity-50" />
                 <p>Your recently played music will appear here</p>

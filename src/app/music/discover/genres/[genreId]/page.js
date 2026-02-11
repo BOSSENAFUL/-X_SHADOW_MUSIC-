@@ -535,7 +535,7 @@ export default function GenreDetailPage() {
 
                 <div className="flex-1 overflow-y-auto">
                     {/* Genre Header */}
-                    <div className={`p-4 md:p-6 text-white bg-gradient-to-br ${currentGenre?.color || 'from-purple-500 to-pink-500'}`}>
+                    <div className={`p-4 md:p-6 text-white bg-gradient-to-br ${currentGenre?.color || 'from-slate-800 to-gray-900'}`}>
                         <div className="flex items-end gap-6">
                             <div className="flex-1">
                                 <Badge variant="secondary" className="mb-2">
@@ -626,7 +626,7 @@ export default function GenreDetailPage() {
                                                                 )}
                                                             </div>
 
-                                                            <div className="w-12 h-12 rounded bg-gradient-to-br from-purple-500 to-pink-500 flex-shrink-0 overflow-hidden">
+                                                            <div className="w-12 h-12 rounded bg-muted flex-shrink-0 overflow-hidden">
                                                                 {song.image?.length > 0 ? (
                                                                     <img
                                                                         src={song.image.find(img => img.quality === '500x500')?.url ||
@@ -744,7 +744,7 @@ export default function GenreDetailPage() {
                                                             </div>
 
                                                             <div className="flex items-center gap-3 min-w-0">
-                                                                <div className="w-12 h-12 rounded bg-gradient-to-br from-purple-500 to-pink-500 shrink-0 overflow-hidden">
+                                                                <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
                                                                     {song.image?.length > 0 ? (
                                                                         <img
                                                                             src={song.image.find(img => img.quality === '500x500')?.url ||

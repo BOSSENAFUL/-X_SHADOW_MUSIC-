@@ -161,7 +161,7 @@ export default function AlbumsPage() {
                   onClick={() => handleAlbumClick(album.albumId)}
                 >
                   <div className="relative mb-3">
-                    <div className="aspect-square rounded-lg overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500 shadow-md group-hover:shadow-lg transition-shadow duration-200">
+                    <div className="aspect-square rounded-lg overflow-hidden bg-muted shadow-md group-hover:shadow-lg transition-shadow duration-200">
                       {album.albumData?.image?.[2]?.url || album.albumData?.image?.[1]?.url || album.albumData?.image?.[0]?.url ? (
                         <img
                           src={album.albumData.image[2]?.url || album.albumData.image[1]?.url || album.albumData.image[0]?.url}

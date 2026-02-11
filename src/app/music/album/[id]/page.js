@@ -42,7 +42,7 @@ export default function AlbumPage() {
   const [album, setAlbum] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentlyPlaying, setCurrentlyPlaying] = useState(null);
-  const [dominantColor, setDominantColor] = useState('rgb(34, 197, 94)'); // Default green
+  const [dominantColor, setDominantColor] = useState('rgb(40, 40, 40)'); // Default dark gray
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState(null);
 
@@ -68,7 +68,7 @@ export default function AlbumPage() {
           console.log(`Fetched album "${albumData.data.name}" with ${albumData.data.songs?.length || 0} songs`);
 
           // Extract dominant color from album image
-          let extractedColor = 'rgb(34, 197, 94)'; // Default green
+          let extractedColor = 'rgb(40, 40, 40)'; // Default dark gray
           const imageUrl = albumData.data.image?.[2]?.url || albumData.data.image?.[1]?.url || albumData.data.image?.[0]?.url;
 
           if (imageUrl) {
@@ -157,7 +157,7 @@ export default function AlbumPage() {
           }
 
           // Find the most common color
-          let dominantColor = '34,197,94'; // Default green
+          let dominantColor = '40,40,40'; // Default dark gray
           let maxCount = 0;
 
           for (const [color, count] of Object.entries(colorCounts)) {
@@ -170,12 +170,12 @@ export default function AlbumPage() {
           resolve(`rgb(${dominantColor})`);
         } catch (error) {
           console.error('Error extracting color:', error);
-          resolve('rgb(34, 197, 94)'); // Default green
+          resolve('rgb(40, 40, 40)'); // Default dark gray
         }
       };
 
       img.onerror = () => {
-        resolve('rgb(34, 197, 94)'); // Default green
+        resolve('rgb(40, 40, 40)'); // Default dark gray
       };
 
       img.src = imageUrl;
@@ -655,7 +655,7 @@ export default function AlbumPage() {
                         )}
                       </div>
 
-                      <div className="w-12 h-12 rounded bg-gradient-to-br from-purple-500 to-pink-500 flex-shrink-0 overflow-hidden">
+                      <div className="w-12 h-12 rounded bg-muted flex-shrink-0 overflow-hidden">
                         {song.image?.length > 0 ? (
                           <img
                             src={song.image.find(img => img.quality === '500x500')?.url ||
@@ -782,7 +782,7 @@ export default function AlbumPage() {
                       </div>
 
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-12 h-12 rounded bg-gradient-to-br from-purple-500 to-pink-500 shrink-0 overflow-hidden">
+                        <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
                           {song.image?.length > 0 ? (
                             <img
                               src={song.image.find(img => img.quality === '500x500')?.url ||

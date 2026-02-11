@@ -100,7 +100,7 @@ function PlaylistPageContent() {
           }
 
           // Extract dominant color from playlist image BEFORE setting playlist data
-          let extractedColor = 'rgb(80, 80, 80)'; // Default dark gray
+          let extractedColor = 'rgb(40, 40, 40)'; // Default dark gray to match default playlist image
           if (imageUrl) {
             try {
               extractedColor = await extractDominantColor(imageUrl);
@@ -197,13 +197,12 @@ function PlaylistPageContent() {
 
           resolve(`rgb(${dominantColor})`);
         } catch (error) {
-          console.error('Error extracting color:', error);
-          resolve('rgb(80, 80, 80)'); // Default dark gray
+          resolve('rgb(40, 40, 40)'); // Default dark gray to match default playlist image
         }
       };
 
       img.onerror = () => {
-        resolve('rgb(34, 197, 94)'); // Default green
+        resolve('rgb(40, 40, 40)'); // Default dark gray to match default playlist image
       };
 
       img.src = imageUrl;
@@ -444,20 +443,22 @@ function PlaylistPageContent() {
             {/* Mobile Layout */}
             <div className="block md:hidden">
               <div className="flex flex-col items-center text-center space-y-4">
-                <div className="w-48 h-48 rounded-lg overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500 flex-shrink-0">
+                <div className="w-48 h-48 rounded-lg overflow-hidden bg-muted flex-shrink-0">
                   {playlist.image?.[2]?.url || playlist.image?.[1]?.url || playlist.image?.[0]?.url ? (
                     <img
                       src={playlist.image?.[2]?.url || playlist.image?.[1]?.url || playlist.image?.[0]?.url}
                       alt={playlist.name}
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        e.target.style.display = 'none';
+                        e.target.src = '/default-playlist-image.png';
                       }}
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Play className="w-16 h-16 opacity-50" />
-                    </div>
+                    <img
+                      src="/default-playlist-image.png"
+                      alt={playlist.name}
+                      className="w-full h-full object-cover"
+                    />
                   )}
                 </div>
                 <div className="space-y-2">
@@ -487,20 +488,22 @@ function PlaylistPageContent() {
 
             {/* Desktop Layout */}
             <div className="hidden md:flex gap-6 items-end">
-              <div className="w-60 h-60 rounded-lg overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500 flex-shrink-0">
+              <div className="w-60 h-60 rounded-lg overflow-hidden bg-muted flex-shrink-0">
                 {playlist.image?.[2]?.url || playlist.image?.[1]?.url || playlist.image?.[0]?.url ? (
                   <img
                     src={playlist.image?.[2]?.url || playlist.image?.[1]?.url || playlist.image?.[0]?.url}
                     alt={playlist.name}
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      e.target.style.display = 'none';
+                      e.target.src = '/default-playlist-image.png';
                     }}
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Play className="w-20 h-20 opacity-50" />
-                  </div>
+                  <img
+                    src="/default-playlist-image.png"
+                    alt={playlist.name}
+                    className="w-full h-full object-cover"
+                  />
                 )}
               </div>
               <div className="flex-1 min-w-0">
@@ -631,7 +634,7 @@ function PlaylistPageContent() {
                         )}
                       </div>
 
-                      <div className="w-12 h-12 rounded bg-gradient-to-br from-purple-500 to-pink-500 flex-shrink-0 overflow-hidden">
+                      <div className="w-12 h-12 rounded bg-muted flex-shrink-0 overflow-hidden">
                         {song.image?.length > 0 ? (
                           <img
                             src={song.image.find(img => img.quality === '500x500')?.url ||
@@ -761,7 +764,7 @@ function PlaylistPageContent() {
                       </div>
 
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-12 h-12 rounded bg-gradient-to-br from-purple-500 to-pink-500 flex-shrink-0 overflow-hidden">
+                        <div className="w-12 h-12 rounded bg-muted flex-shrink-0 overflow-hidden">
                           {song.image?.length > 0 ? (
                             <img
                               src={song.image.find(img => img.quality === '500x500')?.url ||

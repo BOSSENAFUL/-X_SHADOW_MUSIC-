@@ -618,7 +618,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                     }`}
                   onClick={() => !isRadioPlaying && setIsFullscreenOpen(true)}
                 >
-                  <div className="w-10 h-10 rounded bg-gradient-to-br from-purple-500 to-pink-500 flex-shrink-0 overflow-hidden">
+                  <div className="w-10 h-10 rounded bg-muted flex-shrink-0 overflow-hidden">
                     {currentSong.image?.length > 0 ? (
                       <img
                         src={
@@ -707,12 +707,12 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                 {/* Song Info */}
                 <div
                   className={`flex items-center gap-3 min-w-0 flex-1 rounded-lg p-2 -m-2 transition-colors ${!isRadioPlaying
-                      ? "cursor-pointer hover:bg-muted/50"
-                      : "cursor-default"
+                    ? "cursor-pointer hover:bg-muted/50"
+                    : "cursor-default"
                     }`}
                   onClick={() => !isRadioPlaying && setIsFullscreenOpen(true)}
                 >
-                  <div className="w-12 h-12 rounded bg-gradient-to-br from-purple-500 to-pink-500 flex-shrink-0 overflow-hidden">
+                  <div className="w-12 h-12 rounded bg-muted flex-shrink-0 overflow-hidden">
                     {currentSong.image?.length > 0 ? (
                       <img
                         src={
