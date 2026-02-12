@@ -21,6 +21,11 @@ const likedPlaylistSchema = new mongoose.Schema({
         required: true
     },
 
+    owner: {
+        type: String,
+        default: 'Jammify'
+    },
+
     description: {
         type: String,
         default: ''
@@ -61,6 +66,7 @@ likedPlaylistSchema.methods.toJSON = function () {
         id: likedPlaylist._id,
         playlistId: likedPlaylist.playlistId,
         playlistName: likedPlaylist.playlistName,
+        owner: likedPlaylist.owner,
         description: likedPlaylist.description,
         image: likedPlaylist.image,
         songCount: likedPlaylist.songCount,
@@ -91,6 +97,7 @@ likedPlaylistSchema.statics.toggleLike = async function (userId, playlistData) {
             userId,
             playlistId: playlistData.id,
             playlistName: playlistData.name || playlistData.title,
+            owner: playlistData.owner || playlistData.subtitle || 'Jammify',
             description: playlistData.description || '',
             image: playlistData.image,
             songCount: playlistData.songCount || playlistData.song_count || 0

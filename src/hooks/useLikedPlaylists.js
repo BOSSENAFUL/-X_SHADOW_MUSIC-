@@ -86,53 +86,61 @@ export function useLikedPlaylists(userId) {
           }
         }
 
-        // Enrich user-created playlists that don't have images
+        // Enrich user-created playlists (images and owner names)
         const enrichedPlaylists = await Promise.all(accessiblePlaylists.map(async (playlist) => {
           const isUserPlaylist = playlist.playlistId &&
             playlist.playlistId.length === 24 &&
             /^[0-9a-fA-F]{24}$/.test(playlist.playlistId);
 
-          const hasImage = playlist.image && (Array.isArray(playlist.image) ? playlist.image.length > 0 : !!playlist.image);
-
-          if (isUserPlaylist && !hasImage) {
+          if (isUserPlaylist) {
             try {
-              // Fetch playlist detail to get songIds
+              // Fetch playlist detail to get owner and song data
               const detailRes = await fetch(`/api/playlists/${playlist.playlistId}`);
               const detailData = await detailRes.json();
 
-              if (detailData.success && detailData.data.songIds && detailData.data.songIds.length > 0) {
-                // Get first 4 song IDs
-                const firstFourIds = detailData.data.songIds.slice(0, 4);
+              if (detailData.success) {
+                const playlistInfo = detailData.data;
+                const owner = playlistInfo.ownerName || playlist.owner;
 
-                // Fetch song images in background (simulated as we need a real API)
-                // We'll use the external songs API if available
-                const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-                const songImages = await Promise.all(firstFourIds.map(async (id) => {
-                  try {
-                    const songRes = await fetch(`${apiUrl}/api/songs?ids=${id}`);
-                    const songData = await songRes.json();
-                    if (songData.success && songData.data?.[0]?.image) {
-                      const img = songData.data[0].image;
-                      return img.find(i => i.quality === '150x150')?.url || img[0]?.url;
-                    }
-                  } catch (e) { }
-                  return null;
-                }));
+                let enrichment = {
+                  ...playlist,
+                  owner,
+                  isUserPlaylist
+                };
 
-                const validImages = songImages.filter(Boolean);
-                if (validImages.length > 0) {
-                  return {
-                    ...playlist,
-                    collageImages: validImages,
-                    isCollage: true,
-                    isUserPlaylist: true
-                  };
+                // Add collage if it doesn't have a specific image
+                const hasImage = playlist.image && (Array.isArray(playlist.image) ? playlist.image.length > 0 : !!playlist.image);
+
+                if (!hasImage && playlistInfo.songIds && playlistInfo.songIds.length > 0) {
+                  const firstFourIds = playlistInfo.songIds.slice(0, 4);
+                  const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+
+                  const songImages = await Promise.all(firstFourIds.map(async (id) => {
+                    try {
+                      const songRes = await fetch(`${apiUrl}/api/songs?ids=${id}`);
+                      const songData = await songRes.json();
+                      if (songData.success && songData.data?.[0]?.image) {
+                        const img = songData.data[0].image;
+                        return img.find(i => i.quality === '150x150')?.url || img[0]?.url;
+                      }
+                    } catch (e) { }
+                    return null;
+                  }));
+
+                  const validImages = songImages.filter(Boolean);
+                  if (validImages.length > 0) {
+                    enrichment.collageImages = validImages;
+                    enrichment.isCollage = true;
+                  }
                 }
+
+                return enrichment;
               }
             } catch (e) {
               console.error(`Failed to enrich playlist ${playlist.playlistId}:`, e);
             }
           }
+
           return {
             ...playlist,
             isUserPlaylist
@@ -181,6 +189,7 @@ export function useLikedPlaylists(userId) {
           setLikedPlaylists(prev => [{
             playlistId: playlistData.id,
             playlistName: playlistData.name || playlistData.title,
+            owner: playlistData.owner || playlistData.subtitle || 'Jammify',
             description: playlistData.description || '',
             image: playlistData.image,
             songCount: playlistData.songCount || playlistData.song_count || 0,

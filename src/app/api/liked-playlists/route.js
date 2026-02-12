@@ -9,7 +9,7 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
-    
+
     if (!userId) {
       return NextResponse.json(
         { success: false, error: 'User ID is required' },
@@ -27,16 +27,16 @@ export async function GET(request) {
     }
 
     await connectDB();
-    
+
     const likedPlaylists = await LikedPlaylist.find({ userId })
       .sort({ likedAt: -1 }) // Most recent first
       .lean();
-    
+
     return NextResponse.json({
       success: true,
       data: likedPlaylists
     });
-    
+
   } catch (error) {
     console.error('Error fetching liked playlists:', error);
     return NextResponse.json(
@@ -50,7 +50,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { success: false, error: 'Authentication required' },
@@ -59,7 +59,7 @@ export async function POST(request) {
     }
 
     const { userId, playlistData } = await request.json();
-    
+
     if (!userId || !playlistData) {
       return NextResponse.json(
         { success: false, error: 'User ID and playlist data are required' },
@@ -76,7 +76,7 @@ export async function POST(request) {
     }
 
     await connectDB();
-    
+
     // Check if playlist is already liked
     const existingLike = await LikedPlaylist.findOne({
       userId,
@@ -89,7 +89,7 @@ export async function POST(request) {
         userId,
         playlistId: playlistData.id
       });
-      
+
       return NextResponse.json({
         success: true,
         liked: false,
@@ -101,14 +101,15 @@ export async function POST(request) {
         userId,
         playlistId: playlistData.id,
         playlistName: playlistData.name || playlistData.title,
+        owner: playlistData.owner || playlistData.subtitle || 'Jammify',
         description: playlistData.description || '',
         image: playlistData.image || [],
         songCount: playlistData.songCount || playlistData.song_count || 0,
         likedAt: new Date()
       });
-      
+
       await likedPlaylist.save();
-      
+
       return NextResponse.json({
         success: true,
         liked: true,
@@ -116,7 +117,7 @@ export async function POST(request) {
         data: likedPlaylist
       });
     }
-    
+
   } catch (error) {
     console.error('Error toggling playlist like:', error);
     return NextResponse.json(

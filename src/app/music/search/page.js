@@ -1674,7 +1674,7 @@ function SearchPageContent() {
                               {album.image?.[2]?.url ? (
                                 <img
                                   src={album.image[2].url}
-                                  alt={album.title}
+                                  alt={album.title || album.name}
                                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                                 />
                               ) : (
@@ -1718,7 +1718,7 @@ function SearchPageContent() {
                                   />
                                 </div>
                                 <p className="font-medium truncate text-xs sm:text-sm mb-1">
-                                  {decodeHtmlEntities(playlist.title)}
+                                  {decodeHtmlEntities(playlist.title || playlist.name)}
                                 </p>
                                 <p className="text-xs text-muted-foreground truncate">
                                   By {playlist.userName || 'Unknown User'}
@@ -1744,7 +1744,7 @@ function SearchPageContent() {
                                   {playlist.image?.[2]?.url ? (
                                     <img
                                       src={playlist.image[2].url}
-                                      alt={playlist.title}
+                                      alt={playlist.title || playlist.name}
                                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                                       onError={(e) => {
                                         e.target.src = '/default-playlist-image.png';
@@ -1753,13 +1753,13 @@ function SearchPageContent() {
                                   ) : (
                                     <img
                                       src="/default-playlist-image.png"
-                                      alt={playlist.title}
+                                      alt={playlist.title || playlist.name}
                                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                                     />
                                   )}
                                 </div>
                                 <p className="font-medium truncate text-xs sm:text-sm mb-1">
-                                  {decodeHtmlEntities(playlist.title)}
+                                  {decodeHtmlEntities(playlist.title || playlist.name)}
                                 </p>
                                 <p className="text-xs text-muted-foreground truncate">
                                   By {playlist.subtitle || 'Various Artists'}
@@ -2131,7 +2131,7 @@ function SearchPageContent() {
                             {album.image?.[2]?.url ? (
                               <img
                                 src={album.image[2].url}
-                                alt={album.title}
+                                alt={album.title || album.name}
                                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                               />
                             ) : (
@@ -2141,7 +2141,7 @@ function SearchPageContent() {
                             )}
                           </div>
                           <p className="font-semibold truncate text-sm sm:text-base mb-1">
-                            {decodeHtmlEntities(album.title)}
+                            {decodeHtmlEntities(album.title || album.name)}
                           </p>
                           <p className="text-xs sm:text-sm text-muted-foreground truncate">
                             {album.year} • {getArtistNames(album)}
@@ -2213,7 +2213,7 @@ function SearchPageContent() {
                             </div>
                           </div>
                           <p className="font-semibold truncate text-sm sm:text-base mb-1">
-                            {decodeHtmlEntities(artist.title)}
+                            {decodeHtmlEntities(artist.title || artist.name)}
                           </p>
                           <p className="text-xs sm:text-sm text-muted-foreground">Artist</p>
                         </div>
@@ -2284,7 +2284,7 @@ function SearchPageContent() {
                                   )}
                                 </div>
                                 <p className="font-semibold truncate text-sm sm:text-base mb-1">
-                                  {decodeHtmlEntities(playlist.title)}
+                                  {decodeHtmlEntities(playlist.title || playlist.name)}
                                 </p>
                                 <p className="text-xs sm:text-sm text-muted-foreground truncate">
                                   By {playlist.userName || 'Unknown User'}
@@ -2320,7 +2320,7 @@ function SearchPageContent() {
                                   {playlist.image?.[2]?.url ? (
                                     <img
                                       src={playlist.image[2].url}
-                                      alt={playlist.title}
+                                      alt={playlist.title || playlist.name}
                                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                                       onError={(e) => {
                                         e.target.src = '/default-playlist-image.png';
@@ -2329,13 +2329,13 @@ function SearchPageContent() {
                                   ) : (
                                     <img
                                       src="/default-playlist-image.png"
-                                      alt={playlist.title}
+                                      alt={playlist.title || playlist.name}
                                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                                     />
                                   )}
                                 </div>
                                 <p className="font-semibold truncate text-sm sm:text-base mb-1">
-                                  {decodeHtmlEntities(playlist.title)}
+                                  {decodeHtmlEntities(playlist.title || playlist.name)}
                                 </p>
                                 <p className="text-xs sm:text-sm text-muted-foreground truncate">
                                   By {playlist.subtitle || 'Various Artists'}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { AppSidebar } from "@/components/app-sidebar"
@@ -30,7 +30,61 @@ export default function LibraryPage() {
   const { likedArtists, loading: loadingArtists } = useLikedArtists(userId)
   const { getLikedCount, loading: loadingSongs } = useLikedSongs(userId)
 
-  const isAnyLoading = loadingPlaylists || loadingAlbums || loadingArtists || loadingSongs
+  const [createdPlaylists, setCreatedPlaylists] = useState([])
+  const [loadingCreated, setLoadingCreated] = useState(true)
+
+  useEffect(() => {
+    if (userId) {
+      const fetchCreatedPlaylists = async () => {
+        try {
+          const res = await fetch('/api/playlists')
+          const data = await res.json()
+          if (data.success) {
+            // Fetch song data for each playlist to generate covers/collages
+            const playlistsWithCovers = await Promise.all(
+              data.data.map(async (playlist) => {
+                if (playlist.songIds && playlist.songIds.length > 0) {
+                  try {
+                    const songsToFetch = playlist.songIds.slice(0, 4)
+                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || ''
+                    const songImages = await Promise.all(songsToFetch.map(async (songId) => {
+                      try {
+                        const response = await fetch(`${apiUrl}/api/songs?ids=${songId}`)
+                        const songData = await response.json()
+                        if (songData.success && songData.data?.[0]?.image) {
+                          const img = songData.data[0].image
+                          return img.find(i => i.quality === '150x150')?.url || img[0]?.url
+                        }
+                      } catch (e) { }
+                      return null
+                    }))
+                    const validImages = songImages.filter(Boolean)
+                    if (validImages.length > 0) {
+                      return {
+                        ...playlist,
+                        collageImages: validImages,
+                        isCollage: validImages.length >= 4,
+                        image: validImages.length < 4 ? validImages[0] : null
+                      }
+                    }
+                  } catch (e) { }
+                }
+                return playlist
+              })
+            )
+            setCreatedPlaylists(playlistsWithCovers)
+          }
+        } catch (error) {
+          console.error("Failed to fetch created playlists", error)
+        } finally {
+          setLoadingCreated(false)
+        }
+      }
+      fetchCreatedPlaylists()
+    }
+  }, [userId])
+
+  const isAnyLoading = loadingPlaylists || loadingAlbums || loadingArtists || loadingSongs || loadingCreated
 
   const likedSongsCount = getLikedCount()
 
@@ -60,17 +114,34 @@ export default function LibraryPage() {
       })
     }
 
-    // 2. Playlists
+    // 2. Playlists (Created & Liked)
     if (activeTab === "All" || activeTab === "Playlists") {
+      // Add Created Playlists first
+      createdPlaylists.forEach((playlist) => {
+        items.push({
+          id: playlist._id || playlist.playlistId,
+          title: playlist.name || playlist.playlistName || "Unknown Playlist",
+          subtitle: `Playlist • You`,
+          image: playlist.image,
+          collageImages: playlist.collageImages,
+          isCollage: playlist.isCollage,
+          type: "playlist",
+          onClick: () => router.push(`/music/playlists/${playlist._id || playlist.playlistId}`),
+        })
+      })
+
+      // Add Liked Playlists (filter out duplicates if they are already in created)
       likedPlaylists?.forEach((playlist) => {
+        if (createdPlaylists.some(cp => cp._id === playlist.playlistId)) return
+
         const playlistUrl = playlist.isUserPlaylist
           ? `/music/playlists/${playlist.playlistId}`
-          : `/music/playlist/${playlist.playlistId}`;
+          : `/music/playlist/${playlist.playlistId}`
 
         items.push({
           id: playlist.playlistId,
           title: playlist.playlistName || playlist.name || playlist.title || "Unknown Playlist",
-          subtitle: `Playlist • ${playlist.owner || session?.user?.name || "User"}`,
+          subtitle: `Playlist • ${playlist.owner || playlist.subtitle || "Jammify"}`,
           image: playlist.image,
           collageImages: playlist.collageImages,
           isCollage: playlist.isCollage,
