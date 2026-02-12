@@ -76,15 +76,50 @@ function SearchPageContent() {
   // Ref to track if we're restoring from sessionStorage (to prevent re-searching)
   const isRestoringFromStorage = useRef(false);
 
+  // State to control opacity during scroll restoration to prevent flash
+  const [isRestoringScroll, setIsRestoringScroll] = useState(false);
+
   // Ref for the scrollable container
   const scrollContainerRef = useRef(null);
+
+  // Refs to store scroll positions for each tab
+  const tabScrollPositions = useRef({
+    all: 0,
+    songs: 0,
+    albums: 0,
+    artists: 0,
+    playlists: 0
+  });
+
+  // Save current tab's scroll position before switching tabs
+  const saveCurrentTabScroll = useCallback(() => {
+    if (scrollContainerRef.current) {
+      tabScrollPositions.current[activeTab] = scrollContainerRef.current.scrollTop;
+    }
+  }, [activeTab]);
+
+  // Effect to save scroll position when tab changes
+  useEffect(() => {
+    return () => {
+      saveCurrentTabScroll();
+    };
+  }, [activeTab, saveCurrentTabScroll]);
 
   // Restore search state from sessionStorage on mount
   useEffect(() => {
     const savedSearchState = sessionStorage.getItem('searchPageState');
     if (savedSearchState) {
       try {
-        const { query, results, lyricsRes, publicPlaylists: savedPublicPlaylists, tab, categoryState, scrollPosition } = JSON.parse(savedSearchState);
+        const {
+          query,
+          results,
+          lyricsRes,
+          publicPlaylists: savedPublicPlaylists,
+          tab,
+          categoryState,
+          scrollPosition,
+          tabScrollPositions: savedTabScrollPositions
+        } = JSON.parse(savedSearchState);
         if (query) {
           isRestoringFromStorage.current = true;
           setSearchQuery(query);
@@ -94,19 +129,36 @@ function SearchPageContent() {
           if (tab) setActiveTab(tab);
           if (categoryState) setCategoryData(categoryState);
 
-          // Restore scroll position after a short delay to ensure content is rendered
-          if (scrollPosition !== undefined) {
+          // Restore tab-specific scroll positions
+          if (savedTabScrollPositions) {
+            tabScrollPositions.current = savedTabScrollPositions;
+          }
+
+          // Set restoring state to prevent flash
+          setIsRestoringScroll(true);
+
+          // Restore scroll position for the active tab after a short delay to ensure content is rendered
+          const scrollToRestore = savedTabScrollPositions?.[tab] ?? scrollPosition ?? 0;
+          if (scrollToRestore !== undefined) {
             setTimeout(() => {
               if (scrollContainerRef.current) {
-                scrollContainerRef.current.scrollTop = scrollPosition;
+                scrollContainerRef.current.scrollTop = scrollToRestore;
+                // Remove the opacity after scroll is restored
+                requestAnimationFrame(() => {
+                  setTimeout(() => {
+                    setIsRestoringScroll(false);
+                  }, 50);
+                });
               }
-            }, 100);
+            }, 50);
+          } else {
+            setIsRestoringScroll(false);
           }
 
           // Reset the flag after a short delay to allow the state updates to complete
           setTimeout(() => {
             isRestoringFromStorage.current = false;
-          }, 100);
+          }, 200);
         }
       } catch (error) {
         console.error('Error restoring search state:', error);
@@ -114,6 +166,48 @@ function SearchPageContent() {
       }
     }
   }, []);
+
+  // Add scroll event listener to continuously save scroll position
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+
+    const handleScroll = () => {
+      if (!isRestoringFromStorage.current) {
+        tabScrollPositions.current[activeTab] = scrollContainer.scrollTop;
+      }
+    };
+
+    // Add scroll listener with passive option for better performance
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      scrollContainer.removeEventListener('scroll', handleScroll);
+    };
+  }, [activeTab]);
+
+  // Restore scroll position when switching tabs
+  useEffect(() => {
+    if (scrollContainerRef.current && !isRestoringFromStorage.current) {
+      const targetScrollPosition = tabScrollPositions.current[activeTab] || 0;
+
+      // Set restoring state
+      setIsRestoringScroll(true);
+
+      // Use requestAnimationFrame to ensure the tab content is rendered
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTop = targetScrollPosition;
+            // Remove opacity after scroll is restored
+            setTimeout(() => {
+              setIsRestoringScroll(false);
+            }, 50);
+          }
+        }, 100);
+      });
+    }
+  }, [activeTab]);
 
   // Save search state to sessionStorage whenever it changes
   useEffect(() => {
@@ -125,10 +219,37 @@ function SearchPageContent() {
         publicPlaylists: publicPlaylists,
         tab: activeTab,
         categoryState: categoryData,
-        scrollPosition: scrollContainerRef.current?.scrollTop || 0
+        scrollPosition: tabScrollPositions.current[activeTab] || 0,
+        tabScrollPositions: tabScrollPositions.current
       };
       sessionStorage.setItem('searchPageState', JSON.stringify(searchState));
     }
+  }, [searchQuery, searchResults, lyricsResults, publicPlaylists, activeTab, categoryData]);
+
+  // Save scroll position before page unload (when navigating away)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (scrollContainerRef.current) {
+        tabScrollPositions.current[activeTab] = scrollContainerRef.current.scrollTop;
+        const searchState = {
+          query: searchQuery,
+          results: searchResults,
+          lyricsRes: lyricsResults,
+          publicPlaylists: publicPlaylists,
+          tab: activeTab,
+          categoryState: categoryData,
+          scrollPosition: tabScrollPositions.current[activeTab] || 0,
+          tabScrollPositions: tabScrollPositions.current
+        };
+        sessionStorage.setItem('searchPageState', JSON.stringify(searchState));
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
   }, [searchQuery, searchResults, lyricsResults, publicPlaylists, activeTab, categoryData]);
 
   // Debounced search function
@@ -997,10 +1118,40 @@ function SearchPageContent() {
   };
 
   const handleAlbumClick = (albumId) => {
+    // Save current scroll position before navigating
+    if (scrollContainerRef.current) {
+      tabScrollPositions.current[activeTab] = scrollContainerRef.current.scrollTop;
+      const searchState = {
+        query: searchQuery,
+        results: searchResults,
+        lyricsRes: lyricsResults,
+        publicPlaylists: publicPlaylists,
+        tab: activeTab,
+        categoryState: categoryData,
+        scrollPosition: tabScrollPositions.current[activeTab] || 0,
+        tabScrollPositions: tabScrollPositions.current
+      };
+      sessionStorage.setItem('searchPageState', JSON.stringify(searchState));
+    }
     router.push(`/music/album/${albumId}`);
   };
 
   const handlePlaylistClick = (playlistId) => {
+    // Save current scroll position before navigating
+    if (scrollContainerRef.current) {
+      tabScrollPositions.current[activeTab] = scrollContainerRef.current.scrollTop;
+      const searchState = {
+        query: searchQuery,
+        results: searchResults,
+        lyricsRes: lyricsResults,
+        publicPlaylists: publicPlaylists,
+        tab: activeTab,
+        categoryState: categoryData,
+        scrollPosition: tabScrollPositions.current[activeTab] || 0,
+        tabScrollPositions: tabScrollPositions.current
+      };
+      sessionStorage.setItem('searchPageState', JSON.stringify(searchState));
+    }
     router.push(`/music/playlist/${playlistId}`);
   };
 
@@ -1336,7 +1487,10 @@ function SearchPageContent() {
 
 
           {combinedSearchResults && (
-            <div className="px-4 sm:px-6 relative">
+            <div
+              className="px-4 sm:px-6 relative transition-opacity duration-200"
+              style={{ opacity: isRestoringScroll ? 0 : 1 }}
+            >
               {/* Overlay loading state for when results are updating */}
               {loading && combinedSearchResults && (
                 <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-lg">
