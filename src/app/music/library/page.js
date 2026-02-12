@@ -1,220 +1,284 @@
-"use client";
+"use client"
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useState, useMemo } from "react"
+import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { AppSidebar } from "@/components/app-sidebar"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import { Separator } from "@/components/ui/separator"
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
-import { Heart, Music, Disc, User, ChevronRight, Play, Plus } from "lucide-react"
-import { useLikedSongs } from "@/hooks/useLikedSongs"
+import { ArrowLeft, Search, Plus, Heart } from "lucide-react"
 import { useLikedPlaylists } from "@/hooks/useLikedPlaylists"
 import { useLikedAlbums } from "@/hooks/useLikedAlbums"
 import { useLikedArtists } from "@/hooks/useLikedArtists"
+import { useLikedSongs } from "@/hooks/useLikedSongs"
+import { Skeleton } from "@/components/ui/skeleton"
+import { cn } from "@/lib/utils"
+import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbPage } from "@/components/ui/breadcrumb"
 
 export default function LibraryPage() {
-  const router = useRouter();
-  const { data: session } = useSession();
-  const [userPlaylists, setUserPlaylists] = useState([]);
-  const [loadingPlaylists, setLoadingPlaylists] = useState(true);
+  const router = useRouter()
+  const { data: session } = useSession()
+  const userId = session?.user?.id
+  const [activeTab, setActiveTab] = useState("All") // All, Playlists, Albums, Artists
 
-  // Use existing hooks for liked content with fallbacks
-  const { likedSongs, loading: likedSongsLoading } = useLikedSongs(session?.user?.id) || { likedSongs: [], loading: false };
-  const { likedPlaylists, loading: likedPlaylistsLoading } = useLikedPlaylists(session?.user?.id) || { likedPlaylists: [], loading: false };
-  const { likedAlbums, loading: likedAlbumsLoading } = useLikedAlbums(session?.user?.id) || { likedAlbums: [], loading: false };
-  const { likedArtists, loading: likedArtistsLoading } = useLikedArtists(session?.user?.id) || { likedArtists: [], loading: false };
+  const { likedPlaylists, loading: loadingPlaylists } = useLikedPlaylists(userId)
+  const { likedAlbums, loading: loadingAlbums } = useLikedAlbums(userId)
+  const { likedArtists, loading: loadingArtists } = useLikedArtists(userId)
+  const { getLikedCount, loading: loadingSongs } = useLikedSongs(userId)
 
-  // Fetch user's own playlists
-  useEffect(() => {
-    const fetchUserPlaylists = async () => {
-      if (!session?.user?.id) {
-        setLoadingPlaylists(false);
-        return;
-      }
+  const isAnyLoading = loadingPlaylists || loadingAlbums || loadingArtists || loadingSongs
 
-      try {
-        const response = await fetch('/api/playlists');
-        const result = await response.json();
+  const likedSongsCount = getLikedCount()
 
-        if (result.success) {
-          setUserPlaylists(result.data);
-        }
-      } catch (error) {
-        console.error('Error fetching user playlists:', error);
-      } finally {
-        setLoadingPlaylists(false);
-      }
-    };
+  const tabs = ["Playlists", "Albums", "Artists"]
 
-    fetchUserPlaylists();
-  }, [session]);
-
-  const libraryItems = [
-    {
-      id: 'liked-songs',
-      title: 'Liked Songs',
-      subtitle: `${likedSongs?.length || 0} songs`,
-      icon: Heart,
-      iconBg: 'linear-gradient(135deg, rgb(147, 51, 234), rgba(147, 51, 234, 0.8))',
-      iconColor: 'white',
-      href: '/music/favorites',
-      loading: likedSongsLoading
-    },
-    {
-      id: 'user-playlists',
-      title: 'Made by You',
-      subtitle: `${userPlaylists?.length || 0} playlists`,
-      icon: Music,
-      iconBg: 'linear-gradient(135deg, rgb(34, 197, 94), rgba(34, 197, 94, 0.8))',
-      iconColor: 'white',
-      href: '/music/playlists',
-      loading: loadingPlaylists
-    },
-    {
-      id: 'liked-playlists',
-      title: 'Liked Playlists',
-      subtitle: `${likedPlaylists?.length || 0} playlists`,
-      icon: Music,
-      iconBg: 'linear-gradient(135deg, rgb(59, 130, 246), rgba(59, 130, 246, 0.8))',
-      iconColor: 'white',
-      href: '/music/library/playlists',
-      loading: likedPlaylistsLoading
-    },
-    {
-      id: 'liked-albums',
-      title: 'Liked Albums',
-      subtitle: `${likedAlbums?.length || 0} albums`,
-      icon: Disc,
-      iconBg: 'linear-gradient(135deg, rgb(239, 68, 68), rgba(239, 68, 68, 0.8))',
-      iconColor: 'white',
-      href: '/music/library/albums',
-      loading: likedAlbumsLoading
-    },
-    {
-      id: 'liked-artists',
-      title: 'Following',
-      subtitle: `${likedArtists?.length || 0} artists`,
-      icon: User,
-      iconBg: 'linear-gradient(135deg, rgb(168, 85, 247), rgba(168, 85, 247, 0.8))',
-      iconColor: 'white',
-      href: '/music/library/artists',
-      loading: likedArtistsLoading
+  const toggleTab = (tab) => {
+    if (activeTab === tab) {
+      setActiveTab("All")
+    } else {
+      setActiveTab(tab)
     }
-  ];
+  }
+
+  const filteredItems = useMemo(() => {
+    const items = []
+
+    // 1. Liked Songs (Special Playlist)
+    // Show in "All" or "Playlists"
+    if (activeTab === "All" || activeTab === "Playlists") {
+      items.push({
+        id: "liked-songs",
+        title: "Liked Songs",
+        subtitle: `Playlist • ${likedSongsCount} songs`,
+        type: "playlist",
+        isLikedSongs: true,
+        onClick: () => router.push("/music/favorites"),
+      })
+    }
+
+    // 2. Playlists
+    if (activeTab === "All" || activeTab === "Playlists") {
+      likedPlaylists?.forEach((playlist) => {
+        const playlistUrl = playlist.isUserPlaylist
+          ? `/music/playlists/${playlist.playlistId}`
+          : `/music/playlist/${playlist.playlistId}`;
+
+        items.push({
+          id: playlist.playlistId,
+          title: playlist.playlistName || playlist.name || playlist.title || "Unknown Playlist",
+          subtitle: `Playlist • ${playlist.owner || session?.user?.name || "User"}`,
+          image: playlist.image,
+          collageImages: playlist.collageImages,
+          isCollage: playlist.isCollage,
+          type: "playlist",
+          onClick: () => router.push(playlistUrl),
+        })
+      })
+    }
+    // 3. Albums
+    if (activeTab === "All" || activeTab === "Albums") {
+      likedAlbums?.forEach((album) => {
+        const artistName = album.artists?.[0]?.name || "Unknown Artist"
+        items.push({
+          id: album.albumId,
+          title: album.name || album.title || "Unknown Album",
+          subtitle: `Album • ${artistName}`,
+          image: album.image,
+          type: "album",
+          onClick: () => router.push(`/music/album/${album.albumId}`),
+        })
+      })
+    }
+
+    // 4. Artists
+    if (activeTab === "All" || activeTab === "Artists") {
+      likedArtists?.forEach((artist) => {
+        items.push({
+          id: artist.artistId,
+          title: artist.artistName || artist.name || "Unknown Artist",
+          subtitle: "Artist",
+          image: artist.image,
+          type: "artist",
+          onClick: () => router.push(`/music/artist/${artist.artistId}`),
+        })
+      })
+    }
+
+    return items
+  }, [activeTab, likedPlaylists, likedAlbums, likedArtists, likedSongsCount, router, session?.user?.name])
+
+  const LibrarySkeleton = () => (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+      {Array.from({ length: 12 }).map((_, i) => (
+        <div key={i} className="p-3">
+          <Skeleton className="aspect-square w-full mb-3 rounded-md bg-zinc-800/50" />
+          <Skeleton className="h-4 w-3/4 mb-2 bg-zinc-800/50" />
+          <Skeleton className="h-3 w-1/2 bg-zinc-800/50" />
+        </div>
+      ))}
+    </div>
+  )
+
+  const getImageSrc = (image) => {
+    if (!image) return null
+    if (Array.isArray(image)) {
+      // Find 300x300 or closest
+      return image.find((img) => img.quality === "500x500")?.url || image[0]?.url
+    }
+    return image // String case
+  }
+
+  const PlaylistCollage = ({ images }) => {
+    if (!images || images.length === 0) return null;
+
+    // Determine how many images to show (up to 4)
+    const displayImages = images.slice(0, 4);
+
+    // If only 1-3 images, just show the first one full size (simplified logic)
+    if (displayImages.length < 4) {
+      return (
+        <img
+          src={displayImages[0]}
+          alt="Playlist Cover"
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+        />
+      );
+    }
+
+    // 4 images collage
+    return (
+      <div className="grid grid-cols-2 grid-rows-2 w-full h-full group-hover:scale-105 transition-transform duration-300">
+        {displayImages.map((src, idx) => (
+          <div key={idx} className="relative w-full h-full overflow-hidden border-[0.5px] border-black/10">
+            <img
+              src={src}
+              alt={`Collage ${idx}`}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <SidebarProvider>
-      <AppSidebar className="hidden md:flex" />
+      <AppSidebar />
       <SidebarInset>
-        <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-          <div className="flex items-center justify-between w-full px-4">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger className="-ml-1 hidden md:flex" />
-              <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:block" />
-              <Breadcrumb>
-                <BreadcrumbList>
-                  <BreadcrumbItem className="hidden md:block">
-                    <BreadcrumbLink href="/music">
-                      Home
-                    </BreadcrumbLink>
-                  </BreadcrumbItem>
-                  <BreadcrumbSeparator className="hidden md:block" />
-                  <BreadcrumbItem>
-                    <BreadcrumbPage>Your Library</BreadcrumbPage>
-                  </BreadcrumbItem>
-                </BreadcrumbList>
-              </Breadcrumb>
-            </div>
-
-            {/* Quick Create Playlist Button */}
-            <Button
-              size="sm"
-              onClick={() => router.push('/music/playlists')}
-              className="text-xs sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 h-8 sm:h-9"
-            >
-              <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-              <span className="hidden xs:inline">Create</span>
-              <span className="xs:hidden">+</span>
-            </Button>
-          </div>
+        <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background px-4">
+          <SidebarTrigger className="-ml-1 hidden md:inline" />
+          <Button variant="ghost" size="sm" onClick={() => router.back()} className="mr-2 hidden md:flex">
+            <ArrowLeft className="w-4 h-4 mr-1" />
+            <span className="">Back</span>
+          </Button>
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbPage>Your Library</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
         </header>
 
-        <div className="flex flex-1 flex-col pb-20 md:pb-6">
-          <div className="p-4 md:p-6">
-            <div className="mb-6">
-              <h1 className="text-2xl md:text-3xl font-bold mb-2">Your Library</h1>
-              <p className="text-muted-foreground">Your music collection in one place</p>
-            </div>
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-24">
+          {/* Tabs */}
+          <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+            {/* Clear filter button (optional, but "X" pattern is common) - implicit by toggling off or clicking 'All' if we had one, but effectively unselecting current tab works */}
+            {activeTab !== "All" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="rounded-full h-8 px-3"
+                onClick={() => setActiveTab("All")}
+              >
+                X
+              </Button>
+            )}
 
-            <div className="space-y-2">
-              {libraryItems.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => router.push(item.href)}
-                  className="group flex items-center gap-4 p-3 rounded-lg hover:bg-muted/50 transition-all duration-200 cursor-pointer"
-                >
-                  {/* Icon */}
-                  <div
-                    className="w-12 h-12 rounded-lg flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow"
-                    style={{ background: item.iconBg }}
-                  >
-                    <item.icon
-                      className="w-6 h-6"
-                      style={{ color: item.iconColor }}
-                      fill={item.id === 'liked-songs' ? 'currentColor' : 'none'}
-                    />
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                      {item.title}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {item.loading ? 'Loading...' : item.subtitle}
-                    </p>
-                  </div>
-
-                  {/* Arrow */}
-                  <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
-                </div>
-              ))}
-            </div>
-
-            {/* Recently Played Section */}
-            <div className="mt-8">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold">Recently Played</h2>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => router.push('/music/library/recently-played')}
-                >
-                  Show all
-                </Button>
-              </div>
-
-              <div className="text-center py-8 text-muted-foreground">
-                <Music className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>Your recently played music will appear here</p>
-              </div>
-            </div>
+            {tabs.map((tab) => (
+              <Button
+                key={tab}
+                variant={activeTab === tab ? "default" : "secondary"}
+                size="sm"
+                className={cn(
+                  "rounded-full h-8 px-4 transition-all",
+                  activeTab === tab
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                )}
+                onClick={() => toggleTab(tab)}
+              >
+                {tab}
+              </Button>
+            ))}
           </div>
+
+          {/* Grid Layout or Skeleton */}
+          {isAnyLoading ? (
+            <LibrarySkeleton />
+          ) : (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6  ">
+                {filteredItems.map((item) => (
+                  <div
+                    key={`${item.type}-${item.id}`}
+                    className="group relative p-3 rounded-md hover:bg-zinc-800/50 transition-colors cursor-pointer"
+                    onClick={item.onClick}
+                  >
+                    {/* Image Container */}
+                    <div className={cn(
+                      "aspect-square w-full mb-3 overflow-hidden shadow-lg relative",
+                      item.type === "artist" ? "rounded-full" : "rounded-md"
+                    )}>
+                      {item.isLikedSongs ? (
+                        <div className="w-full h-full bg-linear-to-br from-indigo-700 to-indigo-300 flex items-center justify-center">
+                          <Heart className="w-1/3 h-1/3 text-white fill-current" />
+                        </div>
+                      ) : item.isCollage ? (
+                        <PlaylistCollage images={item.collageImages} />
+                      ) : getImageSrc(item.image) ? (
+                        <img
+                          src={getImageSrc(item.image)}
+                          alt={item.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
+                          <span className="text-2xl font-bold text-zinc-600">
+                            {item.title?.charAt(0) || "?"}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Text Content */}
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-white truncate mb-1">
+                        {item.title}
+                      </h3>
+                      <p className="text-sm text-zinc-400 truncate">
+                        {item.subtitle}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Empty State */}
+              {filteredItems.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                  <h3 className="text-xl font-bold mb-2">No results found</h3>
+                  <p className="text-muted-foreground">Try adjusting your filters or liking some content.</p>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </SidebarInset>
     </SidebarProvider>
-  );
+  )
 }

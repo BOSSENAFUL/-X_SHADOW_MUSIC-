@@ -147,8 +147,19 @@ const authOptions = {
       return token;
     },
     async session({ session, token }) {
-      if (token) {
+      if (token?.id) {
         session.user.id = token.id;
+        try {
+          await connectDB();
+          const dbUser = await User.findById(token.id);
+          if (dbUser) {
+            session.user.name = dbUser.name;
+            session.user.email = dbUser.email;
+            session.user.image = dbUser.image;
+          }
+        } catch (error) {
+          console.error('Session callback error:', error);
+        }
       }
       return session;
     },

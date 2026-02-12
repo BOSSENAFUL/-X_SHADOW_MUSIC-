@@ -1,21 +1,41 @@
 import { useState, useEffect, useCallback } from 'react';
 
 export function useLikedAlbums(userId) {
-  const [likedAlbums, setLikedAlbums] = useState(new Set());
+  const [likedAlbums, setLikedAlbums] = useState([]);
+  const [likedAlbumIds, setLikedAlbumIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
 
   // Fetch all liked albums for the user
   const fetchLikedAlbums = useCallback(async () => {
     if (!userId) return;
-    
+
     try {
       setLoading(true);
       const response = await fetch(`/api/liked-albums?userId=${encodeURIComponent(userId)}`);
       const data = await response.json();
-      
+
       if (data.success) {
+        // Flatten the structure: extract properties from albumData
+        const formattedAlbums = data.data.map(item => {
+          // Handle potential missing albumData
+          const albumData = item.albumData || {};
+          return {
+            ...albumData, // Spread first to avoid overwriting normalized fields
+            id: item._id, // Internal DB ID
+            albumId: item.albumId, // JioSaavn ID
+            likedAt: item.likedAt,
+            name: albumData.name,
+            image: albumData.image,
+            year: albumData.year,
+            songCount: albumData.songCount,
+            // Normalize artists to an array (this will now correctly overwrite the raw artists object)
+            artists: albumData.artists?.primary || albumData.artists || [],
+          };
+        });
+
+        setLikedAlbums(formattedAlbums);
         const albumIds = new Set(data.data.map(album => album.albumId));
-        setLikedAlbums(albumIds);
+        setLikedAlbumIds(albumIds);
       }
     } catch (error) {
       console.error('Error fetching liked albums:', error);
@@ -26,8 +46,8 @@ export function useLikedAlbums(userId) {
 
   // Check if an album is liked
   const isLiked = useCallback((albumId) => {
-    return likedAlbums.has(albumId);
-  }, [likedAlbums]);
+    return likedAlbumIds.has(albumId);
+  }, [likedAlbumIds]);
 
   // Toggle like status for an album
   const toggleLike = useCallback(async (albumData) => {
@@ -36,19 +56,31 @@ export function useLikedAlbums(userId) {
     }
 
     // Optimistic update - update UI immediately
-    const wasLiked = likedAlbums.has(albumData.id);
+    const wasLiked = likedAlbumIds.has(albumData.id);
     const willBeLiked = !wasLiked;
-    
+
+    // Normalize artists for optimistic update
+    const normalizedArtists = albumData.artists?.primary || albumData.artists || [];
+
     // Update local state optimistically
-    setLikedAlbums(prev => {
-      const newSet = new Set(prev);
-      if (willBeLiked) {
-        newSet.add(albumData.id);
-      } else {
+    if (willBeLiked) {
+      setLikedAlbumIds(prev => new Set([...prev, albumData.id]));
+      setLikedAlbums(prev => [{
+        albumId: albumData.id,
+        name: albumData.name,
+        artists: normalizedArtists,
+        image: albumData.image,
+        year: albumData.year,
+        likedAt: new Date().toISOString()
+      }, ...prev]);
+    } else {
+      setLikedAlbumIds(prev => {
+        const newSet = new Set(prev);
         newSet.delete(albumData.id);
-      }
-      return newSet;
-    });
+        return newSet;
+      });
+      setLikedAlbums(prev => prev.filter(album => album.albumId !== albumData.id));
+    }
 
     try {
       const response = await fetch('/api/liked-albums', {
@@ -63,50 +95,72 @@ export function useLikedAlbums(userId) {
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
         // Server confirmed the operation, no need to update state again
         // as we already did optimistic update
         return result;
       } else {
         // Server operation failed, revert optimistic update
-        setLikedAlbums(prev => {
-          const newSet = new Set(prev);
-          if (wasLiked) {
-            newSet.add(albumData.id);
-          } else {
+        if (wasLiked) {
+          // It was liked, we tried to unlike and failed -> add it back
+          setLikedAlbumIds(prev => new Set([...prev, albumData.id]));
+          setLikedAlbums(prev => [{
+            albumId: albumData.id,
+            name: albumData.name,
+            artists: normalizedArtists,
+            image: albumData.image,
+            year: albumData.year,
+            likedAt: new Date().toISOString()
+          }, ...prev]);
+        } else {
+          // It was not liked, we tried to like and failed -> remove it
+          setLikedAlbumIds(prev => {
+            const newSet = new Set(prev);
             newSet.delete(albumData.id);
-          }
-          return newSet;
-        });
-        
+            return newSet;
+          });
+          setLikedAlbums(prev => prev.filter(album => album.albumId !== albumData.id));
+        }
+
         throw new Error(result.error || 'Failed to toggle album like');
       }
     } catch (error) {
       // Network error, revert optimistic update
-      setLikedAlbums(prev => {
-        const newSet = new Set(prev);
-        if (wasLiked) {
-          newSet.add(albumData.id);
-        } else {
+      if (wasLiked) {
+        // It was liked, we tried to unlike and failed -> add it back
+        setLikedAlbumIds(prev => new Set([...prev, albumData.id]));
+        setLikedAlbums(prev => [{
+          albumId: albumData.id,
+          name: albumData.name,
+          artists: normalizedArtists,
+          image: albumData.image,
+          year: albumData.year,
+          likedAt: new Date().toISOString()
+        }, ...prev]);
+      } else {
+        // It was not liked, we tried to like and failed -> remove it
+        setLikedAlbumIds(prev => {
+          const newSet = new Set(prev);
           newSet.delete(albumData.id);
-        }
-        return newSet;
-      });
-      
+          return newSet;
+        });
+        setLikedAlbums(prev => prev.filter(album => album.albumId !== albumData.id));
+      }
+
       console.error('Error toggling album like:', error);
       throw error;
     }
-  }, [userId, likedAlbums]);
+  }, [userId, likedAlbumIds]);
 
   // Check if a specific album is liked (useful for individual checks)
   const checkIsLiked = useCallback(async (albumId) => {
     if (!userId || !albumId) return false;
-    
+
     try {
       const response = await fetch(`/api/liked-albums/check?userId=${encodeURIComponent(userId)}&albumId=${encodeURIComponent(albumId)}`);
       const data = await response.json();
-      
+
       if (data.success) {
         return data.isLiked;
       }
@@ -123,7 +177,7 @@ export function useLikedAlbums(userId) {
   }, [fetchLikedAlbums]);
 
   return {
-    likedAlbums: Array.from(likedAlbums),
+    likedAlbums,
     isLiked,
     toggleLike,
     checkIsLiked,

@@ -18,8 +18,79 @@ export function useLikedArtists(userId) {
       const data = await response.json();
 
       if (data.success) {
-        setLikedArtists(data.data);
+        // Flatten the structure: extract properties from artistData
+        const formattedArtists = data.data.map(item => {
+          // Handle potential missing artistData
+          const artistData = item.artistData || {};
+
+          return {
+            ...artistData, // Spread properties for UI (name, image, etc.)
+            id: item._id,
+            artistId: item.artistId,
+            likedAt: item.likedAt,
+            // Ensure robust naming fallback
+            name: artistData.name || artistData.artistName || artistData.title || item.artistName || 'Unknown Artist',
+            artistName: artistData.name || artistData.artistName || 'Unknown Artist',
+          };
+        });
+
+        setLikedArtists(formattedArtists);
         setLikedArtistIds(new Set(data.data.map(artist => artist.artistId)));
+
+        // Identify artists with missing details (Unknown Name or missing image)
+        const missingDetails = formattedArtists.filter(a => a.name === 'Unknown Artist' || !a.image);
+
+        if (missingDetails.length > 0) {
+          // Fetch authentic details for missing artists in background
+          const enrichPromises = missingDetails.map(async (artist) => {
+            try {
+              const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+              const res = await fetch(`${apiUrl}/api/artists?id=${artist.artistId}`);
+              const detailData = await res.json();
+
+              if (detailData.success && detailData.data) {
+                return {
+                  ...artist,
+                  name: detailData.data.name,
+                  artistName: detailData.data.name,
+                  image: detailData.data.image,
+                  followerCount: detailData.data.followerCount,
+                  isVerified: detailData.data.isVerified,
+                  dominantLanguage: detailData.data.dominantLanguage,
+                  dominantType: detailData.data.dominantType,
+                  // Add flag to indicate this is enriched data
+                  _enriched: true
+                };
+              }
+              return artist;
+            } catch (e) {
+              console.error(`Failed to fetch details for ${artist.artistId}`, e);
+              return artist;
+            }
+          });
+
+          // Wait for enrichment
+          const enrichedDetails = await Promise.all(enrichPromises);
+
+          // Update state with enriched data
+          setLikedArtists(prev => prev.map(a => {
+            const enriched = enrichedDetails.find(e => e.artistId === a.artistId);
+            return enriched || a;
+          }));
+
+          // Background update to DB for persistence
+          enrichedDetails.forEach(enriched => {
+            if (enriched._enriched && enriched.name !== 'Unknown Artist') {
+              // Silent update to persist the data
+              fetch('/api/liked-artists', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, artistData: enriched })
+              }).catch(e => console.error("Failed to update DB with enriched artist data", e));
+            }
+          });
+        }
+
       } else {
         setError(data.error);
       }
@@ -47,13 +118,16 @@ export function useLikedArtists(userId) {
       setLikedArtistIds(prev => new Set([...prev, artistData.id]));
       setLikedArtists(prev => [{
         artistId: artistData.id,
+        // Ensure consistent naming
         artistName: artistData.name || artistData.title,
+        name: artistData.name || artistData.title,
         image: artistData.image,
         followerCount: artistData.followerCount,
         isVerified: artistData.isVerified,
         dominantLanguage: artistData.dominantLanguage,
         dominantType: artistData.dominantType,
-        likedAt: new Date().toISOString()
+        likedAt: new Date().toISOString(),
+        ...artistData // Spread rest
       }, ...prev]);
     } else {
       // Optimistically remove from liked artists
@@ -99,12 +173,14 @@ export function useLikedArtists(userId) {
           setLikedArtists(prev => [{
             artistId: artistData.id,
             artistName: artistData.name || artistData.title,
+            name: artistData.name || artistData.title,
             image: artistData.image,
             followerCount: artistData.followerCount,
             isVerified: artistData.isVerified,
             dominantLanguage: artistData.dominantLanguage,
             dominantType: artistData.dominantType,
-            likedAt: new Date().toISOString()
+            likedAt: new Date().toISOString(),
+            ...artistData
           }, ...prev]);
         }
 
@@ -127,12 +203,14 @@ export function useLikedArtists(userId) {
         setLikedArtists(prev => [{
           artistId: artistData.id,
           artistName: artistData.name || artistData.title,
+          name: artistData.name || artistData.title,
           image: artistData.image,
           followerCount: artistData.followerCount,
           isVerified: artistData.isVerified,
           dominantLanguage: artistData.dominantLanguage,
           dominantType: artistData.dominantType,
-          likedAt: new Date().toISOString()
+          likedAt: new Date().toISOString(),
+          ...artistData
         }, ...prev]);
       }
 

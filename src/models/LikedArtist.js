@@ -16,6 +16,19 @@ const likedArtistSchema = new mongoose.Schema({
         index: true
     },
 
+    // Artist metadata for quick access
+    artistData: {
+        name: String,
+        image: [{
+            quality: String,
+            url: String
+        }],
+        followerCount: String,
+        isVerified: Boolean,
+        dominantLanguage: String,
+        dominantType: String
+    },
+
     // Metadata
     likedAt: {
         type: Date,
@@ -34,6 +47,7 @@ likedArtistSchema.methods.toJSON = function () {
     return {
         id: likedArtist._id,
         artistId: likedArtist.artistId,
+        artistData: likedArtist.artistData,
         likedAt: likedArtist.likedAt
     };
 };
@@ -47,7 +61,10 @@ likedArtistSchema.statics.isLiked = function (userId, artistId) {
     return this.findOne({ userId, artistId });
 };
 
-likedArtistSchema.statics.toggleLike = async function (userId, artistId) {
+likedArtistSchema.statics.toggleLike = async function (userId, artistData) {
+    // Check if artistData is just an ID string or an object
+    const artistId = typeof artistData === 'string' ? artistData : artistData.id;
+
     const existingLike = await this.findOne({ userId, artistId });
 
     if (existingLike) {
@@ -58,7 +75,15 @@ likedArtistSchema.statics.toggleLike = async function (userId, artistId) {
         // Like the artist
         const likedArtist = new this({
             userId,
-            artistId
+            artistId,
+            artistData: typeof artistData === 'object' ? {
+                name: artistData.name || artistData.title,
+                image: artistData.image,
+                followerCount: artistData.followerCount,
+                isVerified: artistData.isVerified,
+                dominantLanguage: artistData.dominantLanguage,
+                dominantType: artistData.dominantType
+            } : {}
         });
 
         await likedArtist.save();

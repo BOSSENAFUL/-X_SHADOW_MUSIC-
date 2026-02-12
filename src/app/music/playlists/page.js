@@ -20,7 +20,9 @@ import {
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Loader2, Music, Lock, Unlock } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Plus, Loader2, Music, Lock, Unlock, Search, LayoutGrid, List, Grid } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 export default function PlaylistsPage() {
   const router = useRouter();
@@ -33,10 +35,14 @@ export default function PlaylistsPage() {
   // Fetch user's playlists with song data for covers
   useEffect(() => {
     const fetchPlaylists = async () => {
+      if (status === "loading") return;
+
       if (status !== "authenticated" || !session?.user?.id) {
         setLoading(false);
         return;
       }
+
+      setLoading(true);
 
       try {
         const response = await fetch('/api/playlists');
@@ -182,58 +188,77 @@ export default function PlaylistsPage() {
     <SidebarProvider>
       <AppSidebar className="hidden md:flex" />
       <SidebarInset>
-        <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-          <div className="flex items-center justify-between w-full px-4">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger className="-ml-1 hidden md:flex" />
-              <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:block" />
-              <Breadcrumb>
-                <BreadcrumbList>
-                  <BreadcrumbItem className="hidden md:block">
-                    <BreadcrumbLink href="/music">
-                      Music
-                    </BreadcrumbLink>
-                  </BreadcrumbItem>
-                  <BreadcrumbSeparator className="hidden md:block" />
-                  <BreadcrumbItem>
-                    <BreadcrumbPage>My Playlists</BreadcrumbPage>
-                  </BreadcrumbItem>
-                </BreadcrumbList>
-              </Breadcrumb>
+        <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center justify-between gap-2 border-b bg-background/95 backdrop-blur px-4 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+          <div className="flex items-center gap-2">
+            <SidebarTrigger className="-ml-1 hidden md:flex" />
+            <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:block" />
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem className="hidden md:block">
+                  <BreadcrumbLink href="/music">Music</BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator className="hidden md:block" />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>My Playlists</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="relative hidden sm:block w-full max-w-sm">
+              <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Filter playlists..."
+                className="h-9 w-64 rounded-md border bg-muted/50 px-8 text-sm outline-none focus:bg-background focus:ring-1 focus:ring-ring"
+              />
             </div>
 
             <Button
               onClick={handleCreatePlaylist}
               disabled={isCreating || status !== "authenticated"}
               size="sm"
-              className="text-xs sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 h-8 sm:h-9"
+              className="h-9 gap-2"
             >
               {isCreating ? (
                 <>
-                  <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
-                  <span className="hidden xs:inline">Creating...</span>
-                  <span className="xs:hidden">...</span>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="hidden sm:inline">Creating...</span>
                 </>
               ) : (
                 <>
-                  <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                  <span className="hidden xs:inline">Create Playlist</span>
-                  <span className="xs:hidden">Create</span>
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Create Playlist</span>
+                  <span className="sm:hidden">New</span>
                 </>
               )}
             </Button>
           </div>
         </header>
-        <div className="flex flex-1 flex-col p-4 md:p-6 pb-32 md:pb-6">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
+        <div className="flex flex-1 flex-col gap-8 p-6 pb-32 md:pb-6">
 
+          {loading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+              {[...Array(12)].map((_, i) => (
+                <div key={i} className="space-y-3">
+                  <Skeleton className="aspect-square w-full rounded-md bg-zinc-800/50" />
+                  <div className="space-y-1">
+                    <Skeleton className="h-4 w-3/4 bg-zinc-800/50" />
+                    <Skeleton className="h-3 w-1/2 bg-zinc-800/50" />
+                  </div>
+                </div>
+              ))}
             </div>
-          ) : hasLoaded && playlists.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Music className="w-16 h-16 mb-4 text-muted-foreground" />
-              <h3 className="text-xl font-semibold mb-2">No playlists yet</h3>
-              <p className="text-muted-foreground mb-4">Create your first playlist to get started</p>
+          ) : playlists.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center border rounded-lg border-dashed bg-muted/10">
+              <div className="rounded-full bg-muted p-4 mb-4">
+                <Music className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold mb-1">No playlists yet</h3>
+              <p className="text-muted-foreground mb-4 max-w-sm">
+                Create your first playlist to start building your personal collection.
+              </p>
               <Button onClick={handleCreatePlaylist} disabled={isCreating}>
                 {isCreating ? (
                   <>
@@ -249,93 +274,79 @@ export default function PlaylistsPage() {
               </Button>
             </div>
           ) : (
-            <>
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold mb-2">My Playlists</h2>
-                <p className="text-muted-foreground">
-                  {playlists.length} playlist{playlists.length !== 1 ? 's' : ''}
-                </p>
-              </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+              {playlists.map((playlist) => (
+                <div
+                  key={playlist._id}
+                  onClick={() => router.push(`/music/playlists/${playlist._id}`)}
+                  className="group cursor-pointer space-y-3 transition-all"
+                >
+                  <div className="aspect-square w-full relative overflow-hidden rounded-md shadow-sm transition-all duration-300 group-hover:shadow-xl group-hover:scale-[1.02]">
+                    {(() => {
+                      const cover = getPlaylistCover(playlist);
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {playlists.map((playlist) => (
-                  <div
-                    key={playlist._id}
-                    onClick={() => router.push(`/music/playlists/${playlist._id}`)}
-                    className="group cursor-pointer bg-card rounded-lg p-4 hover:bg-muted/20 transition-all duration-200"
-                  >
-                    <div className="aspect-square mb-3 relative">
-                      {(() => {
-                        const cover = getPlaylistCover(playlist);
+                      if (cover.type === 'single') {
+                        return (
+                          <img
+                            src={cover.src}
+                            alt={playlist.name}
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                            onError={(e) => {
+                              e.target.src = '/def playlist image.jpg';
+                            }}
+                          />
+                        );
+                      } else if (cover.type === 'collage') {
+                        return (
+                          <div className="w-full h-full grid grid-cols-2 grid-rows-2">
+                            {cover.images.map((imageSrc, index) => (
+                              <div key={index} className="w-full h-full overflow-hidden border-[0.5px] border-black/10">
+                                <img
+                                  src={imageSrc}
+                                  alt={`Song ${index + 1}`}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    e.target.src = '/def playlist image.jpg';
+                                  }}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
+                            <Music className="w-12 h-12 text-zinc-700" />
+                          </div>
+                        );
+                      }
+                    })()}
 
-                        if (cover.type === 'single') {
-                          return (
-                            <img
-                              src={cover.src}
-                              alt={playlist.name}
-                              className="w-full h-full object-cover rounded-md shadow-md group-hover:shadow-lg transition-shadow"
-                              onError={(e) => {
-                                e.target.src = '/def playlist image.jpg';
-                              }}
-                            />
-                          );
-                        } else if (cover.type === 'collage') {
-                          return (
-                            <div className="w-full h-full grid grid-cols-2 gap-0.5 bg-black rounded-md overflow-hidden shadow-md group-hover:shadow-lg transition-shadow">
-                              {cover.images.map((imageSrc, index) => (
-                                <div key={index} className="w-full h-full overflow-hidden">
-                                  <img
-                                    src={imageSrc}
-                                    alt={`Song ${index + 1}`}
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => {
-                                      e.target.src = '/def playlist image.jpg';
-                                    }}
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        } else {
-                          return (
-                            <img
-                              src="/def playlist image.jpg"
-                              alt={playlist.name}
-                              className="w-full h-full object-cover rounded-md shadow-md group-hover:shadow-lg transition-shadow"
-                            />
-                          );
-                        }
-                      })()}
-                      <div className="absolute top-2 right-2">
-                        {playlist.isPublic ? (
-                          <Badge variant="secondary" className="text-xs">
-                            <Unlock className="w-3 h-3 mr-1" />
-                            Public
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="text-xs">
-                            <Lock className="w-3 h-3 mr-1" />
-                            Private
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <h3 className="font-semibold text-sm line-clamp-2 group-hover:text-primary transition-colors">
-                        {playlist.name}
-                      </h3>
-                      <p className="text-xs text-muted-foreground">
-                        {playlist.songIds?.length || 0} songs
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Created {formatDate(playlist.createdAt)}
-                      </p>
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      {playlist.isPublic ? (
+                        <Badge variant="secondary" className="h-6 px-2 text-[10px] bg-black/50 text-white backdrop-blur-md hover:bg-black/70 border-none">
+                          <Unlock className="w-3 h-3 mr-1" /> Public
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="h-6 px-2 text-[10px] bg-black/50 text-white backdrop-blur-md hover:bg-black/70 border-none">
+                          <Lock className="w-3 h-3 mr-1" /> Private
+                        </Badge>
+                      )}
                     </div>
                   </div>
-                ))}
-              </div>
-            </>
+
+                  <div className="space-y-1">
+                    <h3 className="font-semibold text-sm truncate pr-2 group-hover:text-primary transition-colors">
+                      {playlist.name}
+                    </h3>
+                    <div className="flex flex-col text-xs text-muted-foreground space-y-0.5">
+                      <span>{playlist.songIds?.length || 0} songs</span>
+
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </SidebarInset>
