@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -45,6 +45,9 @@ export default function AlbumPage() {
   const [dominantColor, setDominantColor] = useState('rgb(40, 40, 40)'); // Default dark gray
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState(null);
+  const [showHeaderTitle, setShowHeaderTitle] = useState(false);
+  const mobileTitleRef = useRef(null);
+  const desktopTitleRef = useRef(null);
 
   // Initialize liked songs hook with actual user ID
   const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
@@ -93,6 +96,36 @@ export default function AlbumPage() {
       fetchAlbumDetails();
     }
   }, [albumId]);
+
+  // Effect to handle scroll and show/hide title in header
+  useEffect(() => {
+    const scrollContainer = document.getElementById('album-scroll-container');
+    if (!scrollContainer) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          // Detect visibility to only react to the title that is actually in the current layout
+          const isVisibleInLayout = entry.boundingClientRect.width > 0;
+          if (isVisibleInLayout) {
+            setShowHeaderTitle(!entry.isIntersecting);
+          }
+        });
+      },
+      {
+        root: scrollContainer,
+        threshold: 0,
+        rootMargin: "-64px 0px 0px 0px",
+      }
+    );
+
+    if (mobileTitleRef.current) observer.observe(mobileTitleRef.current);
+    if (desktopTitleRef.current) observer.observe(desktopTitleRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [loading, album?.name]);
 
   const handlePlayClick = (song, index) => {
     playSong(song, album.songs, albumId);
@@ -372,13 +405,13 @@ export default function AlbumPage() {
     return (
       <SidebarProvider>
         <AppSidebar />
-        <SidebarInset>
+        <SidebarInset id="album-scroll-container" className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col">
           <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background">
             <div className="flex items-center gap-2 px-3 md:px-4">
-              <SidebarTrigger className="-ml-1" />
-              <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
-              <Button variant="ghost" size="sm" onClick={handleGoBack} className="mr-2">
-                <ArrowLeft className="w-4 h-4 mr-1" />
+              <SidebarTrigger className="-ml-1 hidden md:flex" />
+              <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:flex" />
+              <Button size="sm" onClick={handleGoBack} className="mr-1 bg-background/40 hover:bg-background/60">
+                <ArrowLeft className="w-4 h-4" />
                 <span className="hidden sm:inline">Back</span>
               </Button>
             </div>
@@ -416,30 +449,53 @@ export default function AlbumPage() {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
-        <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background">
-          <div className="flex items-center gap-2 px-3 md:px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
-            <Button variant="ghost" size="sm" onClick={handleGoBack} className="mr-2">
-              <ArrowLeft className="w-4 h-4 mr-1" />
-              <span className="hidden sm:inline">Back</span>
-            </Button>
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="/music">Music</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>Album</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
+      <SidebarInset id="album-scroll-container" className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col">
+        <header
+          style={{
+            backgroundColor: showHeaderTitle
+              ? dominantColor
+                ? `color-mix(in srgb, ${dominantColor}, black 60%)`
+                : '#1D1046'
+              : undefined
+          }}
+          className={`sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b transition-all duration-300 ${showHeaderTitle
+            ? "border-white/10"
+            : "bg-background border-transparent"
+            }`}
+        >
+          <div className="flex items-center justify-between w-full gap-2 px-3 md:px-4">
+            <div className="flex items-center gap-2">
+              <SidebarTrigger className="-ml-1 hidden md:flex" />
+              <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:flex" />
+              <Button size="sm" onClick={handleGoBack} className="mr-1 bg-background/40 hover:bg-background/60">
+                <ArrowLeft className="w-4 h-4" />
+                <span className="hidden sm:inline">Back</span>
+              </Button>
+
+              <div className="flex items-center gap-2 transition-all duration-300">
+                {showHeaderTitle ? (
+                  <h2 className="text-base font-bold animate-in fade-in slide-in-from-bottom-2 duration-300 line-clamp-1">
+                    {album.name}
+                  </h2>
+                ) : (
+                  <Breadcrumb>
+                    <BreadcrumbList>
+                      <BreadcrumbItem className="hidden md:block">
+                        <BreadcrumbLink href="/music">Music</BreadcrumbLink>
+                      </BreadcrumbItem>
+                      <BreadcrumbSeparator className="hidden md:block" />
+                      <BreadcrumbItem>
+                        <BreadcrumbPage>Album</BreadcrumbPage>
+                      </BreadcrumbItem>
+                    </BreadcrumbList>
+                  </Breadcrumb>
+                )}
+              </div>
+            </div>
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1">
           {/* Album Header */}
           <div
             className="p-4 md:p-6 text-white"
@@ -470,7 +526,7 @@ export default function AlbumPage() {
                   <Badge variant="secondary" className="mb-2">
                     Album
                   </Badge>
-                  <h1 className="text-2xl font-bold break-words leading-tight max-w-full" title={decodeHtmlEntities(album.name)}>
+                  <h1 ref={mobileTitleRef} className="text-2xl font-bold break-words leading-tight max-w-full" title={decodeHtmlEntities(album.name)}>
                     {truncateTitle(decodeHtmlEntities(album.name), 35)}
                   </h1>
                   <div className="text-sm mb-2">
@@ -528,7 +584,7 @@ export default function AlbumPage() {
                 <Badge variant="secondary" className="mb-2">
                   Album
                 </Badge>
-                <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 break-words leading-tight" title={decodeHtmlEntities(album.name)}>
+                <h1 ref={desktopTitleRef} className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 break-words leading-tight" title={decodeHtmlEntities(album.name)}>
                   {truncateTitle(decodeHtmlEntities(album.name), 60)}
                 </h1>
                 <div className="flex items-center gap-2 text-sm mb-2">
