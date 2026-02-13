@@ -2,7 +2,7 @@
 /* eslint-disable react/no-unescaped-entities */
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Input } from "@/components/ui/input";
@@ -77,9 +77,13 @@ function SearchPageContent() {
   // Ref to track if we're restoring from sessionStorage (to prevent re-searching)
   const isRestoringFromStorage = useRef(false);
 
-  // State to control opacity during scroll restoration to prevent flash
-  const [isRestoringScroll, setIsRestoringScroll] = useState(false);
+  // Ref to track if we're currently switching tabs (to prevent overwriting scroll position)
+  const isSwitchingTab = useRef(false);
 
+
+  // State to control visibility during initial scroll restoration from storage
+  // Default to true (hidden) to prevent flash of wrong scroll position
+  const [isInitialRestore, setIsInitialRestore] = useState(true);
   // Ref for the scrollable container
   const scrollContainerRef = useRef(null);
 
@@ -135,36 +139,40 @@ function SearchPageContent() {
             tabScrollPositions.current = savedTabScrollPositions;
           }
 
-          // Set restoring state to prevent flash
-          setIsRestoringScroll(true);
-
           // Restore scroll position for the active tab after a short delay to ensure content is rendered
           const scrollToRestore = savedTabScrollPositions?.[tab] ?? scrollPosition ?? 0;
           if (scrollToRestore !== undefined) {
+
+
             setTimeout(() => {
               if (scrollContainerRef.current) {
                 scrollContainerRef.current.scrollTop = scrollToRestore;
-                // Remove the opacity after scroll is restored
+                // Reveal content after scroll is restored
                 requestAnimationFrame(() => {
-                  setTimeout(() => {
-                    setIsRestoringScroll(false);
-                  }, 50);
+                  setIsInitialRestore(false);
                 });
+              } else {
+                setIsInitialRestore(false);
               }
             }, 50);
           } else {
-            setIsRestoringScroll(false);
+            setIsInitialRestore(false);
           }
 
           // Reset the flag after a short delay to allow the state updates to complete
           setTimeout(() => {
             isRestoringFromStorage.current = false;
           }, 200);
+        } else {
+          setIsInitialRestore(false);
         }
       } catch (error) {
         console.error('Error restoring search state:', error);
         isRestoringFromStorage.current = false;
+        setIsInitialRestore(false);
       }
+    } else {
+      setIsInitialRestore(false);
     }
   }, []);
 
@@ -174,7 +182,7 @@ function SearchPageContent() {
     if (!scrollContainer) return;
 
     const handleScroll = () => {
-      if (!isRestoringFromStorage.current) {
+      if (!isRestoringFromStorage.current && !isSwitchingTab.current) {
         tabScrollPositions.current[activeTab] = scrollContainer.scrollTop;
       }
     };
@@ -189,24 +197,29 @@ function SearchPageContent() {
 
   // Restore scroll position when switching tabs
   useEffect(() => {
+    // Disable scroll tracking immediately when tab changes
+    isSwitchingTab.current = true;
+
     if (scrollContainerRef.current && !isRestoringFromStorage.current) {
       const targetScrollPosition = tabScrollPositions.current[activeTab] || 0;
 
-      // Set restoring state
-      setIsRestoringScroll(true);
-
-      // Use requestAnimationFrame to ensure the tab content is rendered
+      // Use requestAnimationFrame to ensure the tab content is rendered before scrolling
       requestAnimationFrame(() => {
-        setTimeout(() => {
-          if (scrollContainerRef.current) {
-            scrollContainerRef.current.scrollTop = targetScrollPosition;
-            // Remove opacity after scroll is restored
-            setTimeout(() => {
-              setIsRestoringScroll(false);
-            }, 50);
-          }
-        }, 100);
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = targetScrollPosition;
+
+          // Re-enable scroll tracking after a short delay
+          // This ensures we don't capture the scroll event from the restoration itself
+          // or any immediate layout shifts
+          setTimeout(() => {
+            isSwitchingTab.current = false;
+          }, 100);
+        } else {
+          isSwitchingTab.current = false;
+        }
       });
+    } else {
+      isSwitchingTab.current = false;
     }
   }, [activeTab]);
 
@@ -1424,7 +1437,11 @@ function SearchPageContent() {
           </div>
         </header>
 
-        <div ref={scrollContainerRef} className="flex flex-1 flex-col pb-32 md:pb-6 overflow-y-auto">
+        <div
+          ref={scrollContainerRef}
+          className="flex flex-1 flex-col pb-32 md:pb-6 overflow-y-auto transition-opacity duration-150"
+          style={{ opacity: isInitialRestore ? 0 : 1 }}
+        >
           {/* Search Input */}
           <div className="p-4 sm:p-6 pb-4">
             <div className="relative w-full max-w-2xl mx-auto">
@@ -1451,8 +1468,7 @@ function SearchPageContent() {
 
           {combinedSearchResults && (
             <div
-              className="px-2 sm:px-6 relative transition-opacity duration-200"
-              style={{ opacity: isRestoringScroll ? 0 : 1 }}
+              className="px-2 sm:px-6 relative"
             >
               {/* Overlay loading state for when results are updating */}
               {loading && combinedSearchResults && (
