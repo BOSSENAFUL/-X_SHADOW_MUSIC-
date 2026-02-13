@@ -1452,7 +1452,7 @@ export default function PlaylistDetailPage({ params }) {
                 <Badge variant="secondary" className="mb-2">
                   {playlist.isPublic ? 'Public' : 'Private'}
                 </Badge>
-                <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-4 break-words">
+                <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-4 wrap-break-word">
                   {playlist.name}
                 </h1>
                 <div className="flex items-center gap-2 text-sm opacity-80">
@@ -1535,7 +1535,7 @@ export default function PlaylistDetailPage({ params }) {
                     <MoreVertical className="w-5 h-5 md:w-6 md:h-6" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48 z-[9999]">
+                <DropdownMenuContent align="end" className="w-48 z-9999">
                   {/* Owner-only options */}
                   {isOwner && (
                     <>
@@ -1615,7 +1615,7 @@ export default function PlaylistDetailPage({ params }) {
                           className={`md:hidden flex items-center gap-3 p-2 rounded hover:bg-muted/50 group cursor-pointer`}
                           onClick={() => handlePlayClick(song, index)}
                         >
-                          <div className="w-6 text-center flex-shrink-0">
+                          <div className="w-6 text-center shrink-0">
                             {isCurrentSong && isPlaying ? (
                               <div className="flex items-center justify-center">
                                 <div className="flex items-end justify-center gap-0.5 h-3">
@@ -1637,7 +1637,7 @@ export default function PlaylistDetailPage({ params }) {
                             )}
                           </div>
 
-                          <div className="w-12 h-12 rounded bg-muted flex-shrink-0 overflow-hidden">
+                          <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
                             {song.image?.length > 0 ? (
                               <img
                                 src={song.image.find(img => img.quality === '500x500')?.url ||
@@ -1675,7 +1675,7 @@ export default function PlaylistDetailPage({ params }) {
                             </p>
                           </div>
 
-                          <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="flex items-center gap-2 shrink-0">
 
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -1688,7 +1688,7 @@ export default function PlaylistDetailPage({ params }) {
                                   <MoreVertical className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48 z-[9999]">
+                              <DropdownMenuContent align="end" className="w-48 z-9999">
                                 <DropdownMenuItem onClick={(e) => {
                                   e.stopPropagation();
                                   handleToggleSongLike(song);
@@ -1865,7 +1865,7 @@ export default function PlaylistDetailPage({ params }) {
                                   <MoreVertical className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48 z-[9999]">
+                              <DropdownMenuContent align="end" className="w-48 z-9999">
                                 <DropdownMenuItem onClick={(e) => {
                                   e.stopPropagation();
                                   handleToggleSongLike(song);

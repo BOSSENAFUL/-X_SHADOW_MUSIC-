@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Play, ArrowLeft, Heart, Music, ListMusic, MoreVertical, Plus, User, Disc, Share, Download } from "lucide-react";
+import { Play, ArrowLeft, Heart, Music, ListMusic, MoreVertical, Plus, User, Disc, Share, Download, Clock } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -604,33 +604,38 @@ export default function GenreDetailPage() {
                                     </div>
                                 ) : songs.length > 0 ? (
                                     <>
-                                        <div className="space-y-1">
+                                        <div className="space-y-0">
+                                            {/* Desktop Table Header */}
+                                            <div className="hidden md:grid grid-cols-[32px_1fr_1fr_120px] gap-4 items-center text-xs uppercase tracking-wider text-muted-foreground border-b border-white/5 pb-2 mb-2 px-2">
+                                                <div className="text-center">#</div>
+                                                <div>Title</div>
+                                                <div>Album</div>
+                                                <div className="flex items-center justify-end pr-8">
+                                                    <Clock className="w-4 h-4" />
+                                                </div>
+                                            </div>
+
                                             {songs.map((song, index) => {
                                                 const isCurrentSong = currentSong?.id === song.id;
                                                 return (
                                                     <div key={song.id || index}>
                                                         {/* Mobile Layout */}
                                                         <div
-                                                            className={`md:hidden flex items-center gap-3 p-3 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? 'bg-muted/30' : ''
-                                                                }`}
+                                                            className="md:hidden flex items-center gap-3 p-2 rounded hover:bg-muted/50 group cursor-pointer"
                                                             onClick={() => handleSongClick(song, index)}
                                                         >
-                                                            <div className="w-6 text-center shrink-0">
-                                                                {isCurrentSong ? (
+                                                            <div className="w-8 text-center shrink-0">
+                                                                {isCurrentSong && isPlaying ? (
                                                                     <div className="flex items-center justify-center">
-                                                                        <div className={`w-4 h-4 flex items-center justify-center ${isPlaying ? 'text-green-500' : 'text-muted-foreground'
-                                                                            }`}>
-                                                                            {isPlaying ? (
-                                                                                <div className="flex gap-0.5">
-                                                                                    <div className="w-0.5 h-3 bg-green-500 animate-pulse"></div>
-                                                                                    <div className="w-0.5 h-2 bg-green-500 animate-pulse" style={{ animationDelay: '0.1s' }}></div>
-                                                                                    <div className="w-0.5 h-4 bg-green-500 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                                                                                </div>
-                                                                            ) : (
-                                                                                <Play className="w-4 h-4" />
-                                                                            )}
+                                                                        <div className="flex items-end justify-center gap-0.5 h-3">
+                                                                            <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0s' }} />
+                                                                            <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.2s' }} />
+                                                                            <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.4s' }} />
+                                                                            <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.1s' }} />
                                                                         </div>
                                                                     </div>
+                                                                ) : isCurrentSong ? (
+                                                                    <Play className="w-4 h-4 mx-auto text-green-500" />
                                                                 ) : (
                                                                     <>
                                                                         <span className="text-muted-foreground group-hover:hidden text-sm">
@@ -659,26 +664,21 @@ export default function GenreDetailPage() {
                                                             </div>
 
                                                             <div className="min-w-0 flex-1">
-                                                                <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''
-                                                                    }`}>
+                                                                <p className={`font-medium truncate text-sm ${isCurrentSong ? 'text-green-500 font-semibold' : ''}`}>
                                                                     {decodeHtmlEntities(song.name)}
                                                                 </p>
-                                                                <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
-                                                                    }`}>
+                                                                <p className={`text-xs truncate ${isCurrentSong ? 'text-green-400/80' : 'text-muted-foreground'}`}>
                                                                     {song.artists?.primary?.map(artist => artist.name).join(', ') || 'Unknown Artist'}
                                                                 </p>
                                                             </div>
 
-                                                            <div className="flex items-center gap-2 shrink-0">
-                                                                <div className="text-xs text-muted-foreground min-w-[35px] text-right">
-                                                                    {formatDuration(song.duration)}
-                                                                </div>
+                                                            <div className="flex items-center shrink-0">
                                                                 <DropdownMenu>
                                                                     <DropdownMenuTrigger asChild>
                                                                         <Button
                                                                             variant="ghost"
                                                                             size="sm"
-                                                                            className="p-2 h-8 w-8 text-muted-foreground"
+                                                                            className="p-1 h-8 w-8 text-muted-foreground"
                                                                             onClick={(e) => e.stopPropagation()}
                                                                         >
                                                                             <MoreVertical className="w-4 h-4" />
@@ -711,12 +711,11 @@ export default function GenreDetailPage() {
                                                                         <DropdownMenuItem
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
-                                                                                // Optimistic update - toggle immediately for better UX
                                                                                 toggleLike(song).catch(error => {
                                                                                     console.error('Error toggling song like:', error);
                                                                                 });
                                                                             }}
-                                                                            className={isLiked(song.id) ? 'text-red-500' : ''}
+                                                                            className={isLiked(song.id) ? 'text-red-500 font-medium' : ''}
                                                                         >
                                                                             <Heart className={`w-4 h-4 mr-2 ${isLiked(song.id) ? 'fill-current' : ''}`} />
                                                                             {isLiked(song.id) ? 'Unlike' : 'Like'}
@@ -726,31 +725,25 @@ export default function GenreDetailPage() {
                                                             </div>
                                                         </div>
 
-                                                        {/* Desktop Layout */}
                                                         <div
-                                                            className={`hidden md:grid grid-cols-[auto_1fr_auto] gap-4 items-center p-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? 'bg-muted/30' : ''
-                                                                }`}
+                                                            className="hidden md:grid grid-cols-[32px_1fr_1fr_120px] gap-4 items-center p-1.5 rounded hover:bg-white/5 group transition-colors cursor-pointer"
                                                             onClick={() => handleSongClick(song, index)}
                                                         >
                                                             <div className="w-8 text-center">
-                                                                {isCurrentSong ? (
+                                                                {isCurrentSong && isPlaying ? (
                                                                     <div className="flex items-center justify-center">
-                                                                        <div className={`w-4 h-4 flex items-center justify-center ${isPlaying ? 'text-green-500' : 'text-muted-foreground'
-                                                                            }`}>
-                                                                            {isPlaying ? (
-                                                                                <div className="flex gap-0.5">
-                                                                                    <div className="w-0.5 h-3 bg-green-500 animate-pulse"></div>
-                                                                                    <div className="w-0.5 h-2 bg-green-500 animate-pulse" style={{ animationDelay: '0.1s' }}></div>
-                                                                                    <div className="w-0.5 h-4 bg-green-500 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                                                                                </div>
-                                                                            ) : (
-                                                                                <Play className="w-4 h-4" />
-                                                                            )}
+                                                                        <div className="flex items-end justify-center gap-0.5 h-3">
+                                                                            <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0s' }} />
+                                                                            <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.2s' }} />
+                                                                            <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.4s' }} />
+                                                                            <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.1s' }} />
                                                                         </div>
                                                                     </div>
+                                                                ) : isCurrentSong ? (
+                                                                    <Play className="w-4 h-4 mx-auto text-green-500" />
                                                                 ) : (
                                                                     <>
-                                                                        <span className="text-muted-foreground group-hover:hidden">
+                                                                        <span className="text-muted-foreground group-hover:hidden text-sm">
                                                                             {index + 1}
                                                                         </span>
                                                                         <Play className="w-4 h-4 mx-auto hidden group-hover:block" />
@@ -776,19 +769,49 @@ export default function GenreDetailPage() {
                                                                     )}
                                                                 </div>
                                                                 <div className="min-w-0">
-                                                                    <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''
-                                                                        }`}>
+                                                                    <p className={`font-medium truncate text-sm ${isCurrentSong ? 'text-green-500 font-semibold' : ''}`}>
                                                                         {decodeHtmlEntities(song.name)}
                                                                     </p>
-                                                                    <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
-                                                                        }`}>
-                                                                        {song.artists?.primary?.map(artist => artist.name).join(', ') || 'Unknown Artist'}
+                                                                    <p className={`text-xs truncate ${isCurrentSong ? 'text-green-400/80' : 'text-muted-foreground group-hover:text-white/70 transition-colors'}`}>
+                                                                        {song.artists?.primary?.map((artist, aIdx) => (
+                                                                            <span key={artist.id || aIdx}>
+                                                                                <span
+                                                                                    className="hover:underline cursor-pointer"
+                                                                                    onClick={(e) => handleGoToArtist(e, song)}
+                                                                                >
+                                                                                    {artist.name}
+                                                                                </span>
+                                                                                {aIdx < song.artists.primary.length - 1 && ', '}
+                                                                            </span>
+                                                                        )) || 'Unknown Artist'}
                                                                     </p>
                                                                 </div>
                                                             </div>
 
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="w-12 text-center text-sm text-muted-foreground">
+                                                            <div className="min-w-0">
+                                                                {song.album?.name && (
+                                                                    <p
+                                                                        className={`text-xs truncate hover:underline hover:text-white transition-colors cursor-pointer ${isCurrentSong ? 'text-green-400/80' : 'text-muted-foreground'}`}
+                                                                        onClick={(e) => handleGoToAlbum(e, song)}
+                                                                    >
+                                                                        {decodeHtmlEntities(song.album.name)}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+
+                                                            <div className="flex items-center justify-end gap-2">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className={`h-8 w-8 shrink-0 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${isLiked(song.id) ? 'text-green-500' : 'hover:text-green-500'}`}
+                                                                    onClick={async (e) => {
+                                                                        e.stopPropagation();
+                                                                        toggleLike(song);
+                                                                    }}
+                                                                >
+                                                                    <Heart className={`w-4 h-4 ${isLiked(song.id) ? 'fill-current' : ''}`} />
+                                                                </Button>
+                                                                <div className="min-w-[40px] text-right text-xs text-muted-foreground font-mono">
                                                                     {formatDuration(song.duration)}
                                                                 </div>
                                                                 <DropdownMenu>
@@ -796,7 +819,7 @@ export default function GenreDetailPage() {
                                                                         <Button
                                                                             variant="ghost"
                                                                             size="sm"
-                                                                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-8 w-8 shrink-0"
+                                                                            className="opacity-0 group-hover:opacity-100 transition-opacity p-0 h-8 w-8 shrink-0"
                                                                             onClick={(e) => e.stopPropagation()}
                                                                         >
                                                                             <MoreVertical className="w-4 h-4" />
@@ -829,12 +852,9 @@ export default function GenreDetailPage() {
                                                                         <DropdownMenuItem
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
-                                                                                // Optimistic update - toggle immediately for better UX
-                                                                                toggleLike(song).catch(error => {
-                                                                                    console.error('Error toggling song like:', error);
-                                                                                });
+                                                                                toggleLike(song);
                                                                             }}
-                                                                            className={isLiked(song.id) ? 'text-red-500' : ''}
+                                                                            className={isLiked(song.id) ? 'text-red-500 font-medium' : ''}
                                                                         >
                                                                             <Heart className={`w-4 h-4 mr-2 ${isLiked(song.id) ? 'fill-current' : ''}`} />
                                                                             {isLiked(song.id) ? 'Unlike' : 'Like'}
@@ -850,7 +870,7 @@ export default function GenreDetailPage() {
 
                                         {/* Load More Songs Button */}
                                         {hasMoreSongs && (
-                                            <div className="flex justify-center mt-6 md:mt-8">
+                                            <div className="flex justify-center mt-6 md:mt-8 mb-6 md:mb-0">
                                                 <Button
                                                     variant="outline"
                                                     onClick={loadMoreSongs}
@@ -907,7 +927,7 @@ export default function GenreDetailPage() {
 
                                         {/* Load More Playlists Button */}
                                         {hasMorePlaylists && (
-                                            <div className="flex justify-center mt-6 md:mt-8">
+                                            <div className="flex justify-center mt-6 md:mt-8 mb-6 md:mb-0">
                                                 <Button
                                                     variant="outline"
                                                     onClick={loadMorePlaylists}

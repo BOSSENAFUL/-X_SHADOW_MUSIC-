@@ -2514,7 +2514,7 @@ function SearchPageContent() {
                   {(genres || []).slice(0, 8).map((genre) => (
                     <div
                       key={genre.id}
-                      className={`relative h-28 sm:h-32 md:h-40 rounded-xl overflow-hidden cursor-pointer group transition-all hover:brightness-110 active:scale-95 bg-gradient-to-br ${genre.color} shadow-lg`}
+                      className={`relative h-28 sm:h-32 md:h-40 rounded-xl overflow-hidden cursor-pointer group transition-all hover:brightness-110 active:scale-95 bg-linear-to-br ${genre.color} shadow-lg`}
                       onClick={() => router.push(`/music/discover/genres/${genre.id}`)}
                     >
                       <div className="absolute inset-0 bg-black/10 group-hover:bg-black/5 transition-colors" />
