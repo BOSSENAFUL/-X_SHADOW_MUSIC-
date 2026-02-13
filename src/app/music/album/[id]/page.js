@@ -526,7 +526,7 @@ export default function AlbumPage() {
                   <Badge variant="secondary" className="mb-2">
                     Album
                   </Badge>
-                  <h1 ref={mobileTitleRef} className="text-2xl font-bold break-words leading-tight max-w-full" title={decodeHtmlEntities(album.name)}>
+                  <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word leading-tight max-w-full" title={decodeHtmlEntities(album.name)}>
                     {truncateTitle(decodeHtmlEntities(album.name), 35)}
                   </h1>
                   <div className="text-sm mb-2">
@@ -584,7 +584,7 @@ export default function AlbumPage() {
                 <Badge variant="secondary" className="mb-2">
                   Album
                 </Badge>
-                <h1 ref={desktopTitleRef} className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 break-words leading-tight" title={decodeHtmlEntities(album.name)}>
+                <h1 ref={desktopTitleRef} className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 wrap-break-word leading-tight" title={decodeHtmlEntities(album.name)}>
                   {truncateTitle(decodeHtmlEntities(album.name), 60)}
                 </h1>
                 <div className="flex items-center gap-2 text-sm mb-2">
@@ -666,7 +666,7 @@ export default function AlbumPage() {
           </div>
 
           {/* Songs List */}
-          <div className="px-3 md:px-6 pb-32 md:pb-24">
+          <div className="px-2 md:px-6 pb-32 md:pb-24">
             {/* Desktop Table Header */}
             <div className="hidden md:grid grid-cols-[auto_1fr_auto] gap-4 items-center text-sm text-muted-foreground border-b pb-2 mb-4">
               <div className="w-8 text-center">#</div>
@@ -686,10 +686,10 @@ export default function AlbumPage() {
                   <div key={song.id || index}>
                     {/* Mobile Layout */}
                     <div
-                      className="md:hidden flex items-center gap-3 p-2 rounded hover:bg-muted/50 group cursor-pointer"
+                      className="md:hidden flex items-center gap-2 p-1 rounded hover:bg-muted/50 group cursor-pointer"
                       onClick={() => handlePlayClick(song, index)}
                     >
-                      <div className="w-6 text-center flex-shrink-0">
+                      <div className="w-6 text-center shrink-0">
                         {isCurrentSong && isPlaying ? (
                           <div className="flex items-center justify-center">
                             <div className="flex items-end justify-center gap-0.5 h-3">
@@ -711,7 +711,7 @@ export default function AlbumPage() {
                         )}
                       </div>
 
-                      <div className="w-12 h-12 rounded bg-muted flex-shrink-0 overflow-hidden">
+                      <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
                         {song.image?.length > 0 ? (
                           <img
                             src={song.image.find(img => img.quality === '500x500')?.url ||
@@ -763,7 +763,7 @@ export default function AlbumPage() {
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-2 shrink-0">
 
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -776,7 +776,7 @@ export default function AlbumPage() {
                               <MoreVertical className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48 z-[9999]">
+                          <DropdownMenuContent align="end" className="w-48 z-9999">
                             <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, song)}>
                               <Plus className="w-4 h-4 mr-2" />
                               Add to playlist
@@ -913,7 +913,7 @@ export default function AlbumPage() {
                               <MoreVertical className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48 z-[9999]">
+                          <DropdownMenuContent align="end" className="w-48 z-9999">
                             <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, song)}>
                               <Plus className="w-4 h-4 mr-2" />
                               Add to playlist

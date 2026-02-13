@@ -525,7 +525,7 @@ export default function ArtistPage() {
                       Verified Artist
                     </Badge>
                   )}
-                  <h1 ref={mobileTitleRef} className="text-2xl font-bold break-words">
+                  <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word">
                     {artist.name}
                   </h1>
                   <div className="flex items-center justify-center gap-4 text-sm flex-wrap">
@@ -569,7 +569,7 @@ export default function ArtistPage() {
                     Verified Artist
                   </Badge>
                 )}
-                <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-4 break-words">
+                <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-4 wrap-break-word">
                   {artist.name}
                 </h1>
                 <div className="flex items-center gap-4 text-sm">
@@ -629,7 +629,7 @@ export default function ArtistPage() {
             </div>
           </div>
 
-          <div className="px-3 md:px-6 pb-32 md:pb-24 space-y-6 md:space-y-8">
+          <div className="px-2 md:px-6 pb-32 md:pb-24 space-y-6 md:space-y-8">
             {/* Popular Songs */}
             {artist.topSongs && artist.topSongs.length > 0 && (
               <div>
@@ -640,10 +640,10 @@ export default function ArtistPage() {
                     return (
                       <div
                         key={song.id || index}
-                        className="flex items-center gap-3 md:gap-4 p-2 md:p-2 rounded hover:bg-muted/50 group cursor-pointer"
+                        className={`flex items-center gap-2 md:gap-4 p-1 md:p-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''}`}
                         onClick={() => handlePlayClick(song, index)}
                       >
-                        <div className="w-6 md:w-8 text-center flex-shrink-0">
+                        <div className="w-6 md:w-8 text-center shrink-0">
                           {isCurrentSong && isPlaying ? (
                             <div className="flex items-center justify-center">
                               <div className="flex items-end justify-center gap-0.5 h-3">
@@ -712,7 +712,7 @@ export default function ArtistPage() {
                           {formatDuration(song.duration)}
                         </div>
 
-                        <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex items-center gap-2 shrink-0">
 
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -725,7 +725,7 @@ export default function ArtistPage() {
                                 <MoreVertical className="w-4 h-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 z-[9999]">
+                            <DropdownMenuContent align="end" className="w-48 z-9999">
                               <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, song)}>
                                 <Plus className="w-4 h-4 mr-2" />
                                 Add to playlist

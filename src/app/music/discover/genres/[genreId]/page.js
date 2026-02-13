@@ -591,7 +591,7 @@ export default function GenreDetailPage() {
                     </div>
 
                     {/* Content */}
-                    <div className="px-3 md:px-6 pb-24">
+                    <div className="px-2 md:px-6 pb-24">
                         {activeTab === 'songs' && (
                             <div className="py-4 md:py-6">
                                 {hasLoaded && songs.length === 0 ? (
@@ -621,10 +621,10 @@ export default function GenreDetailPage() {
                                                     <div key={song.id || index}>
                                                         {/* Mobile Layout */}
                                                         <div
-                                                            className="md:hidden flex items-center gap-3 p-2 rounded hover:bg-muted/50 group cursor-pointer"
+                                                            className="md:hidden flex items-center gap-2 p-1 rounded hover:bg-muted/50 group cursor-pointer"
                                                             onClick={() => handleSongClick(song, index)}
                                                         >
-                                                            <div className="w-8 text-center shrink-0">
+                                                            <div className="w-6 text-center shrink-0">
                                                                 {isCurrentSong && isPlaying ? (
                                                                     <div className="flex items-center justify-center">
                                                                         <div className="flex items-end justify-center gap-0.5 h-3">

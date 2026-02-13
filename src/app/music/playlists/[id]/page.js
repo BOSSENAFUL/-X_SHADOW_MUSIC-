@@ -1588,7 +1588,7 @@ export default function PlaylistDetailPage({ params }) {
           </div>
 
           {/* Songs List */}
-          <div className="px-3 md:px-6 pb-32 md:pb-24">
+          <div className="px-2 md:px-6 pb-32 md:pb-24">
             {songs.length > 0 ? (
               <>
                 {/* Desktop Table Header */}
@@ -1612,7 +1612,7 @@ export default function PlaylistDetailPage({ params }) {
                       <div key={song.id || index} className="py-0.5 md:py-0">
                         {/* Mobile Layout */}
                         <div
-                          className={`md:hidden flex items-center gap-3 p-2 rounded hover:bg-muted/50 group cursor-pointer`}
+                          className={`md:hidden flex items-center gap-2 p-1 rounded hover:bg-muted/50 group cursor-pointer`}
                           onClick={() => handlePlayClick(song, index)}
                         >
                           <div className="w-6 text-center shrink-0">

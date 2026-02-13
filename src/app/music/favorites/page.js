@@ -579,7 +579,7 @@ export default function FavoritesPage() {
                   <Badge variant="secondary" className="mb-2">
                     Playlist
                   </Badge>
-                  <h1 ref={mobileTitleRef} className="text-2xl font-bold break-words">
+                  <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word">
                     Liked Songs
                   </h1>
                   <div className="flex items-center justify-center gap-2 text-sm opacity-80">
@@ -600,7 +600,7 @@ export default function FavoritesPage() {
                 <Badge variant="secondary" className="mb-2">
                   Playlist
                 </Badge>
-                <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-4 break-words">
+                <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-4 wrap-break-word">
                   Liked Songs
                 </h1>
                 <div className="flex items-center gap-2 text-sm opacity-80">
@@ -644,7 +644,7 @@ export default function FavoritesPage() {
           </div>
 
           {/* Songs List */}
-          <div className="px-3 md:px-6 pb-32 md:pb-24">
+          <div className="px-2 md:px-6 pb-32 md:pb-24">
             {loading ? (
               <div className="space-y-2">
                 {Array.from({ length: 5 }).map((_, index) => (
@@ -686,11 +686,11 @@ export default function FavoritesPage() {
                       <div key={likedSong.songId || index} className="py-0.5 md:py-0">
                         {/* Mobile Layout */}
                         <div
-                          className={`md:hidden flex items-center gap-3 p-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
+                          className={`md:hidden flex items-center gap-2 p-1 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
                             }`}
                           onClick={() => handlePlayClick(likedSong, index)}
                         >
-                          <div className="w-6 text-center flex-shrink-0">
+                          <div className="w-6 text-center shrink-0">
                             {isCurrentSong && isPlaying ? (
                               <div className="flex items-center justify-center">
                                 <div className="flex items-end justify-center gap-0.5 h-3">
@@ -712,7 +712,7 @@ export default function FavoritesPage() {
                             )}
                           </div>
 
-                          <div className="w-12 h-12 rounded bg-muted flex-shrink-0 overflow-hidden">
+                          <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
                             {likedSong.image?.length > 0 ? (
                               <img
                                 src={likedSong.image.find(img => img.quality === '500x500')?.url ||
@@ -764,7 +764,7 @@ export default function FavoritesPage() {
                             </p>
                           </div>
 
-                          <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="flex items-center gap-2 shrink-0">
 
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -777,7 +777,7 @@ export default function FavoritesPage() {
                                   <MoreVertical className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48 z-[9999]">
+                              <DropdownMenuContent align="end" className="w-48 z-9999">
                                 <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, likedSong)}>
                                   <Plus className="w-4 h-4 mr-2" />
                                   Add to playlist
@@ -963,7 +963,7 @@ export default function FavoritesPage() {
                                   <MoreVertical className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48 z-[9999]">
+                              <DropdownMenuContent align="end" className="w-48 z-9999">
                                 <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, likedSong)}>
                                   <Plus className="w-4 h-4 mr-2" />
                                   Add to playlist

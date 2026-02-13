@@ -498,7 +498,7 @@ function PlaylistPageContent() {
             {/* Mobile Layout */}
             <div className="block md:hidden">
               <div className="flex flex-col items-center text-center space-y-4">
-                <div className="w-48 h-48 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                <div className="w-48 h-48 rounded-lg overflow-hidden bg-muted shrink-0">
                   {playlist.image?.[2]?.url || playlist.image?.[1]?.url || playlist.image?.[0]?.url ? (
                     <img
                       src={playlist.image?.[2]?.url || playlist.image?.[1]?.url || playlist.image?.[0]?.url}
@@ -520,7 +520,7 @@ function PlaylistPageContent() {
                   <Badge variant="secondary" className="mb-2">
                     Public Playlist
                   </Badge>
-                  <h1 ref={mobileTitleRef} className="text-2xl font-bold break-words">
+                  <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word">
                     {playlist.name}
                   </h1>
                   <p className="text-sm opacity-80">
@@ -543,7 +543,7 @@ function PlaylistPageContent() {
 
             {/* Desktop Layout */}
             <div className="hidden md:flex gap-6 items-end">
-              <div className="w-60 h-60 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+              <div className="w-60 h-60 rounded-lg overflow-hidden bg-muted shrink-0">
                 {playlist.image?.[2]?.url || playlist.image?.[1]?.url || playlist.image?.[0]?.url ? (
                   <img
                     src={playlist.image?.[2]?.url || playlist.image?.[1]?.url || playlist.image?.[0]?.url}
@@ -565,7 +565,7 @@ function PlaylistPageContent() {
                 <Badge variant="secondary" className="mb-2">
                   Public Playlist
                 </Badge>
-                <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-4 break-words">
+                <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-4 wrap-break-word">
                   {playlist.name}
                 </h1>
                 <p className="text-sm opacity-80 mb-2">
@@ -641,7 +641,7 @@ function PlaylistPageContent() {
           </div>
 
           {/* Songs List */}
-          <div className="px-3 md:px-6 pb-32 md:pb-24">
+          <div className="px-2 md:px-6 pb-32 md:pb-24">
             {/* Desktop Table Header */}
             <div className="hidden md:grid grid-cols-[auto_1fr_1fr_120px_100px] gap-4 items-center text-sm text-muted-foreground border-b pb-2 mb-4">
               <div className="w-8 text-center">#</div>
@@ -663,11 +663,11 @@ function PlaylistPageContent() {
                   <div key={song.id || index} className="py-0.5 md:py-0">
                     {/* Mobile Layout */}
                     <div
-                      className={`md:hidden flex items-center gap-3 p-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
+                      className={`md:hidden flex items-center gap-2 p-1 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
                         }`}
                       onClick={() => handlePlayClick(song, index)}
                     >
-                      <div className="w-6 text-center flex-shrink-0">
+                      <div className="w-6 text-center shrink-0">
                         {isCurrentSong && isPlaying ? (
                           <div className="flex items-center justify-center">
                             <div className="flex items-end justify-center gap-0.5 h-3">
@@ -689,7 +689,7 @@ function PlaylistPageContent() {
                         )}
                       </div>
 
-                      <div className="w-12 h-12 rounded bg-muted flex-shrink-0 overflow-hidden">
+                      <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
                         {song.image?.length > 0 ? (
                           <img
                             src={song.image.find(img => img.quality === '500x500')?.url ||
@@ -741,7 +741,7 @@ function PlaylistPageContent() {
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-2 shrink-0">
 
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -754,7 +754,7 @@ function PlaylistPageContent() {
                               <MoreVertical className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48 z-[9999]">
+                          <DropdownMenuContent align="end" className="w-48 z-9999">
                             <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, song)}>
                               <Plus className="w-4 h-4 mr-2" />
                               Add to playlist
@@ -819,7 +819,7 @@ function PlaylistPageContent() {
                       </div>
 
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-12 h-12 rounded bg-muted flex-shrink-0 overflow-hidden">
+                        <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
                           {song.image?.length > 0 ? (
                             <img
                               src={song.image.find(img => img.quality === '500x500')?.url ||
@@ -921,7 +921,7 @@ function PlaylistPageContent() {
                               <MoreVertical className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48 z-[9999]">
+                          <DropdownMenuContent align="end" className="w-48 z-9999">
                             <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, song)}>
                               <Plus className="w-4 h-4 mr-2" />
                               Add to playlist

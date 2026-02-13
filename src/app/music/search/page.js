@@ -1451,7 +1451,7 @@ function SearchPageContent() {
 
           {combinedSearchResults && (
             <div
-              className="px-4 sm:px-6 relative transition-opacity duration-200"
+              className="px-2 sm:px-6 relative transition-opacity duration-200"
               style={{ opacity: isRestoringScroll ? 0 : 1 }}
             >
               {/* Overlay loading state for when results are updating */}
@@ -1573,7 +1573,7 @@ function SearchPageContent() {
                             return (
                               <div
                                 key={`all-tab-${song.isLyricsMatch ? 'lyrics' : 'regular'}-${song.id || `fallback-${index}`}-${index}`}
-                                className={`flex items-center gap-2 p-1.5 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150`}
+                                className={`flex items-center gap-2 p-1 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150`}
                                 onClick={() => handlePlayClick(song, combinedSearchResults.songs.results)}
                               >
                                 <div className="text-sm text-muted-foreground w-6 text-center shrink-0">
@@ -1914,7 +1914,7 @@ function SearchPageContent() {
                           <div key={`songs-tab-${song.isLyricsMatch ? 'lyrics' : 'regular'}-${song.id || `fallback-${index}`}-${index}`}>
                             {/* Mobile Layout */}
                             <div
-                              className={`md:hidden flex items-center gap-3 p-2 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150`}
+                              className={`md:hidden flex items-center gap-2 p-1 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150`}
                               onClick={() => handlePlayClick(song, categoryData.songs.page > 0 ? categoryData.songs.results : combinedSearchResults.songs.results)}
                             >
                               <div className="text-sm text-muted-foreground w-6 text-center shrink-0">
@@ -1972,7 +1972,7 @@ function SearchPageContent() {
                                   {getArtistNames(song)}
                                 </p>
                               </div>
-                              <div className="flex items-center gap-3 shrink-0">
+                              <div className="flex items-center gap-2 shrink-0">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button
