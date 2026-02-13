@@ -56,24 +56,6 @@ const data = {
       title: "Your Library",
       url: "/music/library",
       icon: ListMusic,
-      items: [
-        {
-          title: "Liked Songs",
-          url: "/music/favorites",
-        },
-        {
-          title: "Albums",
-          url: "/music/library/albums",
-        },
-        {
-          title: "Playlists",
-          url: "/music/library/playlists",
-        },
-        {
-          title: "Artists",
-          url: "/music/library/artists",
-        },
-      ],
     },
     {
       title: "Discover",
