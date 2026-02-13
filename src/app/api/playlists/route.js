@@ -9,7 +9,7 @@ import mongoose from 'mongoose';
 export async function GET(request) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { success: false, error: 'Authentication required' },
@@ -18,18 +18,25 @@ export async function GET(request) {
     }
 
     await connectDB();
-    
+
     const playlists = await Playlist.find({
       userId: new mongoose.Types.ObjectId(session.user.id)
     })
-    .sort({ createdAt: -1 }) // Most recent first
-    .lean();
-    
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Ensure IDs are strings for the frontend
+    const serializedPlaylists = playlists.map(p => ({
+      ...p,
+      _id: p._id.toString(),
+      userId: p.userId.toString()
+    }));
+
     return NextResponse.json({
       success: true,
-      data: playlists
+      data: serializedPlaylists
     });
-    
+
   } catch (error) {
     console.error('Error fetching playlists:', error);
     return NextResponse.json(

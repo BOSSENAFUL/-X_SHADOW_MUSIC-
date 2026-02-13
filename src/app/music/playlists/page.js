@@ -21,16 +21,32 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Plus, Loader2, Music, Lock, Unlock, Search, LayoutGrid, List, Grid } from "lucide-react"
+import { Plus, Loader2, Music, Lock, Unlock, Search, LayoutGrid, List, Grid, Download } from "lucide-react"
 import { cn } from "@/lib/utils"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { toast } from "sonner"
 
 export default function PlaylistsPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const [isCreating, setIsCreating] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importUrl, setImportUrl] = useState("");
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [playlists, setPlaylists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Fetch user's playlists with song data for covers
   useEffect(() => {
@@ -55,7 +71,7 @@ export default function PlaylistsPage() {
       setLoading(true);
 
       try {
-        const response = await fetch('/api/playlists');
+        const response = await fetch('/api/playlists', { cache: 'no-store' });
         const result = await response.json();
 
         if (result.success) {
@@ -120,6 +136,14 @@ export default function PlaylistsPage() {
     fetchPlaylists();
   }, [session, status]);
 
+  // Filter playlists based on search query
+  const filteredPlaylists = playlists.filter(p =>
+    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  console.log("Playlists received from API:", playlists.length, playlists);
+
   const handleCreatePlaylist = async () => {
     if (status !== "authenticated" || !session?.user?.id) {
       return;
@@ -149,6 +173,51 @@ export default function PlaylistsPage() {
       alert('Failed to create playlist. Please try again.');
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleImportPlaylist = async () => {
+    if (!importUrl) {
+      toast.error("Please enter a Spotify playlist URL");
+      return;
+    }
+
+    setIsImporting(true);
+
+    try {
+      const response = await fetch('/api/playlists/import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: importUrl }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success(`Playlist imported successfully! Added ${result.data.songIds.length} songs.`);
+        setShowImportDialog(false);
+        setImportUrl("");
+        // Refresh playlists
+        // We can just add the new playlist to the state to avoid full refetch
+        // But for consistency we might want to refetch or manually construct it
+        // The API returns the new playlist object (result.data)
+        // Ideally we should process the playlist to fetch covers if needed, 
+        // but likely covers won't be ready immediately without song fetch.
+        // Clear cache so the reload fetches fresh data
+        if (session?.user?.id) {
+          sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
+        }
+        window.location.reload();
+      } else {
+        toast.error(result.error || "Failed to import playlist");
+      }
+    } catch (error) {
+      console.error('Error importing playlist:', error);
+      toast.error("Failed to import playlist. Please try again.");
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -225,34 +294,78 @@ export default function PlaylistsPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="relative hidden sm:block w-full max-w-sm">
-              <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
+            <div className="relative hidden xl:block">
+              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
                 type="text"
                 placeholder="Filter playlists..."
-                className="h-9 w-64 rounded-md border bg-muted/50 px-8 text-sm outline-none focus:bg-background focus:ring-1 focus:ring-ring"
+                className="h-9 w-64 pl-9 bg-muted/50"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
 
-            <Button
-              onClick={handleCreatePlaylist}
-              disabled={isCreating || status !== "authenticated"}
-              size="sm"
-              className="h-9 gap-2"
-            >
-              {isCreating ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="hidden sm:inline">Creating...</span>
-                </>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4" />
-                  <span className="hidden sm:inline">Create Playlist</span>
-                  <span className="sm:hidden">New</span>
-                </>
-              )}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 gap-2">
+                    <Download className="h-4 w-4" />
+                    <span className="hidden sm:inline">Import Spotify</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Import from Spotify</DialogTitle>
+                    <DialogDescription>
+                      Paste the link to a public Spotify playlist to import it into Jammify.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="url">Playlist URL</Label>
+                      <Input
+                        id="url"
+                        placeholder="https://open.spotify.com/playlist/..."
+                        value={importUrl}
+                        onChange={(e) => setImportUrl(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={handleImportPlaylist} disabled={isImporting}>
+                      {isImporting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Importing...
+                        </>
+                      ) : (
+                        "Import Playlist"
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              <Button
+                onClick={handleCreatePlaylist}
+                disabled={isCreating || status !== "authenticated"}
+                size="sm"
+                className="h-9 gap-2"
+              >
+                {isCreating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="hidden sm:inline">Creating...</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4" />
+                    <span className="hidden sm:inline">Create Playlist</span>
+                    <span className="sm:hidden">New</span>
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </header>
         <div className="flex flex-1 flex-col gap-8 p-6 pb-32 md:pb-6">
@@ -294,7 +407,7 @@ export default function PlaylistsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-              {playlists.map((playlist) => (
+              {filteredPlaylists.map((playlist) => (
                 <div
                   key={playlist._id}
                   onClick={() => router.push(`/music/playlists/${playlist._id}`)}
