@@ -1,6 +1,7 @@
 "use client"
 
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -20,14 +21,14 @@ export function NavProjects({
       <SidebarMenu>
         {projects.map((item) => {
           const isActive = pathname === item.url;
-          
+
           return (
             <SidebarMenuItem key={item.name}>
               <SidebarMenuButton asChild isActive={isActive}>
-                <a href={item.url}>
+                <Link href={item.url}>
                   <item.icon />
                   <span>{item.name}</span>
-                </a>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           );

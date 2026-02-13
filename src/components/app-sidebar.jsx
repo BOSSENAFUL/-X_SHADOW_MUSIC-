@@ -63,10 +63,6 @@ const data = {
       icon: TrendingUp,
       items: [
         {
-          title: "New Releases",
-          url: "/music/discover/new-releases",
-        },
-        {
           title: "Genres",
           url: "/music/discover/genres",
         },

@@ -32,6 +32,8 @@ import { genres } from "@/data/genres";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { AddToPlaylistDialog } from "@/components/playlists/AddToPlaylistDialog";
+import { PlaylistCover } from "@/components/ui/playlist-cover";
+import Link from "next/link";
 
 export default function GenreDetailPage() {
     const router = useRouter();
@@ -82,35 +84,36 @@ export default function GenreDetailPage() {
                         return `${songName}|${artistName}`;
                     };
 
-                    // Use multiple seed queries to get diverse, relevant results
-                    for (const query of seedQueries.slice(0, 3)) { // Use first 3 seed queries
-                        try {
-                            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/songs?query=${encodeURIComponent(query)}&limit=40&page=1`);
-                            const data = await response.json();
+                    // Use multiple seed queries concurrently to get diverse, relevant results
+                    try {
+                        const queries = seedQueries.slice(0, 3);
+                        const songResults = await Promise.all(
+                            queries.map(query =>
+                                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/songs?query=${encodeURIComponent(query)}&limit=40&page=1`)
+                                    .then(res => res.json())
+                                    .catch(err => {
+                                        console.error(`Error fetching songs for query "${query}":`, err);
+                                        return { success: false };
+                                    })
+                            )
+                        );
 
-                            if (data.success && data.data?.results && data.data.results.length > 0) {
-                                // Filter out duplicates as we add them
-                                const newSongs = data.data.results.filter(song => {
-                                    // Skip if already seen by ID
-                                    if (seenIds.has(song.id)) {
-                                        return false;
+                        songResults.forEach(data => {
+                            if (data.success && data.data?.results) {
+                                data.data.results.forEach(song => {
+                                    if (!seenIds.has(song.id)) {
+                                        const songKey = createSongKey(song);
+                                        if (!seenSongs.has(songKey)) {
+                                            seenIds.add(song.id);
+                                            seenSongs.add(songKey);
+                                            allSongs.push(song);
+                                        }
                                     }
-
-                                    // Skip if same song name + artist combination already exists
-                                    const songKey = createSongKey(song);
-                                    if (seenSongs.has(songKey)) {
-                                        return false;
-                                    }
-
-                                    seenIds.add(song.id);
-                                    seenSongs.add(songKey);
-                                    return true;
                                 });
-                                allSongs.push(...newSongs);
                             }
-                        } catch (error) {
-                            console.error(`Error fetching songs for query "${query}":`, error);
-                        }
+                        });
+                    } catch (error) {
+                        console.error("Batch song fetch error:", error);
                     }
 
                     return allSongs;
@@ -122,26 +125,32 @@ export default function GenreDetailPage() {
                     const seenIds = new Set(); // Track seen playlist IDs to prevent duplicates
                     const seedQueries = currentGenre?.seedQueries || [genreName];
 
-                    // Use multiple seed queries to get diverse, relevant results
-                    for (const query of seedQueries.slice(0, 2)) { // Use first 2 seed queries for playlists
-                        try {
-                            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/playlists?query=${encodeURIComponent(query)}&limit=40&page=1`);
-                            const data = await response.json();
+                    // Use multiple seed queries concurrently to get diverse, relevant results
+                    try {
+                        const queries = seedQueries.slice(0, 2);
+                        const playlistResults = await Promise.all(
+                            queries.map(query =>
+                                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/playlists?query=${encodeURIComponent(query)}&limit=40&page=1`)
+                                    .then(res => res.json())
+                                    .catch(err => {
+                                        console.error(`Error fetching playlists for query "${query}":`, err);
+                                        return { success: false };
+                                    })
+                            )
+                        );
 
-                            if (data.success && data.data?.results && data.data.results.length > 0) {
-                                // Filter out duplicates as we add them
-                                const newPlaylists = data.data.results.filter(playlist => {
-                                    if (seenIds.has(playlist.id)) {
-                                        return false; // Skip duplicate
+                        playlistResults.forEach(data => {
+                            if (data.success && data.data?.results) {
+                                data.data.results.forEach(playlist => {
+                                    if (!seenIds.has(playlist.id)) {
+                                        seenIds.add(playlist.id);
+                                        allPlaylists.push(playlist);
                                     }
-                                    seenIds.add(playlist.id);
-                                    return true;
                                 });
-                                allPlaylists.push(...newPlaylists);
                             }
-                        } catch (error) {
-                            console.error(`Error fetching playlists for query "${query}":`, error);
-                        }
+                        });
+                    } catch (error) {
+                        console.error("Batch playlist fetch error:", error);
                     }
 
                     return allPlaylists;
@@ -514,15 +523,21 @@ export default function GenreDetailPage() {
                         <Breadcrumb>
                             <BreadcrumbList>
                                 <BreadcrumbItem className="hidden md:block">
-                                    <BreadcrumbLink href="/music">Music</BreadcrumbLink>
+                                    <BreadcrumbLink asChild>
+                                        <Link href="/music">Music</Link>
+                                    </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block" />
                                 <BreadcrumbItem className="hidden md:block">
-                                    <BreadcrumbLink href="/music/discover">Discover</BreadcrumbLink>
+                                    <BreadcrumbLink asChild>
+                                        <Link href="/music/discover">Discover</Link>
+                                    </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block" />
                                 <BreadcrumbItem className="hidden md:block">
-                                    <BreadcrumbLink href="/music/discover/genres">Genres</BreadcrumbLink>
+                                    <BreadcrumbLink asChild>
+                                        <Link href="/music/discover/genres">Genres</Link>
+                                    </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block" />
                                 <BreadcrumbItem>
@@ -535,7 +550,7 @@ export default function GenreDetailPage() {
 
                 <div className="flex-1 overflow-y-auto">
                     {/* Genre Header */}
-                    <div className={`p-4 md:p-6 text-white bg-gradient-to-br ${currentGenre?.color || 'from-slate-800 to-gray-900'}`}>
+                    <div className={`p-4 md:p-6 text-white bg-linear-to-br ${currentGenre?.color || 'from-slate-800 to-gray-900'}`}>
                         <div className="flex items-end gap-6">
                             <div className="flex-1">
                                 <Badge variant="secondary" className="mb-2">
@@ -600,7 +615,7 @@ export default function GenreDetailPage() {
                                                                 }`}
                                                             onClick={() => handleSongClick(song, index)}
                                                         >
-                                                            <div className="w-6 text-center flex-shrink-0">
+                                                            <div className="w-6 text-center shrink-0">
                                                                 {isCurrentSong ? (
                                                                     <div className="flex items-center justify-center">
                                                                         <div className={`w-4 h-4 flex items-center justify-center ${isPlaying ? 'text-green-500' : 'text-muted-foreground'
@@ -626,7 +641,7 @@ export default function GenreDetailPage() {
                                                                 )}
                                                             </div>
 
-                                                            <div className="w-12 h-12 rounded bg-muted flex-shrink-0 overflow-hidden">
+                                                            <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
                                                                 {song.image?.length > 0 ? (
                                                                     <img
                                                                         src={song.image.find(img => img.quality === '500x500')?.url ||
@@ -654,7 +669,7 @@ export default function GenreDetailPage() {
                                                                 </p>
                                                             </div>
 
-                                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                                            <div className="flex items-center gap-2 shrink-0">
                                                                 <div className="text-xs text-muted-foreground min-w-[35px] text-right">
                                                                     {formatDuration(song.duration)}
                                                                 </div>
@@ -669,7 +684,7 @@ export default function GenreDetailPage() {
                                                                             <MoreVertical className="w-4 h-4" />
                                                                         </Button>
                                                                     </DropdownMenuTrigger>
-                                                                    <DropdownMenuContent align="end" className="w-48 z-[9999]">
+                                                                    <DropdownMenuContent align="end" className="w-48 z-9999">
                                                                         <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, song)}>
                                                                             <Plus className="w-4 h-4 mr-2" />
                                                                             Add to playlist
@@ -787,7 +802,7 @@ export default function GenreDetailPage() {
                                                                             <MoreVertical className="w-4 h-4" />
                                                                         </Button>
                                                                     </DropdownMenuTrigger>
-                                                                    <DropdownMenuContent align="end" className="w-48 z-[9999]">
+                                                                    <DropdownMenuContent align="end" className="w-48 z-9999">
                                                                         <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, song)}>
                                                                             <Plus className="w-4 h-4 mr-2" />
                                                                             Add to playlist
@@ -871,28 +886,11 @@ export default function GenreDetailPage() {
                                                     onClick={() => handlePlaylistClick(playlist.id)}
                                                 >
                                                     <div className="relative mb-2 md:mb-3">
-                                                        <div className="aspect-square rounded-lg overflow-hidden bg-gradient-to-br from-blue-500 to-purple-500">
-                                                            {playlist.image?.[2]?.url || playlist.image?.[1]?.url || playlist.image?.[0]?.url ? (
-                                                                <img
-                                                                    src={playlist.image[2]?.url || playlist.image[1]?.url || playlist.image[0]?.url}
-                                                                    alt={playlist.name}
-                                                                    className="w-full h-full object-cover"
-                                                                />
-                                                            ) : (
-                                                                <div className="w-full h-full flex items-center justify-center">
-                                                                    <ListMusic className="w-8 h-8 md:w-12 md:h-12 opacity-50 text-white" />
-                                                                </div>
-                                                            )}
-                                                        </div>
-
-                                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-lg">
-                                                            <Button
-                                                                size="sm"
-                                                                className="rounded-full w-10 h-10 md:w-12 md:h-12 bg-green-500 hover:bg-green-600 text-black shadow-lg"
-                                                            >
-                                                                <Play className="w-4 h-4 md:w-5 md:h-5 ml-0.5" />
-                                                            </Button>
-                                                        </div>
+                                                        <PlaylistCover
+                                                            playlist={playlist}
+                                                            className="w-full aspect-square mb-0"
+                                                            showPlayIcon={true}
+                                                        />
                                                     </div>
 
                                                     <div className="space-y-1">

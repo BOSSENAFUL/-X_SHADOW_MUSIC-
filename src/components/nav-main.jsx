@@ -3,6 +3,7 @@
 import { ChevronRight } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 import {
   Collapsible,
@@ -51,16 +52,16 @@ export function NavMain({
         {items.map((item) => {
           const isActive = getActiveState(item.url);
           const isParentOrChildActive = getParentActiveState(item);
-          
+
           // If item has no subitems, render as simple link
           if (!item.items || item.items.length === 0) {
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton asChild tooltip={item.title} isActive={isActive}>
-                  <a href={item.url}>
+                  <Link href={item.url}>
                     {item.icon && <item.icon />}
                     <span>{item.title}</span>
-                  </a>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             );
@@ -87,9 +88,9 @@ export function NavMain({
                     {item.items?.map((subItem) => (
                       <SidebarMenuSubItem key={subItem.title}>
                         <SidebarMenuSubButton asChild isActive={getActiveState(subItem.url)}>
-                          <a href={subItem.url}>
+                          <Link href={subItem.url}>
                             <span>{subItem.title}</span>
-                          </a>
+                          </Link>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
                     ))}

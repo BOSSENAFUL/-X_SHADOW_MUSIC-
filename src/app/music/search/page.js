@@ -35,6 +35,7 @@ import { useMusicPlayer } from "@/contexts/music-player-context";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { AddToPlaylistDialog } from "@/components/playlists/AddToPlaylistDialog";
 import { PlaylistCover } from "@/components/ui/playlist-cover";
+import { genres } from "@/data/genres";
 
 function SearchPageContent() {
   const searchParams = useSearchParams();
@@ -2488,12 +2489,44 @@ function SearchPageContent() {
           )}
 
           {!searchQuery && !loading && (
-            <div className="flex flex-col items-center justify-center py-20">
-              <Search className="w-16 h-16 text-muted-foreground mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Search for music</h3>
-              <p className="text-muted-foreground text-center">
-                Find your favorite songs, albums, artists, and playlists
-              </p>
+            <div className="flex flex-col items-center justify-center py-10 md:py-16">
+              <div className="flex flex-col items-center mb-12">
+                <Search className="w-16 h-16 text-muted-foreground mb-4" />
+                <h3 className="text-xl font-semibold mb-2">Search for music</h3>
+                <p className="text-muted-foreground text-center px-4">
+                  Find your favorite songs, albums, artists, and playlists
+                </p>
+              </div>
+
+              {/* Popular Genres Section */}
+              <div className="w-full max-w-6xl px-4 md:px-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl md:text-2xl font-bold tracking-tight">Browse all</h2>
+                  <Button
+                    variant="link"
+                    className="text-primary font-semibold"
+                    onClick={() => router.push('/music/discover/genres')}
+                  >
+                    See all
+                  </Button>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {(genres || []).slice(0, 8).map((genre) => (
+                    <div
+                      key={genre.id}
+                      className={`relative h-28 sm:h-32 md:h-40 rounded-xl overflow-hidden cursor-pointer group transition-all hover:brightness-110 active:scale-95 bg-gradient-to-br ${genre.color} shadow-lg`}
+                      onClick={() => router.push(`/music/discover/genres/${genre.id}`)}
+                    >
+                      <div className="absolute inset-0 bg-black/10 group-hover:bg-black/5 transition-colors" />
+                      <div className="relative h-full flex items-start p-4">
+                        <h3 className="text-white font-bold text-lg sm:text-xl drop-shadow-lg leading-tight">
+                          {genre.name}
+                        </h3>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 

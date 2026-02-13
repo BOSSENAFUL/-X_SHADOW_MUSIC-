@@ -1391,7 +1391,7 @@ export default function PlaylistDetailPage({ params }) {
                   <Badge variant="secondary" className="mb-2">
                     {playlist.isPublic ? 'Public' : 'Private'}
                   </Badge>
-                  <h1 ref={mobileTitleRef} className="text-2xl font-bold break-words">
+                  <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word">
                     {playlist.name}
                   </h1>
                   <div className="flex items-center justify-center gap-2 text-sm opacity-80">
