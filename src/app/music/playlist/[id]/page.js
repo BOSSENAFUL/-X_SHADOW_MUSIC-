@@ -660,10 +660,10 @@ function PlaylistPageContent() {
               {songs.map((song, index) => {
                 const isCurrentSong = currentSong?.id === song.id;
                 return (
-                  <div key={song.id || index} className="py-0.5 md:py-0">
+                  <div key={song.id || index} >
                     {/* Mobile Layout */}
                     <div
-                      className={`md:hidden flex items-center gap-2 p-1 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
+                      className={`md:hidden flex items-center gap-2 p-1 py-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
                         }`}
                       onClick={() => handlePlayClick(song, index)}
                     >
@@ -792,7 +792,7 @@ function PlaylistPageContent() {
 
                     {/* Desktop Layout */}
                     <div
-                      className={`hidden md:grid grid-cols-[auto_1fr_1fr_120px_100px] gap-4 items-center p-1.5 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
+                      className={`hidden md:grid grid-cols-[auto_1fr_1fr_120px_100px] gap-4 items-center p-1.5 py-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
                         }`}
                       onClick={() => handlePlayClick(song, index)}
                     >

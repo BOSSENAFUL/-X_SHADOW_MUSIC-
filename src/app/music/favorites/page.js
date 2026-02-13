@@ -683,10 +683,10 @@ export default function FavoritesPage() {
                   {likedSongs.map((likedSong, index) => {
                     const isCurrentSong = currentSong?.id === likedSong.songId;
                     return (
-                      <div key={likedSong.songId || index} className="py-0.5 md:py-0">
+                      <div key={likedSong.songId || index} >
                         {/* Mobile Layout */}
                         <div
-                          className={`md:hidden flex items-center gap-2 p-1 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
+                          className={`md:hidden flex items-center gap-2 p-1 py-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
                             }`}
                           onClick={() => handlePlayClick(likedSong, index)}
                         >
@@ -827,7 +827,7 @@ export default function FavoritesPage() {
 
                         {/* Desktop Layout */}
                         <div
-                          className={`hidden md:grid grid-cols-[auto_1fr_1fr_120px_100px] gap-4 items-center p-1.5 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
+                          className={`hidden md:grid grid-cols-[auto_1fr_1fr_120px_100px] gap-4 items-center p-1.5 py-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
                             }`}
                           onClick={() => handlePlayClick(likedSong, index)}
                         >

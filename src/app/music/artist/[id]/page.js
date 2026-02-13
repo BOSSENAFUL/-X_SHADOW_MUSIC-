@@ -640,7 +640,8 @@ export default function ArtistPage() {
                     return (
                       <div
                         key={song.id || index}
-                        className={`flex items-center gap-2 md:gap-4 p-1 md:p-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''}`}
+                        className={`flex items-center gap-2 md:gap-4 p-1 py-2
+                           rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''}`}
                         onClick={() => handlePlayClick(song, index)}
                       >
                         <div className="w-6 md:w-8 text-center shrink-0">

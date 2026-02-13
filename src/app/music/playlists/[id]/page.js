@@ -1609,10 +1609,10 @@ export default function PlaylistDetailPage({ params }) {
                   {songs.map((song, index) => {
                     const isCurrentSong = currentSong?.id === song.id;
                     return (
-                      <div key={song.id || index} className="py-0.5 md:py-0">
-                        {/* Mobile Layout */}
+                      <div key={song.id || index} >
+                          {/* Mobile Layout */}
                         <div
-                          className={`md:hidden flex items-center gap-2 p-1 rounded hover:bg-muted/50 group cursor-pointer`}
+                          className={`md:hidden flex items-center gap-2 p-1 py-2 rounded hover:bg-muted/50 group cursor-pointer`}
                           onClick={() => handlePlayClick(song, index)}
                         >
                           <div className="w-6 text-center shrink-0">
@@ -1745,7 +1745,7 @@ export default function PlaylistDetailPage({ params }) {
 
                         {/* Desktop Layout */}
                         <div
-                          className={`hidden md:grid grid-cols-[auto_1fr_1fr_120px_100px] gap-4 items-center p-1.5 rounded hover:bg-muted/50 group cursor-pointer`}
+                          className={`hidden md:grid grid-cols-[auto_1fr_1fr_120px_100px] gap-4 items-center p-1.5 py-2 rounded hover:bg-muted/50 group cursor-pointer`}
                           onClick={() => handlePlayClick(song, index)}
                         >
                           <div className="w-8 text-center">

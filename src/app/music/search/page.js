@@ -1573,7 +1573,7 @@ function SearchPageContent() {
                             return (
                               <div
                                 key={`all-tab-${song.isLyricsMatch ? 'lyrics' : 'regular'}-${song.id || `fallback-${index}`}-${index}`}
-                                className={`flex items-center gap-2 p-1 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150`}
+                                className={`flex items-center gap-2 p-1 py-1.5 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150`}
                                 onClick={() => handlePlayClick(song, combinedSearchResults.songs.results)}
                               >
                                 <div className="text-sm text-muted-foreground w-6 text-center shrink-0">
@@ -1914,7 +1914,7 @@ function SearchPageContent() {
                           <div key={`songs-tab-${song.isLyricsMatch ? 'lyrics' : 'regular'}-${song.id || `fallback-${index}`}-${index}`}>
                             {/* Mobile Layout */}
                             <div
-                              className={`md:hidden flex items-center gap-2 p-1 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150`}
+                              className={`md:hidden flex items-center gap-2 p-1 py-1.5 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150`}
                               onClick={() => handlePlayClick(song, categoryData.songs.page > 0 ? categoryData.songs.results : combinedSearchResults.songs.results)}
                             >
                               <div className="text-sm text-muted-foreground w-6 text-center shrink-0">
@@ -2052,7 +2052,7 @@ function SearchPageContent() {
 
                             {/* Desktop Layout */}
                             <div
-                              className={`hidden md:grid grid-cols-[auto_1fr_1fr_80px] gap-4 items-center p-1 rounded hover:bg-muted/50 group cursor-pointer`}
+                              className={`hidden md:grid grid-cols-[auto_1fr_1fr_80px] gap-4 items-center p-1 py-1.5 rounded hover:bg-muted/50 group cursor-pointer`}
                               onClick={() => handlePlayClick(song, categoryData.songs.page > 0 ? categoryData.songs.results : combinedSearchResults.songs.results)}
                             >
                               <div className="w-8 text-center">

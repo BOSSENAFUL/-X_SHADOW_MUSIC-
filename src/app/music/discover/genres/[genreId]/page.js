@@ -621,7 +621,7 @@ export default function GenreDetailPage() {
                                                     <div key={song.id || index}>
                                                         {/* Mobile Layout */}
                                                         <div
-                                                            className="md:hidden flex items-center gap-2 p-1 rounded hover:bg-muted/50 group cursor-pointer"
+                                                            className="md:hidden flex items-center gap-2 p-1 py-2 rounded hover:bg-muted/50 group cursor-pointer"
                                                             onClick={() => handleSongClick(song, index)}
                                                         >
                                                             <div className="w-6 text-center shrink-0">
@@ -726,7 +726,7 @@ export default function GenreDetailPage() {
                                                         </div>
 
                                                         <div
-                                                            className="hidden md:grid grid-cols-[32px_1fr_1fr_120px] gap-4 items-center p-1.5 rounded hover:bg-white/5 group transition-colors cursor-pointer"
+                                                            className="hidden md:grid grid-cols-[32px_1fr_1fr_120px] gap-4 items-center p-1.5 py-2 rounded hover:bg-white/5 group transition-colors cursor-pointer"
                                                             onClick={() => handleSongClick(song, index)}
                                                         >
                                                             <div className="w-8 text-center">
