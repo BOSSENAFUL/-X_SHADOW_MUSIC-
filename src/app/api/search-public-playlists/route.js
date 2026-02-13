@@ -35,11 +35,11 @@ export async function GET(request) {
       id: playlist._id.toString(),
       title: playlist.name || playlist.title,
       description: playlist.description,
-      songCount: playlist.songs?.length || 0,
+      songCount: playlist.songIds?.length || 0,
       userName: playlist.userId?.name || 'Unknown User',
       userImage: playlist.userId?.image,
       coverImage: playlist.coverImage,
-      songs: playlist.songs || [],
+      songIds: playlist.songIds || [],
       createdAt: playlist.createdAt,
       updatedAt: playlist.updatedAt
     }));

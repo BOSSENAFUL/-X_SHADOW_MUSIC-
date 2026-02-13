@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 
+// Simple module-level cache for liked playlists to survive navigation
+const playlistsCache = new Map();
+
 export function useLikedPlaylists(userId) {
   const [likedPlaylists, setLikedPlaylists] = useState([]);
   const [likedPlaylistIds, setLikedPlaylistIds] = useState(new Set());
@@ -7,28 +10,30 @@ export function useLikedPlaylists(userId) {
   const [error, setError] = useState(null);
 
   // Fetch all liked playlists for the user
-  const fetchLikedPlaylists = useCallback(async () => {
-    if (!userId) return;
+  const fetchLikedPlaylists = useCallback(async (forceRefresh = false) => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
+    // Check cache first if not forcing refresh
+    if (!forceRefresh && playlistsCache.has(userId)) {
+      const cachedData = playlistsCache.get(userId);
+      setLikedPlaylists(cachedData);
+      setLikedPlaylistIds(new Set(cachedData.map(p => p.playlistId)));
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
     try {
       const response = await fetch(`/api/liked-playlists?userId=${userId}`);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const text = await response.text();
-      if (!text) {
-        throw new Error('Empty response from server');
-      }
-
-      const data = JSON.parse(text);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
 
       if (data.success) {
-        // Separate user-created playlists from API playlists
         const userPlaylistIds = [];
         const apiPlaylists = [];
 
@@ -40,115 +45,87 @@ export function useLikedPlaylists(userId) {
           if (isUserPlaylist) {
             userPlaylistIds.push(playlist.playlistId);
           } else {
-            apiPlaylists.push(playlist);
+            apiPlaylists.push({ ...playlist, isUserPlaylist: false });
           }
         });
 
-        let accessiblePlaylists = [...apiPlaylists];
-
-        // Batch check accessibility for user-created playlists
+        let enrichedUserPlaylists = [];
         if (userPlaylistIds.length > 0) {
-          try {
-            const batchResponse = await fetch('/api/playlists/batch-check', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                playlistIds: userPlaylistIds,
-                userId
-              }),
+          // Batch check accessibility and get basic info (including songIds)
+          const batchResponse = await fetch('/api/playlists/batch-check', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ playlistIds: userPlaylistIds, userId }),
+          });
+          const batchResult = await batchResponse.json();
+
+          if (batchResult.success) {
+            const allNeededSongIds = new Set();
+            const playlistEnrichments = {};
+
+            batchResult.data.forEach(item => {
+              if (item.isAccessible && item.playlist) {
+                const songIds = item.playlist.songIds || [];
+                playlistEnrichments[item.playlistId] = {
+                  ...item.playlist,
+                  songIds: songIds.slice(0, 4)
+                };
+                songIds.slice(0, 4).forEach(id => allNeededSongIds.add(id));
+              }
             });
 
-            const batchResult = await batchResponse.json();
+            // Batch fetch ALL song images needed for ALL collages
+            const songImageCache = {};
+            if (allNeededSongIds.size > 0) {
+              const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+              const idsArray = Array.from(allNeededSongIds);
 
-            if (batchResult.success) {
-              const accessibleUserPlaylists = data.data.filter(playlist => {
-                const isUserPlaylist = playlist.playlistId &&
-                  playlist.playlistId.length === 24 &&
-                  /^[0-9a-fA-F]{24}$/.test(playlist.playlistId);
-
-                if (!isUserPlaylist) return false;
-
-                const accessibilityInfo = batchResult.data.find(
-                  item => item.playlistId === playlist.playlistId
-                );
-
-                return accessibilityInfo?.isAccessible === true;
-              });
-
-              accessiblePlaylists = [...apiPlaylists, ...accessibleUserPlaylists];
-            } else {
-              accessiblePlaylists = data.data;
+              // Use large chunks for API efficiency
+              const chunkSize = 20;
+              for (let i = 0; i < idsArray.length; i += chunkSize) {
+                const chunk = idsArray.slice(i, i + chunkSize);
+                try {
+                  const songRes = await fetch(`${apiUrl}/api/songs?ids=${chunk.join(',')}`);
+                  const songData = await songRes.json();
+                  if (songData.success && songData.data) {
+                    songData.data.forEach(song => {
+                      if (song?.image) {
+                        songImageCache[song.id] = song.image.find(img => img.quality === '150x150')?.url || song.image[0]?.url;
+                      }
+                    });
+                  }
+                } catch (e) { console.error("Batch song fetch error", e); }
+              }
             }
-          } catch (error) {
-            accessiblePlaylists = data.data;
+
+            // Map everything back to the liked playlists list
+            enrichedUserPlaylists = data.data
+              .filter(p => playlistEnrichments[p.playlistId])
+              .map(p => {
+                const enrichment = playlistEnrichments[p.playlistId];
+                const collageImages = enrichment.songIds
+                  .map(id => songImageCache[id])
+                  .filter(Boolean);
+
+                return {
+                  ...p,
+                  owner: enrichment.ownerName || p.owner,
+                  songCount: enrichment.songCount,
+                  isUserPlaylist: true,
+                  collageImages: collageImages.length >= 4 ? collageImages : null,
+                  isCollage: collageImages.length >= 4,
+                  image: collageImages.length > 0 && collageImages.length < 4 ? collageImages[0] : p.image
+                };
+              });
           }
         }
 
-        // Enrich user-created playlists (images and owner names)
-        const enrichedPlaylists = await Promise.all(accessiblePlaylists.map(async (playlist) => {
-          const isUserPlaylist = playlist.playlistId &&
-            playlist.playlistId.length === 24 &&
-            /^[0-9a-fA-F]{24}$/.test(playlist.playlistId);
+        const finalPlaylists = [...apiPlaylists, ...enrichedUserPlaylists];
+        setLikedPlaylists(finalPlaylists);
+        setLikedPlaylistIds(new Set(finalPlaylists.map(p => p.playlistId)));
 
-          if (isUserPlaylist) {
-            try {
-              // Fetch playlist detail to get owner and song data
-              const detailRes = await fetch(`/api/playlists/${playlist.playlistId}`);
-              const detailData = await detailRes.json();
-
-              if (detailData.success) {
-                const playlistInfo = detailData.data;
-                const owner = playlistInfo.ownerName || playlist.owner;
-
-                let enrichment = {
-                  ...playlist,
-                  owner,
-                  isUserPlaylist
-                };
-
-                // Add collage if it doesn't have a specific image
-                const hasImage = playlist.image && (Array.isArray(playlist.image) ? playlist.image.length > 0 : !!playlist.image);
-
-                if (!hasImage && playlistInfo.songIds && playlistInfo.songIds.length > 0) {
-                  const firstFourIds = playlistInfo.songIds.slice(0, 4);
-                  const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-
-                  const songImages = await Promise.all(firstFourIds.map(async (id) => {
-                    try {
-                      const songRes = await fetch(`${apiUrl}/api/songs?ids=${id}`);
-                      const songData = await songRes.json();
-                      if (songData.success && songData.data?.[0]?.image) {
-                        const img = songData.data[0].image;
-                        return img.find(i => i.quality === '150x150')?.url || img[0]?.url;
-                      }
-                    } catch (e) { }
-                    return null;
-                  }));
-
-                  const validImages = songImages.filter(Boolean);
-                  if (validImages.length > 0) {
-                    enrichment.collageImages = validImages;
-                    enrichment.isCollage = true;
-                  }
-                }
-
-                return enrichment;
-              }
-            } catch (e) {
-              console.error(`Failed to enrich playlist ${playlist.playlistId}:`, e);
-            }
-          }
-
-          return {
-            ...playlist,
-            isUserPlaylist
-          };
-        }));
-
-        setLikedPlaylists(enrichedPlaylists);
-        setLikedPlaylistIds(new Set(enrichedPlaylists.map(playlist => playlist.playlistId)));
+        // Update cache
+        playlistsCache.set(userId, finalPlaylists);
       } else {
         setError(data.error);
       }
@@ -170,42 +147,17 @@ export function useLikedPlaylists(userId) {
     try {
       const response = await fetch('/api/liked-playlists', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          playlistData
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, playlistData }),
       });
 
       const result = await response.json();
-
       if (result.success) {
-        // Update local state
-        if (result.liked) {
-          // Playlist was liked
-          setLikedPlaylistIds(prev => new Set([...prev, playlistData.id]));
-          setLikedPlaylists(prev => [{
-            playlistId: playlistData.id,
-            playlistName: playlistData.name || playlistData.title,
-            owner: playlistData.owner || playlistData.subtitle || 'Jammify',
-            description: playlistData.description || '',
-            image: playlistData.image,
-            songCount: playlistData.songCount || playlistData.song_count || 0,
-            likedAt: new Date().toISOString(),
-            isUserPlaylist: playlistData.id?.length === 24 && /^[0-9a-fA-F]{24}$/.test(playlistData.id)
-          }, ...prev]);
-        } else {
-          // Playlist was unliked
-          setLikedPlaylistIds(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(playlistData.id);
-            return newSet;
-          });
-          setLikedPlaylists(prev => prev.filter(playlist => playlist.playlistId !== playlistData.id));
-        }
+        // Clear cache so it refetches next time
+        playlistsCache.delete(userId);
 
+        // Update local state optimistically or refetch
+        fetchLikedPlaylists(true);
         return result;
       } else {
         setError(result.error);
@@ -217,7 +169,7 @@ export function useLikedPlaylists(userId) {
       console.error('Error toggling playlist like:', err);
       return { success: false, error: errorMsg };
     }
-  }, [userId]);
+  }, [userId, fetchLikedPlaylists]);
 
   // Check if a playlist is liked
   const isLiked = useCallback((playlistId) => {
@@ -241,6 +193,6 @@ export function useLikedPlaylists(userId) {
     toggleLike,
     isLiked,
     getLikedCount,
-    refetch: fetchLikedPlaylists
+    refetch: () => fetchLikedPlaylists(true)
   };
 }

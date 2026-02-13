@@ -9,7 +9,7 @@ import mongoose from 'mongoose';
 export async function POST(request) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { success: false, error: 'Authentication required' },
@@ -18,7 +18,7 @@ export async function POST(request) {
     }
 
     const { playlistIds, userId } = await request.json();
-    
+
     if (!playlistIds || !Array.isArray(playlistIds) || !userId) {
       return NextResponse.json(
         { success: false, error: 'Playlist IDs array and user ID are required' },
@@ -35,7 +35,7 @@ export async function POST(request) {
     }
 
     await connectDB();
-    
+
     // Convert playlist IDs to ObjectIds and check accessibility
     const results = await Promise.all(
       playlistIds.map(async (playlistId) => {
@@ -50,7 +50,7 @@ export async function POST(request) {
           }
 
           const playlist = await Playlist.findById(playlistId).lean();
-          
+
           if (!playlist) {
             return {
               playlistId,
@@ -61,7 +61,7 @@ export async function POST(request) {
 
           // Check if playlist is accessible (public or owned by user)
           const isAccessible = playlist.isPublic || playlist.userId.toString() === userId;
-          
+
           return {
             playlistId,
             isAccessible,
@@ -69,11 +69,12 @@ export async function POST(request) {
               name: playlist.name,
               description: playlist.description,
               songCount: playlist.songIds?.length || 0,
+              songIds: playlist.songIds || [], // Added to support batched enrichment
               isPublic: playlist.isPublic,
               isOwner: playlist.userId.toString() === userId
             } : null
           };
-          
+
         } catch (error) {
           console.error(`Error checking playlist ${playlistId}:`, error);
           return {
@@ -84,12 +85,12 @@ export async function POST(request) {
         }
       })
     );
-    
+
     return NextResponse.json({
       success: true,
       data: results
     });
-    
+
   } catch (error) {
     console.error('Error in batch playlist check:', error);
     return NextResponse.json(

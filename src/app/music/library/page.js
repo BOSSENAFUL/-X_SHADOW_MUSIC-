@@ -33,55 +33,87 @@ export default function LibraryPage() {
   const [createdPlaylists, setCreatedPlaylists] = useState([])
   const [loadingCreated, setLoadingCreated] = useState(true)
 
+  // Memoized cache for session to avoid refetching on "back" navigation
   useEffect(() => {
-    if (userId) {
-      const fetchCreatedPlaylists = async () => {
-        try {
-          const res = await fetch('/api/playlists')
-          const data = await res.json()
-          if (data.success) {
-            // Fetch song data for each playlist to generate covers/collages
-            const playlistsWithCovers = await Promise.all(
-              data.data.map(async (playlist) => {
-                if (playlist.songIds && playlist.songIds.length > 0) {
-                  try {
-                    const songsToFetch = playlist.songIds.slice(0, 4)
-                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || ''
-                    const songImages = await Promise.all(songsToFetch.map(async (songId) => {
-                      try {
-                        const response = await fetch(`${apiUrl}/api/songs?ids=${songId}`)
-                        const songData = await response.json()
-                        if (songData.success && songData.data?.[0]?.image) {
-                          const img = songData.data[0].image
-                          return img.find(i => i.quality === '150x150')?.url || img[0]?.url
-                        }
-                      } catch (e) { }
-                      return null
-                    }))
-                    const validImages = songImages.filter(Boolean)
-                    if (validImages.length > 0) {
-                      return {
-                        ...playlist,
-                        collageImages: validImages,
-                        isCollage: validImages.length >= 4,
-                        image: validImages.length < 4 ? validImages[0] : null
-                      }
-                    }
-                  } catch (e) { }
-                }
-                return playlist
-              })
-            )
-            setCreatedPlaylists(playlistsWithCovers)
-          }
-        } catch (error) {
-          console.error("Failed to fetch created playlists", error)
-        } finally {
-          setLoadingCreated(false)
-        }
+    if (!userId) return
+
+    const fetchCreatedPlaylists = async () => {
+      // Check if we have data in session storage to avoid refetching on back navigation
+      const cacheKey = `created_playlists_${userId}`
+      const cached = sessionStorage.getItem(cacheKey)
+      if (cached) {
+        setCreatedPlaylists(JSON.parse(cached))
+        setLoadingCreated(false)
+        return
       }
-      fetchCreatedPlaylists()
+
+      try {
+        const res = await fetch('/api/playlists')
+        const data = await res.json()
+        if (data.success) {
+          // OPTIMIZATION: Batch song data fetching
+          const allSongIds = new Set()
+          data.data.forEach(p => {
+            if (p.songIds) p.songIds.slice(0, 4).forEach(id => allSongIds.add(id))
+          })
+
+          const songCache = {}
+          if (allSongIds.size > 0) {
+            const idsArray = Array.from(allSongIds)
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || ''
+
+            // Fetch in chunks to avoid URL length limits
+            const chunkSize = 20
+            for (let i = 0; i < idsArray.length; i += chunkSize) {
+              const chunk = idsArray.slice(i, i + chunkSize)
+              try {
+                const response = await fetch(`${apiUrl}/api/songs?ids=${chunk.join(',')}`)
+                const songData = await response.json()
+                if (songData.success && songData.data) {
+                  songData.data.forEach(song => {
+                    if (song) songCache[song.id] = song
+                  })
+                }
+              } catch (e) { console.error("Batch song fetch error", e) }
+            }
+          }
+
+          const playlistsWithCovers = data.data.map((playlist) => {
+            if (playlist.songIds && playlist.songIds.length > 0) {
+              const songsToFetch = playlist.songIds.slice(0, 4)
+              const validImages = songsToFetch
+                .map(id => {
+                  const song = songCache[id]
+                  if (song && song.image) {
+                    return song.image.find(i => i.quality === '150x150')?.url || song.image[0]?.url
+                  }
+                  return null
+                })
+                .filter(Boolean)
+
+              if (validImages.length > 0) {
+                return {
+                  ...playlist,
+                  collageImages: validImages,
+                  isCollage: validImages.length >= 4,
+                  image: validImages.length < 4 ? validImages[0] : null
+                }
+              }
+            }
+            return playlist
+          })
+
+          setCreatedPlaylists(playlistsWithCovers)
+          // Store in session storage for "back" navigation
+          sessionStorage.setItem(cacheKey, JSON.stringify(playlistsWithCovers))
+        }
+      } catch (error) {
+        console.error("Failed to fetch created playlists", error)
+      } finally {
+        setLoadingCreated(false)
+      }
     }
+    fetchCreatedPlaylists()
   }, [userId])
 
   const isAnyLoading = loadingPlaylists || loadingAlbums || loadingArtists || loadingSongs || loadingCreated

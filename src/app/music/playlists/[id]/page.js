@@ -232,38 +232,22 @@ export default function PlaylistDetailPage({ params }) {
 
     const fetchSongs = async (songIds) => {
       try {
-        console.log('Fetching songs for IDs:', songIds);
+        if (!songIds || songIds.length === 0) return;
 
-        // Fetch songs from JioSaavn API
-        const songPromises = songIds.map(async (songId) => {
-          try {
-            console.log(`Fetching song: ${songId}`);
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs?ids=${songId}`);
-            console.log(`Response status for ${songId}:`, response.status);
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+        // Batch fetch all songs in one request
+        const response = await fetch(`${apiUrl}/api/songs?ids=${songIds.join(',')}`);
+        const data = await response.json();
 
-            const data = await response.json();
-            console.log(`Response data for ${songId}:`, data);
-
-            if (data.success && data.data && data.data.length > 0) {
-              console.log(`Successfully fetched song: ${data.data[0].name}`);
-              return data.data[0]; // Return the first song from the response
-            }
-            console.log(`No valid data for song ${songId}`);
-            return null;
-          } catch (error) {
-            console.error(`Error fetching song ${songId}:`, error);
-            return null;
-          }
-        });
-
-        const fetchedSongs = await Promise.all(songPromises);
-        console.log('All fetched songs:', fetchedSongs);
-
-        // Filter out null values (failed requests)
-        const validSongs = fetchedSongs.filter(song => song !== null);
-        console.log('Valid songs:', validSongs);
-
-        setSongs(validSongs);
+        if (data.success && data.data) {
+          // Sort songs back into original order from songIds
+          const musicMap = {};
+          data.data.forEach(song => { musicMap[song.id] = song; });
+          const sortedSongs = songIds.map(id => musicMap[id]).filter(Boolean);
+          setSongs(sortedSongs);
+        } else {
+          setSongs([]);
+        }
       } catch (error) {
         console.error('Error fetching songs:', error);
         setSongs([]);

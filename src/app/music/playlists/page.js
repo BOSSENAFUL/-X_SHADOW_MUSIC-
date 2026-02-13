@@ -42,6 +42,16 @@ export default function PlaylistsPage() {
         return;
       }
 
+      // Check session cache for "back" navigation
+      const cacheKey = `user_playlists_page_${session.user.id}`;
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        setPlaylists(JSON.parse(cached));
+        setLoading(false);
+        setHasLoaded(true);
+        return;
+      }
+
       setLoading(true);
 
       try {
@@ -49,44 +59,53 @@ export default function PlaylistsPage() {
         const result = await response.json();
 
         if (result.success) {
-          // Fetch song data for each playlist to generate covers
-          const playlistsWithCovers = await Promise.all(
-            result.data.map(async (playlist) => {
-              if (playlist.songIds && playlist.songIds.length > 0) {
-                try {
-                  // Fetch first few songs for cover generation
-                  const songsToFetch = playlist.songIds.slice(0, 4);
-                  const songPromises = songsToFetch.map(async (songId) => {
-                    try {
-                      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs?ids=${songId}`);
-                      const data = await response.json();
-                      if (data.success && data.data && data.data.length > 0) {
-                        return data.data[0];
-                      }
-                      return null;
-                    } catch (error) {
-                      console.error(`Error fetching song ${songId}:`, error);
-                      return null;
-                    }
+          // BATCH OPTIMIZATION: Collect all song IDs across all playlists
+          const allSongIds = new Set();
+          result.data.forEach(p => {
+            if (p.songIds) p.songIds.slice(0, 4).forEach(id => allSongIds.add(id));
+          });
+
+          const songCache = {};
+          if (allSongIds.size > 0) {
+            const idsArray = Array.from(allSongIds);
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+            const chunkSize = 20;
+
+            for (let i = 0; i < idsArray.length; i += chunkSize) {
+              const chunk = idsArray.slice(i, i + chunkSize);
+              try {
+                const songRes = await fetch(`${apiUrl}/api/songs?ids=${chunk.join(',')}`);
+                const songData = await songRes.json();
+                if (songData.success && songData.data) {
+                  songData.data.forEach(song => {
+                    if (song) songCache[song.id] = song;
                   });
-
-                  const fetchedSongs = await Promise.all(songPromises);
-                  const validSongs = fetchedSongs.filter(song => song !== null);
-
-                  return {
-                    ...playlist,
-                    songs: validSongs
-                  };
-                } catch (error) {
-                  console.error('Error fetching songs for playlist:', error);
-                  return playlist;
                 }
+              } catch (e) {
+                console.error("Batch song fetch error:", e);
               }
-              return playlist;
-            })
-          );
+            }
+          }
+
+          // Map the cached song data back to the playlists
+          const playlistsWithCovers = result.data.map((playlist) => {
+            if (playlist.songIds && playlist.songIds.length > 0) {
+              const songsToFetch = playlist.songIds.slice(0, 4);
+              const validSongs = songsToFetch
+                .map(id => songCache[id])
+                .filter(Boolean);
+
+              return {
+                ...playlist,
+                songs: validSongs
+              };
+            }
+            return playlist;
+          });
 
           setPlaylists(playlistsWithCovers);
+          // Save to session storage
+          sessionStorage.setItem(cacheKey, JSON.stringify(playlistsWithCovers));
         } else {
           console.error('Failed to fetch playlists:', result.error);
         }

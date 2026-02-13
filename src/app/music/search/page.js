@@ -785,95 +785,57 @@ function SearchPageContent() {
       const response = await fetch(`/api/search-public-playlists?q=${encodeURIComponent(query)}`);
       const data = await response.json();
 
-      // Check if this is still the current search
-      if (searchId !== currentSearchId.current) {
-        console.log('Ignoring stale public playlists search result');
-        return;
-      }
+      if (searchId !== currentSearchId.current) return;
 
-      if (data.success) {
-        // Fetch detailed playlist data for each playlist to get song information for covers
-        const playlistsWithSongs = await Promise.all(
-          data.data.map(async (playlist) => {
-            try {
-              console.log(`Fetching playlist details for ${playlist.id}...`);
+      if (data.success && data.data.length > 0) {
+        // Collect first 4 songs for collage from all found playlists
+        const allSongIds = new Set();
+        data.data.forEach(p => {
+          if (p.songIds) p.songIds.slice(0, 4).forEach(sid => allSongIds.add(sid));
+        });
 
-              // Fetch playlist metadata (which includes songIds)
-              const playlistResponse = await fetch(`/api/playlists/${playlist.id}`);
-              const playlistData = await playlistResponse.json();
 
-              if (playlistData.success && playlistData.data) {
-                console.log(`Successfully fetched playlist ${playlist.id} metadata`);
 
-                // Get the first 4 song IDs for the cover
-                const songIds = playlistData.data.songIds || [];
-                const firstFourSongIds = songIds.slice(0, 4);
+        // Batch retrieve all song information in ONE request
+        const songCache = {};
+        if (allSongIds.size > 0) {
+          const idsArray = Array.from(allSongIds);
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
-                if (firstFourSongIds.length > 0) {
-                  console.log(`Fetching first 4 songs for playlist ${playlist.id}:`, firstFourSongIds);
-
-                  // Fetch actual song data for the first 4 songs
-                  const songPromises = firstFourSongIds.map(async (songId) => {
-                    try {
-                      const songResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs?ids=${songId}`);
-                      const songData = await songResponse.json();
-
-                      if (songData.success && songData.data && songData.data.length > 0) {
-                        return songData.data[0];
-                      }
-                      return null;
-                    } catch (error) {
-                      console.error(`Error fetching song ${songId}:`, error);
-                      return null;
-                    }
-                  });
-
-                  const fetchedSongs = await Promise.all(songPromises);
-                  const validSongs = fetchedSongs.filter(song => song !== null);
-
-                  console.log(`Successfully fetched ${validSongs.length} songs for playlist ${playlist.id}`);
-
-                  // Return the playlist with song data for cover generation
-                  return {
-                    ...playlist,
-                    songs: validSongs,
-                    // Also include other playlist details that might be useful
-                    name: playlistData.data.name || playlist.title,
-                    title: playlistData.data.title || playlist.title
-                  };
-                } else {
-                  console.log(`Playlist ${playlist.id} has no songs`);
-                  // Return playlist without songs (will show gradient fallback)
-                  return {
-                    ...playlist,
-                    songs: [],
-                    name: playlistData.data.name || playlist.title,
-                    title: playlistData.data.title || playlist.title
-                  };
-                }
-              } else {
-                console.warn(`Failed to fetch playlist details for ${playlist.id}:`, playlistData.error || 'Unknown error');
+          try {
+            // Fetch in chunks of 20 to avoid URL length limits
+            const chunkSize = 20;
+            for (let i = 0; i < idsArray.length; i += chunkSize) {
+              const chunk = idsArray.slice(i, i + chunkSize);
+              const songRes = await fetch(`${apiUrl}/api/songs?ids=${chunk.join(',')}`);
+              const songsResponseData = await songRes.json();
+              if (songsResponseData.success && songsResponseData.data) {
+                songsResponseData.data.forEach(s => {
+                  if (s) songCache[s.id] = s;
+                });
               }
-            } catch (error) {
-              console.error(`Error fetching playlist details for ${playlist.id}:`, error);
             }
+          } catch (e) { console.error("Batch song fetch failed", e); }
+        }
 
-            // Return original playlist if detailed fetch fails
-            console.log(`Using fallback for playlist ${playlist.id}`);
-            return playlist;
-          })
-        );
+        if (searchId !== currentSearchId.current) return;
 
-        console.log('Final playlists with songs:', playlistsWithSongs.map(p => ({
-          id: p.id,
-          title: p.title,
-          songsCount: p.songs?.length || 0
-        })));
+        // Assemble results locally with enriched song objects for PlaylistCover
+        const playlistsWithSongs = data.data.map(playlist => {
+          const playlistSongs = (playlist.songIds || [])
+            .slice(0, 4)
+            .map(sid => songCache[sid])
+            .filter(Boolean);
+
+          return {
+            ...playlist,
+            songs: playlistSongs
+          };
+        });
 
         setPublicPlaylists(playlistsWithSongs);
       } else {
-        console.error('Public playlists search failed:', data.error || data.message || 'Unknown error');
-        setPublicPlaylists([]);
+        setPublicPlaylists(data.success ? [] : null);
       }
     } catch (error) {
       console.error('Public playlists search error:', error);

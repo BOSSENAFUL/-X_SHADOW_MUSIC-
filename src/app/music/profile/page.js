@@ -39,69 +39,90 @@ export default function ProfilePage() {
   const [loadingCreated, setLoadingCreated] = useState(true);
 
   useEffect(() => {
-    if (userId) {
-      const fetchCreatedPlaylists = async () => {
-        try {
-          const res = await fetch('/api/playlists');
-          const data = await res.json();
-          if (data.success) {
-            // Fetch song data for each playlist to generate covers/collages
-            const playlistsWithCovers = await Promise.all(
-              data.data.map(async (playlist) => {
-                // If we already have image data from somewhere else, skip
-                if (playlist.image || playlist.collageImages) return { ...playlist, isUserPlaylist: true };
-
-                if (playlist.songIds && playlist.songIds.length > 0) {
-                  try {
-                    const songsToFetch = playlist.songIds.slice(0, 4);
-                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-
-                    const songImages = await Promise.all(songsToFetch.map(async (songId) => {
-                      try {
-                        const response = await fetch(`${apiUrl}/api/songs?ids=${songId}`);
-                        const songData = await response.json();
-                        if (songData.success && songData.data?.[0]?.image) {
-                          const img = songData.data[0].image;
-                          return img.find(i => i.quality === '150x150')?.url ||
-                            img.find(i => i.quality === '500x500')?.url ||
-                            img[0]?.url;
-                        }
-                      } catch (error) {
-                        return null;
-                      }
-                      return null;
-                    }));
-
-                    const validImages = songImages.filter(Boolean);
-                    if (validImages.length > 0) {
-                      return {
-                        ...playlist,
-                        collageImages: validImages,
-                        isCollage: validImages.length >= 4,
-                        image: validImages.length < 4 ? validImages[0] : null,
-                        isUserPlaylist: true
-                      };
-                    }
-                  } catch (error) {
-                    console.error('Error fetching songs for playlist enrichment:', error);
-                  }
-                }
-                return { ...playlist, isUserPlaylist: true };
-              })
-            );
-            setCreatedPlaylists(playlistsWithCovers);
-          }
-        } catch (error) {
-          console.error("Failed to fetch created playlists", error);
-        } finally {
-          setLoadingCreated(false);
-        }
-      };
-
-      fetchCreatedPlaylists();
-    } else if (status === 'unauthenticated') {
-      setLoadingCreated(false);
+    if (!userId) {
+      if (status === 'unauthenticated') setLoadingCreated(false);
+      return;
     }
+
+    const fetchCreatedPlaylists = async () => {
+      // Check session cache first
+      const cacheKey = `profile_created_playlists_${userId}`;
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        setCreatedPlaylists(JSON.parse(cached));
+        setLoadingCreated(false);
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/playlists');
+        const data = await res.json();
+        if (data.success) {
+          // BATCH OPTIMIZATION: Collect all song IDs for covers
+          const allSongIds = new Set();
+          data.data.forEach(p => {
+            if (p.songIds) p.songIds.slice(0, 4).forEach(id => allSongIds.add(id));
+          });
+
+          const songCache = {};
+          if (allSongIds.size > 0) {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+            const idsArray = Array.from(allSongIds);
+            const chunkSize = 20;
+
+            for (let i = 0; i < idsArray.length; i += chunkSize) {
+              const chunk = idsArray.slice(i, i + chunkSize);
+              try {
+                const songRes = await fetch(`${apiUrl}/api/songs?ids=${chunk.join(',')}`);
+                const songData = await songRes.json();
+                if (songData.success && songData.data) {
+                  songData.data.forEach(song => {
+                    if (song) songCache[song.id] = song;
+                  });
+                }
+              } catch (e) { console.error("Batch song fetch error", e); }
+            }
+          }
+
+          const playlistsWithCovers = data.data.map((playlist) => {
+            if (playlist.image || playlist.collageImages) return { ...playlist, isUserPlaylist: true };
+
+            if (playlist.songIds && playlist.songIds.length > 0) {
+              const songsToFetch = playlist.songIds.slice(0, 4);
+              const validImages = songsToFetch
+                .map(id => {
+                  const song = songCache[id];
+                  if (song && song.image) {
+                    return song.image.find(i => i.quality === '150x150')?.url || song.image[0]?.url;
+                  }
+                  return null;
+                })
+                .filter(Boolean);
+
+              if (validImages.length > 0) {
+                return {
+                  ...playlist,
+                  collageImages: validImages,
+                  isCollage: validImages.length >= 4,
+                  image: validImages.length < 4 ? validImages[0] : null,
+                  isUserPlaylist: true
+                };
+              }
+            }
+            return { ...playlist, isUserPlaylist: true };
+          });
+
+          setCreatedPlaylists(playlistsWithCovers);
+          sessionStorage.setItem(cacheKey, JSON.stringify(playlistsWithCovers));
+        }
+      } catch (error) {
+        console.error("Failed to fetch created playlists", error);
+      } finally {
+        setLoadingCreated(false);
+      }
+    };
+
+    fetchCreatedPlaylists();
   }, [userId, status]);
 
   const likedSongsCount = getLikedCount();

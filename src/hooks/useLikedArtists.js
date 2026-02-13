@@ -37,8 +37,8 @@ export function useLikedArtists(userId) {
         setLikedArtists(formattedArtists);
         setLikedArtistIds(new Set(data.data.map(artist => artist.artistId)));
 
-        // Identify artists with missing details (Unknown Name or missing image)
-        const missingDetails = formattedArtists.filter(a => a.name === 'Unknown Artist' || !a.image);
+        // Background Enrichment: Identify artists with missing details (Unknown Name or missing image)
+        const missingDetails = formattedArtists.filter(a => a.name === 'Unknown Artist' || !a.image || (Array.isArray(a.image) && a.image.length === 0));
 
         if (missingDetails.length > 0) {
           // Fetch authentic details for missing artists in background
@@ -58,7 +58,6 @@ export function useLikedArtists(userId) {
                   isVerified: detailData.data.isVerified,
                   dominantLanguage: detailData.data.dominantLanguage,
                   dominantType: detailData.data.dominantType,
-                  // Add flag to indicate this is enriched data
                   _enriched: true
                 };
               }
@@ -72,25 +71,29 @@ export function useLikedArtists(userId) {
           // Wait for enrichment
           const enrichedDetails = await Promise.all(enrichPromises);
 
-          // Update state with enriched data
+          // Update local state with enriched data immediately
           setLikedArtists(prev => prev.map(a => {
-            const enriched = enrichedDetails.find(e => e.artistId === a.artistId);
+            const enriched = enrichedDetails.find(e => e.artistId === a.artistId && e._enriched);
             return enriched || a;
           }));
 
           // Background update to DB for persistence
           enrichedDetails.forEach(enriched => {
             if (enriched._enriched && enriched.name !== 'Unknown Artist') {
-              // Silent update to persist the data
+              // Silent update using updateOnly: true
               fetch('/api/liked-artists', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId, artistData: enriched })
+                body: JSON.stringify({
+                  userId,
+                  artistId: enriched.artistId,
+                  artistData: enriched,
+                  updateOnly: true
+                })
               }).catch(e => console.error("Failed to update DB with enriched artist data", e));
             }
           });
         }
-
       } else {
         setError(data.error);
       }
@@ -110,14 +113,20 @@ export function useLikedArtists(userId) {
     }
 
     // Optimistic update - update UI immediately
-    const wasLiked = likedArtistIds.has(artistData.id);
+    const artistId = artistData.artistId || artistData.id;
+    if (!artistId) {
+      setError('Artist ID is required');
+      return { success: false, error: 'Artist ID is required' };
+    }
+
+    const wasLiked = likedArtistIds.has(artistId);
     const willBeLiked = !wasLiked;
 
     if (willBeLiked) {
       // Optimistically add to liked artists
       setLikedArtistIds(prev => new Set([...prev, artistData.id]));
       setLikedArtists(prev => [{
-        artistId: artistData.id,
+        artistId: artistId,
         // Ensure consistent naming
         artistName: artistData.name || artistData.title,
         name: artistData.name || artistData.title,
@@ -133,10 +142,10 @@ export function useLikedArtists(userId) {
       // Optimistically remove from liked artists
       setLikedArtistIds(prev => {
         const newSet = new Set(prev);
-        newSet.delete(artistData.id);
+        newSet.delete(artistId);
         return newSet;
       });
-      setLikedArtists(prev => prev.filter(artist => artist.artistId !== artistData.id));
+      setLikedArtists(prev => prev.filter(artist => artist.artistId !== artistId));
     }
 
     try {
@@ -147,6 +156,7 @@ export function useLikedArtists(userId) {
         },
         body: JSON.stringify({
           userId,
+          artistId: artistData.artistId || artistData.id,
           artistData
         }),
       });
@@ -163,10 +173,10 @@ export function useLikedArtists(userId) {
           // Revert the like
           setLikedArtistIds(prev => {
             const newSet = new Set(prev);
-            newSet.delete(artistData.id);
+            newSet.delete(artistId);
             return newSet;
           });
-          setLikedArtists(prev => prev.filter(artist => artist.artistId !== artistData.id));
+          setLikedArtists(prev => prev.filter(artist => artist.artistId !== artistId));
         } else {
           // Revert the unlike
           setLikedArtistIds(prev => new Set([...prev, artistData.id]));

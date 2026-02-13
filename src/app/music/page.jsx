@@ -57,89 +57,68 @@ export default function MusicPage() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Initialize liked playlists hook
   const { likedPlaylists, loading: playlistsLoading } = useLikedPlaylists(
     session?.user?.id
   );
-  const [playlistsWithCovers, setPlaylistsWithCovers] = useState([]);
 
   useEffect(() => {
-    const fetchNewReleases = async () => {
+    const fetchHomeSections = async () => {
+      // Check session cache first
+      const cached = sessionStorage.getItem('home_sections');
+      if (cached) {
+        const data = JSON.parse(cached);
+        setNewReleases(data.newReleases || []);
+        setTrendingPlaylists(data.trending || []);
+        setTopHitsPlaylists(data.topHits || []);
+        setEnglishTopPlaylists(data.englishTop || []);
+        setLoading(false);
+        setTrendingLoading(false);
+        setTopHitsLoading(false);
+        setEnglishTopLoading(false);
+        return;
+      }
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+
       try {
         setLoading(true);
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/search/playlists?query=new%20releases&page=0&limit=6`
-        );
-        const data = await response.json();
+        setTrendingLoading(true);
+        setTopHitsLoading(true);
+        setEnglishTopLoading(true);
 
-        if (data.success && data.data.results) {
-          setNewReleases(data.data.results);
-        }
+        const results = await Promise.all([
+          fetch(`${apiUrl}/api/search/playlists?query=new%20releases&page=0&limit=6`).then(r => r.json()),
+          fetch(`${apiUrl}/api/search/playlists?query=trending&page=0&limit=6`).then(r => r.json()),
+          fetch(`${apiUrl}/api/search/playlists?query=top%20hits&page=0&limit=6`).then(r => r.json()),
+          fetch(`${apiUrl}/api/search/playlists?query=english%20top&page=0&limit=6`).then(r => r.json())
+        ]);
+
+        const [newRes, trending, topHits, englishTop] = results;
+
+        const homeData = {
+          newReleases: newRes.success ? newRes.data.results : [],
+          trending: trending.success ? trending.data.results : [],
+          topHits: topHits.success ? topHits.data.results : [],
+          englishTop: englishTop.success ? englishTop.data.results : []
+        };
+
+        setNewReleases(homeData.newReleases);
+        setTrendingPlaylists(homeData.trending);
+        setTopHitsPlaylists(homeData.topHits);
+        setEnglishTopPlaylists(homeData.englishTop);
+
+        sessionStorage.setItem('home_sections', JSON.stringify(homeData));
       } catch (error) {
-        console.error("Error fetching new releases:", error);
+        console.error("Error fetching home sections:", error);
       } finally {
         setLoading(false);
-      }
-    };
-
-    const fetchTrendingPlaylists = async () => {
-      try {
-        setTrendingLoading(true);
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/search/playlists?query=trending&page=0&limit=6`
-        );
-        const data = await response.json();
-
-        if (data.success && data.data.results) {
-          setTrendingPlaylists(data.data.results);
-        }
-      } catch (error) {
-        console.error("Error fetching trending playlists:", error);
-      } finally {
         setTrendingLoading(false);
-      }
-    };
-
-    const fetchTopHitsPlaylists = async () => {
-      try {
-        setTopHitsLoading(true);
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/search/playlists?query=top%20hits&page=0&limit=6`
-        );
-        const data = await response.json();
-
-        if (data.success && data.data.results) {
-          setTopHitsPlaylists(data.data.results);
-        }
-      } catch (error) {
-        console.error("Error fetching top hits playlists:", error);
-      } finally {
         setTopHitsLoading(false);
-      }
-    };
-
-    const fetchEnglishTopPlaylists = async () => {
-      try {
-        setEnglishTopLoading(true);
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/search/playlists?query=english%20top&page=0&limit=6`
-        );
-        const data = await response.json();
-
-        if (data.success && data.data.results) {
-          setEnglishTopPlaylists(data.data.results);
-        }
-      } catch (error) {
-        console.error("Error fetching english top playlists:", error);
-      } finally {
         setEnglishTopLoading(false);
       }
     };
 
-    fetchNewReleases();
-    fetchTrendingPlaylists();
-    fetchTopHitsPlaylists();
-    fetchEnglishTopPlaylists();
+    fetchHomeSections();
   }, []);
 
   const handlePlayClick = (item, type) => {
@@ -247,167 +226,50 @@ export default function MusicPage() {
     });
   };
 
-  // Fetch song data for user-created playlists and generate covers
-  useEffect(() => {
-    const fetchPlaylistCovers = async () => {
-      if (!playlistsLoading && likedPlaylists.length > 0) {
-        const playlistsWithCoversData = await Promise.all(
-          likedPlaylists.slice(0, 5).map(async (playlist) => {
-            // Check if it's a user-created playlist (MongoDB ObjectId format)
-            const isUserPlaylist =
-              playlist.playlistId &&
-              playlist.playlistId.length === 24 &&
-              /^[0-9a-fA-F]{24}$/.test(playlist.playlistId);
-
-            if (isUserPlaylist) {
-              try {
-                // Fetch the actual playlist data to get song IDs
-                const playlistResponse = await fetch(
-                  `/api/playlists/${playlist.playlistId}`
-                );
-                const playlistResult = await playlistResponse.json();
-
-                if (playlistResult.success && playlistResult.data) {
-                  // Check if playlist is private and user is not the owner
-                  if (
-                    !playlistResult.data.isPublic &&
-                    !playlistResult.data.isOwner
-                  ) {
-                    return null; // Filter out private playlists
-                  }
-
-                  if (
-                    playlistResult.data.songIds &&
-                    playlistResult.data.songIds.length > 0
-                  ) {
-                    // Fetch first few songs for cover generation
-                    const songsToFetch = playlistResult.data.songIds.slice(
-                      0,
-                      4
-                    );
-                    const songPromises = songsToFetch.map(async (songId) => {
-                      try {
-                        const response = await fetch(
-                          `${process.env.NEXT_PUBLIC_API_URL}/api/songs/${songId}`
-                        );
-                        const data = await response.json();
-                        if (data.success && data.data && data.data.length > 0) {
-                          return data.data[0];
-                        }
-                        return null;
-                      } catch (error) {
-                        console.error(`Error fetching song ${songId}:`, error);
-                        return null;
-                      }
-                    });
-
-                    const fetchedSongs = await Promise.all(songPromises);
-                    const validSongs = fetchedSongs.filter(
-                      (song) => song !== null
-                    );
-
-                    // Extract color for user playlist from the first song's image
-                    if (validSongs.length > 0) {
-                      const firstSong = validSongs[0];
-                      const coverImageForColor =
-                        firstSong.image?.find((img) => img.quality === "500x500")
-                          ?.url ||
-                        firstSong.image?.find((img) => img.quality === "150x150")
-                          ?.url ||
-                        firstSong.image?.[firstSong.image.length - 1]?.url;
-
-                      if (
-                        coverImageForColor &&
-                        !playlistColors[playlist.playlistId]
-                      ) {
-                        extractDominantColor(
-                          coverImageForColor,
-                          playlist.playlistId
-                        );
-                      }
-                    }
-
-                    return {
-                      ...playlist,
-                      songs: validSongs,
-                      actualPlaylistData: playlistResult.data,
-                      songCount: playlistResult.data.songIds?.length || 0,
-                    };
-                  }
-                }
-              } catch (error) {
-                console.error("Error fetching playlist data:", error);
-              }
-            } else {
-              // For API playlists, extract color from existing image
-              const imageUrl =
-                playlist.image?.[2]?.url ||
-                playlist.image?.[1]?.url ||
-                playlist.image?.[0]?.url;
-              if (imageUrl && !playlistColors[playlist.playlistId]) {
-                extractDominantColor(imageUrl, playlist.playlistId);
-              }
-            }
-
-            return playlist;
-          })
-        );
-
-        // Filter out null values (private playlists)
-        const filteredPlaylists = playlistsWithCoversData.filter(
-          (playlist) => playlist !== null
-        );
-        setPlaylistsWithCovers(filteredPlaylists);
-      }
-    };
-
-    fetchPlaylistCovers();
-  }, [likedPlaylists, playlistsLoading, playlistColors]);
-
-  // Generate playlist cover based on songs (same logic as library page)
-  const getPlaylistCover = (playlist) => {
-    const songs = playlist.songs || [];
-
-    if (!songs || songs.length === 0) {
-      return { type: "default", src: "/def playlist image.jpg" };
+  // On-demand color extraction when hovering
+  const handlePlaylistHover = (playlist) => {
+    const playlistId = playlist.playlistId || playlist.id;
+    if (playlistColors[playlistId]) {
+      setHoveredColor(playlistColors[playlistId]);
+      return;
     }
 
-    if (songs.length >= 1 && songs.length <= 3) {
-      // Use first song's cover image
-      const firstSong = songs[0];
-      const imageUrl =
-        firstSong.image?.find((img) => img.quality === "500x500")?.url ||
-        firstSong.image?.find((img) => img.quality === "150x150")?.url ||
-        firstSong.image?.[firstSong.image.length - 1]?.url;
+    const imageUrl =
+      playlist.collageImages?.[0] ||
+      playlist.image?.[2]?.url ||
+      playlist.image?.[1]?.url ||
+      playlist.image?.[0]?.url;
 
-      return {
-        type: "single",
-        src: imageUrl || "/def playlist image.jpg",
-        song: firstSong,
-      };
-    }
-
-    if (songs.length >= 4) {
-      // Create 4-image collage from first 4 songs
-      const firstFourSongs = songs.slice(0, 4);
-      const images = firstFourSongs.map((song) => {
-        return (
-          song.image?.find((img) => img.quality === "150x150")?.url ||
-          song.image?.find((img) => img.quality === "500x500")?.url ||
-          song.image?.[song.image.length - 1]?.url ||
-          "/def playlist image.jpg"
-        );
+    if (imageUrl) {
+      extractDominantColor(imageUrl, playlistId).then(color => {
+        setHoveredColor(color);
       });
-
-      return {
-        type: "collage",
-        images: images,
-        songs: firstFourSongs,
-      };
+    } else {
+      setHoveredColor("rgb(69, 10, 245)");
     }
-
-    return { type: "default", src: "/def playlist image.jpg" };
   };
+
+  const PlaylistCollage = ({ images }) => {
+    if (!images || images.length === 0) return null;
+    const displayImages = images.slice(0, 4);
+
+    return (
+      <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
+        {displayImages.map((src, idx) => (
+          <div key={idx} className="relative w-full h-full overflow-hidden">
+            <img
+              src={src}
+              alt={`Collage ${idx}`}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+
 
   return (
     <SidebarProvider>
@@ -519,144 +381,35 @@ export default function MusicPage() {
                   </div>
                 </div>
               ))
-              : (playlistsWithCovers.length > 0
-                ? playlistsWithCovers
-                : likedPlaylists
-              )
+              : likedPlaylists
                 .slice(0, 5)
                 .map((playlist) => {
-                  const dominantColor =
-                    playlistColors[playlist.playlistId] || "rgb(59,130,246)";
-
                   return (
                     <div
                       key={playlist.playlistId}
                       className="group relative flex items-center bg-white/5 hover:bg-white/10 transition-colors rounded-[4px] overflow-hidden cursor-pointer h-14 md:h-16 lg:h-20 z-10"
-                      onMouseEnter={() =>
-                        setHoveredColor(
-                          playlistColors[playlist.playlistId] ||
-                          "rgb(59,130,246)"
-                        )
-                      }
+                      onMouseEnter={() => handlePlaylistHover(playlist)}
                       onMouseLeave={handleMouseLeave}
                       onClick={() => {
-                        // Check if it's a user-created playlist (MongoDB ObjectId format) or API playlist
-                        const isUserPlaylist =
-                          playlist.playlistId &&
-                          playlist.playlistId.length === 24 &&
-                          /^[0-9a-fA-F]{24}$/.test(playlist.playlistId);
-
-                        if (isUserPlaylist) {
-                          // User-created playlist - use /music/playlists/{id}
-                          router.push(
-                            `/music/playlists/${playlist.playlistId}`
-                          );
+                        if (playlist.isUserPlaylist) {
+                          router.push(`/music/playlists/${playlist.playlistId}`);
                         } else {
-                          // API playlist - use /music/playlist/{id}
-                          router.push(
-                            `/music/playlist/${playlist.playlistId
-                            }?songCount=${playlist.songCount || 50}`
-                          );
+                          router.push(`/music/playlist/${playlist.playlistId}?songCount=${playlist.songCount || 50}`);
                         }
                       }}
                     >
                       <div className="h-full aspect-square shrink-0 relative bg-neutral-800">
-                        {(() => {
-                          // Check if it's a user-created playlist with songs data
-                          const isUserPlaylist =
-                            playlist.playlistId &&
-                            playlist.playlistId.length === 24 &&
-                            /^[0-9a-fA-F]{24}$/.test(playlist.playlistId);
-
-                          if (isUserPlaylist && playlist.songs) {
-                            // Use dynamic cover generation for user playlists
-                            const cover = getPlaylistCover(playlist);
-
-                            if (cover.type === "single") {
-                              return (
-                                <img
-                                  src={cover.src}
-                                  alt={playlist.playlistName || "Playlist"}
-                                  className="w-full h-full object-cover shadow-r-lg"
-                                  loading="lazy"
-                                  onError={(e) => {
-                                    e.target.src = "/def playlist image.jpg";
-                                  }}
-                                />
-                              );
-                            } else if (cover.type === "collage") {
-                              return (
-                                <div className="w-full h-full grid grid-cols-2 gap-0.5 bg-black">
-                                  {cover.images.map((imageSrc, index) => (
-                                    <div
-                                      key={index}
-                                      className="w-full h-full overflow-hidden"
-                                    >
-                                      <img
-                                        src={imageSrc}
-                                        alt={`Song ${index + 1}`}
-                                        className="w-full h-full object-cover"
-                                        loading="lazy"
-                                        onError={(e) => {
-                                          e.target.src =
-                                            "/def playlist image.jpg";
-                                        }}
-                                      />
-                                    </div>
-                                  ))}
-                                </div>
-                              );
-                            } else {
-                              return (
-                                <img
-                                  src="/def playlist image.jpg"
-                                  alt={playlist.playlistName || "Playlist"}
-                                  className="w-full h-full object-cover"
-                                />
-                              );
-                            }
-                          } else if (
-                            playlist.image?.[2]?.url ||
-                            playlist.image?.[1]?.url ||
-                            playlist.image?.[0]?.url
-                          ) {
-                            // Use API playlist image for JioSaavn playlists
-                            return (
-                              <img
-                                src={
-                                  playlist.image[2]?.url ||
-                                  playlist.image[1]?.url ||
-                                  playlist.image[0]?.url
-                                }
-                                alt={playlist.playlistName || "Playlist"}
-                                className="w-full h-full object-cover shadow-r-lg"
-                                loading="lazy"
-                                onError={(e) => {
-                                  e.target.style.display = "none";
-                                  const fallback =
-                                    e.target.nextElementSibling;
-                                  if (fallback) {
-                                    fallback.style.display = "flex";
-                                  }
-                                }}
-                              />
-                            );
-                          } else {
-                            // Fallback to default icon
-                            return (
-                              <div
-                                className="w-full h-full flex items-center justify-center"
-                                style={{
-                                  background: `linear-gradient(135deg, ${dominantColor}, ${dominantColor
-                                    .replace("rgb", "rgba")
-                                    .replace(")", ", 0.8)")})`,
-                                }}
-                              >
-                                <List className="w-6 h-6 md:w-8 md:h-8 text-white/90" />
-                              </div>
-                            );
-                          }
-                        })()}
+                        {playlist.isCollage ? (
+                          <PlaylistCollage images={playlist.collageImages} />
+                        ) : (
+                          <img
+                            src={playlist.image?.[2]?.url || playlist.image?.[1]?.url || playlist.image?.[0]?.url || (typeof playlist.image === 'string' ? playlist.image : "/def playlist image.jpg")}
+                            alt={playlist.playlistName || "Playlist"}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                            onError={(e) => { e.target.src = "/def playlist image.jpg"; }}
+                          />
+                        )}
                       </div>
                       <div className="min-w-0 flex-1 px-2 md:px-3 py-2 flex items-center">
                         <h3 className="font-bold text-[13px] md:text-[14px] lg:text-[16px] text-white line-clamp-2 leading-tight">

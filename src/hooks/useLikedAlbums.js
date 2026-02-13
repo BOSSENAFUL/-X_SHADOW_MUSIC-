@@ -1,13 +1,28 @@
 import { useState, useEffect, useCallback } from 'react';
 
+// Simple module-level cache to survive navigation
+const albumsCache = new Map();
+
 export function useLikedAlbums(userId) {
   const [likedAlbums, setLikedAlbums] = useState([]);
   const [likedAlbumIds, setLikedAlbumIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
 
   // Fetch all liked albums for the user
-  const fetchLikedAlbums = useCallback(async () => {
-    if (!userId) return;
+  const fetchLikedAlbums = useCallback(async (forceRefresh = false) => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
+    // Check cache first
+    if (!forceRefresh && albumsCache.has(userId)) {
+      const cached = albumsCache.get(userId);
+      setLikedAlbums(cached);
+      setLikedAlbumIds(new Set(cached.map(a => a.albumId)));
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
@@ -36,6 +51,9 @@ export function useLikedAlbums(userId) {
         setLikedAlbums(formattedAlbums);
         const albumIds = new Set(data.data.map(album => album.albumId));
         setLikedAlbumIds(albumIds);
+
+        // Update cache
+        albumsCache.set(userId, formattedAlbums);
       }
     } catch (error) {
       console.error('Error fetching liked albums:', error);
@@ -61,6 +79,9 @@ export function useLikedAlbums(userId) {
 
     // Normalize artists for optimistic update
     const normalizedArtists = albumData.artists?.primary || albumData.artists || [];
+
+    // Clear cache to ensure fresh data on next fetch
+    albumsCache.delete(userId);
 
     // Update local state optimistically
     if (willBeLiked) {
@@ -182,6 +203,6 @@ export function useLikedAlbums(userId) {
     toggleLike,
     checkIsLiked,
     loading,
-    refetch: fetchLikedAlbums
+    refetch: () => fetchLikedAlbums(true)
   };
 }
