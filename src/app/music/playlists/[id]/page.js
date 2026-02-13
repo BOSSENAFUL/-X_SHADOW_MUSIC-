@@ -71,6 +71,7 @@ import {
 } from "lucide-react";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
+import { toast } from "sonner";
 
 export default function PlaylistDetailPage({ params }) {
   const router = useRouter();
@@ -429,41 +430,23 @@ export default function PlaylistDetailPage({ params }) {
       });
 
       const result = await response.json();
-      if (!result.success) {
+      if (result.success) {
+        // Clear cache for the playlists list page
+        if (session?.user?.id) {
+          sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
+        }
+        toast.success(result.data.isPublic ? 'Playlist is now public' : 'Playlist is now private');
+      } else {
         // Revert the optimistic update if the API call failed
         setPlaylist(prev => ({ ...prev, isPublic: previousState }));
         console.error('Failed to update playlist privacy:', result.error);
-
-        // Show error toast
-        const toast = document.createElement('div');
-        toast.className = 'fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-        toast.textContent = 'Failed to update playlist privacy. Please try again.';
-        document.body.appendChild(toast);
-
-        setTimeout(() => {
-          toast.style.opacity = '0';
-          setTimeout(() => {
-            document.body.removeChild(toast);
-          }, 300);
-        }, 3000);
+        toast.error('Failed to update playlist privacy');
       }
     } catch (error) {
       // Revert the optimistic update if there was an error
       setPlaylist(prev => ({ ...prev, isPublic: previousState }));
       console.error('Error updating playlist privacy:', error);
-
-      // Show error toast
-      const toast = document.createElement('div');
-      toast.className = 'fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-      toast.textContent = 'Something went wrong. Please try again.';
-      document.body.appendChild(toast);
-
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => {
-          document.body.removeChild(toast);
-        }, 300);
-      }, 3000);
+      toast.error('Something went wrong. Please try again.');
     }
   };
 
@@ -484,50 +467,14 @@ export default function PlaylistDetailPage({ params }) {
         } else {
           // Fallback to clipboard
           await navigator.clipboard.writeText(shareUrl);
-
-          // Create a temporary toast notification
-          const toast = document.createElement('div');
-          toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-          toast.textContent = 'Playlist link copied to clipboard!';
-          document.body.appendChild(toast);
-
-          // Remove toast after 3 seconds
-          setTimeout(() => {
-            toast.style.opacity = '0';
-            setTimeout(() => {
-              document.body.removeChild(toast);
-            }, 300);
-          }, 3000);
+          toast.success('Link copied to clipboard!');
         }
       } catch (error) {
         console.error('Error sharing playlist:', error);
-
-        // Show error toast
-        const toast = document.createElement('div');
-        toast.className = 'fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-        toast.textContent = 'Failed to share playlist. Please try again.';
-        document.body.appendChild(toast);
-
-        setTimeout(() => {
-          toast.style.opacity = '0';
-          setTimeout(() => {
-            document.body.removeChild(toast);
-          }, 300);
-        }, 3000);
+        toast.error('Failed to share playlist');
       }
     } else {
-      // Show toast that playlist needs to be public to share
-      const toast = document.createElement('div');
-      toast.className = 'fixed bottom-4 right-4 bg-orange-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-      toast.textContent = 'Make playlist public first to share it!';
-      document.body.appendChild(toast);
-
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => {
-          document.body.removeChild(toast);
-        }, 300);
-      }, 3000);
+      toast.info('Make playlist public first to share it!');
     }
   };
 
@@ -556,17 +503,24 @@ export default function PlaylistDetailPage({ params }) {
 
       const result = await response.json();
       if (result.success) {
+        // Clear cache for the playlists list page
+        if (session?.user?.id) {
+          sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
+        }
         setPlaylist(prev => ({
           ...prev,
           name: editName.trim(),
           description: editDescription.trim()
         }));
         setEditDialogOpen(false);
+        toast.success('Playlist info updated');
       } else {
         console.error('Failed to update playlist:', result.error);
+        toast.error('Failed to update playlist');
       }
     } catch (error) {
       console.error('Error updating playlist:', error);
+      toast.error('Something went wrong');
     }
   };
 
@@ -578,12 +532,19 @@ export default function PlaylistDetailPage({ params }) {
 
       const result = await response.json();
       if (result.success) {
+        // Clear cache for the playlists list page
+        if (session?.user?.id) {
+          sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
+        }
+        toast.success('Playlist deleted');
         router.push('/music/playlists');
       } else {
         console.error('Failed to delete playlist:', result.error);
+        toast.error('Failed to delete playlist');
       }
     } catch (error) {
       console.error('Error deleting playlist:', error);
+      toast.error('Something went wrong');
     }
   };
 
@@ -612,6 +573,11 @@ export default function PlaylistDetailPage({ params }) {
       const result = await response.json();
 
       if (result.success) {
+        // Clear cache for the playlists list page (because song count/covers change)
+        if (session?.user?.id) {
+          sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
+        }
+
         // Remove the song from the local state
         setSongs(prevSongs => prevSongs.filter(song => song.id !== songId));
 
@@ -621,47 +587,13 @@ export default function PlaylistDetailPage({ params }) {
           songIds: prev.songIds.filter(id => id !== songId)
         }));
 
-        // Show success toast
-        const toast = document.createElement('div');
-        toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-        toast.textContent = 'Song removed from playlist!';
-        document.body.appendChild(toast);
-
-        setTimeout(() => {
-          toast.style.opacity = '0';
-          setTimeout(() => {
-            document.body.removeChild(toast);
-          }, 300);
-        }, 3000);
+        toast.success('Song removed from playlist');
       } else {
-        // Show error toast
-        const toast = document.createElement('div');
-        toast.className = 'fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-        toast.textContent = result.error || 'Failed to remove song from playlist';
-        document.body.appendChild(toast);
-
-        setTimeout(() => {
-          toast.style.opacity = '0';
-          setTimeout(() => {
-            document.body.removeChild(toast);
-          }, 300);
-        }, 3000);
+        toast.error(result.error || 'Failed to remove song');
       }
     } catch (error) {
       console.error('Error removing song from playlist:', error);
-
-      // Show error toast
-      const toast = document.createElement('div');
-      toast.className = 'fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-      toast.textContent = 'Something went wrong. Please try again.';
-      document.body.appendChild(toast);
-
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => {
-          document.body.removeChild(toast);
-        }, 300);
-      }, 3000);
+      toast.error('Something went wrong. Please try again.');
     }
   };
 
@@ -1610,7 +1542,7 @@ export default function PlaylistDetailPage({ params }) {
                     const isCurrentSong = currentSong?.id === song.id;
                     return (
                       <div key={song.id || index} >
-                          {/* Mobile Layout */}
+                        {/* Mobile Layout */}
                         <div
                           className={`md:hidden flex items-center gap-2 p-1 py-2 rounded hover:bg-muted/50 group cursor-pointer`}
                           onClick={() => handlePlayClick(song, index)}

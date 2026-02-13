@@ -162,15 +162,19 @@ export default function PlaylistsPage() {
       const result = await response.json();
 
       if (result.success) {
+        // Clear cache so the back button shows the updated list
+        if (session?.user?.id) {
+          sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
+        }
         // Redirect to the new playlist page
         router.push(`/music/playlists/${result.data._id}`);
       } else {
         console.error('Failed to create playlist:', result.error);
-        alert('Failed to create playlist. Please try again.');
+        toast.error('Failed to create playlist');
       }
     } catch (error) {
       console.error('Error creating playlist:', error);
-      alert('Failed to create playlist. Please try again.');
+      toast.error('Something went wrong');
     } finally {
       setIsCreating(false);
     }
@@ -310,7 +314,7 @@ export default function PlaylistsPage() {
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm" className="h-9 gap-2">
                     <Download className="h-4 w-4" />
-                    <span className="hidden sm:inline">Import Spotify</span>
+                    <span className="">Import Spotify</span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[425px]">
