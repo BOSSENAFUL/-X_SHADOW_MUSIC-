@@ -599,34 +599,12 @@ export default function PlaylistDetailPage({ params }) {
 
   const handleToggleLike = async () => {
     if (!session?.user?.id) {
-      // Show toast to login
-      const toast = document.createElement('div');
-      toast.className = 'fixed bottom-4 right-4 bg-orange-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-      toast.textContent = 'Please login to save playlists!';
-      document.body.appendChild(toast);
-
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => {
-          document.body.removeChild(toast);
-        }, 300);
-      }, 3000);
+      toast.info('Please login to save playlists!');
       return;
     }
 
     if (isOwner) {
-      // Show toast that you can't like your own playlist
-      const toast = document.createElement('div');
-      toast.className = 'fixed bottom-4 right-4 bg-orange-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-      toast.textContent = "You can't save your own playlist!";
-      document.body.appendChild(toast);
-
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => {
-          document.body.removeChild(toast);
-        }, 300);
-      }, 3000);
+      toast.info("You can't save your own playlist!");
       return;
     }
 
@@ -644,50 +622,13 @@ export default function PlaylistDetailPage({ params }) {
 
       if (result.success) {
         setIsLiked(!isLiked);
-
-        // Show success toast
-        const toast = document.createElement('div');
-        toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-        toast.textContent = isLiked
-          ? 'Playlist removed from your library!'
-          : 'Playlist saved to your library!';
-        document.body.appendChild(toast);
-
-        setTimeout(() => {
-          toast.style.opacity = '0';
-          setTimeout(() => {
-            document.body.removeChild(toast);
-          }, 300);
-        }, 3000);
+        toast.success(isLiked ? 'Removed from library' : 'Saved to library');
       } else {
-        // Show error toast
-        const toast = document.createElement('div');
-        toast.className = 'fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-        toast.textContent = result.error || 'Failed to update playlist';
-        document.body.appendChild(toast);
-
-        setTimeout(() => {
-          toast.style.opacity = '0';
-          setTimeout(() => {
-            document.body.removeChild(toast);
-          }, 300);
-        }, 3000);
+        toast.error(result.error || 'Failed to update library');
       }
     } catch (error) {
       console.error('Error toggling like:', error);
-
-      // Show error toast
-      const toast = document.createElement('div');
-      toast.className = 'fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-      toast.textContent = 'Something went wrong. Please try again.';
-      document.body.appendChild(toast);
-
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => {
-          document.body.removeChild(toast);
-        }, 300);
-      }, 3000);
+      toast.error('Something went wrong');
     } finally {
       setLikingInProgress(false);
     }
@@ -769,65 +710,22 @@ export default function PlaylistDetailPage({ params }) {
       } else {
         // Fallback to clipboard
         await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
-
-        // Show success toast
-        const toast = document.createElement('div');
-        toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-        toast.textContent = 'Playlist link copied to clipboard!';
-        document.body.appendChild(toast);
-
-        setTimeout(() => {
-          toast.style.opacity = '0';
-          setTimeout(() => {
-            document.body.removeChild(toast);
-          }, 300);
-        }, 3000);
+        toast.success('Link copied to clipboard!');
       }
     } catch (error) {
       console.error('Error sharing song:', error);
-
-      // Show error toast
-      const toast = document.createElement('div');
-      toast.className = 'fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-      toast.textContent = 'Failed to share playlist. Please try again.';
-      document.body.appendChild(toast);
-
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => {
-          document.body.removeChild(toast);
-        }, 300);
-      }, 3000);
+      toast.error('Failed to share playlist');
     }
   };
 
   const handleDownloadPlaylist = async () => {
     if (songs.length === 0) {
-      // Show toast if no songs to download
-      const toast = document.createElement('div');
-      toast.className = 'fixed bottom-4 right-4 bg-orange-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-      toast.textContent = 'No songs in playlist to download!';
-      document.body.appendChild(toast);
-
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => {
-          document.body.removeChild(toast);
-        }, 300);
-      }, 3000);
+      toast.info('No songs in playlist to download!');
       return;
     }
 
     // Show initial toast
-    const progressToast = document.createElement('div');
-    progressToast.className = 'fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-    progressToast.innerHTML = `
-      <div class="flex items-center gap-2">
-        <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-        <span>Downloading playlist... (0/${songs.length})</span>
-      </div>
-    `;
-    document.body.appendChild(progressToast);
+    const toastId = toast.loading(`Downloading playlist... (0/${songs.length})`);
 
     let downloadedCount = 0;
     let failedCount = 0;
@@ -838,12 +736,7 @@ export default function PlaylistDetailPage({ params }) {
 
       try {
         // Update progress
-        progressToast.innerHTML = `
-          <div class="flex items-center gap-2">
-            <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            <span>Downloading "${song.name}"... (${i + 1}/${songs.length})</span>
-          </div>
-        `;
+        toast.loading(`Downloading "${song.name}"... (${i + 1}/${songs.length})`, { id: toastId });
 
         await downloadSingleSong(song);
         downloadedCount++;
@@ -858,32 +751,14 @@ export default function PlaylistDetailPage({ params }) {
       }
     }
 
-    // Remove progress toast
-    progressToast.style.opacity = '0';
-    setTimeout(() => {
-      document.body.removeChild(progressToast);
-    }, 300);
-
-    // Show completion toast
-    const completionToast = document.createElement('div');
+    // Show completion status
     if (failedCount === 0) {
-      completionToast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-      completionToast.textContent = `Successfully downloaded all ${downloadedCount} songs from "${playlist.name}"!`;
+      toast.success(`Downloaded all ${downloadedCount} songs from "${playlist.name}"!`, { id: toastId });
     } else if (downloadedCount > 0) {
-      completionToast.className = 'fixed bottom-4 right-4 bg-orange-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-      completionToast.textContent = `Downloaded ${downloadedCount} songs, ${failedCount} failed from "${playlist.name}"`;
+      toast.success(`Downloaded ${downloadedCount} songs (${failedCount} failed) from "${playlist.name}"`, { id: toastId });
     } else {
-      completionToast.className = 'fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-      completionToast.textContent = `Failed to download songs from "${playlist.name}". Please try again.`;
+      toast.error(`Failed to download songs from "${playlist.name}"`, { id: toastId });
     }
-
-    document.body.appendChild(completionToast);
-    setTimeout(() => {
-      completionToast.style.opacity = '0';
-      setTimeout(() => {
-        document.body.removeChild(completionToast);
-      }, 300);
-    }, 5000);
   };
 
   const downloadSingleSong = async (song) => {
@@ -1044,19 +919,7 @@ export default function PlaylistDetailPage({ params }) {
 
           console.log('Download completed for:', song.name);
 
-          // Show success toast
-          const toast = document.createElement('div');
-          toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-          toast.textContent = 'Download started!';
-          document.body.appendChild(toast);
-
-          setTimeout(() => {
-            toast.style.opacity = '0';
-            setTimeout(() => {
-              document.body.removeChild(toast);
-            }, 300);
-          }, 3000);
-
+          toast.success('Download started!');
         } catch (fetchError) {
           console.error('Error fetching file for download:', fetchError);
 
@@ -1071,50 +934,15 @@ export default function PlaylistDetailPage({ params }) {
           link.click();
           document.body.removeChild(link);
 
-          // Show success toast for fallback method
-          const toast = document.createElement('div');
-          toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-          toast.textContent = 'Download started!';
-          document.body.appendChild(toast);
-
-          setTimeout(() => {
-            toast.style.opacity = '0';
-            setTimeout(() => {
-              document.body.removeChild(toast);
-            }, 300);
-          }, 3000);
+          toast.success('Download started!');
         }
       } else {
         console.error('No download URL available for this song');
-
-        // Show error toast if no download URL available
-        const toast = document.createElement('div');
-        toast.className = 'fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-        toast.textContent = 'Download not available for this song.';
-        document.body.appendChild(toast);
-
-        setTimeout(() => {
-          toast.style.opacity = '0';
-          setTimeout(() => {
-            document.body.removeChild(toast);
-          }, 300);
-        }, 3000);
+        toast.error('Download not available for this song');
       }
     } catch (error) {
       console.error('Error downloading song:', error);
-
-      // Show error toast
-      const toast = document.createElement('div');
-      toast.className = 'fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-      toast.textContent = 'Failed to download song. Please try again.';
-      document.body.appendChild(toast);
-
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => {
-          document.body.removeChild(toast);
-        }, 300);
-      }, 3000);
+      toast.error('Something went wrong');
     }
   };
 
@@ -1541,7 +1369,7 @@ export default function PlaylistDetailPage({ params }) {
                   {songs.map((song, index) => {
                     const isCurrentSong = currentSong?.id === song.id;
                     return (
-                      <div key={song.id || index} >
+                      <div key={`${song.id}-${index}`} >
                         {/* Mobile Layout */}
                         <div
                           className={`md:hidden flex items-center gap-2 p-1 py-2 rounded hover:bg-muted/50 group cursor-pointer`}

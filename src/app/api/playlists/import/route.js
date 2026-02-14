@@ -1,8 +1,6 @@
-
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { getPlaylistTracks, getPlaylistDetails } from '@/lib/spotify';
 import Playlist from '@/models/Playlist';
 import connectDB from '@/lib/mongodb';
 
@@ -30,23 +28,24 @@ export async function POST(req) {
         // Connect DB
         await connectDB();
 
-        // Fetch Spotify details
-        const [spotifyPlaylist, spotifyTracks] = await Promise.all([
-            getPlaylistDetails(playlistId),
-            getPlaylistTracks(playlistId)
-        ]);
-
-        if (!spotifyPlaylist) {
-            return NextResponse.json({ success: false, error: 'Spotify playlist not found' }, { status: 404 });
+        // Fetch from the new Spotify Express API
+        const externalApiUrl = process.env.SPOTIFY_EX_API_URL || 'https://spotify-ex-api.vercel.app';
+        let spotifyData;
+        try {
+            const apiRes = await fetch(`${externalApiUrl}/api/playlist/${playlistId}`);
+            if (!apiRes.ok) throw new Error(`External API failed with status ${apiRes.status}`);
+            spotifyData = await apiRes.json();
+        } catch (error) {
+            console.error('Failed to fetch from external Spotify API:', error);
+            return NextResponse.json({ success: false, error: 'Failed to fetch playlist data from Spotify.' }, { status: 502 });
         }
 
-        const playlistName = spotifyPlaylist.name;
-        const playlistDescription = spotifyPlaylist.description || `Imported from Spotify`;
+        if (!spotifyData || !spotifyData.tracks) {
+            return NextResponse.json({ success: false, error: 'Spotify playlist not found or empty' }, { status: 404 });
+        }
 
-        // Process tracks to find Jammify matches
-        // We limit to 50 tracks for now to avoid timeouts, or user concurrency
-        // But user asked for "all tracks". We will try to do best effort with concurrency.
-        // If it's too long, it might timeout.
+        const { name: playlistName, description, imageUrl, tracks: spotifyTracks } = spotifyData;
+        const playlistDescription = description || `Imported from Spotify`;
 
         const jammifySongIds = [];
 
@@ -55,13 +54,17 @@ export async function POST(req) {
             if (!track || !track.name) return null;
 
             const spotifyTitle = track.name;
-            const spotifyArtist = track.artists && track.artists[0] ? track.artists[0].name : '';
+            const spotifyArtists = Array.isArray(track.artists) ? track.artists : [track.artists || ''];
+            const spotifyArtistsString = spotifyArtists.join(' ');
+            const spotifyMainArtist = spotifyArtists[0];
+
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
             const cookieHeader = req.headers.get('cookie') || '';
 
             // Search strategies in order of preference
             const searchStrategies = [
-                `${spotifyTitle} ${spotifyArtist}`,
+                `${spotifyTitle} ${spotifyArtistsString}`, // Full title + All artists
+                `${spotifyTitle} ${spotifyMainArtist}`,   // Title + Main artist
                 spotifyTitle, // Just the title
                 spotifyTitle.replace(/\(.*?\)|\[.*?\]/g, '').trim() // Title without (labels)
             ].filter((q, i, self) => q && self.indexOf(q) === i); // Unique queries
@@ -80,33 +83,70 @@ export async function POST(req) {
                         const scoredResults = results.map(result => {
                             let score = 0;
                             const resultTitle = (result.title || result.name || '').toLowerCase();
-                            const resultArtist = (result.primaryArtists || result.artist || '').toLowerCase();
+                            const resultArtistStr = (result.primaryArtists || result.artist || '').toLowerCase();
                             const targetTitle = spotifyTitle.toLowerCase();
-                            const targetArtist = spotifyArtist.toLowerCase();
+                            const targetArtists = spotifyArtists.map(a => a.toLowerCase());
 
-                            // 1. Artist Match
-                            if (resultArtist.includes(targetArtist) || targetArtist.includes(resultArtist)) {
-                                score += 60;
-                            } else if (resultTitle.includes(targetArtist)) {
-                                score += 20;
+                            // 1. Artist Match (Check all artists) - CRITICAL
+                            const cleanArtist = (s) => s.replace(/[^\w]/g, '').toLowerCase();
+                            const targetArtistsClean = targetArtists.map(cleanArtist).filter(Boolean);
+                            const resultArtistStrClean = cleanArtist(resultArtistStr);
+                            const resultTitleCleanForArtist = cleanArtist(resultTitle);
+
+                            let artistMatchScore = 0;
+                            if (targetArtistsClean.length > 0) {
+                                for (const artist of targetArtistsClean) {
+                                    if (resultArtistStrClean.includes(artist) || artist.includes(resultArtistStrClean)) {
+                                        artistMatchScore = 80;
+                                        break;
+                                    }
+                                }
+
+                                // If no direct artist match in artist field, check if artist name is in the result title
+                                if (artistMatchScore === 0) {
+                                    for (const artist of targetArtistsClean) {
+                                        if (resultTitleCleanForArtist.includes(artist)) {
+                                            artistMatchScore = 35;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            score += artistMatchScore;
+
+                            // Penalty for completely wrong artist if we have clear artist data
+                            if (artistMatchScore === 0 && targetArtistsClean.length > 0) {
+                                score -= 30;
                             }
 
                             // 2. Title Match
                             const cleanStr = (s) => s.replace(/[^\w\s]/g, '').toLowerCase().trim();
-                            if (cleanStr(resultTitle) === cleanStr(targetTitle)) {
+                            const targetTitleClean = cleanStr(targetTitle);
+                            const resultTitleClean = cleanStr(resultTitle);
+
+                            if (targetTitleClean === resultTitleClean) {
                                 score += 50;
                             } else if (resultTitle.includes(targetTitle) || targetTitle.includes(resultTitle)) {
                                 score += 20;
                             }
 
-                            // 3. Version keyword matching
+                            // 3. Duration Match (High confidence booster)
+                            if (track.duration && result.duration) {
+                                const diff = Math.abs(parseInt(track.duration) / 1000 - parseInt(result.duration));
+                                if (diff < 3) score += 40; // Very close
+                                else if (diff < 10) score += 20; // Acceptable
+                                else if (diff > 45) score -= 50; // Completely different length
+                            }
+
+                            // 4. Version keyword matching
                             const versionKeywords = ['slowed', 'reverb', 'remix', 'edit', 'acoustic', 'live', 'sped up', 'lofi'];
                             versionKeywords.forEach(word => {
                                 const inTarget = targetTitle.includes(word);
                                 const inResult = resultTitle.includes(word);
                                 if (inTarget && inResult) score += 45;
-                                else if (!inTarget && inResult) score -= 30;
-                                else if (inTarget && !inResult) score -= 20;
+                                else if (!inTarget && inResult) score -= 40;
+                                else if (inTarget && !inResult) score -= 30;
                             });
 
                             return { id: result.id, score, title: result.title, artist: result.primaryArtists };
@@ -114,9 +154,12 @@ export async function POST(req) {
 
                         scoredResults.sort((a, b) => b.score - a.score);
 
-                        if (scoredResults[0].score >= 40) {
-                            console.log(`[Import] Found match for "${spotifyTitle}": "${scoredResults[0].title}" by ${scoredResults[0].artist} (Score: ${scoredResults[0].score})`);
+                        // Threshold raised to 100 to ensure high-confidence matches (Artist + Title consensus)
+                        if (scoredResults[0].score >= 100) {
+                            console.log(`[Import] High-confidence match for "${spotifyTitle}": "${scoredResults[0].title}" by ${scoredResults[0].artist} (Score: ${scoredResults[0].score})`);
                             return scoredResults[0].id;
+                        } else {
+                            console.log(`[Import] Ignoring low-confidence match for "${spotifyTitle}": "${scoredResults[0].title}" (Score: ${scoredResults[0].score})`);
                         }
                     }
                 } catch (e) {
@@ -124,7 +167,7 @@ export async function POST(req) {
                 }
             }
 
-            console.warn(`[Import] Could not find a high-quality match for: ${spotifyTitle} by ${spotifyArtist}`);
+            console.warn(`[Import] NO MATCH FOUND for: ${spotifyTitle} by ${spotifyArtistsString}`);
             return null;
         };
 
@@ -139,14 +182,13 @@ export async function POST(req) {
         }
 
         // Create Jammify Playlist
-        // We can't use createPlaylist static method directly as we want specific name/songs
-
         const newPlaylist = new Playlist({
             name: playlistName,
             userId: session.user.id,
             songIds: jammifySongIds,
             isPublic: true,
-            description: playlistDescription
+            description: playlistDescription,
+            image: imageUrl // Save the Spotify playlist cover
         });
 
         await newPlaylist.save();
