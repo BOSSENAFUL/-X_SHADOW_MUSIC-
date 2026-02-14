@@ -8,7 +8,7 @@ import { getPlaylistDetails, getPlaylistTracks } from '@/lib/spotify';
 
 // --- CONFIGURATION ---
 const CONCURRENCY_LIMIT = 5;
-const ACCEPT_THRESHOLD = 0.85; // Stricter threshold for high precision
+const ACCEPT_THRESHOLD = 0.72; // Adjusted for community slowed tracks
 
 // Known Artist Aliases (Raw)
 const RAW_ARTIST_ALIASES = {
@@ -17,10 +17,12 @@ const RAW_ARTIST_ALIASES = {
     'lena raine': ['lena raine kuhlmann'],
 };
 
-// Normalize text - remove special chars, lowercase, trim
+// Normalize text - remove special chars, lowercase, trim, remove accents
 const normalize = (text) => {
     if (!text) return '';
     return text
+        .normalize("NFD") // Decompose chars (e.g. "ō" -> "o" + "¯")
+        .replace(/[\u0300-\u036f]/g, "") // Remove diacritics
         .toLowerCase()
         .replace(/[^\p{L}\p{N}\s]/gu, ' ')
         .replace(/\s+/g, ' ')
@@ -122,23 +124,33 @@ export async function POST(request) {
             const albumTokens = tokenize(normAlbum);
 
             // STEP 2 — BUILD MULTI QUERIES (SMART + FALLBACK)
+            // UPDATED: Added Artist-first patterns for better search engine hitting
             const queries = [
-                // Priority 1: Title + Artist
+                // 1. Artist + Title (Industry Standard)
+                `${primaryArtist} ${rawTitle}`,
+
+                // 2. Artist + Title (Normalized Tokens - specific fix)
+                `${artistTokens.join(' ')} ${titleTokens.join(' ')}`,
+
+                // 3. Title + Artist
                 `${rawTitle} ${primaryArtist}`,
 
-                // Priority 2: Title + Artist + Album (first 2 words)
+                // 3. Title + Artist + Album (first 2 words)
                 `${rawTitle} ${primaryArtist} ${albumTokens.slice(0, 2).join(' ')}`,
 
-                // Priority 3: Title + Album words
+                // 4. Artist + Album + Title (Strong context)
+                `${primaryArtist} ${albumTokens.slice(0, 2).join(' ')} ${rawTitle}`,
+
+                // 5. Title + Album
                 `${rawTitle} ${albumTokens.slice(0, 3).join(' ')}`,
 
-                // Priority 4: Title + "Minecraft" (Strong fallback for C418 tracks)
+                // 6. Title + "Minecraft" (Strong fallback for C418 tracks)
                 `${rawTitle} Minecraft`,
 
-                // Priority 5: Title only
+                // 7. Title only
                 `${rawTitle}`,
 
-                // Priority 6: Full context
+                // 8. Full context
                 `${rawTitle} ${albumName} ${primaryArtist}`
             ].filter(q => q.trim().length > 2);
 
@@ -257,7 +269,7 @@ export async function POST(request) {
                 // STRICT REJECTION: Artist must match
                 // Exception: Allow lower artist match if title is very strong (community uploads often have slight artist variations)
                 if (artistSim < 0.45) return null; // Hard floor
-                if (artistSim < 0.60 && titleSim <= 0.85) return null; // Standard threshold
+                if (artistSim < 0.50 && titleSim < 0.80) return null; // Relaxed for slowed/reverb
 
                 // HARD FILTER 3: Forbidden Keywords
                 for (const kw of forbiddenKeywords) {
@@ -325,6 +337,7 @@ export async function POST(request) {
             }
 
             // AUTO DECISION
+            console.log('Best Score:', bestScore);
             if (bestMatch && bestScore >= ACCEPT_THRESHOLD) {
                 const artistDisplay = bestMatch.artist || 'Unknown';
                 console.log(`  ✓ MATCH: "${bestMatch.title}" by ${artistDisplay} (Score: ${bestScore.toFixed(2)})`);
