@@ -162,9 +162,9 @@ export default function PlaylistsPage() {
       const result = await response.json();
 
       if (result.success) {
-        // Clear cache so the back button shows the updated list
         if (session?.user?.id) {
           sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
+          sessionStorage.removeItem(`created_playlists_${session.user.id}`);
         }
         // Redirect to the new playlist page
         router.push(`/music/playlists/${result.data._id}`);
@@ -209,9 +209,9 @@ export default function PlaylistsPage() {
         // The API returns the new playlist object (result.data)
         // Ideally we should process the playlist to fetch covers if needed, 
         // but likely covers won't be ready immediately without song fetch.
-        // Clear cache so the reload fetches fresh data
         if (session?.user?.id) {
           sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
+          sessionStorage.removeItem(`created_playlists_${session.user.id}`);
         }
         window.location.reload();
       } else {
@@ -227,6 +227,11 @@ export default function PlaylistsPage() {
 
   // Generate playlist cover based on songs (same logic as detail page)
   const getPlaylistCover = (playlist) => {
+    // If playlist has an explicit image (e.g. from Spotify import), use it
+    if (playlist.image) {
+      return { type: 'single', src: playlist.image };
+    }
+
     const songs = playlist.songs || [];
 
     if (!songs || songs.length === 0) {

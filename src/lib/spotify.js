@@ -108,8 +108,8 @@ async function getAccessToken() {
 export async function getPlaylistTracks(playlistId) {
     const accessToken = await getAccessToken();
     let tracks = [];
-    // Start with the first page of tracks
-    let nextUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?fields=items(track(name,artists(name),album(name),id)),next`;
+    // Spotify returns tracks in pages (limit 100). We loop until 'next' is null.
+    let nextUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?fields=items(track(name,artists(name),album(name),id,duration_ms)),next`;
 
     // Spotify returns tracks in pages (limit 100). We loop until 'next' is null.
     while (nextUrl) {

@@ -103,6 +103,20 @@ export function useLikedPlaylists(userId) {
               .filter(p => playlistEnrichments[p.playlistId])
               .map(p => {
                 const enrichment = playlistEnrichments[p.playlistId];
+
+                // Priority 1: Explicitly stored image
+                if (enrichment.image) {
+                  return {
+                    ...p,
+                    owner: enrichment.ownerName || p.owner,
+                    songCount: enrichment.songCount,
+                    isUserPlaylist: true,
+                    isCollage: false,
+                    image: enrichment.image
+                  };
+                }
+
+                // Priority 2: Collage from songs
                 const collageImages = enrichment.songIds
                   .map(id => songImageCache[id])
                   .filter(Boolean);
@@ -155,6 +169,11 @@ export function useLikedPlaylists(userId) {
       if (result.success) {
         // Clear cache so it refetches next time
         playlistsCache.delete(userId);
+
+        // Also clear Library session storage cache
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem(`created_playlists_${userId}`);
+        }
 
         // Update local state optimistically or refetch
         fetchLikedPlaylists(true);

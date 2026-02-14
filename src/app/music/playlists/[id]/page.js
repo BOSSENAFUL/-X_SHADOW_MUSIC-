@@ -260,6 +260,11 @@ export default function PlaylistDetailPage({ params }) {
 
   // Generate playlist cover based on songs
   const getPlaylistCover = () => {
+    // If playlist has an explicit image (e.g. from Spotify import), use it
+    if (playlist?.image) {
+      return { type: 'single', src: playlist.image };
+    }
+
     if (!songs || songs.length === 0) {
       return { type: 'default', src: '/def playlist image.jpg' };
     }
@@ -431,9 +436,9 @@ export default function PlaylistDetailPage({ params }) {
 
       const result = await response.json();
       if (result.success) {
-        // Clear cache for the playlists list page
         if (session?.user?.id) {
           sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
+          sessionStorage.removeItem(`created_playlists_${session.user.id}`);
         }
         toast.success(result.data.isPublic ? 'Playlist is now public' : 'Playlist is now private');
       } else {
@@ -503,9 +508,9 @@ export default function PlaylistDetailPage({ params }) {
 
       const result = await response.json();
       if (result.success) {
-        // Clear cache for the playlists list page
         if (session?.user?.id) {
           sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
+          sessionStorage.removeItem(`created_playlists_${session.user.id}`);
         }
         setPlaylist(prev => ({
           ...prev,
@@ -532,9 +537,9 @@ export default function PlaylistDetailPage({ params }) {
 
       const result = await response.json();
       if (result.success) {
-        // Clear cache for the playlists list page
         if (session?.user?.id) {
           sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
+          sessionStorage.removeItem(`created_playlists_${session.user.id}`);
         }
         toast.success('Playlist deleted');
         router.push('/music/playlists');
@@ -573,9 +578,9 @@ export default function PlaylistDetailPage({ params }) {
       const result = await response.json();
 
       if (result.success) {
-        // Clear cache for the playlists list page (because song count/covers change)
         if (session?.user?.id) {
           sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
+          sessionStorage.removeItem(`created_playlists_${session.user.id}`);
         }
 
         // Remove the song from the local state
@@ -1154,6 +1159,11 @@ export default function PlaylistDetailPage({ params }) {
                   <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word">
                     {playlist.name}
                   </h1>
+                  {playlist.description && (
+                    <p className="text-sm opacity-90 line-clamp-3 px-4">
+                      {decodeHtmlEntities(playlist.description)}
+                    </p>
+                  )}
                   <div className="flex items-center justify-center gap-2 text-sm opacity-80">
                     <span className="font-semibold">{playlist.ownerName || 'Unknown User'}</span>
                     <span>•</span>
@@ -1212,9 +1222,14 @@ export default function PlaylistDetailPage({ params }) {
                 <Badge variant="secondary" className="mb-2">
                   {playlist.isPublic ? 'Public' : 'Private'}
                 </Badge>
-                <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-4 wrap-break-word">
+                <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-2 wrap-break-word">
                   {playlist.name}
                 </h1>
+                {playlist.description && (
+                  <p className="text-base opacity-90 mb-4 line-clamp-2 max-w-2xl">
+                    {decodeHtmlEntities(playlist.description)}
+                  </p>
+                )}
                 <div className="flex items-center gap-2 text-sm opacity-80">
                   <span className="font-semibold">{playlist.ownerName || 'Unknown User'}</span>
                   <span>•</span>

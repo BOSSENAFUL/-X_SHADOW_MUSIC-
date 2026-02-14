@@ -89,9 +89,9 @@ export function AddToPlaylistDialog({ open, onOpenChange, song }) {
         const addResult = await addResponse.json();
 
         if (addResult.success) {
-          // Clear cache for the playlists list page
           if (session?.user?.id) {
             sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
+            sessionStorage.removeItem(`created_playlists_${session.user.id}`);
           }
 
           // Refresh playlists list
@@ -160,9 +160,9 @@ export function AddToPlaylistDialog({ open, onOpenChange, song }) {
       const result = await response.json();
 
       if (result.success) {
-        // Clear cache for the playlists list page
         if (session?.user?.id) {
           sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
+          sessionStorage.removeItem(`created_playlists_${session.user.id}`);
         }
 
         // Update the playlist in local state to show it contains the song

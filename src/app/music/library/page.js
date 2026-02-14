@@ -79,6 +79,15 @@ export default function LibraryPage() {
           }
 
           const playlistsWithCovers = data.data.map((playlist) => {
+            // Priority 1: Explicitly stored image (e.g. from Spotify import)
+            if (playlist.image) {
+              return {
+                ...playlist,
+                isCollage: false
+              }
+            }
+
+            // Priority 2: Generate collage/thumbnail from songs
             if (playlist.songIds && playlist.songIds.length > 0) {
               const songsToFetch = playlist.songIds.slice(0, 4)
               const validImages = songsToFetch
