@@ -7,7 +7,7 @@ import { cookies } from 'next/headers';
 import { getPlaylistDetails, getPlaylistTracks } from '@/lib/spotify';
 
 // --- CONFIGURATION ---
-const CONCURRENCY_LIMIT = 5;
+const CONCURRENCY_LIMIT = 10;
 const ACCEPT_THRESHOLD = 0.72; // Adjusted for community slowed tracks
 
 // Known Artist Aliases (Raw)
@@ -304,35 +304,59 @@ export async function POST(request) {
             let bestMatch = null;
             let bestScore = 0;
 
-            // STEP 3 — SEARCH EACH QUERY
-            for (let i = 0; i < uniqueQueries.length; i++) {
-                const query = uniqueQueries[i];
-
-                // Early exit if we found excellent match
-                if (bestScore >= 0.95) {
-                    console.log(`  Early exit - excellent match found`);
-                    break;
-                }
-
+            // STEP 3 — SEARCH EACH QUERY (Center optimization here)
+            // Function to execute a single query
+            const executeQuery = async (query) => {
                 try {
                     const res = await fetch(
                         `${apiUrl}/api/search/songs?query=${encodeURIComponent(query)}&limit=20`,
                         { headers: { 'Cookie': cookieHeader } }
                     );
                     const data = await res.json();
+                    
+                    let bestInQuery = null;
+                    let bestScoreInQuery = 0;
 
                     if (data.success && data.data?.results) {
                         for (const candidate of data.data.results) {
                             const scored = scoreCandidate(candidate);
 
-                            if (scored && scored.score > bestScore) {
-                                bestScore = scored.score;
-                                bestMatch = scored;
+                            if (scored && scored.score > bestScoreInQuery) {
+                                bestScoreInQuery = scored.score;
+                                bestInQuery = scored;
                             }
                         }
                     }
+                    return { match: bestInQuery, score: bestScoreInQuery };
                 } catch (e) {
                     console.error(`  Error searching "${query}":`, e.message);
+                    return { match: null, score: 0 };
+                }
+            };
+
+            // Process queries in parallel batches to optimize speed
+            const QUERY_BATCH_SIZE = 3;
+            
+            for (let i = 0; i < uniqueQueries.length; i += QUERY_BATCH_SIZE) {
+                // If we already found an excellent match in previous batch, stop
+                if (bestScore >= 0.95) {
+                    console.log(`  Early exit - excellent match found`);
+                    break;
+                }
+
+                const batch = uniqueQueries.slice(i, i + QUERY_BATCH_SIZE);
+                
+                // Fetch current batch in parallel
+                const results = await Promise.all(batch.map(q => executeQuery(q)));
+
+                // Evaluate results IN ORDER to respect query priority
+                for (const result of results) {
+                    if (result && result.match && result.score > bestScore) {
+                        bestScore = result.score;
+                        bestMatch = result.match;
+                    }
+                    // Check threshold inside the loop to break inner processing if needed (optimization)
+                     if (bestScore >= 0.95) break; 
                 }
             }
 
