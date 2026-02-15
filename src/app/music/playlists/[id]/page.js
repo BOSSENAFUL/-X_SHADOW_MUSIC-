@@ -694,6 +694,7 @@ export default function PlaylistDetailPage({ params }) {
 
     let ticking = false;
 
+
     const handleScroll = () => {
       // 1. Mobile-only progress for animations (Keep this separate)
       // Check mobile status once per frame is okay, or cache it
@@ -706,11 +707,20 @@ export default function PlaylistDetailPage({ params }) {
           if (isMobile) {
             const scrollTop = scrollContainer.scrollTop;
             const imageThreshold = 350;
+            const headerToggleThreshold = 280; // Fast toggle point for mobile
+
             // Clamp value strictly between 0 and 1
             const progress = Math.max(0, Math.min(1, scrollTop / imageThreshold));
 
             // Set the property directly - CSS will handle the interpolation
             scrollContainer.style.setProperty('--scroll-progress', progress.toString());
+
+            // Fast Header Toggle (bypasses Observer delay on mobile)
+            const shouldShow = scrollTop > headerToggleThreshold;
+            setShowHeaderTitle(prev => {
+              if (prev !== shouldShow) return shouldShow;
+              return prev;
+            });
           }
           ticking = false;
         });
@@ -718,31 +728,28 @@ export default function PlaylistDetailPage({ params }) {
       }
     };
 
-    // IntersectionObserver for PC/Mobile Header Switch
-    // Logic: Show header title as soon as the main title touches the header ("reaches top")
+    // IntersectionObserver for PC ONLY (Restored to Artist Logic)
+    // Triggers when the title is FULLY behind the header
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           const isVisibleInLayout = entry.boundingClientRect.width > 0;
           if (isVisibleInLayout) {
-            // Show header title if main title is partially obscured (ratio < 1)
-            // AND it's near the top (not obscured by bottom edge)
-            const isPartiallyObscured = entry.intersectionRatio < 1;
-            const isAtTop = entry.boundingClientRect.top < 100;
-            setShowHeaderTitle(isPartiallyObscured && isAtTop);
+            // PC Logic: Trigger when fully behind header (threshold 0)
+            setShowHeaderTitle(!entry.isIntersecting);
           }
         });
       },
       {
         root: scrollContainer,
-        threshold: [1], // Trigger when it leaves 100% visibility
+        threshold: 0,
         rootMargin: "-64px 0px 0px 0px", // Header height offset
       }
     );
 
     scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
 
-    if (mobileTitleRef.current) observer.observe(mobileTitleRef.current);
+    // Only observe desktop title (Mobile handled manually above)
     if (desktopTitleRef.current) observer.observe(desktopTitleRef.current);
 
     return () => {
