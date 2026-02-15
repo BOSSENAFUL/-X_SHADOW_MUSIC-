@@ -1027,13 +1027,22 @@ export default function PlaylistDetailPage({ params }) {
             </div>
           </header>
           <div className="flex-1 p-4 pt-8 md:p-6">
-            <div className="animate-pulse space-y-6">
+            <div className="animate-pulse space-y-8">
+              {/* Header Skeleton Only */}
               <div className="flex flex-col md:flex-row gap-6 items-center md:items-end">
-                <div className="w-64 h-64 md:w-64 md:h-64 bg-muted rounded-lg" />
-                <div className="flex-1 space-y-3 text-center md:text-left">
-                  <div className="h-6 bg-muted rounded w-24 mx-auto md:mx-0" />
-                  <div className="h-8 md:h-12 bg-muted rounded w-48 mx-auto md:mx-0" />
-                  <div className="h-4 bg-muted rounded w-32 mx-auto md:mx-0" />
+                <div className="w-64 h-64 md:w-64 md:h-64 bg-muted rounded-lg shadow-xl shrink-0" />
+                <div className="flex-1 space-y-4 w-full text-left md:text-left">
+                  {/* Title */}
+                  <div className="h-8 md:h-12 bg-muted rounded w-3/4 md:w-96" />
+
+                  {/* Description */}
+                  <div className="h-4 bg-muted rounded w-1/2 opacity-70" />
+
+                  {/* Metadata Row */}
+                  <div className="flex items-center gap-3 pt-1">
+                    <div className="w-6 h-6 rounded-full bg-muted shrink-0" />
+                    <div className="h-4 w-32 bg-muted rounded" />
+                  </div>
                 </div>
               </div>
             </div>
