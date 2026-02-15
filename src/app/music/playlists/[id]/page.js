@@ -92,6 +92,7 @@ export default function PlaylistDetailPage({ params }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [showHeaderTitle, setShowHeaderTitle] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
   const mobileTitleRef = useRef(null);
   const desktopTitleRef = useRef(null);
 
@@ -668,35 +669,87 @@ export default function PlaylistDetailPage({ params }) {
     });
   };
 
-  // Effect to handle scroll and show/hide title in header
+  const calculateTotalDuration = () => {
+    if (!songs || songs.length === 0) return null;
+
+    // song.duration is usually in seconds based on formatDuration
+    const totalSeconds = songs.reduce((acc, song) => acc + (parseInt(song.duration) || 0), 0);
+
+    if (totalSeconds === 0) return null;
+
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+    if (hours > 0) {
+      return `${hours} hr ${minutes} min`;
+    } else {
+      return `${minutes} min`;
+    }
+  };
+
+  // Effect to handle scroll and smooth animations (highly optimized)
   useEffect(() => {
     const scrollContainer = document.getElementById('user-playlist-scroll-container');
     if (!scrollContainer) return;
 
+    let ticking = false;
+
+    const handleScroll = () => {
+      // 1. Mobile-only progress for animations (Keep this separate)
+      // Check mobile status once per frame is okay, or cache it
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          // Check width inside rAF to ensure we're correct on resize/orientation change
+          // This is generally cheap enough, but can be optimized if needed
+          const isMobile = window.innerWidth < 768;
+
+          if (isMobile) {
+            const scrollTop = scrollContainer.scrollTop;
+            const imageThreshold = 350;
+            // Clamp value strictly between 0 and 1
+            const progress = Math.max(0, Math.min(1, scrollTop / imageThreshold));
+
+            // Set the property directly - CSS will handle the interpolation
+            scrollContainer.style.setProperty('--scroll-progress', progress.toString());
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    // IntersectionObserver for PC/Mobile Header Switch
+    // Logic: Show header title as soon as the main title touches the header ("reaches top")
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          // Detect visibility to only react to the title that is actually in the current layout
           const isVisibleInLayout = entry.boundingClientRect.width > 0;
           if (isVisibleInLayout) {
-            setShowHeaderTitle(!entry.isIntersecting);
+            // Show header title if main title is partially obscured (ratio < 1)
+            // AND it's near the top (not obscured by bottom edge)
+            const isPartiallyObscured = entry.intersectionRatio < 1;
+            const isAtTop = entry.boundingClientRect.top < 100;
+            setShowHeaderTitle(isPartiallyObscured && isAtTop);
           }
         });
       },
       {
         root: scrollContainer,
-        threshold: 0,
-        rootMargin: "-64px 0px 0px 0px",
+        threshold: [1], // Trigger when it leaves 100% visibility
+        rootMargin: "-64px 0px 0px 0px", // Header height offset
       }
     );
+
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
 
     if (mobileTitleRef.current) observer.observe(mobileTitleRef.current);
     if (desktopTitleRef.current) observer.observe(desktopTitleRef.current);
 
     return () => {
+      scrollContainer.removeEventListener('scroll', handleScroll);
       observer.disconnect();
     };
-  }, [loading, songs.length]);
+  }, [loading, playlist?.name]);
 
   const handleShareSong = async (song) => {
     // Share the current playlist URL instead of the individual song
@@ -953,10 +1006,10 @@ export default function PlaylistDetailPage({ params }) {
 
   if (loading) {
     return (
-      <SidebarProvider>
+      <SidebarProvider >
         <AppSidebar />
         <SidebarInset id="user-playlist-scroll-container" className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col">
-          <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background">
+          <header className="sticky top-0 z-50 hidden md:flex h-16 shrink-0 items-center gap-2 md:border-b bg-background">
             <div className="flex items-center gap-2 px-3 md:px-4">
               <SidebarTrigger className="-ml-1 hidden md:flex" />
               <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:flex" />
@@ -966,10 +1019,10 @@ export default function PlaylistDetailPage({ params }) {
               </Button>
             </div>
           </header>
-          <div className="flex-1 p-4 md:p-6">
+          <div className="flex-1 p-4 pt-8 md:p-6">
             <div className="animate-pulse space-y-6">
               <div className="flex flex-col md:flex-row gap-6 items-center md:items-end">
-                <div className="w-48 h-48 md:w-60 md:h-60 bg-muted rounded-lg" />
+                <div className="w-64 h-64 md:w-64 md:h-64 bg-muted rounded-lg" />
                 <div className="flex-1 space-y-3 text-center md:text-left">
                   <div className="h-6 bg-muted rounded w-24 mx-auto md:mx-0" />
                   <div className="h-8 md:h-12 bg-muted rounded w-48 mx-auto md:mx-0" />
@@ -1055,12 +1108,20 @@ export default function PlaylistDetailPage({ params }) {
                 : '#1D1046'
               : undefined
           }}
-          className={`sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b transition-all duration-300 ${showHeaderTitle
+          className={`fixed md:sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b transition-all duration-300 w-full ${showHeaderTitle
             ? "border-white/10"
-            : "bg-background border-transparent"
+            : "bg-transparent md:bg-background border-transparent"
             }`}
         >
-          <div className="flex items-center justify-between w-full gap-2 px-3 md:px-4">
+          {/* Optimized Mobile Background Layer */}
+          <div
+            className="absolute inset-0 -z-10 transition-opacity duration-150 ease-linear pointer-events-none md:hidden"
+            style={{
+              backgroundColor: dominantColors ? `color-mix(in srgb, ${dominantColors}, black 60%)` : '#1D1046',
+              opacity: 'var(--scroll-progress, 0)'
+            }}
+          />
+          <div className="flex items-center justify-between w-full gap-2 px-3 md:px-4 h-full relative z-10">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="-ml-1 hidden md:flex" />
               <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:flex" />
@@ -1069,28 +1130,48 @@ export default function PlaylistDetailPage({ params }) {
                 <span className="hidden sm:inline">Back</span>
               </Button>
 
-              <div className="flex items-center gap-2 transition-all duration-300">
-                {showHeaderTitle ? (
-                  <h2 className="text-base font-bold animate-in fade-in slide-in-from-bottom-2 duration-300 line-clamp-1">
+              {/* Title Content Area (Properly separated for PC/Mobile) */}
+              <div className="flex-1 flex items-center h-full min-w-0 relative">
+                {/* PC Version: Minimal switch, no fancy animations */}
+                <div className="hidden md:flex items-center h-full flex-1">
+                  {!showHeaderTitle ? (
+                    <div className="animate-in fade-in duration-200">
+                      <Breadcrumb>
+                        <BreadcrumbList>
+                          <BreadcrumbItem className="hidden lg:block">
+                            <BreadcrumbLink href="/music">Music</BreadcrumbLink>
+                          </BreadcrumbItem>
+                          <BreadcrumbSeparator className="hidden lg:block" />
+                          <BreadcrumbItem className="hidden lg:block">
+                            <BreadcrumbLink href="/music/playlists">Playlists</BreadcrumbLink>
+                          </BreadcrumbItem>
+                          <BreadcrumbSeparator className="hidden lg:block" />
+                          <BreadcrumbItem>
+                            <BreadcrumbPage className="truncate max-w-[150px] md:max-w-none">{playlist.name}</BreadcrumbPage>
+                          </BreadcrumbItem>
+                        </BreadcrumbList>
+                      </Breadcrumb>
+                    </div>
+                  ) : (
+                    <h2 className="text-base font-bold line-clamp-1 animate-in fade-in slide-in-from-bottom-2 duration-300 text-white">
+                      {playlist.name}
+                    </h2>
+                  )}
+                </div>
+
+                {/* Mobile Version: Smooth fade + slide up, optimized for GPU */}
+                <div
+                  className="md:hidden flex items-center h-full flex-1 transition-all duration-300 pointer-events-none"
+                  style={{
+                    opacity: showHeaderTitle ? 1 : 0,
+                    transform: showHeaderTitle ? 'translate3d(0, 0, 0)' : 'translate3d(0, 8px, 0)',
+                    visibility: showHeaderTitle ? 'visible' : 'hidden'
+                  }}
+                >
+                  <h2 className="text-base font-bold line-clamp-1 text-white pr-4">
                     {playlist.name}
                   </h2>
-                ) : (
-                  <Breadcrumb>
-                    <BreadcrumbList>
-                      <BreadcrumbItem className="hidden md:block">
-                        <BreadcrumbLink href="/music">Music</BreadcrumbLink>
-                      </BreadcrumbItem>
-                      <BreadcrumbSeparator className="hidden md:block" />
-                      <BreadcrumbItem className="hidden md:block">
-                        <BreadcrumbLink href="/music/playlists">Playlists</BreadcrumbLink>
-                      </BreadcrumbItem>
-                      <BreadcrumbSeparator className="hidden md:block" />
-                      <BreadcrumbItem>
-                        <BreadcrumbPage>{playlist.name}</BreadcrumbPage>
-                      </BreadcrumbItem>
-                    </BreadcrumbList>
-                  </Breadcrumb>
-                )}
+                </div>
               </div>
             </div>
           </div>
@@ -1099,7 +1180,7 @@ export default function PlaylistDetailPage({ params }) {
         <div className="flex-1">
           {/* Playlist Header */}
           <div
-            className="p-4 md:p-6 text-white transition-colors duration-700"
+            className="p-4 pt-8 md:p-6 text-white transition-colors duration-700"
             style={{
               background: dominantColors
                 ? `linear-gradient(to bottom, ${dominantColors.replace('rgb', 'rgba').replace(')', ', 0.5)')} 0%, ${dominantColors.replace('rgb', 'rgba').replace(')', ', 0.2)')} 100%)`
@@ -1108,8 +1189,21 @@ export default function PlaylistDetailPage({ params }) {
           >
             {/* Mobile Layout */}
             <div className="block md:hidden">
-              <div className="flex flex-col items-center text-center space-y-4">
-                <div className="w-48 h-48 rounded-lg overflow-hidden shadow-2xl">
+              <div
+                className="flex flex-col items-center text-center space-y-4"
+                style={{
+                  transform: 'translate3d(0, calc(var(--scroll-progress, 0) * -40px), 0)',
+                  opacity: 'calc(1 - var(--scroll-progress, 0))',
+                  willChange: 'transform, opacity'
+                }}
+              >
+                <div
+                  className="w-64 h-64 rounded-lg overflow-hidden shadow-2xl transition-transform duration-75 ease-out"
+                  style={{
+                    transform: 'scale(calc(1 - (var(--scroll-progress, 0) * 0.35)))',
+                    willChange: 'transform'
+                  }}
+                >
                   {(() => {
                     const cover = getPlaylistCover();
 
@@ -1152,22 +1246,33 @@ export default function PlaylistDetailPage({ params }) {
                     }
                   })()}
                 </div>
-                <div className="space-y-2">
-                  <Badge variant="secondary" className="mb-2">
-                    {playlist.isPublic ? 'Public' : 'Private'}
-                  </Badge>
-                  <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word">
+                <div className="space-y-2 w-full">
+
+                  <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word text-start mt-2 line-clamp-1 w-full">
                     {playlist.name}
                   </h1>
                   {playlist.description && (
-                    <p className="text-sm opacity-90 line-clamp-3 px-4">
+                    <p className="text-xs opacity-50 line-clamp-2 text-start">
                       {decodeHtmlEntities(playlist.description)}
                     </p>
                   )}
-                  <div className="flex items-center justify-center gap-2 text-sm opacity-80">
+                  <div className="flex items-center justify-start gap-2 text-sm opacity-80">
+                    {playlist.ownerImage ? (
+                      <img src={playlist.ownerImage} alt={playlist.ownerName} className="w-6 h-6 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center">
+                        <User className="w-3 h-3" />
+                      </div>
+                    )}
                     <span className="font-semibold">{playlist.ownerName || 'Unknown User'}</span>
                     <span>•</span>
                     <span>{playlist.songIds?.length || 0} songs</span>
+                    {calculateTotalDuration() && (
+                      <>
+                        <span>•</span>
+                        <span>{calculateTotalDuration()}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1175,7 +1280,7 @@ export default function PlaylistDetailPage({ params }) {
 
             {/* Desktop Layout */}
             <div className="hidden md:flex gap-6 items-end">
-              <div className="w-60 h-60 rounded-lg overflow-hidden shrink-0 shadow-2xl">
+              <div className="w-64 h-64 rounded-lg overflow-hidden shrink-0 shadow-2xl">
                 {(() => {
                   const cover = getPlaylistCover();
 
@@ -1219,9 +1324,9 @@ export default function PlaylistDetailPage({ params }) {
                 })()}
               </div>
               <div className="flex-1 min-w-0">
-                <Badge variant="secondary" className="mb-2">
+                {/* <Badge variant="secondary" className="mb-2">
                   {playlist.isPublic ? 'Public' : 'Private'}
-                </Badge>
+                </Badge> */}
                 <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-2 wrap-break-word">
                   {playlist.name}
                 </h1>
@@ -1231,9 +1336,22 @@ export default function PlaylistDetailPage({ params }) {
                   </p>
                 )}
                 <div className="flex items-center gap-2 text-sm opacity-80">
+                  {playlist.ownerImage ? (
+                    <img src={playlist.ownerImage} alt={playlist.ownerName} className="w-6 h-6 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center">
+                      <User className="w-3 h-3" />
+                    </div>
+                  )}
                   <span className="font-semibold">{playlist.ownerName || 'Unknown User'}</span>
                   <span>•</span>
                   <span>{playlist.songIds?.length || 0} songs</span>
+                  {calculateTotalDuration() && (
+                    <>
+                      <span>•</span>
+                      <span>{calculateTotalDuration()}</span>
+                    </>
+                  )}
                   {playlist.createdAt && (
                     <>
                       <span>•</span>

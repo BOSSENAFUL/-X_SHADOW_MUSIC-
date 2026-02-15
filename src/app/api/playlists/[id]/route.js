@@ -11,7 +11,7 @@ export async function GET(request, { params }) {
   try {
     const session = await getServerSession(authOptions);
     const { id } = await params;
-    
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, error: 'Invalid playlist ID' },
@@ -20,10 +20,10 @@ export async function GET(request, { params }) {
     }
 
     await connectDB();
-    
+
     // First, try to find the playlist
     const playlist = await Playlist.findById(id).lean();
-    
+
     if (!playlist) {
       return NextResponse.json(
         { success: false, error: 'Playlist not found' },
@@ -32,8 +32,9 @@ export async function GET(request, { params }) {
     }
 
     // Fetch the owner's information
-    const owner = await User.findById(playlist.userId).select('name').lean();
+    const owner = await User.findById(playlist.userId).select('name image').lean();
     const ownerName = owner ? owner.name : 'Unknown User';
+    const ownerImage = owner ? owner.image : null;
 
     // Check access permissions
     const isOwner = session?.user?.id && playlist.userId.toString() === session.user.id;
@@ -56,10 +57,11 @@ export async function GET(request, { params }) {
       data: {
         ...playlist,
         ownerName: ownerName,
+        ownerImage: ownerImage,
         isOwner: isOwner
       }
     });
-    
+
   } catch (error) {
     console.error('Error fetching playlist:', error);
     return NextResponse.json(
@@ -73,7 +75,7 @@ export async function GET(request, { params }) {
 export async function PUT(request, { params }) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { success: false, error: 'Authentication required' },
@@ -84,7 +86,7 @@ export async function PUT(request, { params }) {
     const { id } = await params;
     const body = await request.json();
     const { name, description, isPublic } = body;
-    
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, error: 'Invalid playlist ID' },
@@ -93,19 +95,19 @@ export async function PUT(request, { params }) {
     }
 
     await connectDB();
-    
+
     const playlist = await Playlist.findOne({
       _id: id,
       userId: new mongoose.Types.ObjectId(session.user.id)
     });
-    
+
     if (!playlist) {
       return NextResponse.json(
         { success: false, error: 'Playlist not found' },
         { status: 404 }
       );
     }
-    
+
     // Update fields if provided
     if (name !== undefined) {
       if (!name || name.trim().length === 0) {
@@ -116,23 +118,23 @@ export async function PUT(request, { params }) {
       }
       playlist.name = name.trim();
     }
-    
+
     if (description !== undefined) {
       playlist.description = description.trim();
     }
-    
+
     if (isPublic !== undefined) {
       playlist.isPublic = isPublic;
     }
-    
+
     await playlist.save();
-    
+
     return NextResponse.json({
       success: true,
       data: playlist,
       message: 'Playlist updated successfully'
     });
-    
+
   } catch (error) {
     console.error('Error updating playlist:', error);
     return NextResponse.json(
@@ -146,7 +148,7 @@ export async function PUT(request, { params }) {
 export async function PATCH(request, { params }) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { success: false, error: 'Authentication required' },
@@ -156,7 +158,7 @@ export async function PATCH(request, { params }) {
 
     const { id } = await params;
     const body = await request.json();
-    
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, error: 'Invalid playlist ID' },
@@ -165,19 +167,19 @@ export async function PATCH(request, { params }) {
     }
 
     await connectDB();
-    
+
     const playlist = await Playlist.findOne({
       _id: id,
       userId: new mongoose.Types.ObjectId(session.user.id)
     });
-    
+
     if (!playlist) {
       return NextResponse.json(
         { success: false, error: 'Playlist not found' },
         { status: 404 }
       );
     }
-    
+
     // Update only the provided fields
     Object.keys(body).forEach(key => {
       if (key === 'isPublic' && typeof body[key] === 'boolean') {
@@ -190,15 +192,15 @@ export async function PATCH(request, { params }) {
         playlist.songIds = body[key];
       }
     });
-    
+
     await playlist.save();
-    
+
     return NextResponse.json({
       success: true,
       data: playlist,
       message: 'Playlist updated successfully'
     });
-    
+
   } catch (error) {
     console.error('Error updating playlist:', error);
     return NextResponse.json(
@@ -212,7 +214,7 @@ export async function PATCH(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { success: false, error: 'Authentication required' },
@@ -221,7 +223,7 @@ export async function DELETE(request, { params }) {
     }
 
     const { id } = await params;
-    
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, error: 'Invalid playlist ID' },
@@ -230,24 +232,24 @@ export async function DELETE(request, { params }) {
     }
 
     await connectDB();
-    
+
     const playlist = await Playlist.findOneAndDelete({
       _id: id,
       userId: new mongoose.Types.ObjectId(session.user.id)
     });
-    
+
     if (!playlist) {
       return NextResponse.json(
         { success: false, error: 'Playlist not found' },
         { status: 404 }
       );
     }
-    
+
     return NextResponse.json({
       success: true,
       message: 'Playlist deleted successfully'
     });
-    
+
   } catch (error) {
     console.error('Error deleting playlist:', error);
     return NextResponse.json(
