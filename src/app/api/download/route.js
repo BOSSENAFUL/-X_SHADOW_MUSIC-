@@ -1,9 +1,26 @@
 import { NextResponse } from "next/server";
 import sharp from "sharp";
 import ffmpeg from "fluent-ffmpeg";
+import ffmpegPath from "ffmpeg-static";
 import fs from "fs";
 import path from "path";
 import os from "os";
+
+// Critical for production/serverless: tell fluent-ffmpeg where to find the binary
+if (ffmpegPath) {
+    let finalPath = ffmpegPath;
+
+    // Fix for Next.js Turbopack/Webpack virtual paths (e.g. \ROOT\node_modules...)
+    if (finalPath.includes('\\ROOT\\') || finalPath.includes('/ROOT/')) {
+        const relativePath = finalPath.replace(/.*[\/\\]ROOT[\/\\]/, '');
+        finalPath = path.join(process.cwd(), relativePath);
+    }
+
+    // Final check: only set if it's actually a valid path string
+    if (typeof finalPath === 'string') {
+        ffmpeg.setFfmpegPath(finalPath);
+    }
+}
 
 // Tank-level reliable pipeline using temporary files for both audio and image
 async function processWithFfmpeg({ audioBuffer, imageBuffer, title, artist, album, year }) {
