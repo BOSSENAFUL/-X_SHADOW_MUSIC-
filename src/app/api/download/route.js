@@ -2,55 +2,46 @@ import { NextResponse } from "next/server";
 import sharp from "sharp";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
-import fs from "fs";
+import { promises as fs } from "fs";
 import path from "path";
 import os from "os";
 
 // Critical for production/serverless: tell fluent-ffmpeg where to find the binary
 if (ffmpegPath) {
     let finalPath = ffmpegPath;
-
-    // Fix for Next.js Turbopack/Webpack virtual paths (e.g. \ROOT\node_modules...)
     if (finalPath.includes('\\ROOT\\') || finalPath.includes('/ROOT/')) {
         const relativePath = finalPath.replace(/.*[\/\\]ROOT[\/\\]/, '');
         finalPath = path.join(process.cwd(), relativePath);
     }
-
-    // Final check: only set if it's actually a valid path string
     if (typeof finalPath === 'string') {
         ffmpeg.setFfmpegPath(finalPath);
     }
 }
 
-// Tank-level reliable pipeline using temporary files for both audio and image
-async function processWithFfmpeg({ audioBuffer, imageBuffer, title, artist, album, year }) {
+// 🛡️ Ultra-Optimized Pipeline
+async function processReliable({ audioBuffer, imageBuffer, title, artist, album, year, isMp3Input }) {
     const tempId = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const tempAudioPath = path.join(os.tmpdir(), `audio_${tempId}`);
     const tempImagePath = path.join(os.tmpdir(), `art_${tempId}.jpg`);
     const tempOutputPath = path.join(os.tmpdir(), `output_${tempId}.mp3`);
 
-    return new Promise((resolve, reject) => {
-        try {
-            // Write input buffers to temp files
-            fs.writeFileSync(tempAudioPath, audioBuffer);
-            if (imageBuffer) {
-                fs.writeFileSync(tempImagePath, imageBuffer);
-            }
+    try {
+        // 🚀 Parallel Writes
+        await Promise.all([
+            fs.writeFile(tempAudioPath, audioBuffer),
+            imageBuffer ? fs.writeFile(tempImagePath, imageBuffer) : Promise.resolve()
+        ]);
 
+        return new Promise((resolve, reject) => {
             const command = ffmpeg(tempAudioPath);
+            if (imageBuffer) command.input(tempImagePath);
 
-            if (imageBuffer) {
-                command.input(tempImagePath);
-            }
-
-            // Using outputOptions individually to ensure proper shell escaping of arguments with spaces
-            command.outputOptions('-map', '0:a:0');
-            command.outputOptions('-id3v2_version', '3'); // Universal v2.3
-
-            // Metadata need to be passed as separate arguments: key=value
-            // We strip any double quotes from metadata to prevent breaking shell commands
             const clean = (val) => String(val || "").replace(/"/g, '');
 
+            // Re-tuned FFmpeg arguments for raw speed
+            command.outputOptions('-threads', '0');
+            command.outputOptions('-map', '0:a:0');
+            command.outputOptions('-id3v2_version', '3');
             command.outputOptions('-metadata', `title=${clean(title)}`);
             command.outputOptions('-metadata', `artist=${clean(artist)}`);
             command.outputOptions('-metadata', `album=${clean(album || title)}`);
@@ -58,44 +49,49 @@ async function processWithFfmpeg({ audioBuffer, imageBuffer, title, artist, albu
             command.outputOptions('-metadata', 'comment=Downloaded via Jammify');
 
             if (imageBuffer) {
-                // Map the image as a video stream and mark it as album art
                 command.outputOptions('-map', '1:v:0');
-                command.outputOptions('-c:v', 'copy'); // Copy image codec (JPEG)
+                command.outputOptions('-c:v', 'copy');
                 command.outputOptions('-disposition:v:0', 'attached_pic');
             }
 
-            // Force MP3 encoding with high quality
+            if (isMp3Input) {
+                // Instant binary copy - zero transcoding delay
+                command.audioCodec('copy');
+            } else {
+                // Fast re-encode if input is AAC/M4A
+                command.audioCodec('libmp3lame').audioBitrate(256); // 256k is faster than 320k with near-identical quality
+            }
+
             command
-                .toFormat('mp3')
-                .audioCodec('libmp3lame')
-                .audioBitrate(320)
-                .on('start', (cmd) => console.log(`[FFmpeg] Executing: ${cmd}`))
-                .on('error', (err) => {
-                    console.error('[FFmpeg] Error:', err);
-                    cleanup();
+                .on('error', async (err) => {
+                    await cleanup();
                     reject(err);
                 })
-                .on('end', () => {
+                .on('end', async () => {
                     try {
-                        const finalBuffer = fs.readFileSync(tempOutputPath);
-                        cleanup();
+                        const finalBuffer = await fs.readFile(tempOutputPath);
+                        await cleanup();
                         resolve(finalBuffer);
-                    } catch (readErr) {
-                        cleanup();
-                        reject(readErr);
+                    } catch (e) {
+                        await cleanup();
+                        reject(e);
                     }
                 })
                 .save(tempOutputPath);
 
-            function cleanup() {
-                [tempAudioPath, tempImagePath, tempOutputPath].forEach(p => {
-                    try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch (e) { }
-                });
+            async function cleanup() {
+                try {
+                    await Promise.all([
+                        fs.unlink(tempAudioPath).catch(() => { }),
+                        imageBuffer ? fs.unlink(tempImagePath).catch(() => { }) : Promise.resolve(),
+                        fs.unlink(tempOutputPath).catch(() => { })
+                    ]);
+                } catch (e) { }
             }
-        } catch (err) {
-            reject(err);
-        }
-    });
+        });
+    } catch (err) {
+        throw err;
+    }
 }
 
 export async function POST(req) {
@@ -103,60 +99,51 @@ export async function POST(req) {
         const { songUrl, imageUrl, title, artist, album, year } = await req.json();
         if (!songUrl) return NextResponse.json({ error: "Missing songUrl" }, { status: 400 });
 
-        console.log(`[Download API] Request for: ${title} - ${artist}`);
+        // 🚀 Parallel Meta Fetching
+        const [songRes, imageRes] = await Promise.all([
+            fetch(songUrl, { headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://www.jiosaavn.com/' } }),
+            imageUrl ? fetch(imageUrl.replace(/^http:\/\//i, 'https://'), { headers: { 'User-Agent': 'Mozilla/5.0' } }) : Promise.resolve(null)
+        ]);
 
-        // 1. Fetch Audio
-        const songRes = await fetch(songUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Referer': 'https://www.jiosaavn.com/',
-            }
-        });
-        if (!songRes.ok) throw new Error("Audio source unreachable");
+        if (!songRes.ok) throw new Error("Audio source down");
+
         const audioBuffer = Buffer.from(await songRes.arrayBuffer());
+        const isMp3Input = songUrl.toLowerCase().includes('.mp3') || songRes.headers.get('content-type')?.includes('mpeg');
 
-        // 2. Fetch & Optimize Image
         let optimizedImage = null;
-        if (imageUrl) {
+        if (imageRes?.ok) {
             try {
-                const imgRes = await fetch(imageUrl.replace(/^http:\/\//i, 'https://'), {
-                    headers: { 'User-Agent': 'Mozilla/5.0' }
-                });
-                if (imgRes.ok) {
-                    const rawImg = Buffer.from(await imgRes.arrayBuffer());
-                    optimizedImage = await sharp(rawImg)
-                        .resize(500, 500)
-                        .jpeg({ quality: 80, progressive: false })
-                        .toBuffer();
-                }
-            } catch (e) {
-                console.error("[Download API] Image failed:", e);
-            }
+                // 🚀 HIGH-QUALITY IMAGE MODE: 500px is the sweet spot for sharpness and file size
+                const rawImg = Buffer.from(await imageRes.arrayBuffer());
+                optimizedImage = await sharp(rawImg)
+                    .resize(500, 500, {
+                        fit: 'cover',
+                        withoutEnlargement: true
+                    })
+                    .jpeg({
+                        quality: 90,
+                        progressive: true,
+                        chromaSubsampling: '4:4:4'
+                    })
+                    .toBuffer();
+            } catch (e) { }
         }
 
-        // 3. Process
-        const finalMp3Buffer = await processWithFfmpeg({
+        const finalBuffer = await processReliable({
             audioBuffer,
             imageBuffer: optimizedImage,
-            title: title || "Track",
-            artist: artist || "Artist",
-            album: album || title,
-            year: year
+            title, artist, album, year, isMp3Input
         });
 
-        const safeFilename = `${title || "track"} - ${artist || "artist"}`.replace(/[<>:"/\\|?*\x00-\x1f]/g, '').trim();
-
-        return new Response(finalMp3Buffer, {
+        return new Response(finalBuffer, {
             headers: {
                 "Content-Type": "audio/mpeg",
-                "Content-Disposition": `attachment; filename="${safeFilename}.mp3"`,
+                "Content-Disposition": `attachment; filename="${title}.mp3"`,
                 "X-Tagged": "true",
-                "Cache-Control": "no-cache",
             },
         });
 
     } catch (error) {
-        console.error("[Download API] Global Error:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

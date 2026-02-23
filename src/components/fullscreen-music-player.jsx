@@ -36,6 +36,7 @@ import { useMusicPlayer } from "@/contexts/music-player-context";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useSession } from "next-auth/react";
 import { AddToPlaylistDialog } from "@/components/playlists/AddToPlaylistDialog";
+import { toast } from "sonner";
 
 export function FullscreenMusicPlayer({
   currentSong,
@@ -683,9 +684,8 @@ export function FullscreenMusicPlayer({
             if (alpha < 128) continue;
 
             // Group similar colors
-            const key = `${Math.floor(r / 32) * 32},${
-              Math.floor(g / 32) * 32
-            },${Math.floor(b / 32) * 32}`;
+            const key = `${Math.floor(r / 32) * 32},${Math.floor(g / 32) * 32
+              },${Math.floor(b / 32) * 32}`;
             colorCounts[key] = (colorCounts[key] || 0) + 1;
           }
 
@@ -1022,9 +1022,8 @@ export function FullscreenMusicPlayer({
 
         {/* Content */}
         <div
-          className={`relative z-10 flex flex-col h-full text-white safe-area-inset transition-all duration-300 ${
-            showPlaylist ? "md:mr-80" : ""
-          } ${showLyrics ? "hidden" : ""}`}
+          className={`relative z-10 flex flex-col h-full text-white safe-area-inset transition-all duration-300 ${showPlaylist ? "md:mr-80" : ""
+            } ${showLyrics ? "hidden" : ""}`}
         >
           {/* Header */}
           <div className="flex items-center justify-between p-4 sm:p-6 flex-shrink-0">
@@ -1059,7 +1058,7 @@ export function FullscreenMusicPlayer({
               <DropdownMenuContent
                 align="end"
                 className="w-48 transform-gpu will-change-transform backdrop-blur-sm"
-                style={{ 
+                style={{
                   zIndex: 10001,
                   backfaceVisibility: 'hidden',
                   WebkitBackfaceVisibility: 'hidden',
@@ -1075,11 +1074,10 @@ export function FullscreenMusicPlayer({
                   disabled={isLikeLoading}
                 >
                   <Heart
-                    className={`w-4 h-4 mr-2 transition-colors duration-150 ${
-                      getCurrentLikeState()
+                    className={`w-4 h-4 mr-2 transition-colors duration-150 ${getCurrentLikeState()
                         ? "fill-red-500 text-red-500"
                         : ""
-                    }`}
+                      }`}
                   />
                   {isLikeLoading ? "..." : getCurrentLikeState() ? "Unlike" : "Like"}
                 </DropdownMenuItem>
@@ -1113,106 +1111,84 @@ export function FullscreenMusicPlayer({
                 <DropdownMenuItem
                   onClick={async () => {
                     if (!currentSong) return;
-                    try {
-                      console.log(
-                        "Attempting to download song:",
-                        currentSong.name || currentSong.title
-                      );
+                    const toastId = toast.loading(`Preparing "${decodeHtmlEntities(currentSong.name || currentSong.title)}"...`);
 
-                      // Get download URL
+                    try {
+                      // 1. Resolve Best Quality URL
                       let downloadUrl = null;
-                      if (
-                        currentSong.downloadUrl &&
-                        Array.isArray(currentSong.downloadUrl)
-                      ) {
-                        const highQuality =
-                          currentSong.downloadUrl.find(
-                            (url) => url.quality === "320kbps"
-                          ) ||
-                          currentSong.downloadUrl.find(
-                            (url) => url.quality === "160kbps"
-                          ) ||
-                          currentSong.downloadUrl[
-                            currentSong.downloadUrl.length - 1
-                          ];
-                        downloadUrl = highQuality?.url;
+                      if (currentSong.downloadUrl && Array.isArray(currentSong.downloadUrl)) {
+                        const mp3s = currentSong.downloadUrl.filter(u => u.url.toLowerCase().includes('.mp3'));
+                        const bestMp3 = mp3s.find(u => u.quality === '320kbps') ||
+                          mp3s.find(u => u.quality === '160kbps') ||
+                          mp3s[0];
+                        const bestOverall = currentSong.downloadUrl.find(u => u.quality === '320kbps') ||
+                          currentSong.downloadUrl[currentSong.downloadUrl.length - 1];
+                        downloadUrl = bestMp3?.url || bestOverall?.url;
                       }
 
                       if (!downloadUrl && currentSong.id) {
-                        const response = await fetch(
-                          `${process.env.NEXT_PUBLIC_API_URL}/api/songs/${currentSong.id}`
-                        );
-                        const data = await response.json();
-                        if (
-                          data.success &&
-                          data.data &&
-                          data.data[0]?.downloadUrl
-                        ) {
-                          const songData = data.data[0];
-                          const highQuality =
-                            songData.downloadUrl.find(
-                              (url) => url.quality === "320kbps"
-                            ) ||
-                            songData.downloadUrl.find(
-                              (url) => url.quality === "160kbps"
-                            ) ||
-                            songData.downloadUrl[
-                              songData.downloadUrl.length - 1
-                            ];
-                          downloadUrl = highQuality?.url;
+                        const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs/${currentSong.id}`);
+                        const d = await resp.json();
+                        if (d.success && d.data?.[0]?.downloadUrl) {
+                          const freshUrls = d.data[0].downloadUrl;
+                          const mp3s = freshUrls.filter(u => u.url.toLowerCase().includes('.mp3'));
+                          const bestMp3 = mp3s.find(u => u.quality === '320kbps') || mp3s.find(u => u.quality === '160kbps') || mp3s[0];
+                          const bestOverall = freshUrls.find(u => u.quality === '320kbps') || freshUrls[freshUrls.length - 1];
+                          downloadUrl = bestMp3?.url || bestOverall?.url;
                         }
                       }
 
-                      if (downloadUrl) {
-                        const filename = `${decodeHtmlEntities(
-                          currentSong.name || currentSong.title
-                        )} - ${getArtistNames(currentSong)}.mp3`;
+                      if (!downloadUrl) throw new Error('No download URL available');
 
-                        try {
-                          const response = await fetch(downloadUrl);
-                          if (!response.ok)
-                            throw new Error(
-                              `HTTP error! status: ${response.status}`
-                            );
+                      // 2. Resolve Best Image
+                      const imageUrl = currentSong.image?.find(img => img.quality === '500x500')?.url ||
+                        currentSong.image?.find(img => img.quality === '150x150')?.url ||
+                        currentSong.image?.[currentSong.image.length - 1]?.url;
 
-                          const blob = await response.blob();
-                          const blobUrl = window.URL.createObjectURL(blob);
+                      const title = decodeHtmlEntities(currentSong.name || currentSong.title);
+                      const artist = getArtistNames(currentSong);
+                      const album = currentSong.album?.name ? decodeHtmlEntities(currentSong.album.name) : (typeof currentSong.album === 'string' ? decodeHtmlEntities(currentSong.album) : 'Unknown Album');
+                      const year = currentSong.year || (currentSong.releaseDate ? new Date(currentSong.releaseDate).getFullYear() : '');
 
-                          const link = document.createElement("a");
-                          link.href = blobUrl;
-                          link.download = filename;
-                          link.style.display = "none";
+                      toast.loading(`Injecting metadata for "${title}"...`, { id: toastId });
 
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
+                      // 3. Call Backend API
+                      const response = await fetch('/api/download', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          songUrl: downloadUrl,
+                          imageUrl,
+                          title,
+                          artist,
+                          album,
+                          year
+                        }),
+                      });
 
-                          setTimeout(() => {
-                            window.URL.revokeObjectURL(blobUrl);
-                          }, 1000);
+                      if (!response.ok) throw new Error('Backend failed to process song');
 
-                          console.log(
-                            "Download completed for:",
-                            currentSong.name || currentSong.title
-                          );
-                        } catch (fetchError) {
-                          console.error("Error downloading:", fetchError);
-                          // Fallback: direct link
-                          const link = document.createElement("a");
-                          link.href = downloadUrl;
-                          link.download = filename;
-                          link.target = "_blank";
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                        }
+                      const isTagged = response.headers.get('X-Tagged') === 'true';
+                      const isConverted = response.headers.get('X-Converted') === 'true';
+
+                      const blob = await response.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = `${title} - ${artist}.mp3`;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      window.URL.revokeObjectURL(url);
+
+                      if (isTagged) {
+                        toast.success(`Downloaded "${title}" with album art! ${isConverted ? '(High-Quality MP3)' : ''}`, { id: toastId });
                       } else {
-                        console.error("No download URL available");
-                        alert("Download not available for this song");
+                        toast.error(`Download successful, but metadata injection failed for "${title}".`, { id: toastId });
                       }
                     } catch (error) {
-                      console.error("Error downloading song:", error);
-                      alert("Failed to download song. Please try again.");
+                      console.error('Download error:', error);
+                      toast.error(`Failed to download: ${error.message}`, { id: toastId });
                     }
                   }}
                 >
@@ -1264,20 +1240,18 @@ export function FullscreenMusicPlayer({
                     size="sm"
                     onClick={handleLikeToggle}
                     disabled={isLikeLoading}
-                    className={`flex-shrink-0 ml-4 p-2 transform-gpu will-change-transform ${
-                      getCurrentLikeState()
+                    className={`flex-shrink-0 ml-4 p-2 transform-gpu will-change-transform ${getCurrentLikeState()
                         ? "text-green-500"
                         : "text-white/60"
-                    }`}
+                      }`}
                     style={{
                       backfaceVisibility: 'hidden',
                       WebkitBackfaceVisibility: 'hidden',
                     }}
                   >
                     <Heart
-                      className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors duration-150 ${
-                        getCurrentLikeState() ? "fill-green-500" : ""
-                      }`}
+                      className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors duration-150 ${getCurrentLikeState() ? "fill-green-500" : ""
+                        }`}
                     />
                   </Button>
                 </div>
@@ -1303,9 +1277,8 @@ export function FullscreenMusicPlayer({
                     variant="ghost"
                     size="sm"
                     onClick={() => setIsShuffled(!isShuffled)}
-                    className={`p-2 ${
-                      isShuffled ? "text-green-400" : "text-white/60"
-                    }`}
+                    className={`p-2 ${isShuffled ? "text-green-400" : "text-white/60"
+                      }`}
                   >
                     <Shuffle className="w-4 h-4 sm:w-5 sm:h-5" />
                   </Button>
@@ -1347,9 +1320,8 @@ export function FullscreenMusicPlayer({
                     variant="ghost"
                     size="sm"
                     onClick={toggleRepeat}
-                    className={`relative p-2 ${
-                      repeatMode !== "off" ? "text-green-400" : "text-white/60"
-                    }`}
+                    className={`relative p-2 ${repeatMode !== "off" ? "text-green-400" : "text-white/60"
+                      }`}
                   >
                     <Repeat className="w-4 h-4 sm:w-5 sm:h-5" />
                     {repeatMode === "one" && (
@@ -1433,20 +1405,18 @@ export function FullscreenMusicPlayer({
                         size="sm"
                         onClick={handleLikeToggle}
                         disabled={isLikeLoading}
-                        className={`flex-shrink-0 text-white hover:bg-white/10 rounded-full p-3 transform-gpu will-change-transform ${
-                          getCurrentLikeState()
+                        className={`flex-shrink-0 text-white hover:bg-white/10 rounded-full p-3 transform-gpu will-change-transform ${getCurrentLikeState()
                             ? "text-green-500"
                             : "text-white/60"
-                        }`}
+                          }`}
                         style={{
                           backfaceVisibility: 'hidden',
                           WebkitBackfaceVisibility: 'hidden',
                         }}
                       >
                         <Heart
-                          className={`w-7 h-7 transition-colors duration-150 ${
-                            getCurrentLikeState() ? "fill-green-500" : ""
-                          }`}
+                          className={`w-7 h-7 transition-colors duration-150 ${getCurrentLikeState() ? "fill-green-500" : ""
+                            }`}
                         />
                       </Button>
                     </div>
@@ -1473,9 +1443,8 @@ export function FullscreenMusicPlayer({
                       variant="ghost"
                       size="sm"
                       onClick={() => setIsShuffled(!isShuffled)}
-                      className={`text-white hover:bg-white/10 rounded-full p-3 ${
-                        isShuffled ? "text-green-400" : "text-white/60"
-                      }`}
+                      className={`text-white hover:bg-white/10 rounded-full p-3 ${isShuffled ? "text-green-400" : "text-white/60"
+                        }`}
                     >
                       <Shuffle className="w-6 h-6" />
                     </Button>
@@ -1517,11 +1486,10 @@ export function FullscreenMusicPlayer({
                       variant="ghost"
                       size="sm"
                       onClick={toggleRepeat}
-                      className={`text-white hover:bg-white/10 rounded-full p-3 relative ${
-                        repeatMode !== "off"
+                      className={`text-white hover:bg-white/10 rounded-full p-3 relative ${repeatMode !== "off"
                           ? "text-green-400"
                           : "text-white/60"
-                      }`}
+                        }`}
                     >
                       <Repeat className="w-6 h-6" />
                       {repeatMode === "one" && (
@@ -1618,13 +1586,11 @@ export function FullscreenMusicPlayer({
                           setShowPlaylist(false); // Close queue on mobile after selection
                         }
                       }}
-                      className={`flex items-center gap-3 p-4 hover:bg-white/5 cursor-move transition-all duration-200 select-none ${
-                        song.id === currentSong.id ? "bg-white/10" : ""
-                      } ${
-                        dragOverIndex === index && draggedIndex !== index
+                      className={`flex items-center gap-3 p-4 hover:bg-white/5 cursor-move transition-all duration-200 select-none ${song.id === currentSong.id ? "bg-white/10" : ""
+                        } ${dragOverIndex === index && draggedIndex !== index
                           ? "border-t-2 border-green-400"
                           : ""
-                      } ${draggedIndex === index ? "opacity-50 scale-95" : ""}`}
+                        } ${draggedIndex === index ? "opacity-50 scale-95" : ""}`}
                     >
                       <div className="w-12 h-12 rounded bg-white/10 overflow-hidden flex-shrink-0">
                         {song.image?.length > 0 ? (
@@ -1650,11 +1616,10 @@ export function FullscreenMusicPlayer({
                       </div>
                       <div className="flex-1 min-w-0">
                         <p
-                          className={`font-medium truncate text-base ${
-                            song.id === currentSong.id
+                          className={`font-medium truncate text-base ${song.id === currentSong.id
                               ? "text-green-400"
                               : "text-white"
-                          }`}
+                            }`}
                         >
                           {decodeHtmlEntities(song.name)}
                         </p>
@@ -1726,13 +1691,11 @@ export function FullscreenMusicPlayer({
                         onSongChange?.(song, index, localPlaylist);
                       }
                     }}
-                    className={`flex items-center gap-3 p-3 hover:bg-white/5 cursor-move transition-all duration-200 select-none ${
-                      song.id === currentSong.id ? "bg-white/10" : ""
-                    } ${
-                      dragOverIndex === index && draggedIndex !== index
+                    className={`flex items-center gap-3 p-3 hover:bg-white/5 cursor-move transition-all duration-200 select-none ${song.id === currentSong.id ? "bg-white/10" : ""
+                      } ${dragOverIndex === index && draggedIndex !== index
                         ? "border-t-2 border-green-400"
                         : ""
-                    } ${draggedIndex === index ? "opacity-50 scale-95" : ""}`}
+                      } ${draggedIndex === index ? "opacity-50 scale-95" : ""}`}
                   >
                     <div className="w-12 h-12 rounded bg-white/10 overflow-hidden flex-shrink-0">
                       {song.image?.length > 0 ? (
@@ -1756,11 +1719,10 @@ export function FullscreenMusicPlayer({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p
-                        className={`font-medium truncate text-sm ${
-                          song.id === currentSong.id
+                        className={`font-medium truncate text-sm ${song.id === currentSong.id
                             ? "text-green-400"
                             : "text-white"
-                        }`}
+                          }`}
                       >
                         {decodeHtmlEntities(song.name)}
                       </p>
@@ -1967,26 +1929,25 @@ export function FullscreenMusicPlayer({
                                     <p
                                       key={index}
                                       ref={(el) =>
-                                        (mobileLyricLineRefs.current[index] =
-                                          el)
+                                      (mobileLyricLineRefs.current[index] =
+                                        el)
                                       }
-                                      className={`text-lg transition-all duration-700 ease-out transform will-change-transform ${
-                                        isCurrentLine
+                                      className={`text-lg transition-all duration-700 ease-out transform will-change-transform ${isCurrentLine
                                           ? "text-white font-bold text-xl scale-105 blur-0 opacity-100"
                                           : isUpcomingLine
-                                          ? "text-white/80 font-medium blur-0 opacity-90 scale-100"
-                                          : isPreviousLine
-                                          ? "text-white/60 blur-[0.5px] opacity-70 scale-95"
-                                          : "text-white/40 blur-[1px] opacity-50 scale-90"
-                                      }`}
+                                            ? "text-white/80 font-medium blur-0 opacity-90 scale-100"
+                                            : isPreviousLine
+                                              ? "text-white/60 blur-[0.5px] opacity-70 scale-95"
+                                              : "text-white/40 blur-[1px] opacity-50 scale-90"
+                                        }`}
                                       style={{
                                         filter: isCurrentLine
                                           ? "blur(0px) brightness(1.1)"
                                           : isUpcomingLine
-                                          ? "blur(0px) brightness(1)"
-                                          : isPreviousLine
-                                          ? "blur(0.5px) brightness(0.9)"
-                                          : "blur(1px) brightness(0.7)",
+                                            ? "blur(0px) brightness(1)"
+                                            : isPreviousLine
+                                              ? "blur(0.5px) brightness(0.9)"
+                                              : "blur(1px) brightness(0.7)",
                                         textShadow: isCurrentLine
                                           ? "0 0 20px rgba(255,255,255,0.3)"
                                           : "none",
@@ -2169,32 +2130,31 @@ export function FullscreenMusicPlayer({
                                           <p
                                             key={index}
                                             ref={(el) =>
-                                              (desktopLyricLineRefs.current[
-                                                index
-                                              ] = el)
+                                            (desktopLyricLineRefs.current[
+                                              index
+                                            ] = el)
                                             }
-                                            className={`text-xl lg:text-2xl transition-all duration-700 ease-out cursor-pointer hover:text-white/90 break-words transform will-change-transform ${
-                                              isCurrentLine
+                                            className={`text-xl lg:text-2xl transition-all duration-700 ease-out cursor-pointer hover:text-white/90 break-words transform will-change-transform ${isCurrentLine
                                                 ? "text-white font-bold text-2xl lg:text-3xl scale-105 blur-0 opacity-100"
                                                 : isUpcomingLine
-                                                ? "text-white/85 font-medium text-xl lg:text-2xl blur-0 opacity-95 scale-100"
-                                                : isPreviousLine
-                                                ? "text-white/65 blur-[0.5px] opacity-75 scale-98"
-                                                : "text-white/45 blur-[1px] opacity-60 scale-95"
-                                            }`}
+                                                  ? "text-white/85 font-medium text-xl lg:text-2xl blur-0 opacity-95 scale-100"
+                                                  : isPreviousLine
+                                                    ? "text-white/65 blur-[0.5px] opacity-75 scale-98"
+                                                    : "text-white/45 blur-[1px] opacity-60 scale-95"
+                                              }`}
                                             style={{
                                               filter: isCurrentLine
                                                 ? "blur(0px) brightness(1.2) saturate(1.1)"
                                                 : isUpcomingLine
-                                                ? "blur(0px) brightness(1.05) saturate(1.05)"
-                                                : isPreviousLine
-                                                ? "blur(0.5px) brightness(0.95) saturate(0.95)"
-                                                : "blur(1px) brightness(0.8) saturate(0.8)",
+                                                  ? "blur(0px) brightness(1.05) saturate(1.05)"
+                                                  : isPreviousLine
+                                                    ? "blur(0.5px) brightness(0.95) saturate(0.95)"
+                                                    : "blur(1px) brightness(0.8) saturate(0.8)",
                                               textShadow: isCurrentLine
                                                 ? "0 0 30px rgba(255,255,255,0.4), 0 0 60px rgba(255,255,255,0.2)"
                                                 : isUpcomingLine
-                                                ? "0 0 15px rgba(255,255,255,0.2)"
-                                                : "none",
+                                                  ? "0 0 15px rgba(255,255,255,0.2)"
+                                                  : "none",
                                               backfaceVisibility: "hidden",
                                               WebkitFontSmoothing:
                                                 "antialiased",

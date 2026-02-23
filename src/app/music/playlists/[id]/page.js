@@ -790,225 +790,164 @@ export default function PlaylistDetailPage({ params }) {
     }
 
     // Show initial toast
-    const toastId = toast.loading(`Downloading playlist... (0/${songs.length})`);
+    const progressToast = document.createElement('div');
+    progressToast.className = 'fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
+    progressToast.innerHTML = `
+      <div class="flex items-center gap-2">
+        <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+        <div class="flex flex-col">
+          <span class="font-bold text-sm">Downloading Playlist...</span>
+          <span class="text-xs opacity-90" id="download-progress-text">Preparing 0 / ${songs.length}</span>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(progressToast);
 
     let downloadedCount = 0;
     let failedCount = 0;
+    const CONCURRENCY_LIMIT = 4;
+    const queue = [...songs];
 
-    // Download songs with a small delay between each to avoid overwhelming the server
-    for (let i = 0; i < songs.length; i++) {
-      const song = songs[i];
+    const downloadWorker = async () => {
+      while (queue.length > 0) {
+        const song = queue.shift();
+        if (!song) break;
 
-      try {
-        // Update progress
-        toast.loading(`Downloading "${song.name}"... (${i + 1}/${songs.length})`, { id: toastId });
+        try {
+          await downloadSingleSong(song, true);
+          downloadedCount++;
+        } catch (error) {
+          console.error(`Failed to download ${song.name}:`, error);
+          failedCount++;
+        }
 
-        await downloadSingleSong(song);
-        downloadedCount++;
-      } catch (error) {
-        console.error(`Failed to download ${song.name}:`, error);
-        failedCount++;
+        const progressText = document.getElementById('download-progress-text');
+        if (progressText) {
+          progressText.textContent = `Progress: ${downloadedCount + failedCount} / ${songs.length} (${failedCount} failed)`;
+        }
       }
+    };
 
-      // Small delay between downloads
-      if (i < songs.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-    }
+    // Spin up workers
+    await Promise.all(Array(Math.min(CONCURRENCY_LIMIT, queue.length)).fill(null).map(downloadWorker));
 
-    // Show completion status
-    if (failedCount === 0) {
-      toast.success(`Downloaded all ${downloadedCount} songs from "${playlist.name}"!`, { id: toastId });
-    } else if (downloadedCount > 0) {
-      toast.success(`Downloaded ${downloadedCount} songs (${failedCount} failed) from "${playlist.name}"`, { id: toastId });
-    } else {
-      toast.error(`Failed to download songs from "${playlist.name}"`, { id: toastId });
-    }
+    // Finish
+    document.body.removeChild(progressToast);
+
+    const completionToast = document.createElement('div');
+    completionToast.className = `fixed bottom-4 right-4 ${failedCount > 0 ? 'bg-orange-600' : 'bg-green-600'} text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300`;
+    completionToast.innerHTML = `
+      <div class="flex flex-col">
+        <span class="font-bold text-sm">Download Finished</span>
+        <span class="text-xs opacity-90">${downloadedCount} songs saved. ${failedCount > 0 ? `${failedCount} failed.` : ''}</span>
+      </div>
+    `;
+    document.body.appendChild(completionToast);
+
+    setTimeout(() => {
+      completionToast.style.opacity = '0';
+      setTimeout(() => {
+        if (document.body.contains(completionToast)) {
+          document.body.removeChild(completionToast);
+        }
+      }, 300);
+    }, 5000);
   };
 
-  const downloadSingleSong = async (song) => {
-    // First, try to get download links from the song object
-    let downloadUrl = null;
-
-    // Check if song already has download URLs
-    if (song.downloadUrl && Array.isArray(song.downloadUrl)) {
-      // Look for 320kbps quality first, then fallback to highest available
-      const highQuality = song.downloadUrl.find(url => url.quality === '320kbps') ||
-        song.downloadUrl.find(url => url.quality === '160kbps') ||
-        song.downloadUrl[song.downloadUrl.length - 1];
-      downloadUrl = highQuality?.url;
+  const downloadSingleSong = async (song, silent = false) => {
+    let toastId = null;
+    if (!silent) {
+      toastId = toast.loading(`Preparing "${decodeHtmlEntities(song.name)}"...`);
     }
-
-    // If no download URL found, fetch from API
-    if (!downloadUrl) {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs?ids=${song.id}`);
-      const data = await response.json();
-
-      if (data.success && data.data && data.data[0]?.downloadUrl) {
-        const songData = data.data[0];
-        // Look for 320kbps quality first, then fallback to highest available
-        const highQuality = songData.downloadUrl.find(url => url.quality === '320kbps') ||
-          songData.downloadUrl.find(url => url.quality === '160kbps') ||
-          songData.downloadUrl[songData.downloadUrl.length - 1];
-        downloadUrl = highQuality?.url;
-      }
-    }
-
-    if (!downloadUrl) {
-      throw new Error('No download URL available');
-    }
-
-    const filename = `${song.name} - ${song.artists?.primary?.map(artist => artist.name).join(', ') || 'Unknown Artist'}.mp3`;
 
     try {
-      // Fetch the file as a blob
-      const response = await fetch(downloadUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'audio/mpeg, audio/mp4, */*'
-        }
-      });
+      // 1. Resolve Best Quality URL
+      let downloadUrl = null;
+      if (song.downloadUrl && Array.isArray(song.downloadUrl)) {
+        // Step 1: Find all MP3s
+        const mp3s = song.downloadUrl.filter(u => u.url.toLowerCase().includes('.mp3'));
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        // Step 2: Pick the best MP3 (prefer high quality)
+        const bestMp3 = mp3s.find(u => u.quality === '320kbps') ||
+          mp3s.find(u => u.quality === '160kbps') ||
+          mp3s[0];
+
+        // Step 3: Fallback to best overall if no MP3 found
+        const bestOverall = song.downloadUrl.find(u => u.quality === '320kbps') ||
+          song.downloadUrl[song.downloadUrl.length - 1];
+
+        downloadUrl = bestMp3?.url || bestOverall?.url;
       }
 
-      // Get the file as a blob
+      if (!downloadUrl) {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs?ids=${song.id}`);
+        const data = await response.json();
+        if (data.success && data.data?.[0]?.downloadUrl) {
+          const freshUrls = data.data[0].downloadUrl;
+          const mp3s = freshUrls.filter(u => u.url.toLowerCase().includes('.mp3'));
+          const bestMp3 = mp3s.find(u => u.quality === '320kbps') || mp3s.find(u => u.quality === '160kbps') || mp3s[0];
+          const bestOverall = freshUrls.find(u => u.quality === '320kbps') || freshUrls[freshUrls.length - 1];
+          downloadUrl = bestMp3?.url || bestOverall?.url;
+        }
+      }
+
+      if (!downloadUrl) throw new Error('No download URL available');
+
+      // 2. Resolve Best Image
+      const imageUrl = song.image?.find(img => img.quality === '500x500')?.url ||
+        song.image?.find(img => img.quality === '150x150')?.url ||
+        song.image?.[song.image.length - 1]?.url;
+
+      const title = decodeHtmlEntities(song.name);
+      const artist = song.artists?.primary?.map(a => a.name).join(', ') || 'Unknown Artist';
+      const album = song.album?.name ? decodeHtmlEntities(song.album.name) : 'Unknown Album';
+      const year = song.year || (song.releaseDate ? new Date(song.releaseDate).getFullYear() : '');
+
+      if (!silent) toast.loading(`Injecting metadata for "${title}"...`, { id: toastId });
+
+      // 3. Call Backend API
+      const response = await fetch('/api/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          songUrl: downloadUrl,
+          imageUrl,
+          title,
+          artist,
+          album,
+          year
+        }),
+      });
+
+      if (!response.ok) throw new Error('Backend failed to process song');
+
+      const isTagged = response.headers.get('X-Tagged') === 'true';
+      const isConverted = response.headers.get('X-Converted') === 'true';
+
       const blob = await response.blob();
-
-      // Create a blob URL
-      const blobUrl = window.URL.createObjectURL(blob);
-
-      // Create a temporary anchor element for download
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = filename;
-      link.style.display = 'none';
-
-      // Add to DOM, click, and remove
+      link.href = url;
+      link.download = `${title} - ${artist}.mp3`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
 
-      // Clean up the blob URL after a short delay
-      setTimeout(() => {
-        window.URL.revokeObjectURL(blobUrl);
-      }, 1000);
-
-    } catch (fetchError) {
-      // Fallback: try direct link method if blob fetch fails
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = filename;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      if (isTagged) {
+        if (!silent) toast.success(`Downloaded "${title}" with album art! ${isConverted ? '(High-Quality MP3)' : ''}`, { id: toastId });
+      } else {
+        if (!silent) toast.error(`Download successful, but metadata injection failed for "${title}".`, { id: toastId });
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      if (!silent) toast.error(`Failed to download: ${error.message}`, { id: toastId });
+      throw error;
     }
   };
 
   const handleDownloadSong = async (song) => {
-    try {
-      console.log('Attempting to download song:', song.name);
-
-      // First, try to get download links from the song object
-      let downloadUrl = null;
-
-      // Check if song already has download URLs
-      if (song.downloadUrl && Array.isArray(song.downloadUrl)) {
-        // Look for 320kbps quality first, then fallback to highest available
-        const highQuality = song.downloadUrl.find(url => url.quality === '320kbps') ||
-          song.downloadUrl.find(url => url.quality === '160kbps') ||
-          song.downloadUrl[song.downloadUrl.length - 1];
-        downloadUrl = highQuality?.url;
-      }
-
-      // If no download URL found, fetch from API
-      if (!downloadUrl) {
-        console.log('No download URL found in song object, fetching from API...');
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs?ids=${song.id}`);
-        const data = await response.json();
-
-        if (data.success && data.data && data.data[0]?.downloadUrl) {
-          const songData = data.data[0];
-          // Look for 320kbps quality first, then fallback to highest available
-          const highQuality = songData.downloadUrl.find(url => url.quality === '320kbps') ||
-            songData.downloadUrl.find(url => url.quality === '160kbps') ||
-            songData.downloadUrl[songData.downloadUrl.length - 1];
-          downloadUrl = highQuality?.url;
-          console.log('Found download URL from API:', downloadUrl);
-        }
-      }
-
-      if (downloadUrl) {
-        // Fetch the file through your website and trigger direct download
-        console.log('Fetching file for download...');
-
-        const filename = `${song.name} - ${song.artists?.primary?.map(artist => artist.name).join(', ') || 'Unknown Artist'}.mp3`;
-
-        try {
-          // Fetch the file as a blob
-          const response = await fetch(downloadUrl, {
-            method: 'GET',
-            headers: {
-              'Accept': 'audio/mpeg, audio/mp4, */*'
-            }
-          });
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          // Get the file as a blob
-          const blob = await response.blob();
-
-          // Create a blob URL
-          const blobUrl = window.URL.createObjectURL(blob);
-
-          // Create a temporary anchor element for download
-          const link = document.createElement('a');
-          link.href = blobUrl;
-          link.download = filename;
-          link.style.display = 'none';
-
-          // Add to DOM, click, and remove
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-
-          // Clean up the blob URL after a short delay
-          setTimeout(() => {
-            window.URL.revokeObjectURL(blobUrl);
-          }, 1000);
-
-          console.log('Download completed for:', song.name);
-
-          toast.success('Download started!');
-        } catch (fetchError) {
-          console.error('Error fetching file for download:', fetchError);
-
-          // Fallback: try direct link method if blob fetch fails
-          console.log('Falling back to direct link method...');
-          const link = document.createElement('a');
-          link.href = downloadUrl;
-          link.download = filename;
-          link.target = '_blank';
-          link.rel = 'noopener noreferrer';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-
-          toast.success('Download started!');
-        }
-      } else {
-        console.error('No download URL available for this song');
-        toast.error('Download not available for this song');
-      }
-    } catch (error) {
-      console.error('Error downloading song:', error);
-      toast.error('Something went wrong');
-    }
+    await downloadSingleSong(song);
   };
 
   if (loading) {

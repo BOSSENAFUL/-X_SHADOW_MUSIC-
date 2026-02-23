@@ -255,33 +255,48 @@ export default function FavoritesPage() {
 
     let downloadedCount = 0;
     let failedCount = 0;
+    let completedCount = 0;
 
-    // Download songs with a small delay between each to avoid overwhelming the server
-    for (let i = 0; i < likedSongs.length; i++) {
-      const song = likedSongs[i];
+    // Helper to update the UI progress
+    const updateProgress = (currentSongName) => {
+      progressToast.innerHTML = `
+        <div class="flex items-center gap-2">
+          <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          <span>[${completedCount}/${likedSongs.length}] Downloading "${decodeHtmlEntities(currentSongName)}"...</span>
+        </div>
+      `;
+    };
 
-      try {
-        // Update progress
-        progressToast.innerHTML = `
-          <div class="flex items-center gap-2">
-            <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            <span>Downloading "${decodeHtmlEntities(song.songName)}"... (${i + 1}/${likedSongs.length})</span>
-          </div>
-        `;
+    // 🚀 PARALLEL BATCH DOWNLOADER (4 at a time)
+    const CONCURRENCY_LIMIT = 4;
+    const queue = [...likedSongs];
 
-        // Pass true for 'silent' to prevent individual loading toasts
-        await downloadSingleLikedSong(song, true);
-        downloadedCount++;
-      } catch (error) {
-        console.error(`Failed to download ${song.songName}:`, error);
-        failedCount++;
+    const downloadWorker = async () => {
+      while (queue.length > 0) {
+        const song = queue.shift();
+        if (!song) break;
+
+        try {
+          // Update toast with latest active song
+          updateProgress(song.songName);
+
+          // Download the song
+          await downloadSingleLikedSong(song, true);
+          downloadedCount++;
+        } catch (error) {
+          console.error(`Failed to download ${song.songName}:`, error);
+          failedCount++;
+        } finally {
+          completedCount++;
+          // Update progress again for the next waiting song
+          if (queue.length > 0) updateProgress(queue[0].songName);
+        }
       }
+    };
 
-      // Small delay between downloads
-      if (i < likedSongs.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, i === 0 ? 0 : 500));
-      }
-    }
+    // Start 4 workers simultaneously
+    const workers = Array(CONCURRENCY_LIMIT).fill(null).map(() => downloadWorker());
+    await Promise.all(workers);
 
     // Remove progress toast
     progressToast.style.opacity = '0';
