@@ -690,41 +690,6 @@ export function FullscreenMusicPlayer({
     setAddToPlaylistDialogOpen(true);
   };
 
-  // Go to artist handler
-  const handleGoToArtist = (e, song) => {
-    if (e) e.stopPropagation();
-
-    // Close the fullscreen player first
-    onClose();
-
-    if (song.artists?.primary?.length > 0) {
-      router.push(`/music/artist/${song.artists.primary[0].id}`);
-    } else {
-      // Fallback: search for the artist by name
-      const artistName = getArtistNames(song);
-      if (artistName && artistName !== "Unknown Artist") {
-        router.push(`/music/search?q=${encodeURIComponent(artistName)}`);
-      }
-    }
-  };
-
-  // Go to album handler
-  const handleGoToAlbum = (e, song) => {
-    if (e) e.stopPropagation();
-
-    // Close the fullscreen player first
-    onClose();
-
-    if (song.album?.id) {
-      router.push(`/music/album/${song.album.id}`);
-    } else {
-      // Fallback: search for the album by name if available
-      const albumName = song.album?.name || song.album;
-      if (albumName && typeof albumName === "string") {
-        router.push(`/music/search?q=${encodeURIComponent(albumName)}`);
-      }
-    }
-  };
 
   // Extract dominant colors from album art
   const extractColorsFromImage = (imageUrl) => {
@@ -1174,19 +1139,6 @@ export function FullscreenMusicPlayer({
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => handleGoToArtist(null, currentSong)}
-                >
-                  <User className="w-4 h-4 mr-2" />
-                  Go to artist
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => handleGoToAlbum(null, currentSong)}
-                >
-                  <Disc className="w-4 h-4 mr-2" />
-                  Go to album
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
                   onClick={async () => {
                     if (!currentSong) return;
                     const toastId = toast.loading(`Preparing "${decodeHtmlEntities(currentSong.name || currentSong.title)}"...`);
@@ -1522,7 +1474,7 @@ export function FullscreenMusicPlayer({
                   {/* Main Controls */}
                   <div className="flex items-center justify-center gap-6 mb-8">
                     <Button
-                      
+
                       size="sm"
                       onClick={() => setIsShuffled(!isShuffled)}
                       className={`bg-transparent hover:bg-transparent hover:cursor-pointer ${isShuffled ? "text-green-400" : "text-white/65"
@@ -1532,7 +1484,7 @@ export function FullscreenMusicPlayer({
                     </Button>
 
                     <Button
-              
+
                       size="xs"
                       onClick={handlePrevious}
                       disabled={playlist.length === 0}
@@ -1555,7 +1507,7 @@ export function FullscreenMusicPlayer({
                     </Button>
 
                     <Button
-                      
+
                       size="xs"
                       onClick={handleNext}
                       disabled={playlist.length === 0}
@@ -1565,7 +1517,7 @@ export function FullscreenMusicPlayer({
                     </Button>
 
                     <Button
-                      
+
                       size="sm"
                       onClick={toggleRepeat}
                       className={`relative hover:bg-transparent bg-transparent hover:cursor-pointer ${repeatMode !== "off"
@@ -1647,7 +1599,10 @@ export function FullscreenMusicPlayer({
                     <ChevronDown className="w-5 h-5" />
                   </Button>
                 </div>
-                <div className="flex-1 overflow-y-auto scrollbar-hide">
+                <div
+                  className="flex-1 overflow-y-auto scrollbar-hide"
+                  style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
+                >
                   {localPlaylist.map((song, index) => (
                     <div
                       key={song.id}
@@ -1668,7 +1623,7 @@ export function FullscreenMusicPlayer({
                           setShowPlaylist(false); // Close queue on mobile after selection
                         }
                       }}
-                      className={`flex items-center gap-3 p-4 hover:bg-white/5 cursor-move transition-all duration-200 select-none ${song.id === currentSong.id ? "bg-white/10" : ""
+                      className={`flex items-center gap-3 p-4 active:bg-white/5 cursor-move transition-[opacity,transform] duration-200 select-none ${song.id === currentSong.id ? "bg-white/10" : ""
                         } ${dragOverIndex === index && draggedIndex !== index
                           ? "border-t-2 border-green-400"
                           : ""
@@ -1689,6 +1644,7 @@ export function FullscreenMusicPlayer({
                             alt={song.name}
                             className="w-full h-full object-cover"
                             loading="lazy"
+                            decoding="async"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
