@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Play, Heart, List, Search } from "lucide-react";
 import { useLikedPlaylists } from "@/hooks/useLikedPlaylists";
 import { PlaylistSection } from "@/components/music/playlist-section";
+import { IoMdPlay } from "react-icons/io";
 
 export default function MusicPage() {
   const router = useRouter();
@@ -362,7 +363,7 @@ export default function MusicPage() {
                     handlePlayClick({ type: "liked-songs" }, "liked-songs");
                   }}
                 >
-                  <Play className="w-4 h-4 md:w-6 md:h-6 fill-black translate-x-0.5" />
+                  <IoMdPlay className="w-4 h-4 md:w-6 md:h-6 fill-black translate-x-0.5" />
                 </div>
               </div>
             </div>
@@ -426,7 +427,7 @@ export default function MusicPage() {
                             handlePlayClick(playlist, "playlist");
                           }}
                         >
-                          <Play className="w-4 h-4 md:w-6 md:h-6 fill-black translate-x-0.5" />
+                          <IoMdPlay className="w-4 h-4 md:w-6 md:h-6 fill-black translate-x-0.5" />
                         </div>
                       </div>
                     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -49,8 +49,13 @@ export default function ArtistPage() {
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState(null);
   const [showHeaderTitle, setShowHeaderTitle] = useState(false);
+  const [albums, setAlbums] = useState([]);
+  const [albumPage, setAlbumPage] = useState(0);
+  const [hasMoreAlbums, setHasMoreAlbums] = useState(true);
+  const [fetchingMoreAlbums, setFetchingMoreAlbums] = useState(false);
   const mobileTitleRef = useRef(null);
   const desktopTitleRef = useRef(null);
+  const albumsObserverTarget = useRef(null);
 
   // Initialize liked songs hook with actual user ID
   const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
@@ -84,6 +89,17 @@ export default function ArtistPage() {
 
           setDominantColor(extractedColor);
           setArtist(artistData.data);
+
+          if (artistData.data.topAlbums) {
+            setAlbums(artistData.data.topAlbums);
+            // Initialize albumPage to 0 so we fetch page 0 of the dedicated API next
+            setAlbumPage(0);
+            // We can check if we should even try to fetch more. 
+            // Usually, if total is not available here, we assume there's more if we got a full page of topAlbums.
+            setHasMoreAlbums(artistData.data.topAlbums.length >= 10);
+          } else {
+            setHasMoreAlbums(false);
+          }
         }
       } catch (error) {
         console.error('Error fetching artist details:', error);
@@ -126,6 +142,73 @@ export default function ArtistPage() {
       observer.disconnect();
     };
   }, [loading, artist?.name]);
+
+  // Function to fetch more albums (Lazy Loading)
+  const fetchMoreAlbums = useCallback(async () => {
+    if (fetchingMoreAlbums || !hasMoreAlbums || !artistId) return;
+
+    setFetchingMoreAlbums(true);
+    try {
+      const nextPage = albumPage;
+      console.log(`Fetching more albums for artist ${artistId}, page ${nextPage}`);
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/artists/${artistId}/albums?page=${nextPage}`);
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        const newAlbums = data.data.albums || data.data;
+
+        if (Array.isArray(newAlbums) && newAlbums.length > 0) {
+          // Calculate new unique albums outside the state updater (keep updater pure)
+          setAlbums(prev => {
+            const existingIds = new Set(prev.map(a => a.id));
+            const uniqueNew = newAlbums.filter(a => a.id && !existingIds.has(a.id));
+            return [...prev, ...uniqueNew];
+          });
+          setAlbumPage(nextPage + 1);
+          // Stop when the API returns a partial page (fewer than 10 means it's the last page).
+          // Don't rely on `data.data.total` — it can be inflated due to duplicates in the API.
+          setHasMoreAlbums(newAlbums.length >= 10);
+        } else {
+          // Empty array means no more pages
+          setHasMoreAlbums(false);
+        }
+      } else {
+        setHasMoreAlbums(false);
+      }
+    } catch (error) {
+      console.error('Error fetching more albums:', error);
+      setHasMoreAlbums(false);
+    } finally {
+      setFetchingMoreAlbums(false);
+    }
+  }, [artistId, albumPage, fetchingMoreAlbums, hasMoreAlbums]);
+
+  // Observer for infinite scrolling albums
+  useEffect(() => {
+    const scrollContainer = document.getElementById('artist-scroll-container');
+    if (!scrollContainer || !hasMoreAlbums || fetchingMoreAlbums || loading) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          fetchMoreAlbums();
+        }
+      },
+      {
+        root: scrollContainer,
+        threshold: 0.1,
+      }
+    );
+
+    if (albumsObserverTarget.current) {
+      observer.observe(albumsObserverTarget.current);
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [hasMoreAlbums, fetchingMoreAlbums, fetchMoreAlbums, loading]);
 
   // Check if artist is liked when component mounts and session is available
   useEffect(() => {
@@ -768,11 +851,11 @@ export default function ArtistPage() {
             )}
 
             {/* Albums */}
-            {artist.topAlbums && artist.topAlbums.length > 0 && (
+            {albums.length > 0 && (
               <div>
                 <h2 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">Albums</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-6">
-                  {artist.topAlbums.slice(0, 12).map((album) => (
+                  {albums.map((album) => (
                     <div
                       key={album.id}
                       className="group cursor-pointer hover:scale-105 transition-transform"
@@ -812,6 +895,17 @@ export default function ArtistPage() {
                     </div>
                   ))}
                 </div>
+                {hasMoreAlbums && (
+                  <div ref={albumsObserverTarget} className="w-full flex justify-center py-8">
+                    {fetchingMoreAlbums && (
+                      <div className="flex gap-1">
+                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
