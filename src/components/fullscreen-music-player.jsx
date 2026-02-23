@@ -100,6 +100,76 @@ export function FullscreenMusicPlayer({
     setLocalPlaylist([...playlist]);
   }, [playlist]);
 
+  // Handle mobile back button to close lyrics
+  useEffect(() => {
+    if (typeof window === "undefined" || !showLyrics) return;
+
+    const stateKey = "isFullscreenLyricsOpen";
+    const currentState = window.history.state || {};
+    window.history.pushState({ ...currentState, [stateKey]: true }, "");
+
+    const handlePopState = () => {
+      if (!window.history.state?.[stateKey]) {
+        setShowLyrics(false);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      if (window.history.state?.[stateKey]) {
+        window.history.back();
+      }
+    };
+  }, [showLyrics]);
+
+  // Handle mobile back button to close playlist
+  useEffect(() => {
+    if (typeof window === "undefined" || !showPlaylist) return;
+
+    const stateKey = "isFullscreenPlaylistOpen";
+    const currentState = window.history.state || {};
+    window.history.pushState({ ...currentState, [stateKey]: true }, "");
+
+    const handlePopState = () => {
+      if (!window.history.state?.[stateKey]) {
+        setShowPlaylist(false);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      if (window.history.state?.[stateKey]) {
+        window.history.back();
+      }
+    };
+  }, [showPlaylist]);
+
+  // Handle mobile back button to close Add to Playlist dialog
+  useEffect(() => {
+    if (typeof window === "undefined" || !addToPlaylistDialogOpen) return;
+
+    const stateKey = "isAddToPlaylistDialogOpen";
+    const currentState = window.history.state || {};
+    window.history.pushState({ ...currentState, [stateKey]: true }, "");
+
+    const handlePopState = () => {
+      if (!window.history.state?.[stateKey]) {
+        setAddToPlaylistDialogOpen(false);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      if (window.history.state?.[stateKey]) {
+        window.history.back();
+      }
+    };
+  }, [addToPlaylistDialogOpen]);
+
+
   // Mouse drag and drop handlers
   const handleDragStart = (e, index) => {
     setDraggedIndex(index);
@@ -1034,14 +1104,14 @@ export function FullscreenMusicPlayer({
             } ${showLyrics ? "hidden" : ""}`}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-4 sm:p-6 flex-shrink-0">
+          <div className="flex items-center justify-between p-4 sm:p-6 shrink-0">
             <Button
               variant="ghost"
               size="sm"
               onClick={onClose}
               className="text-white hover:bg-white/10 rounded-full p-2"
             >
-              <ChevronDown className="w-6 h-6" />
+              <ChevronDown style={{ width: '20px', height: '20px' }} />
             </Button>
 
             <div className="text-center">
@@ -1060,7 +1130,7 @@ export function FullscreenMusicPlayer({
                     WebkitBackfaceVisibility: 'hidden',
                   }}
                 >
-                  <MoreHorizontal className="w-6 h-6" />
+                  <MoreHorizontal style={{ width: '20px', height: '20px' }} />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent
@@ -1231,10 +1301,10 @@ export function FullscreenMusicPlayer({
               </div>
 
               {/* Song Info - Compact for small screens */}
-              <div className="px-4 pb-4 shrink-0">
+              <div className="px-2 pb-4 shrink-0">
                 <div className="flex items-center justify-between mb-3 sm:mb-4">
-                  <div className="flex-1 min-w-0">
-                    <h1 className="text-lg sm:text-xl font-bold text-white mb-1 truncate">
+                  <div className="flex-1 min-w-0 mb-1">
+                    <h1 className="text-lg sm:text-xl font-bold text-white truncate">
                       {decodeHtmlEntities(currentSong.name)}
                     </h1>
                     <p className="text-sm sm:text-base text-white/70 truncate">
@@ -1248,7 +1318,7 @@ export function FullscreenMusicPlayer({
                     size="sm"
                     onClick={handleLikeToggle}
                     disabled={isLikeLoading}
-                    className={`flex-shrink-0 ml-4 p-2 transform-gpu will-change-transform ${getCurrentLikeState()
+                    className={`shrink-0 ml-4 p-2 transform-gpu will-change-transform ${getCurrentLikeState()
                       ? "text-green-500"
                       : "text-white/60"
                       }`}
@@ -1289,42 +1359,42 @@ export function FullscreenMusicPlayer({
                     className={`p-2 ${isShuffled ? "text-green-400" : "text-white/60"
                       }`}
                   >
-                    <RxShuffle  style={{ width: '24px', height: '24px' }}/>
+                    <RxShuffle style={{ width: '24px', height: '24px' }} />
                   </Button>
 
-<div className="flex items-center gap-5">
+                  <div className="flex items-center gap-5">
 
-                  <Button
-                    size="xs"
-                    onClick={handlePrevious}
-                    disabled={playlist.length === 0}
-                    className="text-white  hover:bg-transparent bg-transparent"
-                  >
-                   <BiSkipPrevious style={{ width: '44px', height: '44px' }} />
-                  </Button>
+                    <Button
+                      size="xs"
+                      onClick={handlePrevious}
+                      disabled={playlist.length === 0}
+                      className="text-white  hover:bg-transparent bg-transparent"
+                    >
+                      <BiSkipPrevious style={{ width: '44px', height: '44px' }} />
+                    </Button>
 
-                  <Button
-                    variant="default"
-                    size="lg"
-                    onClick={onTogglePlayPause}
-                    className="rounded-full w-14 h-14 sm:w-16 sm:h-16 bg-white text-black hover:bg-white/90"
-                  >
-                    {isPlaying ? (
-                      <HiPause style={{ width: '24px', height: '24px' }} />
-                    ) : (
-                      <IoMdPlay style={{ width: '24px', height: '24px', marginLeft: '4px' }} />
-                    )}
-                  </Button>
+                    <Button
+                      variant="default"
+                      size="lg"
+                      onClick={onTogglePlayPause}
+                      className="rounded-full w-14 h-14 sm:w-16 sm:h-16 bg-white text-black hover:bg-white/90"
+                    >
+                      {isPlaying ? (
+                        <HiPause style={{ width: '24px', height: '24px' }} />
+                      ) : (
+                        <IoMdPlay style={{ width: '24px', height: '24px', marginLeft: '4px' }} />
+                      )}
+                    </Button>
 
-                  <Button
-                    size="xs"
-                    onClick={handleNext}
-                    disabled={playlist.length === 0}
-                    className="text-white  hover:bg-transparent bg-transparent"
-                  >
-                    <BiSkipNext style={{ width: '44px', height: '44px' }} />
-                  </Button>
-</div>
+                    <Button
+                      size="xs"
+                      onClick={handleNext}
+                      disabled={playlist.length === 0}
+                      className="text-white  hover:bg-transparent bg-transparent"
+                    >
+                      <BiSkipNext style={{ width: '44px', height: '44px' }} />
+                    </Button>
+                  </div>
 
 
                   <Button
@@ -1334,7 +1404,7 @@ export function FullscreenMusicPlayer({
                     className={`relative p-2 ${repeatMode !== "off" ? "text-green-400" : "text-white/60"
                       }`}
                   >
-                    <BsRepeat  style={{ width: '24px', height: '24px' }} />
+                    <BsRepeat style={{ width: '24px', height: '24px' }} />
                     {repeatMode === "one" && (
                       <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full flex items-center justify-center text-xs text-black font-bold">
                         1
@@ -1351,7 +1421,7 @@ export function FullscreenMusicPlayer({
                     onClick={() => setShowPlaylist(!showPlaylist)}
                     className="text-white/60 hover:text-white p-3 rounded-full hover:bg-white/10"
                   >
-                    <ListMusic style={{ width: '18px', height: '18px' }}/>
+                    <ListMusic style={{ width: '18px', height: '18px' }} />
                   </Button>
 
                   <Button
@@ -1370,8 +1440,8 @@ export function FullscreenMusicPlayer({
             <div className="hidden md:flex items-center justify-center h-full">
               <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 max-w-6xl w-full px-8">
                 {/* Left Side - Album Art */}
-                <div className="flex-shrink-0">
-                  <div className="w-[350px] h-[350px] lg:w-[400px] lg:h-[400px] xl:w-[450px] xl:h-[450px] rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-gray-800 to-gray-900">
+                <div className="shrink-0">
+                  <div className="w-[350px] h-[350px] lg:w-[400px] lg:h-[400px] xl:w-[450px] xl:h-[450px] rounded-2xl overflow-hidden shadow-2xl bg-linear-to-br from-gray-800 to-gray-900">
                     {currentSong.image?.[2]?.url ? (
                       <img
                         src={currentSong.image[2].url}
@@ -1380,7 +1450,7 @@ export function FullscreenMusicPlayer({
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <Play className="w-24 h-24 text-white/50" />
+                        <IoMdPlay className="w-24 h-24 text-white/50" />
                       </div>
                     )}
                   </div>
@@ -1416,7 +1486,7 @@ export function FullscreenMusicPlayer({
                         size="sm"
                         onClick={handleLikeToggle}
                         disabled={isLikeLoading}
-                        className={`flex-shrink-0 text-white hover:bg-white/10 rounded-full p-3 transform-gpu will-change-transform ${getCurrentLikeState()
+                        className={`shrink-0 text-white hover:bg-white/10 rounded-full p-3 transform-gpu will-change-transform ${getCurrentLikeState()
                           ? "text-green-500"
                           : "text-white/60"
                           }`}
@@ -1433,14 +1503,14 @@ export function FullscreenMusicPlayer({
                     </div>
 
                     {/* Progress Bar */}
-                    <div className="mb-8">
+                    <div className="mb-8 ">
                       <Slider
                         value={[currentTime]}
                         max={duration || 100}
                         step={1}
                         onValueChange={onSeek}
                         onValueCommit={onSeekCommit}
-                        className="w-full **:data-[slot=slider-thumb]:opacity-100 **:data-[slot=slider-thumb]:bg-white **:data-[slot=slider-thumb]:w-3 **:data-[slot=slider-thumb]:h-3 **:data-[slot=slider-range]:bg-white **:data-[slot=slider-track]:bg-white/20"
+                        className="w-full **:data-[slot=slider-thumb]:opacity-100 **:data-[slot=slider-thumb]:bg-white **:data-[slot=slider-thumb]:w-3 **:data-[slot=slider-thumb]:h-3 **:data-[slot=slider-range]:bg-white **:data-[slot=slider-track]:bg-white/20 hover:cursor-pointer"
                       />
                       <div className="flex justify-between text-base text-white/60 mt-3">
                         <span>{formatTime(currentTime)}</span>
@@ -1452,58 +1522,58 @@ export function FullscreenMusicPlayer({
                   {/* Main Controls */}
                   <div className="flex items-center justify-center gap-6 mb-8">
                     <Button
-                      variant="ghost"
+                      
                       size="sm"
                       onClick={() => setIsShuffled(!isShuffled)}
-                      className={`text-white hover:bg-white/10 rounded-full p-3 ${isShuffled ? "text-green-400" : "text-white/60"
+                      className={`bg-transparent hover:bg-transparent hover:cursor-pointer ${isShuffled ? "text-green-400" : "text-white/65"
                         }`}
                     >
-                      <Shuffle className="w-6 h-6" />
+                      <RxShuffle style={{ width: '24px', height: '24px' }} />
                     </Button>
 
                     <Button
-                      variant="ghost"
-                      size="lg"
+              
+                      size="xs"
                       onClick={handlePrevious}
                       disabled={playlist.length === 0}
-                      className="text-white hover:bg-white/10 rounded-full p-4"
+                      className="text-white/65 hover:text-white  hover:bg-transparent bg-transparent hover:cursor-pointer"
                     >
-                      <SkipBack className="w-7 h-7" />
+                      <BiSkipPrevious style={{ width: '44px', height: '44px' }} />
                     </Button>
 
                     <Button
                       variant="default"
                       size="lg"
                       onClick={onTogglePlayPause}
-                      className="rounded-full w-16 h-16 bg-white text-black hover:bg-white/90 hover:scale-105 transition-all duration-200"
+                      className="rounded-full w-16 h-16 bg-white text-black hover:bg-white/90 hover:scale-105 transition-all duration-200 hover:cursor-pointer"
                     >
                       {isPlaying ? (
-                        <Pause className="w-8 h-8" />
+                        <HiPause style={{ width: '24px', height: '24px' }} />
                       ) : (
-                        <Play className="w-8 h-8 ml-1" />
+                        <IoMdPlay style={{ width: '24px', height: '24px' }} className="ml-1" />
                       )}
                     </Button>
 
                     <Button
-                      variant="ghost"
-                      size="lg"
+                      
+                      size="xs"
                       onClick={handleNext}
                       disabled={playlist.length === 0}
-                      className="text-white hover:bg-white/10 rounded-full p-4"
+                      className="text-white/65 hover:text-white  hover:bg-transparent bg-transparent hover:cursor-pointer"
                     >
-                      <SkipForward className="w-7 h-7" />
+                      <BiSkipNext style={{ width: '44px', height: '44px' }} />
                     </Button>
 
                     <Button
-                      variant="ghost"
+                      
                       size="sm"
                       onClick={toggleRepeat}
-                      className={`text-white hover:bg-white/10 rounded-full p-3 relative ${repeatMode !== "off"
+                      className={`relative hover:bg-transparent bg-transparent hover:cursor-pointer ${repeatMode !== "off"
                         ? "text-green-400"
-                        : "text-white/60"
+                        : "text-white/65"
                         }`}
                     >
-                      <Repeat className="w-6 h-6" />
+                      <BsRepeat style={{ width: '24px', height: '24px' }} />
                       {repeatMode === "one" && (
                         <span className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full flex items-center justify-center text-xs text-black font-bold">
                           1
@@ -1518,9 +1588,9 @@ export function FullscreenMusicPlayer({
                       variant="ghost"
                       size="sm"
                       onClick={() => setShowPlaylist(!showPlaylist)}
-                      className="text-white/60 hover:bg-white/10 rounded-full p-3"
+                      className="text-white/60 hover:bg-white/10 rounded-full p-3 hover:cursor-pointer"
                     >
-                      <ListMusic className="w-6 h-6" />
+                      <ListMusic style={{ width: '18px', height: '18px' }} />
                     </Button>
 
                     <div className="flex items-center gap-3">
@@ -1528,7 +1598,7 @@ export function FullscreenMusicPlayer({
                         variant="ghost"
                         size="sm"
                         onClick={() => onVolumeChange([volume === 0 ? 0.7 : 0])}
-                        className="text-white/60 hover:bg-white/10 rounded-full p-3"
+                        className="text-white/60 hover:bg-white/10 rounded-full p-3 hover:cursor-pointer"
                       >
                         {volume === 0 ? (
                           <VolumeX className="w-5 h-5" />
@@ -1541,17 +1611,17 @@ export function FullscreenMusicPlayer({
                         max={1}
                         step={0.1}
                         onValueChange={onVolumeChange}
-                        className="w-24 [&_[role=slider]]:bg-white [&_[role=slider]]:border-white [&_.bg-primary]:bg-white/60"
+                        className="w-24 hover:cursor-pointer **:[[role=slider]]:bg-white **:[[role=slider]]:border-white [&_.bg-primary]:bg-white/60"
                       />
                     </div>
 
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-white/60 hover:bg-white/10 rounded-full p-3"
+                      className="text-white/60 hover:bg-white/10 rounded-full p-3 hover:cursor-pointer"
                       onClick={handleLyricsToggle}
                     >
-                      <Mic className="w-6 h-6" />
+                      <Mic style={{ width: '18px', height: '18px' }} />
                     </Button>
                   </div>
                 </div>
@@ -1604,7 +1674,7 @@ export function FullscreenMusicPlayer({
                           : ""
                         } ${draggedIndex === index ? "opacity-50 scale-95" : ""}`}
                     >
-                      <div className="w-12 h-12 rounded bg-white/10 overflow-hidden flex-shrink-0">
+                      <div className="w-12 h-12 rounded bg-white/10 overflow-hidden shrink-0">
                         {song.image?.length > 0 ? (
                           <img
                             src={
@@ -1622,7 +1692,7 @@ export function FullscreenMusicPlayer({
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            <Play className="w-4 h-4 text-white/50" />
+                            <IoMdPlay className="w-4 h-4 text-white/50" />
                           </div>
                         )}
                       </div>
@@ -1639,7 +1709,7 @@ export function FullscreenMusicPlayer({
                           {decodeHtmlEntities(getArtistNames(song))}
                         </p>
                       </div>
-                      <div className="flex-shrink-0 text-white/40">
+                      <div className="shrink-0 text-white/40">
                         <ArrowUpDown className="w-4 h-4" />
                       </div>
                     </div>
@@ -1709,7 +1779,7 @@ export function FullscreenMusicPlayer({
                         : ""
                       } ${draggedIndex === index ? "opacity-50 scale-95" : ""}`}
                   >
-                    <div className="w-12 h-12 rounded bg-white/10 overflow-hidden flex-shrink-0">
+                    <div className="w-12 h-12 rounded bg-white/10 overflow-hidden shrink-0">
                       {song.image?.length > 0 ? (
                         <img
                           src={
@@ -1725,7 +1795,7 @@ export function FullscreenMusicPlayer({
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <Play className="w-4 h-4 text-white/50" />
+                          <IoMdPlay className="w-4 h-4 text-white/50" />
                         </div>
                       )}
                     </div>
@@ -1742,7 +1812,7 @@ export function FullscreenMusicPlayer({
                         {decodeHtmlEntities(getArtistNames(song))}
                       </p>
                     </div>
-                    <div className="flex-shrink-0 text-white/40">
+                    <div className="shrink-0 text-white/40">
                       <ArrowUpDown className="w-3 h-3" />
                     </div>
                   </div>
@@ -1772,7 +1842,7 @@ export function FullscreenMusicPlayer({
 
         {/* Lyrics View - Full Screen Overlay */}
         {showLyrics && (
-          <div className="fixed inset-0 z-[110] overflow-hidden">
+          <div className="fixed inset-0 z-110 overflow-hidden">
             {/* Ambient Background */}
             <div className="absolute inset-0">
               {/* Multiple layered background images for ambient effect */}
@@ -1855,7 +1925,7 @@ export function FullscreenMusicPlayer({
                 <div className="md:hidden h-full flex flex-col">
                   {/* Album Art and Song Info */}
                   <div className="flex items-center gap-4 p-4 border-b border-white/5">
-                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-gradient-to-br from-gray-800 to-gray-900 flex-shrink-0">
+                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-linear-to-br from-gray-800 to-gray-900 shrink-0">
                       {currentSong.image?.length > 0 ? (
                         <img
                           src={
@@ -1873,7 +1943,7 @@ export function FullscreenMusicPlayer({
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <Play className="w-6 h-6 text-white/50" />
+                          <IoMdPlay className="w-6 h-6 text-white/50" />
                         </div>
                       )}
                     </div>
@@ -1889,12 +1959,12 @@ export function FullscreenMusicPlayer({
                       variant="default"
                       size="sm"
                       onClick={onTogglePlayPause}
-                      className="flex-shrink-0 rounded-full w-12 h-12 bg-green-500 hover:bg-green-600 text-black hover:scale-105 transition-all duration-200"
+                      className="shrink-0 rounded-full w-12 h-12 bg-green-500 hover:bg-green-600 text-black hover:scale-105 transition-all duration-200"
                     >
                       {isPlaying ? (
-                        <Pause className="w-5 h-5" />
+                        <HiPause style={{ width: '20px', height: '20px' }} />
                       ) : (
-                        <Play className="w-5 h-5 ml-0.5" />
+                        <IoMdPlay style={{ width: '20px', height: '20px' }} className="ml-0.5" />
                       )}
                     </Button>
                   </div>
@@ -2012,10 +2082,10 @@ export function FullscreenMusicPlayer({
                   <div className="flex items-center justify-center w-full px-8 py-8">
                     <div className="flex items-center gap-12 lg:gap-16 max-w-6xl w-full">
                       {/* Left Side - Album Art with Integrated Controls */}
-                      <div className="flex-shrink-0">
+                      <div className="shrink-0">
                         <div className="w-[350px] lg:w-[400px]">
                           {/* Album Art Container with Overlay Controls */}
-                          <div className="relative aspect-square rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-gray-800 to-gray-900 mb-6 group">
+                          <div className="relative aspect-square rounded-2xl overflow-hidden shadow-2xl bg-linear-to-br from-gray-800 to-gray-900 mb-6 group">
                             {currentSong.image?.[2]?.url ? (
                               <img
                                 src={currentSong.image[2].url}
@@ -2024,7 +2094,7 @@ export function FullscreenMusicPlayer({
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
-                                <Play className="w-16 h-16 text-white/50" />
+                                <IoMdPlay className="w-16 h-16 text-white/50" />
                               </div>
                             )}
 
@@ -2049,9 +2119,9 @@ export function FullscreenMusicPlayer({
                                     className="rounded-full w-14 h-14 bg-white text-black hover:bg-white/90 hover:scale-105 transition-all duration-200"
                                   >
                                     {isPlaying ? (
-                                      <Pause className="w-6 h-6" />
+                                      <HiPause style={{ width: '24px', height: '24px' }} />
                                     ) : (
-                                      <Play className="w-6 h-6 ml-0.5" />
+                                      <IoMdPlay style={{ width: '24px', height: '24px' }} className="ml-0.5" />
                                     )}
                                   </Button>
 
@@ -2076,7 +2146,7 @@ export function FullscreenMusicPlayer({
                                       max={duration || 100}
                                       step={1}
                                       onValueChange={onSeek}
-                                      className="w-full [&_[role=slider]]:bg-white [&_[role=slider]]:border-white [&_[role=slider]]:w-3 [&_[role=slider]]:h-3 [&_.bg-primary]:bg-white"
+                                      className="w-full **:[[role=slider]]:bg-white **:[[role=slider]]:border-white **:[[role=slider]]:w-3 **:[[role=slider]]:h-3 [&_.bg-primary]:bg-white"
                                     />
                                   </div>
                                   <span>{formatTime(duration)}</span>
@@ -2146,7 +2216,7 @@ export function FullscreenMusicPlayer({
                                               index
                                             ] = el)
                                             }
-                                            className={`text-xl lg:text-2xl transition-all duration-700 ease-out cursor-pointer hover:text-white/90 break-words transform will-change-transform ${isCurrentLine
+                                            className={`text-xl lg:text-2xl transition-all duration-700 ease-out cursor-pointer hover:text-white/90 wrap-break-word transform will-change-transform ${isCurrentLine
                                               ? "text-white font-bold text-2xl lg:text-3xl scale-105 blur-0 opacity-100"
                                               : isUpcomingLine
                                                 ? "text-white/85 font-medium text-xl lg:text-2xl blur-0 opacity-95 scale-100"
@@ -2193,7 +2263,7 @@ export function FullscreenMusicPlayer({
                                       .map((line, index) => (
                                         <p
                                           key={index}
-                                          className="text-xl lg:text-2xl text-white/70 hover:text-white/90 transition-colors cursor-pointer break-words"
+                                          className="text-xl lg:text-2xl text-white/70 hover:text-white/90 transition-colors cursor-pointer wrap-break-word"
                                         >
                                           {line.trim()}
                                         </p>

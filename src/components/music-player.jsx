@@ -317,6 +317,44 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     }
   }, [currentSong]);
 
+  // Handle mobile back button to close fullscreen player
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Only apply logic if the player is open
+    if (!isFullscreenOpen) return;
+
+    // Add a state to history so back button can close the player
+    // This allows the back button to close the player instead of navigating away
+    const stateKey = "isFullscreenMusicPlayer";
+
+    // Check if we already have this state to avoid duplicate pushes
+    if (!window.history.state?.[stateKey]) {
+      window.history.pushState({ [stateKey]: true }, "");
+    }
+
+    const handlePopState = (event) => {
+      // Only close if the specific state we pushed is no longer present
+      // This ensures sub-modals (like lyrics) can have their own history states
+      if (!window.history.state?.[stateKey] && isFullscreenOpen) {
+        setIsFullscreenOpen(false);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+
+      // If the player is closed via UI (onClose), we are still sitting on the 
+      // pushed history state. We need to go back one step to clean it up,
+      // but ONLY if the current state is ours (meaning popstate didn't already happen).
+      if (window.history.state?.[stateKey]) {
+        window.history.back();
+      }
+    };
+  }, [isFullscreenOpen, setIsFullscreenOpen]);
+
   useEffect(() => {
     if (currentSong && audioRef.current) {
       // Use only 320kbps quality audio URL
@@ -631,7 +669,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
       {/* Only show the bottom bar when fullscreen is NOT open */}
       {!isFullscreenOpen && (
-        <div className="fixed bottom-16 left-0 right-0 md:left-64 md:bottom-0 border-t border-border z-[60] md:bg-background">
+        <div className="fixed bottom-16 left-0 right-0 md:left-64 md:bottom-0 border-t border-border z-60 md:bg-background">
           {/* Mobile background - uses least dominant color from album cover */}
           <div
             className="block md:hidden absolute inset-0"
@@ -654,7 +692,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                     }`}
                   onClick={() => !isRadioPlaying && setIsFullscreenOpen(true)}
                 >
-                  <div className="w-10 h-10 rounded bg-muted flex-shrink-0 overflow-hidden">
+                  <div className="w-10 h-10 rounded bg-muted shrink-0 overflow-hidden">
                     {currentSong.image?.length > 0 ? (
                       <img
                         src={
@@ -758,7 +796,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                     }`}
                   onClick={() => !isRadioPlaying && setIsFullscreenOpen(true)}
                 >
-                  <div className="w-12 h-12 rounded bg-muted flex-shrink-0 overflow-hidden">
+                  <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
                     {currentSong.image?.length > 0 ? (
                       <img
                         src={
