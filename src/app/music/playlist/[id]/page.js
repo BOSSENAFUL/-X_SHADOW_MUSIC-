@@ -129,11 +129,39 @@ function PlaylistPageContent() {
     }
   }, [playlistId, songCount]);
 
-  // Effect to handle scroll and show/hide title in header
+  // Effect to handle scroll and smooth animations (highly optimized)
   useEffect(() => {
     const scrollContainer = document.getElementById('playlist-scroll-container');
     if (!scrollContainer) return;
 
+    let ticking = false;
+
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const isMobile = window.innerWidth < 768;
+
+          if (isMobile) {
+            const scrollTop = scrollContainer.scrollTop;
+            const imageThreshold = 350;
+            const headerToggleThreshold = 280;
+
+            const progress = Math.max(0, Math.min(1, scrollTop / imageThreshold));
+            scrollContainer.style.setProperty('--scroll-progress', progress.toString());
+
+            const shouldShow = scrollTop > headerToggleThreshold;
+            setShowHeaderTitle(prev => {
+              if (prev !== shouldShow) return shouldShow;
+              return prev;
+            });
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    // IntersectionObserver for PC ONLY
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -150,10 +178,13 @@ function PlaylistPageContent() {
       }
     );
 
-    if (mobileTitleRef.current) observer.observe(mobileTitleRef.current);
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+
+    // Only observe desktop title (Mobile handled manually above)
     if (desktopTitleRef.current) observer.observe(desktopTitleRef.current);
 
     return () => {
+      scrollContainer.removeEventListener('scroll', handleScroll);
       observer.disconnect();
     };
   }, [loading, songs.length]);
@@ -448,12 +479,20 @@ function PlaylistPageContent() {
                 : '#1D1046'
               : undefined
           }}
-          className={`sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b transition-all duration-300 ${showHeaderTitle
+          className={`fixed md:sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b transition-all duration-300 w-full ${showHeaderTitle
             ? "border-white/10"
-            : "bg-background border-transparent"
+            : "bg-transparent md:bg-background border-transparent"
             }`}
         >
-          <div className="flex items-center justify-between w-full gap-2 px-3 md:px-4">
+          {/* Optimized Mobile Background Layer */}
+          <div
+            className="absolute inset-0 -z-10 transition-opacity duration-150 ease-linear pointer-events-none md:hidden"
+            style={{
+              backgroundColor: dominantColor ? `color-mix(in srgb, ${dominantColor}, black 60%)` : '#1D1046',
+              opacity: 'var(--scroll-progress, 0)'
+            }}
+          />
+          <div className="flex items-center justify-between w-full gap-2 px-3 md:px-4 h-full relative z-10">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="-ml-1 hidden md:flex" />
               <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:flex" />
@@ -462,24 +501,44 @@ function PlaylistPageContent() {
                 <span className="hidden sm:inline">Back</span>
               </Button>
 
-              <div className="flex items-center gap-2 transition-all duration-300">
-                {showHeaderTitle ? (
-                  <h2 className="text-base font-bold animate-in fade-in slide-in-from-bottom-2 duration-300 line-clamp-1">
+              {/* Title Content Area (Properly separated for PC/Mobile) */}
+              <div className="flex-1 flex items-center h-full min-w-0 relative">
+                {/* PC Version: Minimal switch */}
+                <div className="hidden md:flex items-center h-full flex-1">
+                  {!showHeaderTitle ? (
+                    <div className="animate-in fade-in duration-200">
+                      <Breadcrumb>
+                        <BreadcrumbList>
+                          <BreadcrumbItem className="hidden lg:block">
+                            <BreadcrumbLink href="/music">Music</BreadcrumbLink>
+                          </BreadcrumbItem>
+                          <BreadcrumbSeparator className="hidden lg:block" />
+                          <BreadcrumbItem>
+                            <BreadcrumbPage>Playlist</BreadcrumbPage>
+                          </BreadcrumbItem>
+                        </BreadcrumbList>
+                      </Breadcrumb>
+                    </div>
+                  ) : (
+                    <h2 className="text-base font-bold line-clamp-1 animate-in fade-in slide-in-from-bottom-2 duration-300 text-white">
+                      {playlist.name}
+                    </h2>
+                  )}
+                </div>
+
+                {/* Mobile Version: Smooth fade + slide up */}
+                <div
+                  className="md:hidden flex items-center h-full flex-1 transition-all duration-300 pointer-events-none"
+                  style={{
+                    opacity: showHeaderTitle ? 1 : 0,
+                    transform: showHeaderTitle ? 'translate3d(0, 0, 0)' : 'translate3d(0, 8px, 0)',
+                    visibility: showHeaderTitle ? 'visible' : 'hidden'
+                  }}
+                >
+                  <h2 className="text-base font-bold line-clamp-1 text-white pr-4">
                     {playlist.name}
                   </h2>
-                ) : (
-                  <Breadcrumb>
-                    <BreadcrumbList>
-                      <BreadcrumbItem className="hidden md:block">
-                        <BreadcrumbLink href="/music">Music</BreadcrumbLink>
-                      </BreadcrumbItem>
-                      <BreadcrumbSeparator className="hidden md:block" />
-                      <BreadcrumbItem>
-                        <BreadcrumbPage>Playlist</BreadcrumbPage>
-                      </BreadcrumbItem>
-                    </BreadcrumbList>
-                  </Breadcrumb>
-                )}
+                </div>
               </div>
             </div>
           </div>
@@ -488,7 +547,7 @@ function PlaylistPageContent() {
         <div className="flex-1">
           {/* Playlist Header */}
           <div
-            className="p-4 md:p-6 text-white"
+            className="p-4 pt-8 md:p-6 text-white transition-colors duration-700"
             style={{
               background: dominantColor
                 ? `linear-gradient(to bottom, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.5)')} 0%, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.2)')} 100%)`
@@ -497,8 +556,21 @@ function PlaylistPageContent() {
           >
             {/* Mobile Layout */}
             <div className="block md:hidden">
-              <div className="flex flex-col items-center text-center space-y-4">
-                <div className="w-48 h-48 rounded-lg overflow-hidden bg-muted shrink-0">
+              <div
+                className="flex flex-col items-center text-center space-y-4"
+                style={{
+                  transform: 'translate3d(0, calc(var(--scroll-progress, 0) * -40px), 0)',
+                  opacity: 'calc(1 - var(--scroll-progress, 0))',
+                  willChange: 'transform, opacity'
+                }}
+              >
+                <div
+                  className="w-64 h-64 rounded-lg overflow-hidden shadow-2xl transition-transform duration-75 ease-out"
+                  style={{
+                    transform: 'scale(calc(1 - (var(--scroll-progress, 0) * 0.35)))',
+                    willChange: 'transform'
+                  }}
+                >
                   {playlist.image?.[2]?.url || playlist.image?.[1]?.url || playlist.image?.[0]?.url ? (
                     <img
                       src={playlist.image?.[2]?.url || playlist.image?.[1]?.url || playlist.image?.[0]?.url}
@@ -516,17 +588,16 @@ function PlaylistPageContent() {
                     />
                   )}
                 </div>
-                <div className="space-y-2">
-                  <Badge variant="secondary" className="mb-2">
-                    Public Playlist
-                  </Badge>
-                  <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word">
+                <div className="space-y-2 w-full">
+                  <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word text-start mt-2 line-clamp-1 w-full">
                     {playlist.name}
                   </h1>
-                  <p className="text-sm opacity-80">
-                    {playlist.subtitle || playlist.header_desc || "Curated playlist"}
-                  </p>
-                  <div className="flex items-center justify-center gap-1 text-sm flex-wrap">
+                  {(playlist.subtitle || playlist.header_desc) && (
+                    <p className="text-xs opacity-50 line-clamp-2 text-start">
+                      {playlist.subtitle || playlist.header_desc}
+                    </p>
+                  )}
+                  <div className="flex items-center justify-start gap-2 text-sm opacity-80">
                     <span className="font-semibold">JioSaavn</span>
                     <span>•</span>
                     <span>{playlist.songCount || songs.length} songs</span>
@@ -543,7 +614,7 @@ function PlaylistPageContent() {
 
             {/* Desktop Layout */}
             <div className="hidden md:flex gap-6 items-end">
-              <div className="w-60 h-60 rounded-lg overflow-hidden bg-muted shrink-0">
+              <div className="w-64 h-64 rounded-lg overflow-hidden bg-muted shrink-0 shadow-2xl">
                 {playlist.image?.[2]?.url || playlist.image?.[1]?.url || playlist.image?.[0]?.url ? (
                   <img
                     src={playlist.image?.[2]?.url || playlist.image?.[1]?.url || playlist.image?.[0]?.url}
@@ -562,16 +633,15 @@ function PlaylistPageContent() {
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <Badge variant="secondary" className="mb-2">
-                  Public Playlist
-                </Badge>
-                <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-4 wrap-break-word">
+                <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-2 wrap-break-word">
                   {playlist.name}
                 </h1>
-                <p className="text-sm opacity-80 mb-2">
-                  {playlist.subtitle || playlist.header_desc || "Curated playlist"}
-                </p>
-                <div className="flex items-center gap-1 text-sm">
+                {(playlist.subtitle || playlist.header_desc) && (
+                  <p className="text-base opacity-90 mb-4 line-clamp-2 max-w-2xl">
+                    {playlist.subtitle || playlist.header_desc}
+                  </p>
+                )}
+                <div className="flex items-center gap-2 text-sm opacity-80">
                   <span className="font-semibold">JioSaavn</span>
                   <span>•</span>
                   <span>{playlist.songCount || songs.length} songs</span>
@@ -588,7 +658,7 @@ function PlaylistPageContent() {
 
           {/* Controls */}
           <div
-            className="p-4 md:p-6"
+            className="p-4 md:p-6 transition-colors duration-700"
             style={{
               background: dominantColor
                 ? `linear-gradient(to bottom, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.2)')} 0%, transparent 100%)`
@@ -598,7 +668,7 @@ function PlaylistPageContent() {
             <div className="flex items-center gap-3 md:gap-4">
               <Button
                 size="lg"
-                className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-transform"
+                className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-all duration-500"
                 style={{
                   backgroundColor: dominantColor || '#ffffff',
                   boxShadow: dominantColor
@@ -613,14 +683,10 @@ function PlaylistPageContent() {
                   <Play className="w-5 h-5 md:w-6 md:h-6 ml-0.5 md:ml-1" />
                 )}
               </Button>
-              <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
-                <Shuffle className="w-5 h-5 md:w-6 md:h-6" />
-              </Button>
               <Button
                 variant="ghost"
                 size="lg"
-                className={`rounded-full w-10 h-10 md:w-12 md:h-12 ${isPlaylistLiked(playlistId) ? 'text-red-500' : ''
-                  }`}
+                className={`rounded-full w-10 h-10 md:w-12 md:h-12 transition-all duration-200 ${isPlaylistLiked(playlistId) ? 'text-red-500 hover:text-red-600 hover:scale-110' : 'text-white hover:text-red-500 hover:scale-110'}`}
                 onClick={async () => {
                   const result = await togglePlaylistLike({
                     id: playlistId,
@@ -632,7 +698,10 @@ function PlaylistPageContent() {
                   console.log(result.message);
                 }}
               >
-                <Heart className={`w-5 h-5 md:w-6 md:h-6 ${isPlaylistLiked(playlistId) ? 'fill-current' : ''}`} />
+                <Heart className={`w-5 h-5 md:w-6 md:h-6 transition-all duration-200 ${isPlaylistLiked(playlistId) ? 'fill-current' : ''}`} />
+              </Button>
+              <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
+                <Shuffle className="w-5 h-5 md:w-6 md:h-6" />
               </Button>
               <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
                 <MoreVertical className="w-5 h-5 md:w-6 md:h-6" />
