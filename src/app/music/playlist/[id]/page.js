@@ -33,6 +33,8 @@ import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useLikedPlaylists } from "@/hooks/useLikedPlaylists";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { AddToPlaylistDialog } from "@/components/playlists/AddToPlaylistDialog";
+import { HiPause } from "react-icons/hi2";
+import { IoMdPlay } from "react-icons/io";
 
 function PlaylistPageContent() {
   const router = useRouter();
@@ -746,9 +748,9 @@ function PlaylistPageContent() {
                 onClick={handlePlayAll}
               >
                 {currentPlaylistId === playlistId && isPlaying ? (
-                  <Pause className="w-5 h-5 md:w-6 md:h-6" />
+                  <HiPause style={{ width: '24px', height: '24px' }} />
                 ) : (
-                  <Play className="w-5 h-5 md:w-6 md:h-6 ml-0.5 md:ml-1" />
+                  <IoMdPlay style={{ width: '24px', height: '24px', marginLeft: '4px' }} />
                 )}
               </Button>
               <Button
@@ -823,13 +825,13 @@ function PlaylistPageContent() {
                             </div>
                           </div>
                         ) : isCurrentSong ? (
-                          <Play className="w-4 h-4 mx-auto text-green-500" />
+                          <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
                         ) : (
                           <>
                             <span className="text-muted-foreground group-hover:hidden text-sm">
                               {index + 1}
                             </span>
-                            <Play className="w-4 h-4 mx-auto hidden group-hover:block" />
+                            <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
                           </>
                         )}
                       </div>
@@ -849,7 +851,7 @@ function PlaylistPageContent() {
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            <Play className="w-4 h-4 opacity-50 text-white" />
+                            <IoMdPlay className="w-4 h-4 opacity-50 text-white" />
                           </div>
                         )}
                       </div>
@@ -952,13 +954,13 @@ function PlaylistPageContent() {
                             </div>
                           </div>
                         ) : isCurrentSong ? (
-                          <Play className="w-4 h-4 mx-auto text-green-500" />
+                          <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
                         ) : (
                           <>
                             <span className="text-muted-foreground group-hover:hidden">
                               {index + 1}
                             </span>
-                            <Play className="w-4 h-4 mx-auto hidden group-hover:block" />
+                            <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
                           </>
                         )}
                       </div>
@@ -979,7 +981,7 @@ function PlaylistPageContent() {
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
-                              <Play className="w-4 h-4 opacity-50 text-white" />
+                              <IoMdPlay className="w-4 h-4 opacity-50 text-white" />
                             </div>
                           )}
                         </div>

@@ -32,6 +32,8 @@ import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { AddToPlaylistDialog } from "@/components/playlists/AddToPlaylistDialog";
 import { toast } from "sonner";
+import { HiPause } from "react-icons/hi2";
+import { IoMdPlay } from "react-icons/io";
 
 export default function FavoritesPage() {
   const router = useRouter();
@@ -553,9 +555,9 @@ export default function FavoritesPage() {
                 disabled={likedSongs.length === 0}
               >
                 {currentPlaylistId === 'favorites' && isPlaying ? (
-                  <Pause className="w-5 h-5 md:w-6 md:h-6" />
+                  <HiPause style={{ width: '24px', height: '24px' }} />
                 ) : (
-                  <Play className="w-5 h-5 md:w-6 md:h-6 ml-0.5 md:ml-1" />
+                  <IoMdPlay style={{ width: '24px', height: '24px', marginLeft: '4px' }} />
                 )}
               </Button>
               <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
@@ -632,13 +634,13 @@ export default function FavoritesPage() {
                                 </div>
                               </div>
                             ) : isCurrentSong ? (
-                              <Play className="w-4 h-4 mx-auto text-green-500" />
+                              <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
                             ) : (
                               <>
                                 <span className="text-muted-foreground group-hover:hidden text-sm">
                                   {index + 1}
                                 </span>
-                                <Play className="w-4 h-4 mx-auto hidden group-hover:block" />
+                                <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
                               </>
                             )}
                           </div>
@@ -658,7 +660,7 @@ export default function FavoritesPage() {
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
-                                <Play className="w-4 h-4 opacity-50 text-white" />
+                                <IoMdPlay className="w-4 h-4 opacity-50 text-white" />
                               </div>
                             )}
                           </div>
@@ -773,13 +775,13 @@ export default function FavoritesPage() {
                                 </div>
                               </div>
                             ) : isCurrentSong ? (
-                              <Play className="w-4 h-4 mx-auto text-green-500" />
+                              <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
                             ) : (
                               <>
                                 <span className="text-muted-foreground group-hover:hidden">
                                   {index + 1}
                                 </span>
-                                <Play className="w-4 h-4 mx-auto hidden group-hover:block" />
+                                <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
                               </>
                             )}
                           </div>
@@ -800,7 +802,7 @@ export default function FavoritesPage() {
                                 />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center">
-                                  <Play className="w-4 h-4 opacity-50 text-white" />
+                                  <IoMdPlay className="w-4 h-4 opacity-50 text-white" />
                                 </div>
                               )}
                             </div>

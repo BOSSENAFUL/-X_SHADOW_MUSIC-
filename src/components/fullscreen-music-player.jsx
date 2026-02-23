@@ -37,6 +37,13 @@ import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useSession } from "next-auth/react";
 import { AddToPlaylistDialog } from "@/components/playlists/AddToPlaylistDialog";
 import { toast } from "sonner";
+import { IoMdPlay } from "react-icons/io";
+import { HiPause } from "react-icons/hi2";
+import { BiSkipNext, BiSkipPrevious } from "react-icons/bi";
+import { RxShuffle } from "react-icons/rx";
+import { BsRepeat } from "react-icons/bs";
+
+
 
 export function FullscreenMusicPlayer({
   currentSong,
@@ -51,6 +58,7 @@ export function FullscreenMusicPlayer({
   volume,
   onVolumeChange,
   onSeek,
+  onSeekCommit,
   onTogglePlayPause,
   onPrevious,
   onNext,
@@ -1075,8 +1083,8 @@ export function FullscreenMusicPlayer({
                 >
                   <Heart
                     className={`w-4 h-4 mr-2 transition-colors duration-150 ${getCurrentLikeState()
-                        ? "fill-red-500 text-red-500"
-                        : ""
+                      ? "fill-red-500 text-red-500"
+                      : ""
                       }`}
                   />
                   {isLikeLoading ? "..." : getCurrentLikeState() ? "Unlike" : "Like"}
@@ -1205,8 +1213,8 @@ export function FullscreenMusicPlayer({
             <div className="md:hidden flex-1 flex flex-col min-h-0">
               {/* Album Art Container - Responsive sizing */}
               <div className="flex-1 flex items-center justify-center py-4 sm:py-8 min-h-0">
-                <div className="w-full max-w-[280px] min-[400px]:max-w-[340px] min-[430px]:max-w-[380px] sm:max-w-[85%] md:max-w-[90%] lg:max-w-[500px] px-2 sm:px-4">
-                  <div className="aspect-square rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-gray-800 to-gray-900">
+                <div className="w-full max-w-[380px] min-[400px]:max-w-[340px] min-[430px]:max-w-[380px] sm:max-w-[85%] md:max-w-[90%] lg:max-w-[500px] px-2 sm:px-4">
+                  <div className="aspect-square overflow-hidden shadow-2xl bg-linear-to-br from-gray-800 to-gray-900">
                     {currentSong.image?.[2]?.url ? (
                       <img
                         src={currentSong.image[2].url}
@@ -1215,7 +1223,7 @@ export function FullscreenMusicPlayer({
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <Play className="w-12 h-12 sm:w-16 sm:h-16 text-white/50" />
+                        <IoMdPlay className="w-12 h-12 sm:w-16 sm:h-16 text-white/50" />
                       </div>
                     )}
                   </div>
@@ -1223,7 +1231,7 @@ export function FullscreenMusicPlayer({
               </div>
 
               {/* Song Info - Compact for small screens */}
-              <div className="px-4 pb-4 flex-shrink-0">
+              <div className="px-4 pb-4 shrink-0">
                 <div className="flex items-center justify-between mb-3 sm:mb-4">
                   <div className="flex-1 min-w-0">
                     <h1 className="text-lg sm:text-xl font-bold text-white mb-1 truncate">
@@ -1241,8 +1249,8 @@ export function FullscreenMusicPlayer({
                     onClick={handleLikeToggle}
                     disabled={isLikeLoading}
                     className={`flex-shrink-0 ml-4 p-2 transform-gpu will-change-transform ${getCurrentLikeState()
-                        ? "text-green-500"
-                        : "text-white/60"
+                      ? "text-green-500"
+                      : "text-white/60"
                       }`}
                     style={{
                       backfaceVisibility: 'hidden',
@@ -1263,7 +1271,8 @@ export function FullscreenMusicPlayer({
                     max={duration || 100}
                     step={1}
                     onValueChange={onSeek}
-                    className="w-full [&_[role=slider]]:bg-white [&_[role=slider]]:border-white [&_[role=slider]]:w-4 [&_[role=slider]]:h-4 [&_.bg-primary]:bg-white"
+                    onValueCommit={onSeekCommit}
+                    className="w-full **:data-[slot=slider-thumb]:opacity-100 **:data-[slot=slider-thumb]:bg-white **:data-[slot=slider-thumb]:w-2.5 **:data-[slot=slider-thumb]:h-2.5 **:data-[slot=slider-range]:bg-white **:data-[slot=slider-track]:bg-white/20"
                   />
                   <div className="flex justify-between text-xs sm:text-sm text-white/60 mt-2">
                     <span>{formatTime(currentTime)}</span>
@@ -1272,7 +1281,7 @@ export function FullscreenMusicPlayer({
                 </div>
 
                 {/* Controls - Compact spacing for small screens */}
-                <div className="flex items-center justify-center gap-4 sm:gap-8 mb-4 sm:mb-6">
+                <div className="flex items-center justify-between gap-4 sm:gap-8 mb-4 sm:mb-6">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1280,17 +1289,18 @@ export function FullscreenMusicPlayer({
                     className={`p-2 ${isShuffled ? "text-green-400" : "text-white/60"
                       }`}
                   >
-                    <Shuffle className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <RxShuffle  style={{ width: '24px', height: '24px' }}/>
                   </Button>
 
+<div className="flex items-center gap-5">
+
                   <Button
-                    variant="ghost"
-                    size="lg"
+                    size="xs"
                     onClick={handlePrevious}
                     disabled={playlist.length === 0}
-                    className="text-white p-2"
+                    className="text-white  hover:bg-transparent bg-transparent"
                   >
-                    <SkipBack className="w-6 h-6 sm:w-7 sm:h-7" />
+                   <BiSkipPrevious style={{ width: '44px', height: '44px' }} />
                   </Button>
 
                   <Button
@@ -1300,21 +1310,22 @@ export function FullscreenMusicPlayer({
                     className="rounded-full w-14 h-14 sm:w-16 sm:h-16 bg-white text-black hover:bg-white/90"
                   >
                     {isPlaying ? (
-                      <Pause className="w-7 h-7 sm:w-8 sm:h-8" />
+                      <HiPause style={{ width: '24px', height: '24px' }} />
                     ) : (
-                      <Play className="w-7 h-7 sm:w-8 sm:h-8 ml-0.5" />
+                      <IoMdPlay style={{ width: '24px', height: '24px', marginLeft: '4px' }} />
                     )}
                   </Button>
 
                   <Button
-                    variant="ghost"
-                    size="lg"
+                    size="xs"
                     onClick={handleNext}
                     disabled={playlist.length === 0}
-                    className="text-white p-2"
+                    className="text-white  hover:bg-transparent bg-transparent"
                   >
-                    <SkipForward className="w-6 h-6 sm:w-7 sm:h-7" />
+                    <BiSkipNext style={{ width: '44px', height: '44px' }} />
                   </Button>
+</div>
+
 
                   <Button
                     variant="ghost"
@@ -1323,7 +1334,7 @@ export function FullscreenMusicPlayer({
                     className={`relative p-2 ${repeatMode !== "off" ? "text-green-400" : "text-white/60"
                       }`}
                   >
-                    <Repeat className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <BsRepeat  style={{ width: '24px', height: '24px' }} />
                     {repeatMode === "one" && (
                       <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full flex items-center justify-center text-xs text-black font-bold">
                         1
@@ -1333,14 +1344,14 @@ export function FullscreenMusicPlayer({
                 </div>
 
                 {/* Bottom Actions - Always visible with proper spacing */}
-                <div className="flex items-center justify-between px-2">
+                <div className="flex items-center justify-between ">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowPlaylist(!showPlaylist)}
                     className="text-white/60 hover:text-white p-3 rounded-full hover:bg-white/10"
                   >
-                    <ListMusic className="w-5 h-5 sm:w-6 sm:h-6" />
+                    <ListMusic style={{ width: '18px', height: '18px' }}/>
                   </Button>
 
                   <Button
@@ -1349,7 +1360,7 @@ export function FullscreenMusicPlayer({
                     className="text-white/60 hover:text-white p-3 rounded-full hover:bg-white/10"
                     onClick={handleLyricsToggle}
                   >
-                    <Mic className="w-5 h-5 sm:w-6 sm:h-6" />
+                    <Mic style={{ width: '18px', height: '18px' }} />
                   </Button>
                 </div>
               </div>
@@ -1406,8 +1417,8 @@ export function FullscreenMusicPlayer({
                         onClick={handleLikeToggle}
                         disabled={isLikeLoading}
                         className={`flex-shrink-0 text-white hover:bg-white/10 rounded-full p-3 transform-gpu will-change-transform ${getCurrentLikeState()
-                            ? "text-green-500"
-                            : "text-white/60"
+                          ? "text-green-500"
+                          : "text-white/60"
                           }`}
                         style={{
                           backfaceVisibility: 'hidden',
@@ -1428,7 +1439,8 @@ export function FullscreenMusicPlayer({
                         max={duration || 100}
                         step={1}
                         onValueChange={onSeek}
-                        className="w-full [&_[role=slider]]:bg-white [&_[role=slider]]:border-white [&_[role=slider]]:w-5 [&_[role=slider]]:h-5 [&_.bg-primary]:bg-white"
+                        onValueCommit={onSeekCommit}
+                        className="w-full **:data-[slot=slider-thumb]:opacity-100 **:data-[slot=slider-thumb]:bg-white **:data-[slot=slider-thumb]:w-3 **:data-[slot=slider-thumb]:h-3 **:data-[slot=slider-range]:bg-white **:data-[slot=slider-track]:bg-white/20"
                       />
                       <div className="flex justify-between text-base text-white/60 mt-3">
                         <span>{formatTime(currentTime)}</span>
@@ -1487,8 +1499,8 @@ export function FullscreenMusicPlayer({
                       size="sm"
                       onClick={toggleRepeat}
                       className={`text-white hover:bg-white/10 rounded-full p-3 relative ${repeatMode !== "off"
-                          ? "text-green-400"
-                          : "text-white/60"
+                        ? "text-green-400"
+                        : "text-white/60"
                         }`}
                     >
                       <Repeat className="w-6 h-6" />
@@ -1617,8 +1629,8 @@ export function FullscreenMusicPlayer({
                       <div className="flex-1 min-w-0">
                         <p
                           className={`font-medium truncate text-base ${song.id === currentSong.id
-                              ? "text-green-400"
-                              : "text-white"
+                            ? "text-green-400"
+                            : "text-white"
                             }`}
                         >
                           {decodeHtmlEntities(song.name)}
@@ -1720,8 +1732,8 @@ export function FullscreenMusicPlayer({
                     <div className="flex-1 min-w-0">
                       <p
                         className={`font-medium truncate text-sm ${song.id === currentSong.id
-                            ? "text-green-400"
-                            : "text-white"
+                          ? "text-green-400"
+                          : "text-white"
                           }`}
                       >
                         {decodeHtmlEntities(song.name)}
@@ -1933,12 +1945,12 @@ export function FullscreenMusicPlayer({
                                         el)
                                       }
                                       className={`text-lg transition-all duration-700 ease-out transform will-change-transform ${isCurrentLine
-                                          ? "text-white font-bold text-xl scale-105 blur-0 opacity-100"
-                                          : isUpcomingLine
-                                            ? "text-white/80 font-medium blur-0 opacity-90 scale-100"
-                                            : isPreviousLine
-                                              ? "text-white/60 blur-[0.5px] opacity-70 scale-95"
-                                              : "text-white/40 blur-[1px] opacity-50 scale-90"
+                                        ? "text-white font-bold text-xl scale-105 blur-0 opacity-100"
+                                        : isUpcomingLine
+                                          ? "text-white/80 font-medium blur-0 opacity-90 scale-100"
+                                          : isPreviousLine
+                                            ? "text-white/60 blur-[0.5px] opacity-70 scale-95"
+                                            : "text-white/40 blur-[1px] opacity-50 scale-90"
                                         }`}
                                       style={{
                                         filter: isCurrentLine
@@ -2135,12 +2147,12 @@ export function FullscreenMusicPlayer({
                                             ] = el)
                                             }
                                             className={`text-xl lg:text-2xl transition-all duration-700 ease-out cursor-pointer hover:text-white/90 break-words transform will-change-transform ${isCurrentLine
-                                                ? "text-white font-bold text-2xl lg:text-3xl scale-105 blur-0 opacity-100"
-                                                : isUpcomingLine
-                                                  ? "text-white/85 font-medium text-xl lg:text-2xl blur-0 opacity-95 scale-100"
-                                                  : isPreviousLine
-                                                    ? "text-white/65 blur-[0.5px] opacity-75 scale-98"
-                                                    : "text-white/45 blur-[1px] opacity-60 scale-95"
+                                              ? "text-white font-bold text-2xl lg:text-3xl scale-105 blur-0 opacity-100"
+                                              : isUpcomingLine
+                                                ? "text-white/85 font-medium text-xl lg:text-2xl blur-0 opacity-95 scale-100"
+                                                : isPreviousLine
+                                                  ? "text-white/65 blur-[0.5px] opacity-75 scale-98"
+                                                  : "text-white/45 blur-[1px] opacity-60 scale-95"
                                               }`}
                                             style={{
                                               filter: isCurrentLine

@@ -6,6 +6,10 @@ import { Slider } from "@/components/ui/slider";
 import { Play, Pause, SkipBack, SkipForward, Volume2 } from "lucide-react";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { FullscreenMusicPlayer } from "@/components/fullscreen-music-player";
+import { IoMdPlay } from "react-icons/io";
+import { HiPause } from "react-icons/hi2";
+import { BiSkipNext, BiSkipPrevious } from "react-icons/bi";
+
 
 export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   const {
@@ -19,7 +23,10 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.7);
   const [dominantColor, setDominantColor] = useState("rgb(40, 40, 40)"); // Default dark color
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  const [wasPlayingBeforeScrub, setWasPlayingBeforeScrub] = useState(false);
   const audioRef = useRef(null);
+  const isScrubbingRef = useRef(false);
 
   // Find current song index in playlist
   const currentIndex =
@@ -67,6 +74,32 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     if (audioRef.current) {
       audioRef.current.currentTime = value[0];
       setCurrentTime(value[0]);
+    }
+  };
+
+  const handleSeekChange = (value) => {
+    if (!isScrubbingRef.current) {
+      isScrubbingRef.current = true;
+      setIsScrubbing(true);
+      setWasPlayingBeforeScrub(isPlaying);
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      }
+    }
+    setCurrentTime(value[0]);
+  };
+
+  const handleSeekCommit = (value) => {
+    isScrubbingRef.current = false;
+    setIsScrubbing(false);
+    if (audioRef.current) {
+      audioRef.current.currentTime = value[0];
+      setCurrentTime(value[0]);
+      if (wasPlayingBeforeScrub) {
+        audioRef.current.play();
+        setIsPlaying(true);
+      }
     }
   };
 
@@ -316,6 +349,9 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     if (!audio) return;
 
     const updateTime = () => {
+      // Don't update current time from audio if user is scrubbing
+      if (isScrubbingRef.current) return;
+
       const newTime = audio.currentTime;
       setCurrentTime(newTime);
 
@@ -636,7 +672,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <Play className="w-3 h-3 opacity-50 text-white" />
+                        <IoMdPlay className="w-3 h-3 opacity-50 text-white" />
                       </div>
                     )}
                   </div>
@@ -660,7 +696,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                     disabled={playlist.length === 0}
                     className="h-8 w-8 p-0 text-white hover:bg-white/20 hover:text-white"
                   >
-                    <SkipBack className="w-4 h-4" />
+                    <BiSkipPrevious style={{ width: '24px', height: '24px' }} />
                   </Button>
 
                   <Button
@@ -670,9 +706,9 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                     className="rounded-full w-10 h-10 p-0 bg-white/90 hover:bg-white text-black hover:text-black"
                   >
                     {isPlaying ? (
-                      <Pause className="w-4 h-4" />
+                      <HiPause className="text-black" style={{ width: '20px', height: '20px' }} />
                     ) : (
-                      <Play className="w-4 h-4 ml-0.5" />
+                      <IoMdPlay style={{ width: '18px', height: '18px', marginLeft: '4px', }} className="text-black" />
                     )}
                   </Button>
 
@@ -683,13 +719,23 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                     disabled={playlist.length === 0}
                     className="h-8 w-8 p-0 text-white hover:bg-white/20 hover:text-white"
                   >
-                    <SkipForward className="w-4 h-4" />
+                    <BiSkipNext style={{ width: '24px', height: '24px' }} />
                   </Button>
                 </div>
               </div>
 
-              {/* Bottom row: Thin progress bar for mobile */}
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 z-10 px-4">
+              {/* Bottom row: Slim interactive progress bar for mobile */}
+              <div
+                className="absolute bottom-0 left-0 right-0 h-0.5 z-10 px-4 cursor-pointer"
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const clickX = e.clientX - rect.left - 16; // Account for padding
+                  const width = rect.width - 32; // Account for padding on both sides
+                  const percentage = Math.max(0, Math.min(1, clickX / width));
+                  const newTime = percentage * (duration || 0);
+                  handleSeek([newTime]);
+                }}
+              >
                 <div className="w-full h-full bg-white/10">
                   <div
                     className="h-full bg-white transition-all duration-300 ease-out"
@@ -730,7 +776,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <Play className="w-4 h-4 opacity-50 text-white" />
+                        <IoMdPlay className="w-4 h-4 opacity-50 text-white" />
                       </div>
                     )}
                   </div>
@@ -747,36 +793,35 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
                 {/* Controls */}
                 <div className="flex flex-col items-center gap-2 flex-1 max-w-md">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     <Button
-                      variant="ghost"
                       size="sm"
                       onClick={handlePrevious}
                       disabled={playlist.length === 0}
+                      className="hover:bg-transparent bg-transparent hover:scale-105 group hover:cursor-pointer"
                     >
-                      <SkipBack className="w-4 h-4" />
+                      <BiSkipPrevious style={{ width: '34px', height: '34px' }} className="text-white/65 group-hover:text-white" />
                     </Button>
 
                     <Button
-                      variant="default"
                       size="sm"
                       onClick={togglePlayPause}
-                      className="rounded-full w-8 h-8"
+                      className="rounded-full w-8 h-8 bg-white hover:bg-white hover:scale-105 transition-transform hover:cursor-pointer"
                     >
                       {isPlaying ? (
-                        <Pause className="w-4 h-4" />
+                        <HiPause className="text-black" style={{ width: '20px', height: '20px' }} />
                       ) : (
-                        <Play className="w-4 h-4 ml-0.5" />
+                        <IoMdPlay style={{ width: '18px', height: '18px', marginLeft: '4px', }} className="text-black" />
                       )}
                     </Button>
 
                     <Button
-                      variant="ghost"
                       size="sm"
                       onClick={handleNext}
                       disabled={playlist.length === 0}
+                      className="hover:bg-transparent bg-transparent hover:scale-105 group hover:cursor-pointer"
                     >
-                      <SkipForward className="w-4 h-4" />
+                      <BiSkipNext style={{ width: '34px', height: '34px' }} className="text-white/65 group-hover:text-white" />
                     </Button>
                   </div>
 
@@ -785,13 +830,16 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                     <span className="text-xs text-muted-foreground min-w-[35px]">
                       {formatTime(currentTime)}
                     </span>
-                    <Slider
-                      value={[currentTime]}
-                      max={duration || 100}
-                      step={1}
-                      onValueChange={handleSeek}
-                      className="flex-1"
-                    />
+                    <div className="flex-1">
+                      <Slider
+                        value={[currentTime]}
+                        max={duration || 100}
+                        step={1}
+                        onValueChange={handleSeekChange}
+                        onValueCommit={handleSeekCommit}
+                        className="w-full cursor-pointer"
+                      />
+                    </div>
                     <span className="text-xs text-muted-foreground min-w-[35px]">
                       {currentSong?.isRadio || !isFinite(duration)
                         ? "LIVE"
@@ -808,7 +856,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                     max={1}
                     step={0.1}
                     onValueChange={handleVolumeChange}
-                    className="w-24"
+                    className="w-24 hover:cursor-pointer"
                   />
                 </div>
               </div>
@@ -829,7 +877,8 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
         duration={duration}
         volume={volume}
         onVolumeChange={handleVolumeChange}
-        onSeek={handleSeek}
+        onSeek={handleSeekChange}
+        onSeekCommit={handleSeekCommit}
         onTogglePlayPause={togglePlayPause}
         onPrevious={handlePrevious}
         onNext={handleNext}

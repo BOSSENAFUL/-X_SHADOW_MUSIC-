@@ -31,6 +31,8 @@ import {
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { AddToPlaylistDialog } from "@/components/playlists/AddToPlaylistDialog";
+import { IoMdPlay } from "react-icons/io";
+import { HiPause } from "react-icons/hi2";
 
 export default function ArtistPage() {
   const router = useRouter();
@@ -606,9 +608,9 @@ export default function ArtistPage() {
                 onClick={handlePlayAll}
               >
                 {currentPlaylistId === artistId && isPlaying ? (
-                  <Pause className="w-5 h-5 md:w-6 md:h-6" />
+                  <HiPause style={{ width: '24px', height: '24px' }} />
                 ) : (
-                  <Play className="w-5 h-5 md:w-6 md:h-6 ml-0.5 md:ml-1" />
+                  <IoMdPlay style={{ width: '24px', height: '24px', marginLeft: '4px' }} />
                 )}
               </Button>
               <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
@@ -655,13 +657,13 @@ export default function ArtistPage() {
                               </div>
                             </div>
                           ) : isCurrentSong ? (
-                            <Play className="w-4 h-4 mx-auto text-green-500" />
+                            <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
                           ) : (
                             <>
                               <span className="text-muted-foreground group-hover:hidden text-sm">
                                 {index + 1}
                               </span>
-                              <Play className="w-4 h-4 mx-auto hidden group-hover:block" />
+                              <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
                             </>
                           )}
                         </div>
@@ -681,7 +683,7 @@ export default function ArtistPage() {
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
-                              <Play className="w-4 h-4 opacity-50 text-white" />
+                              <IoMdPlay className="w-4 h-4 opacity-50 text-white" />
                             </div>
                           )}
                         </div>
@@ -787,16 +789,16 @@ export default function ArtistPage() {
                             }}
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-white">
-                            <Play className="w-8 h-8 md:w-12 md:h-12 opacity-50" />
+                          <div className="w-full h-full flex items-center justify-center text-black">
+                            <IoMdPlay className="w-8 h-8 md:w-12 md:h-12 opacity-50" />
                           </div>
                         )}
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
                         <Button
                           size="icon"
-                          className="absolute bottom-1 right-1 md:bottom-2 md:right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-green-500 hover:bg-green-600 rounded-full shadow-lg w-8 h-8 md:w-10 md:h-10"
+                          className="absolute bottom-1 right-1 md:bottom-2 md:right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-green-500 hover:bg-green-600 rounded-full shadow-lg w-8 h-8 md:w-10 md:h-10 flex items-center justify-center"
                         >
-                          <Play className="w-3 h-3 md:w-4 md:h-4" />
+                          <IoMdPlay className="w-3 h-3 md:w-4 md:h-4 text-black ml-0.5" />
                         </Button>
                       </div>
                       <div className="space-y-1">
