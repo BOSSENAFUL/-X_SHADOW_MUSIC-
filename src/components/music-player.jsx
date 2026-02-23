@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Play, Pause, SkipBack, SkipForward, Volume2 } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { FullscreenMusicPlayer } from "@/components/fullscreen-music-player";
 import { IoMdPlay } from "react-icons/io";
@@ -22,6 +22,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.7);
+  const [prevVolume, setPrevVolume] = useState(0.7);
   const [dominantColor, setDominantColor] = useState("rgb(40, 40, 40)"); // Default dark color
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [wasPlayingBeforeScrub, setWasPlayingBeforeScrub] = useState(false);
@@ -108,6 +109,25 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     setVolume(newVolume);
     if (audioRef.current) {
       audioRef.current.volume = newVolume;
+    }
+    if (newVolume > 0) {
+      setPrevVolume(newVolume);
+    }
+  };
+
+  const toggleMute = () => {
+    if (volume > 0) {
+      setPrevVolume(volume);
+      setVolume(0);
+      if (audioRef.current) {
+        audioRef.current.volume = 0;
+      }
+    } else {
+      const restoredVolume = prevVolume > 0 ? prevVolume : 0.7;
+      setVolume(restoredVolume);
+      if (audioRef.current) {
+        audioRef.current.volume = restoredVolume;
+      }
     }
   };
 
@@ -728,20 +748,19 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                 {/* Mobile Controls */}
                 <div className="flex items-center gap-1">
                   <Button
-                    variant="ghost"
-                    size="sm"
+                    size="xm"
                     onClick={handlePrevious}
                     disabled={playlist.length === 0}
-                    className="h-8 w-8 p-0 text-white hover:bg-white/20 hover:text-white"
+                    className="bg-transparent hover:bg-transparent hover:cursor-pointer"
                   >
-                    <BiSkipPrevious style={{ width: '24px', height: '24px' }} />
+                    <BiSkipPrevious style={{ width: '32px', height: '32px' }} className="text-white/80" />
                   </Button>
 
                   <Button
                     variant="default"
                     size="sm"
                     onClick={togglePlayPause}
-                    className="rounded-full w-10 h-10 p-0 bg-white/90 hover:bg-white text-black hover:text-black"
+                    className="rounded-full w-10 h-10 p-0 bg-white/80 hover:bg-white text-black hover:text-black hover:cursor-pointer"
                   >
                     {isPlaying ? (
                       <HiPause className="text-black" style={{ width: '20px', height: '20px' }} />
@@ -751,13 +770,12 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                   </Button>
 
                   <Button
-                    variant="ghost"
-                    size="sm"
+                    size="xm"
                     onClick={handleNext}
                     disabled={playlist.length === 0}
-                    className="h-8 w-8 p-0 text-white hover:bg-white/20 hover:text-white"
+                    className="bg-transparent hover:bg-transparent hover:cursor-pointer"
                   >
-                    <BiSkipNext style={{ width: '24px', height: '24px' }} />
+                    <BiSkipNext style={{ width: '32px', height: '32px' }} className="text-white/80" />
                   </Button>
                 </div>
               </div>
@@ -888,7 +906,19 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
                 {/* Volume */}
                 <div className="flex items-center gap-2 flex-1 justify-end">
-                  <Volume2 className="w-4 h-4" />
+                  {volume === 0 ? (
+                    <VolumeX
+                      style={{ width: '20px', height: '20px' }}
+                      className="cursor-pointer hover:text-white transition-colors"
+                      onClick={toggleMute}
+                    />
+                  ) : (
+                    <Volume2
+                      style={{ width: '20px', height: '20px' }}
+                      className="cursor-pointer hover:text-white transition-colors"
+                      onClick={toggleMute}
+                    />
+                  )}
                   <Slider
                     value={[volume]}
                     max={1}

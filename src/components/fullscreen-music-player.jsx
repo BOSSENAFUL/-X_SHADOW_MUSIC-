@@ -1601,9 +1601,9 @@ export function FullscreenMusicPlayer({
                         className="text-white/60 hover:bg-white/10 rounded-full p-3 hover:cursor-pointer"
                       >
                         {volume === 0 ? (
-                          <VolumeX className="w-5 h-5" />
+                          <VolumeX style={{ width: '20px', height: '20px' }} />
                         ) : (
-                          <Volume2 className="w-5 h-5" />
+                          <Volume2 style={{ width: '20px', height: '20px' }} />
                         )}
                       </Button>
                       <Slider
