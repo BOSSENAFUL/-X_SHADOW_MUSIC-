@@ -6,7 +6,7 @@ import RecentlyPlayedPlaylist from '@/models/RecentlyPlayedPlaylist';
 
 /**
  * GET /api/recently-played-playlists
- * Returns up to 5 recently played playlists for the logged-in user.
+ * Returns recently played playlists for the logged-in user (up to 50).
  */
 export async function GET(request) {
     try {
@@ -35,7 +35,7 @@ export async function GET(request) {
 
 /**
  * POST /api/recently-played-playlists
- * Records a playlist as recently played (keeps only 5 most recent).
+ * Records a playlist as recently played (keeps the 50 most recent).
  *
  * Body:
  * {

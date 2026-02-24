@@ -8,17 +8,26 @@ import { useSession } from "next-auth/react";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { trackRecentlyPlayed } from "@/lib/track-playlist";
 
-export function PlaylistCard({ playlist, onClick }) {
+export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
     const [isHovered, setIsHovered] = useState(false);
-    const [playingId, setPlayingId] = useState(null);
+    const [localPlayingId, setLocalPlayingId] = useState(null);
     const { data: session } = useSession();
     const { playSong } = useMusicPlayer();
+
+    const currentPlayingId = externalPlayingId || localPlayingId;
+    const id = playlist.id || playlist.playlistId;
 
     const handlePlaylistPlay = async (e) => {
         e.stopPropagation();
         const pid = playlist.id || playlist.playlistId;
-        if (playingId === pid) return;
-        setPlayingId(pid);
+        if (currentPlayingId === pid) return;
+
+        if (onPlay) {
+            onPlay(playlist, e);
+            return;
+        }
+
+        setLocalPlayingId(pid);
 
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -54,11 +63,19 @@ export function PlaylistCard({ playlist, onClick }) {
         } catch (err) {
             console.error('Error playing playlist from card:', err);
         } finally {
-            setPlayingId(null);
+            setLocalPlayingId(null);
         }
     };
 
-    const id = playlist.id || playlist.playlistId;
+    // Detect collage images from image array if collageImages is missing
+    let collageDisplayImages = playlist.collageImages || [];
+    if (collageDisplayImages.length < 4 && Array.isArray(playlist.image) && playlist.image.length >= 4) {
+        // If it's a user playlist or they all have 'default' quality, it's likely a collage
+        const isLikelyCollage = playlist.source === 'user' || playlist.image.every(img => img.quality === 'default');
+        if (isLikelyCollage) {
+            collageDisplayImages = playlist.image.map(img => img.url).filter(Boolean);
+        }
+    }
 
     return (
         <div
@@ -68,25 +85,41 @@ export function PlaylistCard({ playlist, onClick }) {
             onMouseLeave={() => setIsHovered(false)}
         >
             <div className="relative rounded-lg aspect-square overflow-hidden mb-3 bg-neutral-900 border border-white/5 shadow-lg">
-                <img
-                    src={
-                        playlist.image?.[2]?.url ||
-                        playlist.image?.[1]?.url ||
-                        playlist.image?.[0]?.url ||
-                        (typeof playlist.image === 'string' ? playlist.image : "/def playlist image.jpg")
-                    }
-                    alt={playlist.name || playlist.playlistName}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                    onError={(e) => { e.target.src = "/def playlist image.jpg"; }}
-                />
+                {collageDisplayImages.length >= 4 ? (
+                    <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
+                        {collageDisplayImages.slice(0, 4).map((src, idx) => (
+                            <img
+                                key={idx}
+                                src={src}
+                                alt=""
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                                onError={(e) => { e.target.src = "/def playlist image.jpg"; }}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <img
+                        src={
+                            playlist.image?.[2]?.url ||
+                            playlist.image?.[1]?.url ||
+                            playlist.image?.[0]?.url ||
+                            (typeof playlist.image === 'string' ? playlist.image : "/def playlist image.jpg")
+                        }
+                        alt={playlist.name || playlist.playlistName}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        onError={(e) => { e.target.src = "/def playlist image.jpg"; }}
+                    />
+                )}
+
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className={`absolute bottom-2 right-2 transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-20 ${playingId === id ? 'opacity-100 translate-y-0' : 'opacity-0 group-hover:opacity-100'}`}>
+                <div className={`absolute bottom-2 right-2 transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-20 ${currentPlayingId === id ? 'opacity-100 translate-y-0' : 'opacity-0 group-hover:opacity-100'}`}>
                     <div
                         className="rounded-full w-10 h-10 md:w-12 md:h-12 bg-green-500 hover:bg-green-400 flex items-center justify-center text-black shadow-lg hover:scale-105 transition-transform"
                         onClick={handlePlaylistPlay}
                     >
-                        {playingId === id ? (
+                        {currentPlayingId === id ? (
                             <Loader2 className="w-5 h-5 md:w-6 md:h-6 animate-spin text-black" />
                         ) : (
                             <IoMdPlay className="w-5 h-5 md:w-6 md:h-6 fill-black translate-x-0.5" />

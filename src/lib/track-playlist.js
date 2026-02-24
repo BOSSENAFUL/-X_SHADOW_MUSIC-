@@ -9,7 +9,19 @@ export const trackRecentlyPlayed = async (playlist, source = 'jiosaavn', songLis
     try {
         const id = playlist.playlistId || playlist.id;
         const name = playlist.playlistName || playlist.name;
-        const image = playlist.image || [];
+        let image = playlist.image || [];
+
+        // If it's a user playlist with no image, but we have songs, generate a collage
+        if (source === 'user' && (!image || image.length === 0) && songList.length >= 4) {
+            image = songList.slice(0, 4).map(song => {
+                const url = song.image?.find(img => img.quality === '100x100')?.url ||
+                    song.image?.find(img => img.quality === '150x150')?.url ||
+                    song.image?.find(img => img.quality === '500x500')?.url ||
+                    song.image?.[song.image.length - 1]?.url ||
+                    '/def playlist image.jpg';
+                return { quality: 'default', url };
+            });
+        }
 
         await fetch('/api/recently-played-playlists', {
             method: 'POST',

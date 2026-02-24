@@ -77,7 +77,64 @@ export default function MusicPage() {
         setRecentlyPlayedLoading(true);
         const res = await fetch('/api/recently-played-playlists');
         const data = await res.json();
-        if (data.success) setRecentlyPlayed(data.data || []);
+        if (data.success && data.data) {
+          const rawPlaylists = data.data || [];
+
+          // Filter user playlists that need a collage
+          const needsCollage = rawPlaylists.filter(p =>
+            p.source === 'user' && (!p.image || p.image.length === 0)
+          );
+
+          if (needsCollage.length > 0) {
+            // 1. Fetch playlist details to get songIds (in parallel)
+            const playlistDetails = await Promise.all(
+              needsCollage.map(p => fetch(`/api/playlists/${p.playlistId}`).then(r => r.json()))
+            );
+
+            // 2. Collect unique song IDs from first 4 songs of each playlist
+            const songIdsToFetch = new Set();
+            playlistDetails.forEach(res => {
+              if (res.success && res.data?.songIds) {
+                res.data.songIds.slice(0, 4).forEach(id => songIdsToFetch.add(id));
+              }
+            });
+
+            if (songIdsToFetch.size > 0) {
+              // 3. Batch fetch song metadata
+              const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+              const songsRes = await fetch(`${apiUrl}/api/songs?ids=${Array.from(songIdsToFetch).join(',')}`);
+              const songsData = await songsRes.json();
+
+              if (songsData.success && songsData.data) {
+                const songCache = {};
+                songsData.data.forEach(s => { if (s) songCache[s.id] = s; });
+
+                // 4. Map images back to playlists
+                const processed = rawPlaylists.map(p => {
+                  const details = playlistDetails.find(d => d.success && d.data?._id?.toString() === p.playlistId);
+                  if (details && details.data?.songIds) {
+                    const collageImages = details.data.songIds.slice(0, 4).map(id => {
+                      const song = songCache[id];
+                      if (!song) return '/def playlist image.jpg';
+                      return song.image?.find(img => img.quality === '150x150')?.url ||
+                        song.image?.find(img => img.quality === '500x500')?.url ||
+                        song.image?.[song.image.length - 1]?.url ||
+                        '/def playlist image.jpg';
+                    });
+                    if (collageImages.length >= 4) {
+                      return { ...p, collageImages };
+                    }
+                  }
+                  return p;
+                });
+                setRecentlyPlayed(processed);
+                setRecentlyPlayedLoading(false);
+                return;
+              }
+            }
+          }
+          setRecentlyPlayed(rawPlaylists);
+        }
       } catch (err) {
         console.error('Error fetching recently played playlists:', err);
       } finally {
@@ -90,19 +147,9 @@ export default function MusicPage() {
   useEffect(() => {
     const fetchHomeSections = async () => {
       // Check session cache first
-      const cached = sessionStorage.getItem('home_sections');
-      if (cached) {
-        const data = JSON.parse(cached);
-        setNewReleases(data.newReleases || []);
-        setTrendingPlaylists(data.trending || []);
-        setTopHitsPlaylists(data.topHits || []);
-        setEnglishTopPlaylists(data.englishTop || []);
-        setLoading(false);
-        setTrendingLoading(false);
-        setTopHitsLoading(false);
-        setEnglishTopLoading(false);
-        return;
-      }
+      /* Bypass cache to apply new limits */
+      // const cached = sessionStorage.getItem('home_sections');
+      // if (cached) { ... }
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
@@ -113,10 +160,10 @@ export default function MusicPage() {
         setEnglishTopLoading(true);
 
         const results = await Promise.all([
-          fetch(`${apiUrl}/api/search/playlists?query=new%20releases&page=0&limit=6`).then(r => r.json()),
-          fetch(`${apiUrl}/api/search/playlists?query=trending&page=0&limit=6`).then(r => r.json()),
-          fetch(`${apiUrl}/api/search/playlists?query=top%20hits&page=0&limit=6`).then(r => r.json()),
-          fetch(`${apiUrl}/api/search/playlists?query=english%20top&page=0&limit=6`).then(r => r.json())
+          fetch(`${apiUrl}/api/search/playlists?query=new%20releases&page=0&limit=20`).then(r => r.json()),
+          fetch(`${apiUrl}/api/search/playlists?query=trending&page=0&limit=20`).then(r => r.json()),
+          fetch(`${apiUrl}/api/search/playlists?query=top%20hits&page=0&limit=20`).then(r => r.json()),
+          fetch(`${apiUrl}/api/search/playlists?query=english%20top&page=0&limit=20`).then(r => r.json())
         ]);
 
         const [newRes, trending, topHits, englishTop] = results;
@@ -499,19 +546,33 @@ export default function MusicPage() {
                     }
                   }}
                 >
-                  <div className="h-full aspect-square shrink-0 relative bg-neutral-800">
-                    <img
-                      src={
-                        playlist.image?.[2]?.url ||
-                        playlist.image?.[1]?.url ||
-                        playlist.image?.[0]?.url ||
-                        "/def playlist image.jpg"
+                  <div className="h-full aspect-square shrink-0 relative bg-neutral-900 border-r border-white/5">
+                    {(() => {
+                      const collageImages = playlist.collageImages || (
+                        playlist.source === 'user' && playlist.image?.length >= 4
+                          ? playlist.image.map(img => img.url).filter(Boolean)
+                          : null
+                      );
+
+                      if (collageImages && collageImages.length >= 4) {
+                        return <PlaylistCollage images={collageImages} />;
                       }
-                      alt={playlist.playlistName || "Playlist"}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                      onError={(e) => { e.target.src = "/def playlist image.jpg"; }}
-                    />
+
+                      return (
+                        <img
+                          src={
+                            playlist.image?.[2]?.url ||
+                            playlist.image?.[1]?.url ||
+                            playlist.image?.[0]?.url ||
+                            (typeof playlist.image === 'string' ? playlist.image : "/def playlist image.jpg")
+                          }
+                          alt={playlist.playlistName || "Playlist"}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                          onError={(e) => { e.target.src = "/def playlist image.jpg"; }}
+                        />
+                      );
+                    })()}
                   </div>
                   <div className="min-w-0 flex-1 px-2 md:px-3 py-2 flex flex-col justify-center gap-0.5">
                     <h3 className="font-bold text-[13px] md:text-[14px] lg:text-[16px] text-white line-clamp-1 leading-tight">
@@ -537,6 +598,30 @@ export default function MusicPage() {
                 </div>
               ))}
           </div>
+
+          {/* Recently Played Section */}
+          {!recentlyPlayedLoading && recentlyPlayed.length > 0 && (
+            <PlaylistSection
+              title="Recently Played"
+              playlists={recentlyPlayed.slice(0, 20).map(p => ({
+                ...p,
+                id: p.playlistId,
+                name: p.playlistName
+              }))}
+              loading={recentlyPlayedLoading}
+              onShowAll={() => router.push("/music/discover/recently-played")}
+              onPlaylistClick={(playlist) => {
+                const pid = playlist.id || playlist.playlistId;
+                if (playlist.source === "user") {
+                  router.push(`/music/playlists/${pid}`);
+                } else {
+                  router.push(`/music/playlist/${pid}?songCount=${playlist.songCount || 50}`);
+                }
+              }}
+              onPlayClick={handlePlaylistPlay}
+              playingId={playingId}
+            />
+          )}
 
           {/* "New release" */}
           <PlaylistSection

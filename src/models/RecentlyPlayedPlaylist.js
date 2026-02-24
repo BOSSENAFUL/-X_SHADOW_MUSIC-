@@ -3,11 +3,11 @@ import mongoose from 'mongoose';
 /**
  * RecentlyPlayedPlaylist Model
  *
- * Tracks the last 5 playlists a user has played, covering both:
+ * Tracks the last 50 playlists a user has played, covering both:
  *   - External / JioSaavn playlists  (source: 'jiosaavn')
  *   - User-created app playlists     (source: 'user')
  *
- * One document per user stores an ordered array of up to 5 playlist entries.
+ * One document per user stores an ordered array of up to 50 playlist entries.
  * The most recently played playlist is always at index 0.
  */
 
@@ -73,14 +73,10 @@ const recentlyPlayedPlaylistSchema = new mongoose.Schema(
             index: true,
         },
 
-        // Ordered list of recently played playlists (newest first, max 5)
+        // Ordered list of recently played playlists (newest first, max 50)
         playlists: {
             type: [recentPlaylistEntrySchema],
             default: [],
-            validate: {
-                validator: (arr) => arr.length <= 5,
-                message: 'A user can have at most 5 recently played playlists.',
-            },
         },
     },
     { timestamps: true }
@@ -142,7 +138,7 @@ recentlyPlayedPlaylistSchema.statics.track = async function (userId, playlistDat
                 playlists: {
                     $each: [newEntry],
                     $position: 0,  // insert at the front
-                    $slice: 5,     // keep only the 5 most recent
+                    $slice: 50,     // keep only the 50 most recent
                 },
             },
         },
@@ -186,8 +182,11 @@ recentlyPlayedPlaylistSchema.methods.toJSON = function () {
     };
 };
 
-const RecentlyPlayedPlaylist =
-    mongoose.models.RecentlyPlayedPlaylist ||
-    mongoose.model('RecentlyPlayedPlaylist', recentlyPlayedPlaylistSchema);
+// Force refresh the model to pick up schema changes (like the new 50-item limit)
+if (mongoose.models.RecentlyPlayedPlaylist) {
+    delete mongoose.models.RecentlyPlayedPlaylist;
+}
+
+const RecentlyPlayedPlaylist = mongoose.model('RecentlyPlayedPlaylist', recentlyPlayedPlaylistSchema);
 
 export default RecentlyPlayedPlaylist;

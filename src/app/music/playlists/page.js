@@ -377,7 +377,7 @@ export default function PlaylistsPage() {
             </div>
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-8 p-6 pb-32 md:pb-6">
+        <div className="flex flex-1 flex-col gap-8 p-6 pb-32 md:pb-24">
 
           {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">

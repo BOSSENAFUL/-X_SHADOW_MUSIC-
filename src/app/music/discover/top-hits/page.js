@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -29,6 +29,7 @@ export default function TopHitsPage() {
     const [loadingMore, setLoadingMore] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const [currentIndex, setCurrentIndex] = useState(0);
+    const scrollContainerRef = useRef(null);
 
     const ITEMS_PER_BATCH = 24; // Load 24 items at a time
 
@@ -43,43 +44,11 @@ export default function TopHitsPage() {
 
     // Restore scroll position after content loads
     useEffect(() => {
-        if (!loading && displayedHits.length > 0) {
+        if (!loading && displayedHits.length > 0 && scrollContainerRef.current) {
             const savedScrollPosition = sessionStorage.getItem('topHitsScrollPosition');
             if (savedScrollPosition) {
-                const targetScrollPosition = parseInt(savedScrollPosition);
-                let hasUserScrolled = false;
-                let restorationTimeouts = [];
-
-                // Track if user starts scrolling manually
-                const handleUserScroll = () => {
-                    hasUserScrolled = true;
-                    // Clear all pending restoration attempts
-                    restorationTimeouts.forEach(timeout => clearTimeout(timeout));
-                    // Remove the scroll listener
-                    window.removeEventListener('scroll', handleUserScroll);
-                    // Clear the saved position so it doesn't interfere
-                    sessionStorage.removeItem('topHitsScrollPosition');
-                };
-
-                const restoreScroll = () => {
-                    if (!hasUserScrolled) {
-                        window.scrollTo(0, targetScrollPosition);
-                    }
-                };
-
-                // Add scroll listener to detect manual scrolling
-                window.addEventListener('scroll', handleUserScroll);
-
-                // Multiple restoration attempts (but they'll be cancelled if user scrolls)
-                restorationTimeouts.push(setTimeout(restoreScroll, 100));
-                restorationTimeouts.push(setTimeout(restoreScroll, 500));
-                restorationTimeouts.push(setTimeout(restoreScroll, 1000));
-
-                // Clean up after final attempt
-                restorationTimeouts.push(setTimeout(() => {
-                    window.removeEventListener('scroll', handleUserScroll);
-                    sessionStorage.removeItem('topHitsScrollPosition');
-                }, 1500));
+                scrollContainerRef.current.scrollTop = parseInt(savedScrollPosition);
+                sessionStorage.removeItem('topHitsScrollPosition');
             }
         }
     }, [loading, displayedHits.length]);
@@ -197,8 +166,10 @@ export default function TopHitsPage() {
     }, []);
 
     const handleCardClick = (playlist) => {
-        // Save scroll position before navigating
-        sessionStorage.setItem('topHitsScrollPosition', window.scrollY.toString());
+        // Save scroll position from the actual scrollable div
+        if (scrollContainerRef.current) {
+            sessionStorage.setItem('topHitsScrollPosition', scrollContainerRef.current.scrollTop.toString());
+        }
 
         // Navigate to playlist detail page with songCount as query parameter
         router.push(`/music/playlist/${playlist.id}?songCount=${playlist.songCount || 50}`);
@@ -211,7 +182,7 @@ export default function TopHitsPage() {
     return (
         <SidebarProvider>
             <AppSidebar />
-            <SidebarInset className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col">
+            <SidebarInset className="md:ml-0 overflow-x-hidden h-svh relative flex flex-col">
                 <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1" />
@@ -247,7 +218,10 @@ export default function TopHitsPage() {
                     </div>
                 </header>
 
-                <div className="flex-1 overflow-y-auto p-6">
+                <div
+                    ref={scrollContainerRef}
+                    className="flex-1 overflow-y-auto p-6"
+                >
                     <div className="space-y-6">
                         <div>
                             <h1 className="text-4xl font-bold mb-2">Top Hits Playlists</h1>

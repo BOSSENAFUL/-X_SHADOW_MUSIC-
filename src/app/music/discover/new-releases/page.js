@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -26,17 +26,71 @@ export default function NewReleasesPage() {
   const [newReleases, setNewReleases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentlyPlaying, setCurrentlyPlaying] = useState(null);
+  const scrollContainerRef = useRef(null);
+
+  // Save results to sessionStorage
+  useEffect(() => {
+    if (newReleases.length > 0) {
+      sessionStorage.setItem('newReleasesAllData', JSON.stringify(newReleases));
+    }
+  }, [newReleases]);
+
+  // Restore scroll position
+  useEffect(() => {
+    if (!loading && newReleases.length > 0 && scrollContainerRef.current) {
+      const savedPosition = sessionStorage.getItem('newReleasesScrollPosition');
+      if (savedPosition) {
+        scrollContainerRef.current.scrollTop = parseInt(savedPosition);
+        // Clear it after one successful restoration to avoid it triggering on subsequent renders
+        sessionStorage.removeItem('newReleasesScrollPosition');
+      }
+    }
+  }, [loading, newReleases.length]);
 
   useEffect(() => {
     const fetchAllNewReleases = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/playlists?query=new%20releases&page=0&limit=50`);
-        const data = await response.json();
 
-        if (data.success && data.data.results) {
-          setNewReleases(data.data.results);
-        }
+        // Fetch from multiple queries to ensure maximum coverage
+        const queries = ["New Release", "New Releases"];
+        let allPlaylists = [];
+
+        const fetchForQuery = async (query) => {
+          const initialResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/playlists?query=${encodeURIComponent(query)}&page=0&limit=1`);
+          const initialData = await initialResponse.json();
+
+          if (initialData.success && initialData.data.total) {
+            const total = initialData.data.total;
+            const limit = 50;
+            const totalPages = Math.ceil(total / limit);
+            const queryPromises = [];
+
+            for (let page = 0; page < totalPages; page++) {
+              queryPromises.push(
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/playlists?query=${encodeURIComponent(query)}&page=${page}&limit=${limit}`)
+                  .then(res => res.json())
+              );
+            }
+
+            const responses = await Promise.all(queryPromises);
+            responses.forEach(data => {
+              if (data.success && data.data.results) {
+                allPlaylists = [...allPlaylists, ...data.data.results];
+              }
+            });
+          }
+        };
+
+        await Promise.all(queries.map(q => fetchForQuery(q)));
+
+        // Unique results by ID
+        const uniquePlaylists = allPlaylists.filter((playlist, index, self) =>
+          index === self.findIndex(p => p.id === playlist.id)
+        );
+
+        setNewReleases(uniquePlaylists);
+        sessionStorage.setItem('newReleasesAllData', JSON.stringify(uniquePlaylists));
       } catch (error) {
         console.error('Error fetching new releases:', error);
       } finally {
@@ -53,6 +107,10 @@ export default function NewReleasesPage() {
   };
 
   const handleCardClick = (playlist) => {
+    // Save scroll position from the actual scrollable div
+    if (scrollContainerRef.current) {
+      sessionStorage.setItem('newReleasesScrollPosition', scrollContainerRef.current.scrollTop.toString());
+    }
     // Navigate to playlist detail page with songCount as query parameter
     router.push(`/music/playlist/${playlist.id}?songCount=${playlist.songCount || 50}`);
   };
@@ -64,7 +122,7 @@ export default function NewReleasesPage() {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col">
+      <SidebarInset className="md:ml-0 overflow-x-hidden h-svh relative flex flex-col">
         <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
@@ -100,13 +158,23 @@ export default function NewReleasesPage() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto p-6"
+        >
           <div className="space-y-6">
-            <div>
-              <h1 className="text-4xl font-bold mb-2">New Releases</h1>
-              <p className="text-muted-foreground">
-                Discover the latest music releases and trending playlists
-              </p>
+            <div className="flex items-end justify-between">
+              <div>
+                <h1 className="text-4xl font-bold mb-2">New Releases</h1>
+                <p className="text-muted-foreground">
+                  Discover the latest music releases and trending playlists
+                </p>
+              </div>
+              {!loading && newReleases.length > 0 && (
+                <p className="text-muted-foreground text-sm font-medium pb-1">
+                  {newReleases.length} playlists
+                </p>
+              )}
             </div>
 
             {loading ? (
