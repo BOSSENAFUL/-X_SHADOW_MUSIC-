@@ -505,7 +505,7 @@ export default function MusicPage() {
               </div>
 
               {/* Play button overlay */}
-              <div className="absolute right-2 md:right-3 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-20">
+              <div className="absolute right-2 md:right-3 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-20 hidden md:block">
                 <div
                   className="rounded-full w-8 h-8 md:w-12 md:h-12 bg-green-500 hover:bg-green-400 flex items-center justify-center text-black shadow-lg hover:scale-105 transition-transform"
                   onClick={(e) => {
@@ -584,9 +584,9 @@ export default function MusicPage() {
                   </div>
 
                   {/* Play button overlay */}
-                  <div className={`absolute right-2 md:right-3 transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-20 ${playingId === (playlist.playlistId || playlist.id) ? 'opacity-100 translate-y-0' : 'opacity-0 group-hover:opacity-100'}`}>
+                  <div className={`absolute right-2 md:right-3 transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-20 hidden md:block ${playingId === (playlist.playlistId || playlist.id) ? 'opacity-100 translate-y-0' : 'opacity-0 group-hover:opacity-100'}`}>
                     <div
-                      className="rounded-full w-8 h-8 md:w-12 md:h-12 bg-green-500 hover:bg-green-400 flex items-center justify-center text-black shadow-lg hover:scale-105 transition-transform"
+                      className="rounded-full w-8 h-8 md:w-12 md:h-12 bg-green-500 hover:bg-green-400 flex items-center justify-center text-black shadow-lg hover:scale-105 transition-transform "
                       onClick={(e) => handlePlaylistPlay(playlist, e)}
                     >
                       {playingId === (playlist.playlistId || playlist.id)

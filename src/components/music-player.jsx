@@ -78,6 +78,15 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     }
   };
 
+  const handleDirectSeek = (value) => {
+    isScrubbingRef.current = false;
+    setIsScrubbing(false);
+    if (audioRef.current) {
+      audioRef.current.currentTime = value[0];
+      setCurrentTime(value[0]);
+    }
+  };
+
   const handleSeekChange = (value) => {
     if (!isScrubbingRef.current) {
       isScrubbingRef.current = true;
@@ -789,7 +798,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                   const width = rect.width - 32; // Account for padding on both sides
                   const percentage = Math.max(0, Math.min(1, clickX / width));
                   const newTime = percentage * (duration || 0);
-                  handleSeek([newTime]);
+                  handleDirectSeek([newTime]);
                 }}
               >
                 <div className="w-full h-full bg-white/10">
@@ -947,6 +956,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
         onVolumeChange={handleVolumeChange}
         onSeek={handleSeekChange}
         onSeekCommit={handleSeekCommit}
+        onDirectSeek={handleDirectSeek} // New prop for immediate seeks
         onTogglePlayPause={togglePlayPause}
         onPrevious={handlePrevious}
         onNext={handleNext}

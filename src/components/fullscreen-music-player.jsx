@@ -59,6 +59,7 @@ export function FullscreenMusicPlayer({
   onVolumeChange,
   onSeek,
   onSeekCommit,
+  onDirectSeek, // New prop for immediate seeks
   onTogglePlayPause,
   onPrevious,
   onNext,
@@ -432,25 +433,102 @@ export function FullscreenMusicPlayer({
         : "";
       const duration = song.duration || 0;
 
-      // Build API URL
+      // Method 1: Try exact match using get endpoint
       const params = new URLSearchParams();
       params.append("artist_name", artistName);
       params.append("track_name", trackName);
       if (albumName) params.append("album_name", albumName);
       if (duration) params.append("duration", duration.toString());
 
-      const apiUrl = `https://lrclib.net/api/get?${params.toString()}`;
-      console.log("Fetching lyrics from:", apiUrl);
+      const getApiUrl = `https://lrclib.net/api/get?${params.toString()}`;
+      console.log("Fetching lyrics (exact match) from:", getApiUrl);
 
-      const response = await fetch(apiUrl);
+      let response = await fetch(getApiUrl);
 
-      // Handle 404 (lyrics not found) gracefully
+      // If exact match fails (404), try searching
       if (response.status === 404) {
-        console.log("Lyrics not found for this song");
+        console.log("Exact match not found, trying search API...");
+        const query = `${artistName} ${trackName}`;
+        const searchApiUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(query)}`;
+        console.log("Searching lyrics from:", searchApiUrl);
+
+        let searchResults = [];
+        response = await fetch(searchApiUrl);
+        if (response.ok) {
+          searchResults = await response.json();
+        }
+
+        // If no results with artist, try searching with JUST track name
+        // (Great for slowed/reverb or common tracks where artist name varies)
+        if (!searchResults || searchResults.length === 0) {
+          console.log("No results with artist, trying track name only...");
+          const trackOnlyUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(trackName)}`;
+          const trackResponse = await fetch(trackOnlyUrl);
+          if (trackResponse.ok) {
+            searchResults = await trackResponse.json();
+          }
+        }
+
+        if (searchResults && searchResults.length > 0) {
+          // Find the best match among search results
+          // We look for:
+          // 1. Closest duration (within 10 seconds)
+          // 2. Results that actually have lyrics
+          const matches = searchResults
+            .filter(r => r.syncedLyrics || r.plainLyrics)
+            .map(r => {
+              let score = 0;
+
+              // Helper for normalization
+              const normalize = (str) =>
+                (str || "")
+                  .toLowerCase()
+                  .replace(/[^\w\s]/gi, " ")
+                  .replace(/\s+/g, " ")
+                  .trim();
+
+              const rNameNorm = normalize(r.name || r.trackName);
+              const sNameNorm = normalize(trackName);
+
+              // Name match (case insensitive)
+              const rName = (r.name || r.trackName || "").toLowerCase();
+              const sName = trackName.toLowerCase();
+
+              if (rName === sName || rNameNorm === sNameNorm) score += 15;
+              else if (rName.includes(sName) || sName.includes(rName)) score += 8;
+              else if (rNameNorm.includes(sNameNorm) || sNameNorm.includes(rNameNorm)) score += 5;
+
+              // Artist match
+              const rArtist = (r.artistName || "").toLowerCase();
+              const sArtist = artistName.toLowerCase();
+              if (rArtist === sArtist) score += 10;
+              else if (rArtist.includes(sArtist) || sArtist.includes(rArtist)) score += 5;
+
+              // Duration match (very important to avoid wrong versions/covers)
+              const durationDiff = Math.abs((r.duration || 0) - duration);
+              if (durationDiff <= 2) score += 20; // Perfect duration match is key
+              else if (durationDiff <= 5) score += 12;
+              else if (durationDiff <= 10) score += 7;
+
+              return { ...r, matchScore: score };
+            })
+            .sort((a, b) => b.matchScore - a.matchScore);
+
+          const bestMatch = matches[0];
+          // If we have a very strong name + duration match, accept it even if artist is different
+          if (bestMatch && bestMatch.matchScore >= 25) {
+            console.log("Found strong lyric match through search:", bestMatch);
+            return bestMatch;
+          } else if (bestMatch && bestMatch.matchScore > 10) {
+            console.log("Found likely lyric match through search:", bestMatch);
+            return bestMatch;
+          }
+        }
+
         return null;
       }
 
-      // Handle other HTTP errors
+      // Handle other HTTP errors for the GET request
       if (!response.ok) {
         console.warn(`Lyrics API returned status: ${response.status}`);
         return null;
@@ -2102,6 +2180,7 @@ export function FullscreenMusicPlayer({
                                       max={duration || 100}
                                       step={1}
                                       onValueChange={onSeek}
+                                      onValueCommit={onSeekCommit}
                                       className="w-full **:[[role=slider]]:bg-white **:[[role=slider]]:border-white **:[[role=slider]]:w-3 **:[[role=slider]]:h-3 [&_.bg-primary]:bg-white"
                                     />
                                   </div>
@@ -2198,7 +2277,7 @@ export function FullscreenMusicPlayer({
                                                 "antialiased",
                                             }}
                                             onClick={() =>
-                                              onSeek([
+                                              onDirectSeek([
                                                 parseSyncedLyrics(
                                                   lyrics.syncedLyrics
                                                 )[index]?.time || 0,
