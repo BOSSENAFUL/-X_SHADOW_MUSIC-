@@ -18,7 +18,8 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Play, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { PlaylistCard } from "@/components/music/playlist-card";
 
 export default function NewReleasesPage() {
   const router = useRouter();
@@ -121,50 +122,11 @@ export default function NewReleasesPage() {
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
                 {newReleases.map((playlist) => (
-                  <div
+                  <PlaylistCard
                     key={playlist.id}
-                    className="group cursor-pointer hover:scale-105 transition-transform"
-                    onClick={() => handleCardClick(playlist)}
-                  >
-                    <div className="relative rounded-lg aspect-square overflow-hidden mb-3 bg-muted">
-                      {playlist.image?.[2]?.url || playlist.image?.[1]?.url || playlist.image?.[0]?.url ? (
-                        <img
-                          src={playlist.image?.[2]?.url || playlist.image?.[1]?.url || playlist.image?.[0]?.url}
-                          alt={playlist.name}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.src = '/default-playlist-image.png';
-                          }}
-                          onLoad={() => {
-                            console.log('Image loaded successfully');
-                          }}
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-white">
-                          <Play className="w-12 h-12 opacity-50" />
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      <Button
-                        size="icon"
-                        className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-green-500 hover:bg-green-600 rounded-full shadow-lg"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePlayClick(playlist, "playlist");
-                        }}
-                      >
-                        <Play className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium leading-tight line-clamp-2 text-foreground">
-                        {playlist.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {playlist.songCount} songs
-                      </p>
-                    </div>
-                  </div>
+                    playlist={{ ...playlist, source: 'jiosaavn' }}
+                    onClick={handleCardClick}
+                  />
                 ))}
               </div>
             )}

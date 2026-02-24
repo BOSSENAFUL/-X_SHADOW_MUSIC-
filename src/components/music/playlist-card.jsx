@@ -1,0 +1,107 @@
+
+"use client";
+
+import { useState } from "react";
+import { Loader2 } from "lucide-react";
+import { IoMdPlay } from "react-icons/io";
+import { useSession } from "next-auth/react";
+import { useMusicPlayer } from "@/contexts/music-player-context";
+import { trackRecentlyPlayed } from "@/lib/track-playlist";
+
+export function PlaylistCard({ playlist, onClick }) {
+    const [isHovered, setIsHovered] = useState(false);
+    const [playingId, setPlayingId] = useState(null);
+    const { data: session } = useSession();
+    const { playSong } = useMusicPlayer();
+
+    const handlePlaylistPlay = async (e) => {
+        e.stopPropagation();
+        const pid = playlist.id || playlist.playlistId;
+        if (playingId === pid) return;
+        setPlayingId(pid);
+
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+            let songs = [];
+            const source = playlist.source || 'jiosaavn';
+
+            if (source === 'user') {
+                const res = await fetch(`/api/playlists/${pid}`);
+                const result = await res.json();
+                if (result.success && result.data?.songIds?.length) {
+                    const songsRes = await fetch(`${apiUrl}/api/songs?ids=${result.data.songIds.join(',')}`);
+                    const songsData = await songsRes.json();
+                    if (songsData.success && songsData.data) {
+                        const map = {};
+                        songsData.data.forEach(s => { map[s.id] = s; });
+                        songs = result.data.songIds.map(id => map[id]).filter(Boolean);
+                    }
+                }
+            } else {
+                const res = await fetch(`${apiUrl}/api/playlists?id=${pid}&page=0&limit=${playlist.songCount || 50}`);
+                const data = await res.json();
+                if (data.success && data.data?.songs) {
+                    songs = data.data.songs;
+                }
+            }
+
+            if (songs.length > 0) {
+                playSong(songs[0], songs, pid);
+                if (session?.user?.id) {
+                    await trackRecentlyPlayed(playlist, source, songs);
+                }
+            }
+        } catch (err) {
+            console.error('Error playing playlist from card:', err);
+        } finally {
+            setPlayingId(null);
+        }
+    };
+
+    const id = playlist.id || playlist.playlistId;
+
+    return (
+        <div
+            className="group cursor-pointer hover:scale-105 transition-transform"
+            onClick={() => onClick(playlist)}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+        >
+            <div className="relative rounded-lg aspect-square overflow-hidden mb-3 bg-neutral-900 border border-white/5 shadow-lg">
+                <img
+                    src={
+                        playlist.image?.[2]?.url ||
+                        playlist.image?.[1]?.url ||
+                        playlist.image?.[0]?.url ||
+                        (typeof playlist.image === 'string' ? playlist.image : "/def playlist image.jpg")
+                    }
+                    alt={playlist.name || playlist.playlistName}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                    onError={(e) => { e.target.src = "/def playlist image.jpg"; }}
+                />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className={`absolute bottom-2 right-2 transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-20 ${playingId === id ? 'opacity-100 translate-y-0' : 'opacity-0 group-hover:opacity-100'}`}>
+                    <div
+                        className="rounded-full w-10 h-10 md:w-12 md:h-12 bg-green-500 hover:bg-green-400 flex items-center justify-center text-black shadow-lg hover:scale-105 transition-transform"
+                        onClick={handlePlaylistPlay}
+                    >
+                        {playingId === id ? (
+                            <Loader2 className="w-5 h-5 md:w-6 md:h-6 animate-spin text-black" />
+                        ) : (
+                            <IoMdPlay className="w-5 h-5 md:w-6 md:h-6 fill-black translate-x-0.5" />
+                        )}
+                    </div>
+                </div>
+            </div>
+            <div className="space-y-1 px-1">
+                <p className="text-sm font-bold leading-tight line-clamp-1 text-foreground">
+                    {playlist.name || playlist.playlistName}
+                </p>
+                <p className="text-xs text-muted-foreground font-medium">
+                    {playlist.songCount || 0} songs
+                </p>
+            </div>
+        </div>
+    );
+}

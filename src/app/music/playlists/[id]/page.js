@@ -333,6 +333,32 @@ export default function PlaylistDetailPage({ params }) {
     }
   }, [playlist, songs]);
 
+  // ── Recently Played Tracking ────────────────────────────────────────
+  const trackRecentlyPlayed = () => {
+    if (!session?.user?.id || !playlist) return;
+    const cover = getPlaylistCover();
+    let imageArr = [];
+    if (cover.type === 'single' && cover.src) {
+      imageArr = [{ quality: 'default', url: cover.src }];
+    } else if (cover.type === 'collage' && cover.images?.length) {
+      imageArr = cover.images.map(url => ({ quality: 'default', url }));
+    }
+    const playlistData = {
+      id: playlistId,
+      name: playlist.name,
+      image: imageArr,
+      songCount: songs.length,
+      source: 'user',
+      owner: session.user.name || session.user.email || 'You',
+    };
+    // Fire-and-forget – don't block UI
+    fetch('/api/recently-played-playlists', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playlistData }),
+    }).catch(() => { });
+  };
+
   const handlePlayClick = (song, index) => {
     const isCurrentSong = currentSong?.id === song.id;
 
@@ -371,6 +397,7 @@ export default function PlaylistDetailPage({ params }) {
 
     playSong(songData, playlistData, playlistId);
     setCurrentlyPlaying({ song, index });
+    trackRecentlyPlayed();
     console.log(`Playing song from playlist:`, song);
   };
 
@@ -413,6 +440,7 @@ export default function PlaylistDetailPage({ params }) {
 
       playSong(firstSong, playlistData, playlistId);
       setCurrentlyPlaying({ song: songs[0], index: 0 });
+      trackRecentlyPlayed();
       console.log('Playing all songs from playlist starting with:', songs[0]);
     }
   };

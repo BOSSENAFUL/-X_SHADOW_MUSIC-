@@ -192,9 +192,33 @@ function PlaylistPageContent() {
     };
   }, [loading, songs.length]);
 
+  // ── Recently Played Tracking ────────────────────────────────────────
+  const trackRecentlyPlayed = () => {
+    if (!session?.user?.id || !playlist) return;
+    const imageUrl =
+      playlist.image?.[2]?.url ||
+      playlist.image?.[1]?.url ||
+      playlist.image?.[0]?.url;
+    const playlistData = {
+      id: playlistId,
+      name: playlist.name,
+      image: playlist.image || (imageUrl ? [{ quality: 'default', url: imageUrl }] : []),
+      songCount: playlist.songCount || songs.length,
+      source: 'jiosaavn',
+      owner: playlist.subtitle || playlist.owner || 'JioSaavn',
+    };
+    // Fire-and-forget – don't block UI
+    fetch('/api/recently-played-playlists', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playlistData }),
+    }).catch(() => { });
+  };
+
   const handlePlayClick = (song, index) => {
     playSong(song, songs, playlistId);
     setCurrentlyPlaying({ song, index });
+    trackRecentlyPlayed();
     console.log(`Playing song:`, song);
   };
 
@@ -207,6 +231,7 @@ function PlaylistPageContent() {
       } else {
         playSong(songs[0], songs, playlistId);
         setCurrentlyPlaying({ song: songs[0], index: 0 });
+        trackRecentlyPlayed();
       }
       console.log('Playlist action:', isPlaylistPlaying ? 'toggling play/pause' : 'starting from beginning');
     }

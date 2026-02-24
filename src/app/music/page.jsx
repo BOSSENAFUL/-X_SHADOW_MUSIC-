@@ -20,10 +20,12 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Play, Heart, List, Search } from "lucide-react";
-import { useLikedPlaylists } from "@/hooks/useLikedPlaylists";
+import { Heart, Search } from "lucide-react";
+
 import { PlaylistSection } from "@/components/music/playlist-section";
 import { IoMdPlay } from "react-icons/io";
+import { useMusicPlayer } from "@/contexts/music-player-context";
+import { Loader2 } from "lucide-react";
 
 export default function MusicPage() {
   const router = useRouter();
@@ -37,8 +39,14 @@ export default function MusicPage() {
   const [trendingLoading, setTrendingLoading] = useState(true);
   const [topHitsLoading, setTopHitsLoading] = useState(true);
   const [englishTopLoading, setEnglishTopLoading] = useState(true);
+  const [recentlyPlayed, setRecentlyPlayed] = useState([]);
+  const [recentlyPlayedLoading, setRecentlyPlayedLoading] = useState(true);
   const [playlistColors, setPlaylistColors] = useState({});
   const [hoveredColor, setHoveredColor] = useState(null);
+  // Track which recently-played card is loading (play button spinner)
+  const [playingId, setPlayingId] = useState(null);
+
+  const { playSong } = useMusicPlayer();
 
   useEffect(() => {
     // Set default color only on desktop
@@ -58,9 +66,26 @@ export default function MusicPage() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const { likedPlaylists, loading: playlistsLoading } = useLikedPlaylists(
-    session?.user?.id
-  );
+  // Fetch recently played playlists whenever session is ready
+  useEffect(() => {
+    if (!session?.user?.id) {
+      setRecentlyPlayedLoading(false);
+      return;
+    }
+    const fetchRecentlyPlayed = async () => {
+      try {
+        setRecentlyPlayedLoading(true);
+        const res = await fetch('/api/recently-played-playlists');
+        const data = await res.json();
+        if (data.success) setRecentlyPlayed(data.data || []);
+      } catch (err) {
+        console.error('Error fetching recently played playlists:', err);
+      } finally {
+        setRecentlyPlayedLoading(false);
+      }
+    };
+    fetchRecentlyPlayed();
+  }, [session?.user?.id]);
 
   useEffect(() => {
     const fetchHomeSections = async () => {
@@ -125,6 +150,84 @@ export default function MusicPage() {
   const handlePlayClick = (item, type) => {
     setCurrentlyPlaying({ item, type });
     console.log(`Playing ${type}:`, item);
+  };
+
+  // Play a playlist directly from any card (Recently played info or Home sections)
+  const handlePlaylistPlay = async (playlist, e = null) => {
+    if (e) e.stopPropagation();
+    const pid = playlist.playlistId || playlist.id;
+    if (playingId === pid) return; // already loading
+    setPlayingId(pid);
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      let songs = [];
+
+      // Determine info for tracking
+      const name = playlist.playlistName || playlist.name;
+      const source = playlist.source || 'jiosaavn';
+      const image = playlist.image || [];
+      const songCount = playlist.songCount || 0;
+
+      if (source === 'user') {
+        // 1. Fetch user playlist to get songIds
+        const res = await fetch(`/api/playlists/${pid}`);
+        const result = await res.json();
+        if (result.success && result.data?.songIds?.length) {
+          // 2. Batch-fetch the actual songs
+          const songsRes = await fetch(`${apiUrl}/api/songs?ids=${result.data.songIds.join(',')}`);
+          const songsData = await songsRes.json();
+          if (songsData.success && songsData.data) {
+            // Preserve playlist order
+            const map = {};
+            songsData.data.forEach(s => { map[s.id] = s; });
+            songs = result.data.songIds.map(id => map[id]).filter(Boolean);
+          }
+        }
+      } else {
+        // JioSaavn playlist (External)
+        const res = await fetch(`${apiUrl}/api/playlists?id=${pid}&page=0&limit=${songCount || 50}`);
+        const data = await res.json();
+        if (data.success && data.data?.songs) {
+          songs = data.data.songs;
+        }
+      }
+
+      if (songs.length > 0) {
+        // Start playback
+        playSong(songs[0], songs, pid);
+
+        // Track as recently played
+        if (session?.user?.id) {
+          const trackRes = await fetch('/api/recently-played-playlists', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              playlistData: {
+                id: pid,
+                name: name,
+                image: image,
+                songCount: songs.length,
+                source: source,
+                owner: playlist.owner || playlist.subtitle || (source === 'user' ? 'You' : 'JioSaavn')
+              }
+            }),
+          });
+
+          if (trackRes.ok) {
+            // Refresh the recently played list on UI
+            const updatedData = await trackRes.json();
+            if (updatedData.success && updatedData.data) {
+              setRecentlyPlayed(updatedData.data);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error playing playlist:', err);
+    } finally {
+      setPlayingId(null);
+    }
   };
 
   const handleCardClick = (item, type) => {
@@ -368,9 +471,9 @@ export default function MusicPage() {
               </div>
             </div>
 
-            {/* Dynamic Liked Playlists */}
-            {playlistsLoading
-              ? // Loading skeleton for playlists
+            {/* Recently Played Playlists */}
+            {recentlyPlayedLoading
+              ? // Loading skeleton
               Array.from({ length: 5 }).map((_, index) => (
                 <div
                   key={`skeleton-${index}`}
@@ -382,57 +485,57 @@ export default function MusicPage() {
                   </div>
                 </div>
               ))
-              : likedPlaylists
-                .slice(0, 5)
-                .map((playlist) => {
-                  return (
-                    <div
-                      key={playlist.playlistId}
-                      className="group relative flex items-center bg-white/5 hover:bg-white/10 transition-colors rounded-[4px] overflow-hidden cursor-pointer h-14 md:h-16 lg:h-20 z-10"
-                      onMouseEnter={() => handlePlaylistHover(playlist)}
-                      onMouseLeave={handleMouseLeave}
-                      onClick={() => {
-                        if (playlist.isUserPlaylist) {
-                          router.push(`/music/playlists/${playlist.playlistId}`);
-                        } else {
-                          router.push(`/music/playlist/${playlist.playlistId}?songCount=${playlist.songCount || 50}`);
-                        }
-                      }}
-                    >
-                      <div className="h-full aspect-square shrink-0 relative bg-neutral-800">
-                        {playlist.isCollage ? (
-                          <PlaylistCollage images={playlist.collageImages} />
-                        ) : (
-                          <img
-                            src={playlist.image?.[2]?.url || playlist.image?.[1]?.url || playlist.image?.[0]?.url || (typeof playlist.image === 'string' ? playlist.image : "/def playlist image.jpg")}
-                            alt={playlist.playlistName || "Playlist"}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                            onError={(e) => { e.target.src = "/def playlist image.jpg"; }}
-                          />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1 px-2 md:px-3 py-2 flex items-center">
-                        <h3 className="font-bold text-[13px] md:text-[14px] lg:text-[16px] text-white line-clamp-2 leading-tight">
-                          {playlist.playlistName}
-                        </h3>
-                      </div>
+              : recentlyPlayed.slice(0, 5).map((playlist) => (
+                <div
+                  key={playlist.playlistId}
+                  className="group relative flex items-center bg-white/5 hover:bg-white/10 transition-colors rounded-[4px] overflow-hidden cursor-pointer h-14 md:h-16 lg:h-20 z-10"
+                  onMouseEnter={() => handlePlaylistHover(playlist)}
+                  onMouseLeave={handleMouseLeave}
+                  onClick={() => {
+                    if (playlist.source === 'user') {
+                      router.push(`/music/playlists/${playlist.playlistId}`);
+                    } else {
+                      router.push(`/music/playlist/${playlist.playlistId}?songCount=${playlist.songCount || 50}`);
+                    }
+                  }}
+                >
+                  <div className="h-full aspect-square shrink-0 relative bg-neutral-800">
+                    <img
+                      src={
+                        playlist.image?.[2]?.url ||
+                        playlist.image?.[1]?.url ||
+                        playlist.image?.[0]?.url ||
+                        "/def playlist image.jpg"
+                      }
+                      alt={playlist.playlistName || "Playlist"}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                      onError={(e) => { e.target.src = "/def playlist image.jpg"; }}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1 px-2 md:px-3 py-2 flex flex-col justify-center gap-0.5">
+                    <h3 className="font-bold text-[13px] md:text-[14px] lg:text-[16px] text-white line-clamp-1 leading-tight">
+                      {playlist.playlistName}
+                    </h3>
+                    {playlist.source === 'user' && (
+                      <span className="text-[10px] text-white/40 font-medium uppercase tracking-wide">Your playlist</span>
+                    )}
+                  </div>
 
-                      {/* Play button overlay */}
-                      <div className="absolute right-2 md:right-3 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0  z-20">
-                        <div
-                          className="rounded-full w-8 h-8 md:w-12 md:h-12 bg-green-500 hover:bg-green-400 flex items-center justify-center text-black shadow-lg hover:scale-105 transition-transform"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePlayClick(playlist, "playlist");
-                          }}
-                        >
-                          <IoMdPlay className="w-4 h-4 md:w-6 md:h-6 fill-black translate-x-0.5" />
-                        </div>
-                      </div>
+                  {/* Play button overlay */}
+                  <div className={`absolute right-2 md:right-3 transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-20 ${playingId === (playlist.playlistId || playlist.id) ? 'opacity-100 translate-y-0' : 'opacity-0 group-hover:opacity-100'}`}>
+                    <div
+                      className="rounded-full w-8 h-8 md:w-12 md:h-12 bg-green-500 hover:bg-green-400 flex items-center justify-center text-black shadow-lg hover:scale-105 transition-transform"
+                      onClick={(e) => handlePlaylistPlay(playlist, e)}
+                    >
+                      {playingId === (playlist.playlistId || playlist.id)
+                        ? <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin text-black" />
+                        : <IoMdPlay className="w-4 h-4 md:w-6 md:h-6 fill-black translate-x-0.5" />
+                      }
                     </div>
-                  );
-                })}
+                  </div>
+                </div>
+              ))}
           </div>
 
           {/* "New release" */}
@@ -442,9 +545,8 @@ export default function MusicPage() {
             loading={loading}
             onShowAll={handleShowAll}
             onPlaylistClick={(playlist) => handleCardClick(playlist, "playlist")}
-            onPlayClick={(playlist) => {
-              handlePlayClick(playlist, "playlist");
-            }}
+            onPlayClick={handlePlaylistPlay}
+            playingId={playingId}
           />
 
           {/* Trending Playlists Section */}
@@ -454,9 +556,8 @@ export default function MusicPage() {
             loading={trendingLoading}
             onShowAll={() => router.push("/music/discover/playlists")}
             onPlaylistClick={(playlist) => handleCardClick(playlist, "playlist")}
-            onPlayClick={(playlist) => {
-              handlePlayClick(playlist, "playlist");
-            }}
+            onPlayClick={handlePlaylistPlay}
+            playingId={playingId}
           />
 
           {/* Top Hits Playlists Section */}
@@ -465,9 +566,8 @@ export default function MusicPage() {
             playlists={topHitsPlaylists}
             onShowAll={() => router.push("/music/discover/top-hits")}
             onPlaylistClick={(playlist) => handleCardClick(playlist, "playlist")}
-            onPlayClick={(playlist) => {
-              handlePlayClick(playlist, "playlist");
-            }}
+            onPlayClick={handlePlaylistPlay}
+            playingId={playingId}
           />
 
           {/* English Top Playlists Section */}
@@ -477,9 +577,8 @@ export default function MusicPage() {
             loading={englishTopLoading}
             onShowAll={() => router.push("/music/discover/english-top")}
             onPlaylistClick={(playlist) => handleCardClick(playlist, "playlist")}
-            onPlayClick={(playlist) => {
-              handlePlayClick(playlist, "playlist");
-            }}
+            onPlayClick={handlePlaylistPlay}
+            playingId={playingId}
           />
 
           {/* Bottom padding to prevent content being hidden behind music player */}
