@@ -92,9 +92,11 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       isScrubbingRef.current = true;
       setIsScrubbing(true);
       setWasPlayingBeforeScrub(isPlaying);
-      if (isPlaying) {
+      // Pause the audio directly — do NOT call setIsPlaying(false).
+      // Changing isPlaying state triggers the Media Session effect which
+      // sets playbackState="paused" and collapses the OS widget.
+      if (isPlaying && audioRef.current) {
         audioRef.current.pause();
-        setIsPlaying(false);
       }
     }
     setCurrentTime(value[0]);
@@ -106,9 +108,9 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     if (audioRef.current) {
       audioRef.current.currentTime = value[0];
       setCurrentTime(value[0]);
+      // Resume directly via audioRef — do NOT call setIsPlaying(true).
       if (wasPlayingBeforeScrub) {
-        audioRef.current.play();
-        setIsPlaying(true);
+        audioRef.current.play().catch(() => { });
       }
     }
   };
@@ -463,7 +465,10 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     };
 
     const handleEnded = () => {
-      setIsPlaying(false);
+      // Do NOT set isPlaying(false) here — doing so collapses the OS widget
+      // then handleNext immediately tries to play the next song, causing
+      // the widget to flicker open again. Let handleNext keep isPlaying=true
+      // so the OS widget stays visible and the next song auto-plays seamlessly.
       handleNext();
     };
 
@@ -521,94 +526,46 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     }
   }, [isPlaying, currentSong]);
 
-  // Media Session API - Rich media notifications
+  // Media Session API — register action handlers only once, update metadata
+  // only when the song ID changes, update playbackState in its own lightweight
+  // effect. This prevents the OS widget from reopening on every isPlaying change.
+
+  // Stable refs so handlers registered once always call the latest functions
+  const handlePreviousRef = useRef(handlePrevious);
+  const handleNextRef = useRef(handleNext);
+  useEffect(() => { handlePreviousRef.current = handlePrevious; });
+  useEffect(() => { handleNextRef.current = handleNext; });
+
+  // Register action handlers ONCE on mount — never re-register.
   useEffect(() => {
-    if (
-      !currentSong ||
-      typeof window === "undefined" ||
-      !("mediaSession" in navigator)
-    )
-      return;
+    if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
 
-    // Get artist name
-    const artistName =
-      currentSong.artists?.primary?.[0]?.name ||
-      currentSong.primaryArtists ||
-      "Unknown Artist";
-
-    // Get album name
-    const albumName = currentSong.album?.name || "Unknown Album";
-
-    // Get song title
-    const songTitle = decodeHtmlEntities(
-      currentSong.name || currentSong.title || "Unknown Song"
-    );
-
-    // Prepare artwork - use multiple sizes for better compatibility
-    const artwork = [];
-    if (currentSong.image && Array.isArray(currentSong.image)) {
-      // Use all available image sizes
-      currentSong.image.forEach((img, index) => {
-        if (img?.url) {
-          // Estimate sizes based on JioSaavn API pattern
-          const sizes = ["50x50", "150x150", "500x500"];
-          const size = sizes[index] || "500x500";
-          artwork.push({
-            src: img.url,
-            sizes: size,
-            type: "image/jpeg",
-          });
-        }
-      });
-    }
-
-    // If no artwork, use app icon as fallback
-    if (artwork.length === 0) {
-      artwork.push({
-        src: "/icon-192.png",
-        sizes: "192x192",
-        type: "image/png",
-      });
-    }
-
-    // Set media metadata
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: songTitle,
-      artist: artistName,
-      album: albumName,
-      artwork: artwork,
-    });
-
-    // Set action handlers
     navigator.mediaSession.setActionHandler("play", () => {
-      if (audioRef.current && !isPlaying) {
-        togglePlayPause();
+      if (audioRef.current) {
+        audioRef.current.play().catch(() => { });
+        setIsPlaying(true);
       }
     });
-
     navigator.mediaSession.setActionHandler("pause", () => {
-      if (audioRef.current && isPlaying) {
-        togglePlayPause();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        setIsPlaying(false);
       }
     });
-
     navigator.mediaSession.setActionHandler("previoustrack", () => {
-      handlePrevious();
+      handlePreviousRef.current();
     });
-
     navigator.mediaSession.setActionHandler("nexttrack", () => {
-      handleNext();
+      handleNextRef.current();
     });
-
     navigator.mediaSession.setActionHandler("seekbackward", (details) => {
       const skipTime = details.seekOffset || 10;
       if (audioRef.current) {
         const newTime = Math.max(audioRef.current.currentTime - skipTime, 0);
         audioRef.current.currentTime = newTime;
-        setCurrentTime(newTime); // Update React state immediately
+        setCurrentTime(newTime);
       }
     });
-
     navigator.mediaSession.setActionHandler("seekforward", (details) => {
       const skipTime = details.seekOffset || 10;
       if (audioRef.current) {
@@ -617,10 +574,9 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
           audioRef.current.duration || 0
         );
         audioRef.current.currentTime = newTime;
-        setCurrentTime(newTime); // Update React state immediately
+        setCurrentTime(newTime);
       }
     });
-
     navigator.mediaSession.setActionHandler("seekto", (details) => {
       if (details.seekTime !== undefined && audioRef.current) {
         const newTime = Math.max(
@@ -628,32 +584,65 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
           Math.min(details.seekTime, audioRef.current.duration || 0)
         );
         audioRef.current.currentTime = newTime;
-        setCurrentTime(newTime); // Update React state immediately
-
-        // Force position state update
+        setCurrentTime(newTime);
         try {
           navigator.mediaSession.setPositionState({
             duration: audioRef.current.duration || 0,
             playbackRate: audioRef.current.playbackRate || 1,
             position: newTime,
           });
-        } catch (error) {
-          // Ignore position state errors
-        }
+        } catch (_) { }
       }
     });
+    return () => {
+      ["play", "pause", "previoustrack", "nexttrack",
+        "seekbackward", "seekforward", "seekto"].forEach((a) => {
+          try { navigator.mediaSession.setActionHandler(a, null); } catch (_) { }
+        });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty — register once, never re-register
 
-    // Update playback state
-    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+  // Update song metadata ONLY when the song ID changes.
+  // Never tied to isPlaying so a play/pause toggle never touches MediaMetadata.
+  useEffect(() => {
+    if (!currentSong || typeof window === "undefined" || !("mediaSession" in navigator))
+      return;
 
-    console.log("Media Session updated:", {
+    const artistName =
+      currentSong.artists?.primary?.[0]?.name ||
+      currentSong.primaryArtists ||
+      "Unknown Artist";
+    const albumName = currentSong.album?.name || "Unknown Album";
+    const songTitle = decodeHtmlEntities(
+      currentSong.name || currentSong.title || "Unknown Song"
+    );
+    const artwork = [];
+    if (currentSong.image && Array.isArray(currentSong.image)) {
+      currentSong.image.forEach((img, index) => {
+        if (img?.url) {
+          const sizes = ["50x50", "150x150", "500x500"];
+          artwork.push({ src: img.url, sizes: sizes[index] || "500x500", type: "image/jpeg" });
+        }
+      });
+    }
+    if (artwork.length === 0) {
+      artwork.push({ src: "/icon-192.png", sizes: "192x192", type: "image/png" });
+    }
+    navigator.mediaSession.metadata = new MediaMetadata({
       title: songTitle,
       artist: artistName,
       album: albumName,
-      artworkCount: artwork.length,
-      playbackState: isPlaying ? "playing" : "paused",
+      artwork,
     });
-  }, [currentSong, isPlaying]);
+  }, [currentSong?.id]); // Only song ID — not isPlaying
+
+  // Update playbackState when isPlaying toggles — lightweight, never touches
+  // MediaMetadata so the widget never flickers or reopens.
+  useEffect(() => {
+    if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
+    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+  }, [isPlaying]);
 
   // Determine the context of where music is playing from
   const getPlayingFromContext = () => {
