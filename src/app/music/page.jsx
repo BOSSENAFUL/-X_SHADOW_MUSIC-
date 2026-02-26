@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, memo, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -27,6 +27,28 @@ import { IoMdPlay } from "react-icons/io";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { Loader2 } from "lucide-react";
 
+const PlaylistCollage = memo(({ images }) => {
+  if (!images || images.length === 0) return null;
+  const displayImages = images.slice(0, 4);
+
+  return (
+    <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
+      {displayImages.map((src, idx) => (
+        <div key={idx} className="relative w-full h-full overflow-hidden">
+          <img
+            src={src}
+            alt={`Collage ${idx}`}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        </div>
+      ))}
+    </div>
+  );
+});
+
+PlaylistCollage.displayName = "PlaylistCollage";
+
 export default function MusicPage() {
   const router = useRouter();
   const { data: session } = useSession();
@@ -43,28 +65,34 @@ export default function MusicPage() {
   const [recentlyPlayedLoading, setRecentlyPlayedLoading] = useState(true);
   const [playlistColors, setPlaylistColors] = useState({});
   const [hoveredColor, setHoveredColor] = useState(null);
-  // Track which recently-played card is loading (play button spinner)
   const [playingId, setPlayingId] = useState(null);
 
   const { playSong } = useMusicPlayer();
 
   useEffect(() => {
-    // Set default color only on desktop
-    if (window.innerWidth >= 768) {
+    const isDesktop = window.innerWidth >= 768;
+    if (isDesktop) {
       setHoveredColor("rgb(69, 10, 245)");
     }
 
+    let timeoutId;
     const handleResize = () => {
-      if (window.innerWidth >= 768) {
-        if (!hoveredColor) setHoveredColor("rgb(69, 10, 245)");
-      } else {
-        setHoveredColor(null);
-      }
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        if (window.innerWidth >= 768) {
+          if (!hoveredColor) setHoveredColor("rgb(69, 10, 245)");
+        } else {
+          setHoveredColor(null);
+        }
+      }, 200);
     };
 
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      clearTimeout(timeoutId);
+    };
+  }, [hoveredColor]);
 
   // Fetch recently played playlists whenever session is ready
   useEffect(() => {
@@ -77,62 +105,67 @@ export default function MusicPage() {
         setRecentlyPlayedLoading(true);
         const res = await fetch('/api/recently-played-playlists');
         const data = await res.json();
-        if (data.success && data.data) {
-          const rawPlaylists = data.data || [];
 
-          // Filter user playlists that need a collage
-          const needsCollage = rawPlaylists.filter(p =>
-            p.source === 'user' && (!p.image || p.image.length === 0)
-          );
+        if (!data.success || !data.data) {
+          setRecentlyPlayedLoading(false);
+          return;
+        }
 
-          if (needsCollage.length > 0) {
-            // 1. Fetch playlist details to get songIds (in parallel)
-            const playlistDetails = await Promise.all(
-              needsCollage.map(p => fetch(`/api/playlists/${p.playlistId}`).then(r => r.json()))
-            );
+        const rawPlaylists = data.data || [];
+        const needsCollage = rawPlaylists.filter(p =>
+          p.source === 'user' && (!p.image || p.image.length === 0)
+        );
 
-            // 2. Collect unique song IDs from first 4 songs of each playlist
-            const songIdsToFetch = new Set();
-            playlistDetails.forEach(res => {
-              if (res.success && res.data?.songIds) {
-                res.data.songIds.slice(0, 4).forEach(id => songIdsToFetch.add(id));
-              }
-            });
+        if (needsCollage.length === 0) {
+          setRecentlyPlayed(rawPlaylists);
+          setRecentlyPlayedLoading(false);
+          return;
+        }
 
-            if (songIdsToFetch.size > 0) {
-              // 3. Batch fetch song metadata
-              const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-              const songsRes = await fetch(`${apiUrl}/api/songs?ids=${Array.from(songIdsToFetch).join(',')}`);
-              const songsData = await songsRes.json();
+        // 1. Fetch playlist details to get songIds (in parallel)
+        const playlistDetails = await Promise.all(
+          needsCollage.map(p => fetch(`/api/playlists/${p.playlistId}`).then(r => r.json()))
+        );
 
-              if (songsData.success && songsData.data) {
-                const songCache = {};
-                songsData.data.forEach(s => { if (s) songCache[s.id] = s; });
-
-                // 4. Map images back to playlists
-                const processed = rawPlaylists.map(p => {
-                  const details = playlistDetails.find(d => d.success && d.data?._id?.toString() === p.playlistId);
-                  if (details && details.data?.songIds) {
-                    const collageImages = details.data.songIds.slice(0, 4).map(id => {
-                      const song = songCache[id];
-                      if (!song) return '/def playlist image.jpg';
-                      return song.image?.find(img => img.quality === '150x150')?.url ||
-                        song.image?.find(img => img.quality === '500x500')?.url ||
-                        song.image?.[song.image.length - 1]?.url ||
-                        '/def playlist image.jpg';
-                    });
-                    if (collageImages.length >= 4) {
-                      return { ...p, collageImages };
-                    }
-                  }
-                  return p;
-                });
-                setRecentlyPlayed(processed);
-                setRecentlyPlayedLoading(false);
-                return;
-              }
-            }
+        // 2. Collect unique song IDs from first 4 songs of each playlist
+        const songIdsToFetch = new Set();
+        playlistDetails.forEach(res => {
+          if (res.success && res.data?.songIds) {
+            res.data.songIds.slice(0, 4).forEach(id => songIdsToFetch.add(id));
           }
+        });
+
+        if (songIdsToFetch.size > 0) {
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+          const songsRes = await fetch(`${apiUrl}/api/songs?ids=${Array.from(songIdsToFetch).join(',')}`);
+          const songsData = await songsRes.json();
+
+          if (songsData.success && songsData.data) {
+            const songCache = {};
+            songsData.data.forEach(s => { if (s) songCache[s.id] = s; });
+
+            const processed = rawPlaylists.map(p => {
+              const details = playlistDetails.find(d => d.success && d.data?._id?.toString() === p.playlistId);
+              if (details && details.data?.songIds) {
+                const collageImages = details.data.songIds.slice(0, 4).map(id => {
+                  const song = songCache[id];
+                  if (!song) return '/def playlist image.jpg';
+                  return song.image?.find(img => img.quality === '150x150')?.url ||
+                    song.image?.find(img => img.quality === '500x500')?.url ||
+                    song.image?.[song.image.length - 1]?.url ||
+                    '/def playlist image.jpg';
+                });
+                if (collageImages.length >= 4) {
+                  return { ...p, collageImages };
+                }
+              }
+              return p;
+            });
+            setRecentlyPlayed(processed);
+          } else {
+            setRecentlyPlayed(rawPlaylists);
+          }
+        } else {
           setRecentlyPlayed(rawPlaylists);
         }
       } catch (err) {
@@ -147,17 +180,33 @@ export default function MusicPage() {
   useEffect(() => {
     const fetchHomeSections = async () => {
       // Check session cache first
-      /* Bypass cache to apply new limits */
-      // const cached = sessionStorage.getItem('home_sections');
-      // if (cached) { ... }
+      const cached = sessionStorage.getItem('home_sections');
+      if (cached) {
+        try {
+          const homeData = JSON.parse(cached);
+          setNewReleases(homeData.newReleases || []);
+          setTrendingPlaylists(homeData.trending || []);
+          setTopHitsPlaylists(homeData.topHits || []);
+          setEnglishTopPlaylists(homeData.englishTop || []);
+          setLoading(false);
+          setTrendingLoading(false);
+          setTopHitsLoading(false);
+          setEnglishTopLoading(false);
+          // Still fetch in background to refresh cache
+        } catch (e) {
+          console.error("Cache parse error:", e);
+        }
+      }
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
       try {
-        setLoading(true);
-        setTrendingLoading(true);
-        setTopHitsLoading(true);
-        setEnglishTopLoading(true);
+        if (!cached) {
+          setLoading(true);
+          setTrendingLoading(true);
+          setTopHitsLoading(true);
+          setEnglishTopLoading(true);
+        }
 
         const results = await Promise.all([
           fetch(`${apiUrl}/api/search/playlists?query=new%20releases&page=0&limit=20`).then(r => r.json()),
@@ -194,13 +243,13 @@ export default function MusicPage() {
     fetchHomeSections();
   }, []);
 
-  const handlePlayClick = (item, type) => {
+  const handlePlayClick = useCallback((item, type) => {
     setCurrentlyPlaying({ item, type });
     console.log(`Playing ${type}:`, item);
-  };
+  }, []);
 
   // Play a playlist directly from any card (Recently played info or Home sections)
-  const handlePlaylistPlay = async (playlist, e = null) => {
+  const handlePlaylistPlay = useCallback(async (playlist, e = null) => {
     if (e) e.stopPropagation();
     const pid = playlist.playlistId || playlist.id;
     if (playingId === pid) return; // already loading
@@ -210,29 +259,24 @@ export default function MusicPage() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL;
       let songs = [];
 
-      // Determine info for tracking
       const name = playlist.playlistName || playlist.name;
       const source = playlist.source || 'jiosaavn';
       const image = playlist.image || [];
       const songCount = playlist.songCount || 0;
 
       if (source === 'user') {
-        // 1. Fetch user playlist to get songIds
         const res = await fetch(`/api/playlists/${pid}`);
         const result = await res.json();
         if (result.success && result.data?.songIds?.length) {
-          // 2. Batch-fetch the actual songs
           const songsRes = await fetch(`${apiUrl}/api/songs?ids=${result.data.songIds.join(',')}`);
           const songsData = await songsRes.json();
           if (songsData.success && songsData.data) {
-            // Preserve playlist order
             const map = {};
-            songsData.data.forEach(s => { map[s.id] = s; });
+            songsData.data.forEach(s => { if (s) map[s.id] = s; });
             songs = result.data.songIds.map(id => map[id]).filter(Boolean);
           }
         }
       } else {
-        // JioSaavn playlist (External)
         const res = await fetch(`${apiUrl}/api/playlists?id=${pid}&page=0&limit=${songCount || 50}`);
         const data = await res.json();
         if (data.success && data.data?.songs) {
@@ -241,10 +285,8 @@ export default function MusicPage() {
       }
 
       if (songs.length > 0) {
-        // Start playback
         playSong(songs[0], songs, pid);
 
-        // Track as recently played
         if (session?.user?.id) {
           const trackRes = await fetch('/api/recently-played-playlists', {
             method: 'POST',
@@ -262,7 +304,6 @@ export default function MusicPage() {
           });
 
           if (trackRes.ok) {
-            // Refresh the recently played list on UI
             const updatedData = await trackRes.json();
             if (updatedData.success && updatedData.data) {
               setRecentlyPlayed(updatedData.data);
@@ -275,34 +316,33 @@ export default function MusicPage() {
     } finally {
       setPlayingId(null);
     }
-  };
+  }, [playingId, playSong, session?.user?.id]);
 
-  const handleCardClick = (item, type) => {
+  const handleCardClick = useCallback((item, type) => {
     if (type === "playlist" && typeof item === "object" && item.id) {
-      // Navigate to playlist detail page with songCount
       router.push(
         `/music/playlist/${item.id}?songCount=${item.songCount || 50}`
       );
     } else {
       console.log(`Clicked ${type}:`, item);
     }
-  };
+  }, [router]);
 
-  const handleShowAll = () => {
+  const handleShowAll = useCallback(() => {
     // Navigate to existing new releases page
     router.push("/music/discover/new-releases");
-  };
+  }, [router]);
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = useCallback(() => {
     if (window.innerWidth >= 768) {
       setHoveredColor("rgb(69, 10, 245)");
     } else {
       setHoveredColor(null);
     }
-  };
+  }, []);
 
   // Extract dominant color from image
-  const extractDominantColor = (imageUrl, playlistId) => {
+  const extractDominantColor = useCallback((imageUrl, playlistId) => {
     return new Promise((resolve) => {
       const img = new window.Image();
       img.crossOrigin = "anonymous";
@@ -312,32 +352,30 @@ export default function MusicPage() {
           const canvas = document.createElement("canvas");
           const ctx = canvas.getContext("2d");
 
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx.drawImage(img, 0, 0);
+          // Reduced dimensions for faster color extraction
+          const size = 50;
+          canvas.width = size;
+          canvas.height = size;
+          ctx.drawImage(img, 0, 0, size, size);
 
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, size, size);
           const data = imageData.data;
 
           const colorCounts = {};
 
-          // Sample every 10th pixel for performance
-          for (let i = 0; i < data.length; i += 40) {
+          for (let i = 0; i < data.length; i += 16) {
             const r = data[i];
             const g = data[i + 1];
             const b = data[i + 2];
 
-            // Skip very light or very dark colors
             const brightness = (r + g + b) / 3;
-            if (brightness < 30 || brightness > 220) continue;
+            if (brightness < 40 || brightness > 220) continue;
 
-            const color = `${Math.floor(r / 15) * 15},${Math.floor(g / 15) * 15
-              },${Math.floor(b / 15) * 15}`;
+            const color = `${Math.floor(r / 20) * 20},${Math.floor(g / 20) * 20},${Math.floor(b / 20) * 20}`;
             colorCounts[color] = (colorCounts[color] || 0) + 1;
           }
 
-          // Find the most common color
-          let dominantColor = "59,130,246"; // Default blue
+          let dominantColor = "59,130,246";
           let maxCount = 0;
 
           for (const [color, count] of Object.entries(colorCounts)) {
@@ -375,10 +413,10 @@ export default function MusicPage() {
 
       img.src = imageUrl;
     });
-  };
+  }, []);
 
   // On-demand color extraction when hovering
-  const handlePlaylistHover = (playlist) => {
+  const handlePlaylistHover = useCallback((playlist) => {
     const playlistId = playlist.playlistId || playlist.id;
     if (playlistColors[playlistId]) {
       setHoveredColor(playlistColors[playlistId]);
@@ -398,27 +436,7 @@ export default function MusicPage() {
     } else {
       setHoveredColor("rgb(69, 10, 245)");
     }
-  };
-
-  const PlaylistCollage = ({ images }) => {
-    if (!images || images.length === 0) return null;
-    const displayImages = images.slice(0, 4);
-
-    return (
-      <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
-        {displayImages.map((src, idx) => (
-          <div key={idx} className="relative w-full h-full overflow-hidden">
-            <img
-              src={src}
-              alt={`Collage ${idx}`}
-              className="w-full h-full object-cover"
-              loading="lazy"
-            />
-          </div>
-        ))}
-      </div>
-    );
-  };
+  }, [playlistColors, extractDominantColor]);
 
 
 

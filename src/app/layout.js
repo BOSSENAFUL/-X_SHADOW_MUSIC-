@@ -22,6 +22,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://jammify-music.vercel.app"),
   title: "Jammify — Stream Music with Style",
   description:
     "Jammify is a modern, minimal, high-quality music streaming experience powered by clean UI, smooth animations, and fast search using the JioSaavn API.",

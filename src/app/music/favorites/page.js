@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -81,15 +81,27 @@ export default function FavoritesPage() {
   // Initialize music player
   const { playSong, currentSong, isPlaying, togglePlayPause, currentPlaylistId } = useMusicPlayer();
 
-  const handlePlayClick = (song, index) => {
+  // Pre-calculate playlist data for the player to avoid mapping on every click
+  const playlistData = useMemo(() => {
+    return likedSongs.map(likedSong => ({
+      id: likedSong.songId,
+      name: likedSong.songName,
+      artists: { primary: likedSong.artists },
+      album: likedSong.album,
+      duration: likedSong.duration,
+      image: likedSong.image,
+      releaseDate: likedSong.releaseDate,
+      language: likedSong.language,
+      playCount: likedSong.playCount,
+      downloadUrl: likedSong.downloadUrl
+    }));
+  }, [likedSongs]);
+
+  const handlePlayClick = useCallback((song, index) => {
     const isCurrentSong = currentSong?.id === song.songId;
 
-    // If clicking on the currently playing song, do nothing
-    if (isCurrentSong) {
-      return;
-    }
+    if (isCurrentSong) return;
 
-    // Convert liked song format to standard song format for the player
     const songData = {
       id: song.songId,
       name: song.songName,
@@ -103,26 +115,11 @@ export default function FavoritesPage() {
       downloadUrl: song.downloadUrl
     };
 
-    // Convert all liked songs to standard format for playlist
-    const playlistData = likedSongs.map(likedSong => ({
-      id: likedSong.songId,
-      name: likedSong.songName,
-      artists: { primary: likedSong.artists },
-      album: likedSong.album,
-      duration: likedSong.duration,
-      image: likedSong.image,
-      releaseDate: likedSong.releaseDate,
-      language: likedSong.language,
-      playCount: likedSong.playCount,
-      downloadUrl: likedSong.downloadUrl
-    }));
-
     playSong(songData, playlistData, 'favorites');
     setCurrentlyPlaying({ song, index });
-    console.log(`Playing song:`, song);
-  };
+  }, [currentSong?.id, playlistData, playSong]);
 
-  const handlePlayAll = () => {
+  const handlePlayAll = useCallback(() => {
     if (likedSongs.length > 0) {
       const isPlaylistPlaying = currentPlaylistId === 'favorites';
 
@@ -145,74 +142,66 @@ export default function FavoritesPage() {
         downloadUrl: likedSongs[0].downloadUrl
       };
 
-      // Convert all liked songs to standard format for playlist
-      const playlistData = likedSongs.map(likedSong => ({
-        id: likedSong.songId,
-        name: likedSong.songName,
-        artists: { primary: likedSong.artists },
-        album: likedSong.album,
-        duration: likedSong.duration,
-        image: likedSong.image,
-        releaseDate: likedSong.releaseDate,
-        language: likedSong.language,
-        playCount: likedSong.playCount,
-        downloadUrl: likedSong.downloadUrl
-      }));
-
       playSong(firstSong, playlistData, 'favorites');
       setCurrentlyPlaying({ song: likedSongs[0], index: 0 });
-      console.log('Playing all liked songs starting with:', likedSongs[0]);
     }
-  };
+  }, [likedSongs, currentPlaylistId, togglePlayPause, playSong, playlistData]);
 
-  const handleGoBack = () => {
+  const handleGoBack = useCallback(() => {
     router.back();
-  };
+  }, [router]);
 
-  const formatDuration = (duration) => {
+  const formatDuration = useCallback((duration) => {
     if (!duration) return "0:00";
     const minutes = Math.floor(duration / 60);
     const seconds = duration % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
+  }, []);
 
-  const decodeHtmlEntities = (text) => {
-    if (!text) return text;
-    const textarea = document.createElement('textarea');
-    textarea.innerHTML = text;
-    return textarea.value;
-  };
+  // Use a faster decoding method that doesn't create DOM elements on every call
+  const decodeHtmlEntities = useCallback((text) => {
+    if (!text || !text.includes('&')) return text;
+    const entities = {
+      '&amp;': '&',
+      '&lt;': '<',
+      '&gt;': '>',
+      '&quot;': '"',
+      '&#39;': "'",
+      '&apos;': "'"
+    };
+    return text.replace(/&amp;|&lt;|&gt;|&quot;|&#39;|&apos;/g, m => entities[m]);
+  }, []);
 
-  const formatDate = (dateString) => {
+  const formatDate = useCallback((dateString) => {
     if (!dateString) return 'Unknown date';
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
     });
-  };
+  }, []);
 
-  const handleAddToPlaylist = (e, song) => {
+  const handleAddToPlaylist = useCallback((e, song) => {
     e.stopPropagation();
     setSelectedSong(song);
     setAddToPlaylistDialogOpen(true);
-  };
+  }, []);
 
-  const handleGoToArtist = (e, song) => {
+  const handleGoToArtist = useCallback((e, song) => {
     e.stopPropagation();
     if (song.artists?.length > 0) {
       router.push(`/music/artist/${song.artists[0].id}`);
     }
-  };
+  }, [router]);
 
-  const handleGoToAlbum = (e, song) => {
+  const handleGoToAlbum = useCallback((e, song) => {
     e.stopPropagation();
     if (song.album?.id) {
       router.push(`/music/album/${song.album.id}`);
     }
-  };
+  }, [router]);
 
-  const handleShare = (e, song) => {
+  const handleShare = useCallback((e, song) => {
     e.stopPropagation();
     if (navigator.share) {
       navigator.share({
@@ -225,7 +214,7 @@ export default function FavoritesPage() {
       navigator.clipboard.writeText(window.location.href);
       console.log('Link copied to clipboard');
     }
-  };
+  }, []);
 
   const handleDownloadAllLikedSongs = async () => {
     if (likedSongs.length === 0) {
@@ -420,10 +409,28 @@ export default function FavoritesPage() {
     }
   };
 
-  const handleDownload = async (e, song) => {
+  const handleDownload = useCallback(async (e, song) => {
     e.stopPropagation();
     await downloadSingleLikedSong(song);
-  };
+  }, []); // downloadSingleLikedSong is defined inside component, but doesn't change after mounting usually. Actually it depends on toast, but toast is static.
+
+  const handleUnlike = useCallback(async (e, likedSong) => {
+    e.stopPropagation();
+    const songData = {
+      id: likedSong.songId,
+      name: likedSong.songName,
+      artists: { primary: likedSong.artists },
+      album: likedSong.album,
+      duration: likedSong.duration,
+      image: likedSong.image,
+      releaseDate: likedSong.releaseDate,
+      language: likedSong.language,
+      playCount: likedSong.playCount,
+      downloadUrl: likedSong.downloadUrl
+    };
+    const result = await toggleLike(songData);
+    console.log(result.message);
+  }, [toggleLike]);
 
   if (loading) {
     return (
@@ -731,23 +738,7 @@ export default function FavoritesPage() {
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    const songData = {
-                                      id: likedSong.songId,
-                                      name: likedSong.songName,
-                                      artists: { primary: likedSong.artists },
-                                      album: likedSong.album,
-                                      duration: likedSong.duration,
-                                      image: likedSong.image,
-                                      releaseDate: likedSong.releaseDate,
-                                      language: likedSong.language,
-                                      playCount: likedSong.playCount,
-                                      downloadUrl: likedSong.downloadUrl
-                                    };
-                                    const result = await toggleLike(songData);
-                                    console.log(result.message);
-                                  }}
+                                  onClick={(e) => handleUnlike(e, likedSong)}
                                   className="text-red-500"
                                 >
                                   <Heart className="w-4 h-4 mr-2 fill-current" />
@@ -863,22 +854,7 @@ export default function FavoritesPage() {
                               variant="ghost"
                               size="sm"
                               className="h-8 w-8 text-green-500 hover:text-green-600 hidden md:inline-flex shrink-0 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                const songData = {
-                                  id: likedSong.songId,
-                                  name: likedSong.songName,
-                                  artists: { primary: likedSong.artists },
-                                  album: likedSong.album,
-                                  duration: likedSong.duration,
-                                  image: likedSong.image,
-                                  releaseDate: likedSong.releaseDate,
-                                  language: likedSong.language,
-                                  playCount: likedSong.playCount,
-                                  downloadUrl: likedSong.downloadUrl
-                                };
-                                await toggleLike(songData);
-                              }}
+                              onClick={(e) => handleUnlike(e, likedSong)}
                             >
                               <Heart className="w-4 h-4 fill-current" />
                             </Button>
@@ -917,23 +893,7 @@ export default function FavoritesPage() {
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    const songData = {
-                                      id: likedSong.songId,
-                                      name: likedSong.songName,
-                                      artists: { primary: likedSong.artists },
-                                      album: likedSong.album,
-                                      duration: likedSong.duration,
-                                      image: likedSong.image,
-                                      releaseDate: likedSong.releaseDate,
-                                      language: likedSong.language,
-                                      playCount: likedSong.playCount,
-                                      downloadUrl: likedSong.downloadUrl
-                                    };
-                                    const result = await toggleLike(songData);
-                                    console.log(result.message);
-                                  }}
+                                  onClick={(e) => handleUnlike(e, likedSong)}
                                   className="text-red-500"
                                 >
                                   <Heart className="w-4 h-4 mr-2 fill-current" />

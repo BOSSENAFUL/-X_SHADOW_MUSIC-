@@ -2,6 +2,7 @@ import NextAuth from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import GitHubProvider from 'next-auth/providers/github';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import mongoose from 'mongoose';
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 
@@ -54,6 +55,7 @@ const authOptions = {
             email: user.email,
             name: user.name,
             image: user.image,
+            role: user.role || 'user',
           };
         } catch (error) {
           console.error('Auth error:', error);
@@ -89,8 +91,9 @@ const authOptions = {
             // Update lastActive on every sign-in
             existingUser.lastActive = new Date();
             await existingUser.save();
-            // Set the user ID for OAuth users
+            // Set the user ID and role for OAuth users
             user.id = existingUser._id.toString();
+            user.role = existingUser.role || 'user';
             console.log('Set user.id to:', user.id);
           } else {
             console.log('Creating new user for OAuth');
@@ -101,12 +104,14 @@ const authOptions = {
               image: user.image,
               isVerified: true,
               emailVerified: new Date(),
+              role: 'user',
               ...(account.provider === 'google' && { googleId: account.providerAccountId }),
               ...(account.provider === 'github' && { githubId: account.providerAccountId }),
             });
             const savedUser = await newUser.save();
-            // Set the user ID for OAuth users
+            // Set the user ID and role for OAuth users
             user.id = savedUser._id.toString();
+            user.role = savedUser.role || 'user';
             console.log('Created new user with ID:', user.id);
           }
         }
@@ -116,28 +121,26 @@ const authOptions = {
         return false;
       }
     },
-    async jwt({ token, user, account }) {
-
-      // If user object is present (first time login), use the ID from signIn callback
+    async jwt({ token, user, trigger, session }) {
+      // If user object is present (first time login)
       if (user) {
-        console.log('Setting token.id from user.id:', user.id);
         token.id = user.id;
+        token.role = user.role || 'user';
       }
 
-      // Check if token.id is a valid MongoDB ObjectId, if not, fetch from database
-      const mongoose = require('mongoose');
-      const isValidObjectId = token.id && mongoose.Types.ObjectId.isValid(token.id);
+      // Handle session updates (if you use useSession().update())
+      if (trigger === 'update' && session) {
+        return { ...token, ...session };
+      }
 
-      if (!token.id || !isValidObjectId) {
-        console.log('Invalid or missing ObjectId, fetching from database. Current token.id:', token.id);
+      // Ensure token.id is valid, otherwise try to fetch it
+      if (!token.id || !mongoose.Types.ObjectId.isValid(token.id)) {
         try {
           await connectDB();
-          const dbUser = await User.findOne({ email: token.email });
+          const dbUser = await User.findOne({ email: token.email }).select('_id role').lean();
           if (dbUser) {
-            console.log('Found DB user, setting token.id to:', dbUser._id.toString());
             token.id = dbUser._id.toString();
-          } else {
-            console.log('No DB user found for email:', token.email);
+            token.role = dbUser.role || 'user';
           }
         } catch (error) {
           console.error('JWT callback error:', error);
@@ -147,19 +150,9 @@ const authOptions = {
       return token;
     },
     async session({ session, token }) {
-      if (token?.id) {
+      if (token) {
         session.user.id = token.id;
-        try {
-          await connectDB();
-          const dbUser = await User.findById(token.id);
-          if (dbUser) {
-            session.user.name = dbUser.name;
-            session.user.email = dbUser.email;
-            session.user.image = dbUser.image;
-          }
-        } catch (error) {
-          console.error('Session callback error:', error);
-        }
+        session.user.role = token.role;
       }
       return session;
     },
@@ -168,6 +161,7 @@ const authOptions = {
     signIn: '/login',
     error: '/auth/error',
   },
+  secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === 'development',
 };
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback, memo } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { AppSidebar } from "@/components/app-sidebar"
@@ -18,6 +18,50 @@ import { useLikedSongs } from "@/hooks/useLikedSongs"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbPage } from "@/components/ui/breadcrumb"
+const TABS = ["Playlists", "Albums", "Artists"]
+
+const PlaylistCollage = memo(({ images }) => {
+  if (!images || images.length === 0) return null;
+  const displayImages = images.slice(0, 4);
+
+  if (displayImages.length < 4) {
+    return (
+      <img
+        src={displayImages[0]}
+        alt="Playlist Cover"
+        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+      />
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 grid-rows-2 w-full h-full group-hover:scale-105 transition-transform duration-300">
+      {displayImages.map((src, idx) => (
+        <div key={idx} className="relative w-full h-full overflow-hidden border-[0.5px] border-black/10">
+          <img
+            src={src}
+            alt={`Collage ${idx}`}
+            className="w-full h-full object-cover"
+          />
+        </div>
+      ))}
+    </div>
+  );
+});
+PlaylistCollage.displayName = "PlaylistCollage";
+
+const LibrarySkeleton = memo(() => (
+  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+    {Array.from({ length: 12 }).map((_, i) => (
+      <div key={i} className="p-3">
+        <Skeleton className="aspect-square w-full mb-3 rounded-md bg-zinc-800/50" />
+        <Skeleton className="h-4 w-3/4 mb-2 bg-zinc-800/50" />
+        <Skeleton className="h-3 w-1/2 bg-zinc-800/50" />
+      </div>
+    ))}
+  </div>
+));
+LibrarySkeleton.displayName = "LibrarySkeleton";
 
 export default function LibraryPage() {
   const router = useRouter()
@@ -129,15 +173,19 @@ export default function LibraryPage() {
 
   const likedSongsCount = getLikedCount()
 
-  const tabs = ["Playlists", "Albums", "Artists"]
+  const toggleTab = useCallback((tab) => {
+    setActiveTab(prev => prev === tab ? "All" : tab)
+  }, [])
 
-  const toggleTab = (tab) => {
-    if (activeTab === tab) {
-      setActiveTab("All")
-    } else {
-      setActiveTab(tab)
+  const handleBack = useCallback(() => router.back(), [router])
+
+  const getImageSrc = useCallback((image) => {
+    if (!image) return null
+    if (Array.isArray(image)) {
+      return image.find((img) => img.quality === "500x500")?.url || image[0]?.url
     }
-  }
+    return image
+  }, [])
 
   const filteredItems = useMemo(() => {
     const items = []
@@ -221,61 +269,7 @@ export default function LibraryPage() {
     }
 
     return items
-  }, [activeTab, likedPlaylists, likedAlbums, likedArtists, likedSongsCount, router, session?.user?.name])
-
-  const LibrarySkeleton = () => (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
-      {Array.from({ length: 12 }).map((_, i) => (
-        <div key={i} className="p-3">
-          <Skeleton className="aspect-square w-full mb-3 rounded-md bg-zinc-800/50" />
-          <Skeleton className="h-4 w-3/4 mb-2 bg-zinc-800/50" />
-          <Skeleton className="h-3 w-1/2 bg-zinc-800/50" />
-        </div>
-      ))}
-    </div>
-  )
-
-  const getImageSrc = (image) => {
-    if (!image) return null
-    if (Array.isArray(image)) {
-      // Find 300x300 or closest
-      return image.find((img) => img.quality === "500x500")?.url || image[0]?.url
-    }
-    return image // String case
-  }
-
-  const PlaylistCollage = ({ images }) => {
-    if (!images || images.length === 0) return null;
-
-    // Determine how many images to show (up to 4)
-    const displayImages = images.slice(0, 4);
-
-    // If only 1-3 images, just show the first one full size (simplified logic)
-    if (displayImages.length < 4) {
-      return (
-        <img
-          src={displayImages[0]}
-          alt="Playlist Cover"
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-        />
-      );
-    }
-
-    // 4 images collage
-    return (
-      <div className="grid grid-cols-2 grid-rows-2 w-full h-full group-hover:scale-105 transition-transform duration-300">
-        {displayImages.map((src, idx) => (
-          <div key={idx} className="relative w-full h-full overflow-hidden border-[0.5px] border-black/10">
-            <img
-              src={src}
-              alt={`Collage ${idx}`}
-              className="w-full h-full object-cover"
-            />
-          </div>
-        ))}
-      </div>
-    );
-  };
+  }, [activeTab, likedPlaylists, likedAlbums, likedArtists, likedSongsCount, createdPlaylists, router])
 
   return (
     <SidebarProvider>
@@ -283,7 +277,7 @@ export default function LibraryPage() {
       <SidebarInset className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col">
         <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background px-4">
           <SidebarTrigger className="-ml-1 hidden md:inline" />
-          <Button variant="ghost" size="sm" onClick={() => router.back()} className="mr-2 hidden md:flex">
+          <Button variant="ghost" size="sm" onClick={handleBack} className="mr-2 hidden md:flex">
             <ArrowLeft className="w-4 h-4 mr-1" />
             <span className="">Back</span>
           </Button>
@@ -311,7 +305,7 @@ export default function LibraryPage() {
               </Button>
             )}
 
-            {tabs.map((tab) => (
+            {TABS.map((tab) => (
               <Button
                 key={tab}
                 variant={activeTab === tab ? "default" : "secondary"}

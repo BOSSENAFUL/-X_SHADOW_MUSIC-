@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo, memo } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar"
@@ -35,6 +35,119 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
+
+// --- Memoized Components ---
+
+const PlaylistSkeleton = memo(() => (
+  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+    {[...Array(12)].map((_, i) => (
+      <div key={i} className="space-y-3">
+        <Skeleton className="aspect-square w-full rounded-md bg-zinc-800/50" />
+        <div className="space-y-1">
+          <Skeleton className="h-4 w-3/4 bg-zinc-800/50" />
+          <Skeleton className="h-3 w-1/2 bg-zinc-800/50" />
+        </div>
+      </div>
+    ))}
+  </div>
+));
+PlaylistSkeleton.displayName = "PlaylistSkeleton";
+
+const PlaylistCard = memo(({ playlist, onClick }) => {
+  // Generate playlist cover based on songs
+  const cover = useMemo(() => {
+    if (playlist.image) {
+      return { type: 'single', src: playlist.image };
+    }
+
+    const songs = playlist.songs || [];
+    if (!songs || songs.length === 0) {
+      return { type: 'default' };
+    }
+
+    if (songs.length >= 1 && songs.length <= 3) {
+      const firstSong = songs[0];
+      const imageUrl = firstSong.image?.find(img => img.quality === '500x500')?.url ||
+        firstSong.image?.find(img => img.quality === '150x150')?.url ||
+        firstSong.image?.[firstSong.image.length - 1]?.url;
+
+      return {
+        type: 'single',
+        src: imageUrl || '/def playlist image.jpg'
+      };
+    }
+
+    if (songs.length >= 4) {
+      const images = songs.slice(0, 4).map(song => {
+        return song.image?.find(img => img.quality === '150x150')?.url ||
+          song.image?.find(img => img.quality === '500x500')?.url ||
+          song.image?.[song.image.length - 1]?.url ||
+          '/def playlist image.jpg';
+      });
+
+      return {
+        type: 'collage',
+        images: images
+      };
+    }
+
+    return { type: 'default' };
+  }, [playlist.image, playlist.songs]);
+
+  return (
+    <div
+      onClick={onClick}
+      className="group cursor-pointer space-y-3 transition-all"
+    >
+      <div className="aspect-square w-full relative overflow-hidden rounded-md shadow-sm transition-all duration-300 group-hover:shadow-xl group-hover:scale-[1.02]">
+        {cover.type === 'single' ? (
+          <img
+            src={cover.src}
+            alt={playlist.name}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+            onError={(e) => { e.target.src = '/def playlist image.jpg'; }}
+          />
+        ) : cover.type === 'collage' ? (
+          <div className="w-full h-full grid grid-cols-2 grid-rows-2">
+            {cover.images.map((imageSrc, index) => (
+              <div key={index} className="w-full h-full overflow-hidden border-[0.5px] border-black/10">
+                <img
+                  src={imageSrc}
+                  alt={`Song ${index + 1}`}
+                  className="w-full h-full object-cover"
+                  onError={(e) => { e.target.src = '/def playlist image.jpg'; }}
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
+            <Music className="w-12 h-12 text-zinc-700" />
+          </div>
+        )}
+
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <Badge variant="secondary" className="h-6 px-2 text-[10px] bg-black/50 text-white backdrop-blur-md hover:bg-black/70 border-none">
+            {playlist.isPublic ? <Unlock className="w-3 h-3 mr-1" /> : <Lock className="w-3 h-3 mr-1" />}
+            {playlist.isPublic ? "Public" : "Private"}
+          </Badge>
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <h3 className="font-semibold text-sm truncate pr-2 group-hover:text-primary transition-colors">
+          {playlist.name}
+        </h3>
+        <div className="flex flex-col text-xs text-muted-foreground space-y-0.5">
+          <span>{playlist.songIds?.length || 0} songs</span>
+        </div>
+      </div>
+    </div>
+  );
+});
+PlaylistCard.displayName = "PlaylistCard";
+
+// --- Main Page Component ---
 
 export default function PlaylistsPage() {
   const router = useRouter();
@@ -137,14 +250,17 @@ export default function PlaylistsPage() {
   }, [session, status]);
 
   // Filter playlists based on search query
-  const filteredPlaylists = playlists.filter(p =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredPlaylists = useMemo(() => {
+    const query = searchQuery.toLowerCase();
+    return playlists.filter(p =>
+      p.name.toLowerCase().includes(query) ||
+      (p.description && p.description.toLowerCase().includes(query))
+    );
+  }, [playlists, searchQuery]);
 
   console.log("Playlists received from API:", playlists.length, playlists);
 
-  const handleCreatePlaylist = async () => {
+  const handleCreatePlaylist = useCallback(async () => {
     if (status !== "authenticated" || !session?.user?.id) {
       return;
     }
@@ -166,7 +282,6 @@ export default function PlaylistsPage() {
           sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
           sessionStorage.removeItem(`created_playlists_${session.user.id}`);
         }
-        // Redirect to the new playlist page
         router.push(`/music/playlists/${result.data._id}`);
       } else {
         console.error('Failed to create playlist:', result.error);
@@ -178,9 +293,9 @@ export default function PlaylistsPage() {
     } finally {
       setIsCreating(false);
     }
-  };
+  }, [status, session?.user?.id, router]);
 
-  const handleImportPlaylist = async () => {
+  const handleImportPlaylist = useCallback(async () => {
     if (!importUrl) {
       toast.error("Please enter a Spotify playlist URL");
       return;
@@ -203,12 +318,6 @@ export default function PlaylistsPage() {
         toast.success(`Playlist imported successfully! Added ${result.data.songIds.length} songs.`);
         setShowImportDialog(false);
         setImportUrl("");
-        // Refresh playlists
-        // We can just add the new playlist to the state to avoid full refetch
-        // But for consistency we might want to refetch or manually construct it
-        // The API returns the new playlist object (result.data)
-        // Ideally we should process the playlist to fetch covers if needed, 
-        // but likely covers won't be ready immediately without song fetch.
         if (session?.user?.id) {
           sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
           sessionStorage.removeItem(`created_playlists_${session.user.id}`);
@@ -223,63 +332,9 @@ export default function PlaylistsPage() {
     } finally {
       setIsImporting(false);
     }
-  };
+  }, [importUrl, session?.user?.id]);
 
-  // Generate playlist cover based on songs (same logic as detail page)
-  const getPlaylistCover = (playlist) => {
-    // If playlist has an explicit image (e.g. from Spotify import), use it
-    if (playlist.image) {
-      return { type: 'single', src: playlist.image };
-    }
 
-    const songs = playlist.songs || [];
-
-    if (!songs || songs.length === 0) {
-      return { type: 'default', src: '/def playlist image.jpg' };
-    }
-
-    if (songs.length >= 1 && songs.length <= 3) {
-      // Use first song's cover image
-      const firstSong = songs[0];
-      const imageUrl = firstSong.image?.find(img => img.quality === '500x500')?.url ||
-        firstSong.image?.find(img => img.quality === '150x150')?.url ||
-        firstSong.image?.[firstSong.image.length - 1]?.url;
-
-      return {
-        type: 'single',
-        src: imageUrl || '/def playlist image.jpg',
-        song: firstSong
-      };
-    }
-
-    if (songs.length >= 4) {
-      // Create 4-image collage from first 4 songs
-      const firstFourSongs = songs.slice(0, 4);
-      const images = firstFourSongs.map(song => {
-        return song.image?.find(img => img.quality === '150x150')?.url ||
-          song.image?.find(img => img.quality === '500x500')?.url ||
-          song.image?.[song.image.length - 1]?.url ||
-          '/def playlist image.jpg';
-      });
-
-      return {
-        type: 'collage',
-        images: images,
-        songs: firstFourSongs
-      };
-    }
-
-    return { type: 'default', src: '/def playlist image.jpg' };
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'Unknown date';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
 
   return (
     <SidebarProvider>
@@ -380,17 +435,7 @@ export default function PlaylistsPage() {
         <div className="flex flex-1 flex-col gap-8 p-6 pb-32 md:pb-24">
 
           {loading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-              {[...Array(12)].map((_, i) => (
-                <div key={i} className="space-y-3">
-                  <Skeleton className="aspect-square w-full rounded-md bg-zinc-800/50" />
-                  <div className="space-y-1">
-                    <Skeleton className="h-4 w-3/4 bg-zinc-800/50" />
-                    <Skeleton className="h-3 w-1/2 bg-zinc-800/50" />
-                  </div>
-                </div>
-              ))}
-            </div>
+            <PlaylistSkeleton />
           ) : playlists.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center border rounded-lg border-dashed bg-muted/10">
               <div className="rounded-full bg-muted p-4 mb-4">
@@ -417,75 +462,11 @@ export default function PlaylistsPage() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
               {filteredPlaylists.map((playlist) => (
-                <div
+                <PlaylistCard
                   key={playlist._id}
+                  playlist={playlist}
                   onClick={() => router.push(`/music/playlists/${playlist._id}`)}
-                  className="group cursor-pointer space-y-3 transition-all"
-                >
-                  <div className="aspect-square w-full relative overflow-hidden rounded-md shadow-sm transition-all duration-300 group-hover:shadow-xl group-hover:scale-[1.02]">
-                    {(() => {
-                      const cover = getPlaylistCover(playlist);
-
-                      if (cover.type === 'single') {
-                        return (
-                          <img
-                            src={cover.src}
-                            alt={playlist.name}
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                            onError={(e) => {
-                              e.target.src = '/def playlist image.jpg';
-                            }}
-                          />
-                        );
-                      } else if (cover.type === 'collage') {
-                        return (
-                          <div className="w-full h-full grid grid-cols-2 grid-rows-2">
-                            {cover.images.map((imageSrc, index) => (
-                              <div key={index} className="w-full h-full overflow-hidden border-[0.5px] border-black/10">
-                                <img
-                                  src={imageSrc}
-                                  alt={`Song ${index + 1}`}
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    e.target.src = '/def playlist image.jpg';
-                                  }}
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      } else {
-                        return (
-                          <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
-                            <Music className="w-12 h-12 text-zinc-700" />
-                          </div>
-                        );
-                      }
-                    })()}
-
-                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      {playlist.isPublic ? (
-                        <Badge variant="secondary" className="h-6 px-2 text-[10px] bg-black/50 text-white backdrop-blur-md hover:bg-black/70 border-none">
-                          <Unlock className="w-3 h-3 mr-1" /> Public
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="h-6 px-2 text-[10px] bg-black/50 text-white backdrop-blur-md hover:bg-black/70 border-none">
-                          <Lock className="w-3 h-3 mr-1" /> Private
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <h3 className="font-semibold text-sm truncate pr-2 group-hover:text-primary transition-colors">
-                      {playlist.name}
-                    </h3>
-                    <div className="flex flex-col text-xs text-muted-foreground space-y-0.5">
-                      <span>{playlist.songIds?.length || 0} songs</span>
-
-                    </div>
-                  </div>
-                </div>
+                />
               ))}
             </div>
           )}

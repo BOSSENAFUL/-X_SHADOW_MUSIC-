@@ -273,7 +273,7 @@ export default function ArtistPage() {
 
           const colorCounts = {};
 
-          // Sample every 10th pixel for performance
+          // Sample pixels
           for (let i = 0; i < data.length; i += 40) {
             const r = data[i];
             const g = data[i + 1];
@@ -281,19 +281,25 @@ export default function ArtistPage() {
 
             // Skip very light or very dark colors
             const brightness = (r + g + b) / 3;
-            if (brightness < 50 || brightness > 200) continue;
+            if (brightness < 40 || brightness > 220) continue;
+
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            const saturation = max - min;
+
+            if (saturation < 30) continue;
 
             const color = `${Math.floor(r / 10) * 10},${Math.floor(g / 10) * 10},${Math.floor(b / 10) * 10}`;
-            colorCounts[color] = (colorCounts[color] || 0) + 1;
+            colorCounts[color] = (colorCounts[color] || 0) + (1 + saturation / 50);
           }
 
-          // Find the most common color
-          let dominantColor = '40,40,40'; // Default dark gray
-          let maxCount = 0;
+          // Find the most vibrant color
+          let dominantColor = '40,40,40'; // Default
+          let maxWeight = 0;
 
-          for (const [color, count] of Object.entries(colorCounts)) {
-            if (count > maxCount) {
-              maxCount = count;
+          for (const [color, weight] of Object.entries(colorCounts)) {
+            if (weight > maxWeight) {
+              maxWeight = weight;
               dominantColor = color;
             }
           }
@@ -576,18 +582,79 @@ export default function ArtistPage() {
           </div>
         </header>
 
-        <div className="flex-1">
-          {/* Artist Header */}
+        <div
+          className="flex-1 relative transition-colors duration-1000"
+          style={{
+            backgroundColor: dominantColor
+              ? `color-mix(in srgb, ${dominantColor}, black 94%)`
+              : '#121212'
+          }}
+        >
+          {/* Main Ambient Gradient Layer */}
           <div
-            className="p-4 md:p-6 text-white"
+            className="absolute inset-0 h-[450px] pointer-events-none transition-all duration-1000"
             style={{
-              background: `linear-gradient(to bottom, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.5)')} 0%, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.2)')} 100%)`
+              background: dominantColor
+                ? `linear-gradient(to bottom, 
+                    ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.7)')} 0%, 
+                    ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.4)')} 40%, 
+                    ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.1)')} 80%, 
+                    transparent 100%)`
+                : 'transparent'
             }}
-          >
-            {/* Mobile Layout */}
-            <div className="block md:hidden">
-              <div className="flex flex-col items-center text-center space-y-4">
-                <div className="w-48 h-48 rounded-full overflow-hidden bg-muted">
+          />
+
+          <div className="relative z-10">
+            {/* Artist Header */}
+            <div className="p-4 pt-12 pb-2 md:p-8 md:pt-20 md:pb-4 text-white">
+              {/* Mobile Layout */}
+              <div className="block md:hidden">
+                <div className="flex flex-col items-center text-center space-y-4">
+                  <div className="w-48 h-48 rounded-full overflow-hidden bg-muted">
+                    {artist.image?.[2]?.url || artist.image?.[1]?.url || artist.image?.[0]?.url ? (
+                      <img
+                        src={artist.image?.[2]?.url || artist.image?.[1]?.url || artist.image?.[0]?.url}
+                        alt={artist.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Users className="w-16 h-16 opacity-50" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    {artist.isVerified && (
+                      <Badge variant="secondary" className="mb-2">
+                        <span className="w-2 h-2 bg-blue-500 rounded-full mr-1" />
+                        Verified Artist
+                      </Badge>
+                    )}
+                    <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word">
+                      {artist.name}
+                    </h1>
+                    <div className="flex items-center justify-center gap-4 text-sm flex-wrap">
+                      <div className="flex items-center gap-1">
+                        <Users className="w-4 h-4" />
+                        <span>{formatFollowers(artist.followerCount)} followers</span>
+                      </div>
+                      {artist.dob && (
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-4 h-4" />
+                          <span>Born {artist.dob}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Desktop Layout */}
+              <div className="hidden md:flex gap-6 items-end">
+                <div className="w-60 h-60 rounded-full overflow-hidden bg-muted shrink-0">
                   {artist.image?.[2]?.url || artist.image?.[1]?.url || artist.image?.[0]?.url ? (
                     <img
                       src={artist.image?.[2]?.url || artist.image?.[1]?.url || artist.image?.[0]?.url}
@@ -599,21 +666,21 @@ export default function ArtistPage() {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <Users className="w-16 h-16 opacity-50" />
+                      <Users className="w-20 h-20 opacity-50" />
                     </div>
                   )}
                 </div>
-                <div className="space-y-2">
+                <div className="flex-1 min-w-0">
                   {artist.isVerified && (
                     <Badge variant="secondary" className="mb-2">
                       <span className="w-2 h-2 bg-blue-500 rounded-full mr-1" />
                       Verified Artist
                     </Badge>
                   )}
-                  <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word">
+                  <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-4 wrap-break-word">
                     {artist.name}
                   </h1>
-                  <div className="flex items-center justify-center gap-4 text-sm flex-wrap">
+                  <div className="flex items-center gap-4 text-sm">
                     <div className="flex items-center gap-1">
                       <Users className="w-4 h-4" />
                       <span>{formatFollowers(artist.followerCount)} followers</span>
@@ -629,304 +696,256 @@ export default function ArtistPage() {
               </div>
             </div>
 
-            {/* Desktop Layout */}
-            <div className="hidden md:flex gap-6 items-end">
-              <div className="w-60 h-60 rounded-full overflow-hidden bg-muted shrink-0">
-                {artist.image?.[2]?.url || artist.image?.[1]?.url || artist.image?.[0]?.url ? (
-                  <img
-                    src={artist.image?.[2]?.url || artist.image?.[1]?.url || artist.image?.[0]?.url}
-                    alt={artist.name}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                    }}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Users className="w-20 h-20 opacity-50" />
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                {artist.isVerified && (
-                  <Badge variant="secondary" className="mb-2">
-                    <span className="w-2 h-2 bg-blue-500 rounded-full mr-1" />
-                    Verified Artist
-                  </Badge>
-                )}
-                <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-4 wrap-break-word">
-                  {artist.name}
-                </h1>
-                <div className="flex items-center gap-4 text-sm">
-                  <div className="flex items-center gap-1">
-                    <Users className="w-4 h-4" />
-                    <span>{formatFollowers(artist.followerCount)} followers</span>
-                  </div>
-                  {artist.dob && (
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      <span>Born {artist.dob}</span>
-                    </div>
+            {/* Controls */}
+            <div className="p-4 pt-2 md:p-8 md:pt-4">
+              <div className="flex items-center gap-3 md:gap-4">
+                <Button
+                  size="lg"
+                  className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-transform"
+                  style={{
+                    backgroundColor: dominantColor,
+                    boxShadow: `0 8px 32px ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.3)')}`
+                  }}
+                  onClick={handlePlayAll}
+                >
+                  {currentPlaylistId === artistId && isPlaying ? (
+                    <HiPause style={{ width: '24px', height: '24px' }} />
+                  ) : (
+                    <IoMdPlay style={{ width: '24px', height: '24px', marginLeft: '4px' }} />
                   )}
-                </div>
+                </Button>
+                <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
+                  <Shuffle className="w-5 h-5 md:w-6 md:h-6" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  className={`rounded-full w-10 h-10 md:w-12 md:h-12 ${isArtistLiked ? 'text-red-500' : ''}`}
+                  onClick={toggleArtistLike}
+                  disabled={artistLikeLoading || !session?.user?.id}
+                >
+                  <Heart className={`w-5 h-5 md:w-6 md:h-6 ${isArtistLiked ? 'fill-current' : ''}`} />
+                </Button>
+                <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
+                  <MoreVertical className="w-5 h-5 md:w-6 md:h-6" />
+                </Button>
               </div>
             </div>
-          </div>
 
-          {/* Controls */}
-          <div
-            className="p-4 md:p-6"
-            style={{
-              background: `linear-gradient(to bottom, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.2)')}, transparent)`
-            }}
-          >
-            <div className="flex items-center gap-3 md:gap-4">
-              <Button
-                size="lg"
-                className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-transform"
-                style={{
-                  backgroundColor: dominantColor,
-                  boxShadow: `0 8px 32px ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.3)')}`
-                }}
-                onClick={handlePlayAll}
-              >
-                {currentPlaylistId === artistId && isPlaying ? (
-                  <HiPause style={{ width: '24px', height: '24px' }} />
-                ) : (
-                  <IoMdPlay style={{ width: '24px', height: '24px', marginLeft: '4px' }} />
-                )}
-              </Button>
-              <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
-                <Shuffle className="w-5 h-5 md:w-6 md:h-6" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="lg"
-                className={`rounded-full w-10 h-10 md:w-12 md:h-12 ${isArtistLiked ? 'text-red-500' : ''}`}
-                onClick={toggleArtistLike}
-                disabled={artistLikeLoading || !session?.user?.id}
-              >
-                <Heart className={`w-5 h-5 md:w-6 md:h-6 ${isArtistLiked ? 'fill-current' : ''}`} />
-              </Button>
-              <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
-                <MoreVertical className="w-5 h-5 md:w-6 md:h-6" />
-              </Button>
-            </div>
-          </div>
-
-          <div className="px-2 md:px-6 pb-32 md:pb-24 space-y-6 md:space-y-8">
-            {/* Popular Songs */}
-            {artist.topSongs && artist.topSongs.length > 0 && (
-              <div>
-                <h2 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">Popular</h2>
-                <div className="space-y-0">
-                  {artist.topSongs.slice(0, 10).map((song, index) => {
-                    const isCurrentSong = currentSong?.id === song.id;
-                    return (
-                      <div
-                        key={song.id || index}
-                        className={`flex items-center gap-2 md:gap-4 p-1 py-2
+            <div className="px-2 md:px-6 pb-32 md:pb-24 space-y-6 md:space-y-8">
+              {/* Popular Songs */}
+              {artist.topSongs && artist.topSongs.length > 0 && (
+                <div>
+                  <h2 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">Popular</h2>
+                  <div className="space-y-0">
+                    {artist.topSongs.slice(0, 10).map((song, index) => {
+                      const isCurrentSong = currentSong?.id === song.id;
+                      return (
+                        <div
+                          key={song.id || index}
+                          className={`flex items-center gap-2 md:gap-4 p-1 py-2
                            rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''}`}
-                        onClick={() => handlePlayClick(song, index)}
-                      >
-                        <div className="w-6 md:w-8 text-center shrink-0">
-                          {isCurrentSong && isPlaying ? (
-                            <div className="flex items-center justify-center">
-                              <div className="flex items-end justify-center gap-0.5 h-3">
-                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
-                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
-                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
-                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
+                          onClick={() => handlePlayClick(song, index)}
+                        >
+                          <div className="w-6 md:w-8 text-center shrink-0">
+                            {isCurrentSong && isPlaying ? (
+                              <div className="flex items-center justify-center">
+                                <div className="flex items-end justify-center gap-0.5 h-3">
+                                  <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
+                                  <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
+                                  <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
+                                  <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
+                                </div>
                               </div>
-                            </div>
-                          ) : isCurrentSong ? (
-                            <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
-                          ) : (
-                            <>
-                              <span className="text-muted-foreground group-hover:hidden text-sm">
-                                {index + 1}
-                              </span>
-                              <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
-                            </>
-                          )}
-                        </div>
+                            ) : isCurrentSong ? (
+                              <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
+                            ) : (
+                              <>
+                                <span className="text-muted-foreground group-hover:hidden text-sm">
+                                  {index + 1}
+                                </span>
+                                <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
+                              </>
+                            )}
+                          </div>
 
-                        <div className="w-12 h-12 md:w-12 md:h-12 rounded bg-muted shrink-0 overflow-hidden">
-                          {song.image?.length > 0 ? (
+                          <div className="w-12 h-12 md:w-12 md:h-12 rounded bg-muted shrink-0 overflow-hidden">
+                            {song.image?.length > 0 ? (
+                              <img
+                                src={song.image.find(img => img.quality === '500x500')?.url ||
+                                  song.image.find(img => img.quality === '150x150')?.url ||
+                                  song.image[song.image.length - 1]?.url}
+                                alt={song.name}
+                                className="w-full h-full object-cover rounded"
+                                loading="lazy"
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <IoMdPlay className="w-4 h-4 opacity-50 text-white" />
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <p className={`font-medium truncate text-sm md:text-base ${isCurrentSong ? 'text-green-500' : ''
+                              }`}>
+                              {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
+                            </p>
+                            <p className={`text-xs md:text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
+                              }`}>
+                              {song.album?.name || 'Unknown Album'}
+                            </p>
+                          </div>
+
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={`h-8 w-8 hidden md:inline-flex shrink-0 p-0 opacity-0 group-hover:opacity-100 transition-opacity ${isLiked(song.id) ? 'text-green-500 hover:text-green-600' : 'text-muted-foreground hover:text-foreground'}`}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              await toggleLike(song);
+                            }}
+                          >
+                            <Heart className={`w-4 h-4 ${isLiked(song.id) ? 'fill-current' : ''}`} />
+                          </Button>
+
+                          <div className="w-12 text-center text-sm text-muted-foreground hidden md:block">
+                            {formatDuration(song.duration)}
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="p-1 h-8 w-8 text-muted-foreground md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48 z-9999">
+                                <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, song)}>
+                                  <Plus className="w-4 h-4 mr-2" />
+                                  Add to playlist
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={(e) => handleGoToAlbum(e, song)}>
+                                  <Disc className="w-4 h-4 mr-2" />
+                                  Go to album
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={(e) => handleDownload(e, song)}>
+                                  <Download className="w-4 h-4 mr-2" />
+                                  Download
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    // Optimistic update - toggle immediately for better UX
+                                    toggleLike(song).catch(error => {
+                                      console.error('Error toggling song like:', error);
+                                    });
+                                  }}
+                                  className={isLiked(song.id) ? 'text-red-500' : ''}
+                                >
+                                  <Heart className={`w-4 h-4 mr-2 ${isLiked(song.id) ? 'fill-current' : ''}`} />
+                                  {isLiked(song.id) ? 'Unlike' : 'Like'}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Albums */}
+              {albums.length > 0 && (
+                <div>
+                  <h2 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">Albums</h2>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-6">
+                    {albums.map((album) => (
+                      <div
+                        key={album.id}
+                        className="group cursor-pointer hover:scale-105 transition-transform"
+                        onClick={() => router.push(`/music/album/${album.id}`)}
+                      >
+                        <div className="relative rounded-lg aspect-square overflow-hidden mb-2 md:mb-3 bg-muted">
+                          {album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url ? (
                             <img
-                              src={song.image.find(img => img.quality === '500x500')?.url ||
-                                song.image.find(img => img.quality === '150x150')?.url ||
-                                song.image[song.image.length - 1]?.url}
-                              alt={song.name}
-                              className="w-full h-full object-cover rounded"
-                              loading="lazy"
+                              src={album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url}
+                              alt={album.name}
+                              className="w-full h-full object-cover"
                               onError={(e) => {
                                 e.target.style.display = 'none';
                               }}
                             />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <IoMdPlay className="w-4 h-4 opacity-50 text-white" />
+                            <div className="w-full h-full flex items-center justify-center text-black">
+                              <IoMdPlay className="w-8 h-8 md:w-12 md:h-12 opacity-50" />
                             </div>
                           )}
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <Button
+                            size="icon"
+                            className="absolute bottom-1 right-1 md:bottom-2 md:right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-green-500 hover:bg-green-600 rounded-full shadow-lg w-8 h-8 md:w-10 md:h-10 flex items-center justify-center"
+                          >
+                            <IoMdPlay className="w-3 h-3 md:w-4 md:h-4 text-black ml-0.5" />
+                          </Button>
                         </div>
-
-                        <div className="flex-1 min-w-0">
-                          <p className={`font-medium truncate text-sm md:text-base ${isCurrentSong ? 'text-green-500' : ''
-                            }`}>
-                            {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
+                        <div className="space-y-1">
+                          <p className="text-xs md:text-sm font-medium leading-tight line-clamp-2 text-foreground">
+                            {album.name}
                           </p>
-                          <p className={`text-xs md:text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
-                            }`}>
-                            {song.album?.name || 'Unknown Album'}
+                          <p className="text-xs text-muted-foreground">
+                            {album.year} • Album
                           </p>
                         </div>
-
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className={`h-8 w-8 hidden md:inline-flex shrink-0 p-0 opacity-0 group-hover:opacity-100 transition-opacity ${isLiked(song.id) ? 'text-green-500 hover:text-green-600' : 'text-muted-foreground hover:text-foreground'}`}
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            await toggleLike(song);
-                          }}
-                        >
-                          <Heart className={`w-4 h-4 ${isLiked(song.id) ? 'fill-current' : ''}`} />
-                        </Button>
-
-                        <div className="w-12 text-center text-sm text-muted-foreground hidden md:block">
-                          {formatDuration(song.duration)}
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="p-1 h-8 w-8 text-muted-foreground md:opacity-0 md:group-hover:opacity-100 transition-opacity"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <MoreVertical className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 z-9999">
-                              <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, song)}>
-                                <Plus className="w-4 h-4 mr-2" />
-                                Add to playlist
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={(e) => handleGoToAlbum(e, song)}>
-                                <Disc className="w-4 h-4 mr-2" />
-                                Go to album
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={(e) => handleDownload(e, song)}>
-                                <Download className="w-4 h-4 mr-2" />
-                                Download
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  // Optimistic update - toggle immediately for better UX
-                                  toggleLike(song).catch(error => {
-                                    console.error('Error toggling song like:', error);
-                                  });
-                                }}
-                                className={isLiked(song.id) ? 'text-red-500' : ''}
-                              >
-                                <Heart className={`w-4 h-4 mr-2 ${isLiked(song.id) ? 'fill-current' : ''}`} />
-                                {isLiked(song.id) ? 'Unlike' : 'Like'}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Albums */}
-            {albums.length > 0 && (
-              <div>
-                <h2 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">Albums</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-6">
-                  {albums.map((album) => (
-                    <div
-                      key={album.id}
-                      className="group cursor-pointer hover:scale-105 transition-transform"
-                      onClick={() => router.push(`/music/album/${album.id}`)}
-                    >
-                      <div className="relative rounded-lg aspect-square overflow-hidden mb-2 md:mb-3 bg-muted">
-                        {album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url ? (
-                          <img
-                            src={album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url}
-                            alt={album.name}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              e.target.style.display = 'none';
-                            }}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-black">
-                            <IoMdPlay className="w-8 h-8 md:w-12 md:h-12 opacity-50" />
-                          </div>
-                        )}
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <Button
-                          size="icon"
-                          className="absolute bottom-1 right-1 md:bottom-2 md:right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-green-500 hover:bg-green-600 rounded-full shadow-lg w-8 h-8 md:w-10 md:h-10 flex items-center justify-center"
-                        >
-                          <IoMdPlay className="w-3 h-3 md:w-4 md:h-4 text-black ml-0.5" />
-                        </Button>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs md:text-sm font-medium leading-tight line-clamp-2 text-foreground">
-                          {album.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {album.year} • Album
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {hasMoreAlbums && (
-                  <div ref={albumsObserverTarget} className="w-full flex justify-center py-8">
-                    {fetchingMoreAlbums && (
-                      <div className="flex gap-1">
-                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
-                      </div>
-                    )}
+                    ))}
                   </div>
-                )}
-              </div>
-            )}
-
-            {/* About */}
-            {artist.bio && artist.bio.length > 0 && (
-              <div>
-                <h2 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">About</h2>
-                <div className="space-y-3 md:space-y-4">
-                  {artist.bio.slice(0, 3).map((bioSection, index) => (
-                    <div key={index}>
-                      {bioSection.title && (
-                        <h3 className="text-base md:text-lg font-semibold mb-2">{bioSection.title}</h3>
+                  {hasMoreAlbums && (
+                    <div ref={albumsObserverTarget} className="w-full flex justify-center py-8">
+                      {fetchingMoreAlbums && (
+                        <div className="flex gap-1">
+                          <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                          <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                          <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
+                        </div>
                       )}
-                      <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
-                        {bioSection.text}
-                      </p>
                     </div>
-                  ))}
+                  )}
                 </div>
-              </div>
-            )}
+              )}
+
+              {/* About */}
+              {artist.bio && artist.bio.length > 0 && (
+                <div>
+                  <h2 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">About</h2>
+                  <div className="space-y-3 md:space-y-4">
+                    {artist.bio.slice(0, 3).map((bioSection, index) => (
+                      <div key={index}>
+                        {bioSection.title && (
+                          <h3 className="text-base md:text-lg font-semibold mb-2">{bioSection.title}</h3>
+                        )}
+                        <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
+                          {bioSection.text}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </SidebarInset>

@@ -178,7 +178,7 @@ export default function AlbumPage() {
 
           const colorCounts = {};
 
-          // Sample every 10th pixel for performance
+          // Sample pixels
           for (let i = 0; i < data.length; i += 40) {
             const r = data[i];
             const g = data[i + 1];
@@ -186,19 +186,25 @@ export default function AlbumPage() {
 
             // Skip very light or very dark colors
             const brightness = (r + g + b) / 3;
-            if (brightness < 50 || brightness > 200) continue;
+            if (brightness < 40 || brightness > 220) continue;
+
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            const saturation = max - min;
+
+            if (saturation < 30) continue;
 
             const color = `${Math.floor(r / 10) * 10},${Math.floor(g / 10) * 10},${Math.floor(b / 10) * 10}`;
-            colorCounts[color] = (colorCounts[color] || 0) + 1;
+            colorCounts[color] = (colorCounts[color] || 0) + (1 + saturation / 50);
           }
 
-          // Find the most common color
-          let dominantColor = '40,40,40'; // Default dark gray
-          let maxCount = 0;
+          // Find the most vibrant color
+          let dominantColor = '40,40,40'; // Default
+          let maxWeight = 0;
 
-          for (const [color, count] of Object.entries(colorCounts)) {
-            if (count > maxCount) {
-              maxCount = count;
+          for (const [color, weight] of Object.entries(colorCounts)) {
+            if (weight > maxWeight) {
+              maxWeight = weight;
               dominantColor = color;
             }
           }
@@ -498,18 +504,93 @@ export default function AlbumPage() {
           </div>
         </header>
 
-        <div className="flex-1">
-          {/* Album Header */}
+        <div
+          className="flex-1 relative transition-colors duration-1000"
+          style={{
+            backgroundColor: dominantColor
+              ? `color-mix(in srgb, ${dominantColor}, black 94%)`
+              : '#121212'
+          }}
+        >
+          {/* Main Ambient Gradient Layer */}
           <div
-            className="p-4 md:p-6 text-white"
+            className="absolute inset-0 h-[550px] pointer-events-none transition-all duration-1000"
             style={{
-              background: `linear-gradient(to bottom, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.5)')} 0%, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.2)')} 100%)`
+              background: dominantColor
+                ? `linear-gradient(to bottom, 
+                    ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.7)')} 0%, 
+                    ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.4)')} 40%, 
+                    ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.1)')} 80%, 
+                    transparent 100%)`
+                : 'transparent'
             }}
-          >
-            {/* Mobile Layout */}
-            <div className="block md:hidden">
-              <div className="flex flex-col items-center text-center space-y-4">
-                <div className="w-48 h-48 rounded-lg overflow-hidden bg-muted shadow-2xl">
+          />
+
+          <div className="relative z-10">
+            {/* Album Header */}
+            <div className="p-4 pt-12 pb-2 md:p-8 md:pt-20 md:pb-4 text-white">
+              {/* Mobile Layout */}
+              <div className="block md:hidden">
+                <div className="flex flex-col items-center text-center space-y-4">
+                  <div className="w-48 h-48 rounded-lg overflow-hidden bg-muted shadow-2xl">
+                    {album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url ? (
+                      <img
+                        src={album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url}
+                        alt={album.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Disc className="w-16 h-16 opacity-50" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    <Badge variant="secondary" className="mb-2">
+                      Album
+                    </Badge>
+                    <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word leading-tight max-w-full" title={decodeHtmlEntities(album.name)}>
+                      {truncateTitle(decodeHtmlEntities(album.name), 35)}
+                    </h1>
+                    <div className="text-sm mb-2">
+                      {album.artists?.primary?.length > 0 && (
+                        <>
+                          {album.artists.primary.map((artist, index) => (
+                            <span key={artist.id || index}>
+                              <button
+                                className="font-semibold hover:underline transition-colors"
+                                onClick={() => handleArtistClick(artist.id)}
+                              >
+                                {decodeHtmlEntities(artist.name)}
+                              </button>
+                              {index < album.artists.primary.length - 1 && ', '}
+                            </span>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-center gap-2 text-sm opacity-80 flex-wrap">
+                      {album.year && (
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-4 h-4" />
+                          <span>{album.year}</span>
+                        </div>
+                      )}
+                      <span>•</span>
+                      <span>{album.songCount || album.songs?.length || 0} songs</span>
+                      <span>•</span>
+                      <span>{getTotalDuration()}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Desktop Layout */}
+              <div className="hidden md:flex gap-6 items-end">
+                <div className="w-60 h-60 rounded-lg overflow-hidden bg-muted shrink-0 shadow-2xl">
                   {album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url ? (
                     <img
                       src={album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url}
@@ -521,18 +602,18 @@ export default function AlbumPage() {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <Disc className="w-16 h-16 opacity-50" />
+                      <Disc className="w-20 h-20 opacity-50" />
                     </div>
                   )}
                 </div>
-                <div className="space-y-3">
+                <div className="flex-1 min-w-0">
                   <Badge variant="secondary" className="mb-2">
                     Album
                   </Badge>
-                  <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word leading-tight max-w-full" title={decodeHtmlEntities(album.name)}>
-                    {truncateTitle(decodeHtmlEntities(album.name), 35)}
+                  <h1 ref={desktopTitleRef} className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 wrap-break-word leading-tight" title={decodeHtmlEntities(album.name)}>
+                    {truncateTitle(decodeHtmlEntities(album.name), 60)}
                   </h1>
-                  <div className="text-sm mb-2">
+                  <div className="flex items-center gap-2 text-sm mb-2">
                     {album.artists?.primary?.length > 0 && (
                       <>
                         {album.artists.primary.map((artist, index) => (
@@ -549,7 +630,7 @@ export default function AlbumPage() {
                       </>
                     )}
                   </div>
-                  <div className="flex items-center justify-center gap-2 text-sm opacity-80 flex-wrap">
+                  <div className="flex items-center gap-2 text-sm opacity-80">
                     {album.year && (
                       <div className="flex items-center gap-1">
                         <Calendar className="w-4 h-4" />
@@ -565,282 +646,92 @@ export default function AlbumPage() {
               </div>
             </div>
 
-            {/* Desktop Layout */}
-            <div className="hidden md:flex gap-6 items-end">
-              <div className="w-60 h-60 rounded-lg overflow-hidden bg-muted shrink-0 shadow-2xl">
-                {album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url ? (
-                  <img
-                    src={album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url}
-                    alt={album.name}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                    }}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Disc className="w-20 h-20 opacity-50" />
+            {/* Controls */}
+            <div className="p-4 pt-2 md:p-8 md:pt-4">
+              <div className="flex items-center gap-3 md:gap-4">
+                <Button
+                  size="lg"
+                  className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-transform"
+                  style={{
+                    backgroundColor: dominantColor,
+                    boxShadow: `0 8px 32px ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.3)')}`
+                  }}
+                  onClick={handlePlayAll}
+                >
+                  {currentPlaylistId === albumId && isPlaying ? (
+                    <HiPause style={{ width: '24px', height: '24px' }} />
+                  ) : (
+                    <IoMdPlay style={{ width: '24px', height: '24px', marginLeft: '4px' }} />
+                  )}
+                </Button>
+                <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
+                  <Shuffle className="w-5 h-5 md:w-6 md:h-6" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  className={`rounded-full w-10 h-10 md:w-12 md:h-12 ${isAlbumLiked(albumId) ? 'text-red-500' : ''}`}
+                  onClick={() => {
+                    // Optimistic update - toggle immediately for better UX
+                    toggleAlbumLike(album).catch(error => {
+                      console.error('Error toggling album like:', error);
+                    });
+                  }}
+                >
+                  <Heart className={`w-5 h-5 md:w-6 md:h-6 ${isAlbumLiked(albumId) ? 'fill-current' : ''}`} />
+                </Button>
+                <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
+                  <MoreVertical className="w-5 h-5 md:w-6 md:h-6" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Songs List */}
+            <div className="px-2 md:px-6 pb-32 md:pb-24">
+              {/* Desktop Table Header */}
+              <div className="hidden md:grid grid-cols-[auto_1fr_auto] gap-4 items-center text-sm text-muted-foreground border-b pb-2 mb-4">
+                <div className="w-8 text-center">#</div>
+                <div>Title</div>
+                <div className="flex items-center gap-2">
+                  <div className="w-12 text-center">
+                    <Clock className="w-4 h-4 mx-auto" />
                   </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <Badge variant="secondary" className="mb-2">
-                  Album
-                </Badge>
-                <h1 ref={desktopTitleRef} className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 wrap-break-word leading-tight" title={decodeHtmlEntities(album.name)}>
-                  {truncateTitle(decodeHtmlEntities(album.name), 60)}
-                </h1>
-                <div className="flex items-center gap-2 text-sm mb-2">
-                  {album.artists?.primary?.length > 0 && (
-                    <>
-                      {album.artists.primary.map((artist, index) => (
-                        <span key={artist.id || index}>
-                          <button
-                            className="font-semibold hover:underline transition-colors"
-                            onClick={() => handleArtistClick(artist.id)}
-                          >
-                            {decodeHtmlEntities(artist.name)}
-                          </button>
-                          {index < album.artists.primary.length - 1 && ', '}
-                        </span>
-                      ))}
-                    </>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-sm opacity-80">
-                  {album.year && (
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      <span>{album.year}</span>
-                    </div>
-                  )}
-                  <span>•</span>
-                  <span>{album.songCount || album.songs?.length || 0} songs</span>
-                  <span>•</span>
-                  <span>{getTotalDuration()}</span>
+                  <div className="w-8"></div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Controls */}
-          <div
-            className="p-4 md:p-6"
-            style={{
-              background: `linear-gradient(to bottom, ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.2)')}, transparent)`
-            }}
-          >
-            <div className="flex items-center gap-3 md:gap-4">
-              <Button
-                size="lg"
-                className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-transform"
-                style={{
-                  backgroundColor: dominantColor,
-                  boxShadow: `0 8px 32px ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.3)')}`
-                }}
-                onClick={handlePlayAll}
-              >
-                {currentPlaylistId === albumId && isPlaying ? (
-                  <HiPause style={{ width: '24px', height: '24px' }} />
-                ) : (
-                  <IoMdPlay style={{ width: '24px', height: '24px', marginLeft: '4px' }} />
-                )}
-              </Button>
-              <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
-                <Shuffle className="w-5 h-5 md:w-6 md:h-6" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="lg"
-                className={`rounded-full w-10 h-10 md:w-12 md:h-12 ${isAlbumLiked(albumId) ? 'text-red-500' : ''}`}
-                onClick={() => {
-                  // Optimistic update - toggle immediately for better UX
-                  toggleAlbumLike(album).catch(error => {
-                    console.error('Error toggling album like:', error);
-                  });
-                }}
-              >
-                <Heart className={`w-5 h-5 md:w-6 md:h-6 ${isAlbumLiked(albumId) ? 'fill-current' : ''}`} />
-              </Button>
-              <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
-                <MoreVertical className="w-5 h-5 md:w-6 md:h-6" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Songs List */}
-          <div className="px-2 md:px-6 pb-32 md:pb-24">
-            {/* Desktop Table Header */}
-            <div className="hidden md:grid grid-cols-[auto_1fr_auto] gap-4 items-center text-sm text-muted-foreground border-b pb-2 mb-4">
-              <div className="w-8 text-center">#</div>
-              <div>Title</div>
-              <div className="flex items-center gap-2">
-                <div className="w-12 text-center">
-                  <Clock className="w-4 h-4 mx-auto" />
-                </div>
-                <div className="w-8"></div>
-              </div>
-            </div>
-
-            <div className="space-y-0">
-              {album.songs?.map((song, index) => {
-                const isCurrentSong = currentSong?.id === song.id;
-                return (
-                  <div key={song.id || index}>
-                    {/* Mobile Layout */}
-                    <div
-                      className="md:hidden flex items-center gap-2 p-1 py-2 rounded hover:bg-muted/50 group cursor-pointer"
-                      onClick={() => handlePlayClick(song, index)}
-                    >
-                      <div className="w-6 text-center shrink-0">
-                        {isCurrentSong && isPlaying ? (
-                          <div className="flex items-center justify-center">
-                            <div className="flex items-end justify-center gap-0.5 h-3">
-                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
-                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
-                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
-                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
+              <div className="space-y-0">
+                {album.songs?.map((song, index) => {
+                  const isCurrentSong = currentSong?.id === song.id;
+                  return (
+                    <div key={song.id || index}>
+                      {/* Mobile Layout */}
+                      <div
+                        className="md:hidden flex items-center gap-2 p-1 py-2 rounded hover:bg-muted/50 group cursor-pointer"
+                        onClick={() => handlePlayClick(song, index)}
+                      >
+                        <div className="w-6 text-center shrink-0">
+                          {isCurrentSong && isPlaying ? (
+                            <div className="flex items-center justify-center">
+                              <div className="flex items-end justify-center gap-0.5 h-3">
+                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
+                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
+                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
+                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
+                              </div>
                             </div>
-                          </div>
-                        ) : isCurrentSong ? (
-                          <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
-                        ) : (
-                          <>
-                            <span className="text-muted-foreground group-hover:hidden text-sm">
-                              {index + 1}
-                            </span>
-                            <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
-                          </>
-                        )}
-                      </div>
-
-                      <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
-                        {song.image?.length > 0 ? (
-                          <img
-                            src={song.image.find(img => img.quality === '500x500')?.url ||
-                              song.image.find(img => img.quality === '150x150')?.url ||
-                              song.image[song.image.length - 1]?.url}
-                            alt={song.name}
-                            className="w-full h-full object-cover rounded"
-                            loading="lazy"
-                            onError={(e) => {
-                              e.target.style.display = 'none';
-                            }}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <IoMdPlay className="w-4 h-4 opacity-50 text-white" />
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''
-                          }`}>
-                          {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
-                        </p>
-                        <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
-                          }`}>
-                          {song.artists?.primary?.length > 0 ? (
-                            song.artists.primary.map((artist, artistIndex) => (
-                              <span key={artist.id || artistIndex}>
-                                <span className="md:hidden">
-                                  {decodeHtmlEntities(artist.name)}
-                                </span>
-                                <button
-                                  className={`hidden md:inline hover:underline transition-colors ${isCurrentSong ? 'hover:text-green-300' : 'hover:text-foreground'
-                                    }`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleArtistClick(artist.id);
-                                  }}
-                                >
-                                  {decodeHtmlEntities(artist.name)}
-                                </button>
-                                {artistIndex < song.artists.primary.length - 1 && ', '}
-                              </span>
-                            ))
+                          ) : isCurrentSong ? (
+                            <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
                           ) : (
-                            album.artists?.primary?.map(artist => decodeHtmlEntities(artist.name)).join(', ') || 'Unknown Artist'
+                            <>
+                              <span className="text-muted-foreground group-hover:hidden text-sm">
+                                {index + 1}
+                              </span>
+                              <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
+                            </>
                           )}
-                        </p>
-                      </div>
+                        </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="p-2 h-8 w-8 text-muted-foreground"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48 z-9999">
-                            <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, song)}>
-                              <Plus className="w-4 h-4 mr-2" />
-                              Add to playlist
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={(e) => handleGoToArtist(e, song)}>
-                              <User className="w-4 h-4 mr-2" />
-                              Go to artist
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={(e) => handleDownload(e, song)}>
-                              <Download className="w-4 h-4 mr-2" />
-                              Download
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                // Optimistic update - toggle immediately for better UX
-                                toggleLike(song).catch(error => {
-                                  console.error('Error toggling song like:', error);
-                                });
-                              }}
-                              className={isLiked(song.id) ? 'text-red-500' : ''}
-                            >
-                              <Heart className={`w-4 h-4 mr-2 ${isLiked(song.id) ? 'fill-current' : ''}`} />
-                              {isLiked(song.id) ? 'Unlike' : 'Like'}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-
-                    {/* Desktop Layout */}
-                    <div
-                      className="hidden md:grid grid-cols-[auto_1fr_auto] gap-4 items-center p-2 py-2 rounded hover:bg-muted/50 group cursor-pointer"
-                      onClick={() => handlePlayClick(song, index)}
-                    >
-                      <div className="w-8 text-center">
-                        {isCurrentSong && isPlaying ? (
-                          <div className="flex items-center justify-center">
-                            <div className="flex items-end justify-center gap-0.5 h-3">
-                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
-                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
-                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
-                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
-                            </div>
-                          </div>
-                        ) : isCurrentSong ? (
-                          <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
-                        ) : (
-                          <>
-                            <span className="text-muted-foreground group-hover:hidden">
-                              {index + 1}
-                            </span>
-                            <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
-                          </>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-3 min-w-0">
                         <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
                           {song.image?.length > 0 ? (
                             <img
@@ -860,7 +751,8 @@ export default function AlbumPage() {
                             </div>
                           )}
                         </div>
-                        <div className="min-w-0">
+
+                        <div className="min-w-0 flex-1">
                           <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''
                             }`}>
                             {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
@@ -870,8 +762,11 @@ export default function AlbumPage() {
                             {song.artists?.primary?.length > 0 ? (
                               song.artists.primary.map((artist, artistIndex) => (
                                 <span key={artist.id || artistIndex}>
+                                  <span className="md:hidden">
+                                    {decodeHtmlEntities(artist.name)}
+                                  </span>
                                   <button
-                                    className={`hover:underline transition-colors ${isCurrentSong ? 'hover:text-green-300' : 'hover:text-foreground'
+                                    className={`hidden md:inline hover:underline transition-colors ${isCurrentSong ? 'hover:text-green-300' : 'hover:text-foreground'
                                       }`}
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -888,77 +783,201 @@ export default function AlbumPage() {
                             )}
                           </p>
                         </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="p-2 h-8 w-8 text-muted-foreground"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48 z-9999">
+                              <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, song)}>
+                                <Plus className="w-4 h-4 mr-2" />
+                                Add to playlist
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={(e) => handleGoToArtist(e, song)}>
+                                <User className="w-4 h-4 mr-2" />
+                                Go to artist
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={(e) => handleDownload(e, song)}>
+                                <Download className="w-4 h-4 mr-2" />
+                                Download
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // Optimistic update - toggle immediately for better UX
+                                  toggleLike(song).catch(error => {
+                                    console.error('Error toggling song like:', error);
+                                  });
+                                }}
+                                className={isLiked(song.id) ? 'text-red-500' : ''}
+                              >
+                                <Heart className={`w-4 h-4 mr-2 ${isLiked(song.id) ? 'fill-current' : ''}`} />
+                                {isLiked(song.id) ? 'Unlike' : 'Like'}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className={`h-8 w-8 hidden md:inline-flex shrink-0 p-0 opacity-0 group-hover:opacity-100 transition-opacity ${isLiked(song.id) ? 'text-green-500 hover:text-green-600' : 'text-muted-foreground hover:text-foreground'}`}
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            await toggleLike(song);
-                          }}
-                        >
-                          <Heart className={`w-4 h-4 ${isLiked(song.id) ? 'fill-current' : ''}`} />
-                        </Button>
-                        <div className="w-12 text-center text-sm text-muted-foreground hidden md:block">
-                          {formatDuration(song.duration)}
+                      {/* Desktop Layout */}
+                      <div
+                        className="hidden md:grid grid-cols-[auto_1fr_auto] gap-4 items-center p-2 py-2 rounded hover:bg-muted/50 group cursor-pointer"
+                        onClick={() => handlePlayClick(song, index)}
+                      >
+                        <div className="w-8 text-center">
+                          {isCurrentSong && isPlaying ? (
+                            <div className="flex items-center justify-center">
+                              <div className="flex items-end justify-center gap-0.5 h-3">
+                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
+                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
+                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
+                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
+                              </div>
+                            </div>
+                          ) : isCurrentSong ? (
+                            <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
+                          ) : (
+                            <>
+                              <span className="text-muted-foreground group-hover:hidden">
+                                {index + 1}
+                              </span>
+                              <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
+                            </>
+                          )}
                         </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-8 w-8 shrink-0"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48 z-9999">
-                            <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, song)}>
-                              <Plus className="w-4 h-4 mr-2" />
-                              Add to playlist
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={(e) => handleGoToArtist(e, song)}>
-                              <User className="w-4 h-4 mr-2" />
-                              Go to artist
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={(e) => handleDownload(e, song)}>
-                              <Download className="w-4 h-4 mr-2" />
-                              Download
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                // Optimistic update - toggle immediately for better UX
-                                toggleLike(song).catch(error => {
-                                  console.error('Error toggling song like:', error);
-                                });
-                              }}
-                              className={isLiked(song.id) ? 'text-red-500' : ''}
-                            >
-                              <Heart className={`w-4 h-4 mr-2 ${isLiked(song.id) ? 'fill-current' : ''}`} />
-                              {isLiked(song.id) ? 'Unlike' : 'Like'}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
+                            {song.image?.length > 0 ? (
+                              <img
+                                src={song.image.find(img => img.quality === '500x500')?.url ||
+                                  song.image.find(img => img.quality === '150x150')?.url ||
+                                  song.image[song.image.length - 1]?.url}
+                                alt={song.name}
+                                className="w-full h-full object-cover rounded"
+                                loading="lazy"
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <IoMdPlay className="w-4 h-4 opacity-50 text-white" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''
+                              }`}>
+                              {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
+                            </p>
+                            <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
+                              }`}>
+                              {song.artists?.primary?.length > 0 ? (
+                                song.artists.primary.map((artist, artistIndex) => (
+                                  <span key={artist.id || artistIndex}>
+                                    <button
+                                      className={`hover:underline transition-colors ${isCurrentSong ? 'hover:text-green-300' : 'hover:text-foreground'
+                                        }`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleArtistClick(artist.id);
+                                      }}
+                                    >
+                                      {decodeHtmlEntities(artist.name)}
+                                    </button>
+                                    {artistIndex < song.artists.primary.length - 1 && ', '}
+                                  </span>
+                                ))
+                              ) : (
+                                album.artists?.primary?.map(artist => decodeHtmlEntities(artist.name)).join(', ') || 'Unknown Artist'
+                              )}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={`h-8 w-8 hidden md:inline-flex shrink-0 p-0 opacity-0 group-hover:opacity-100 transition-opacity ${isLiked(song.id) ? 'text-green-500 hover:text-green-600' : 'text-muted-foreground hover:text-foreground'}`}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              await toggleLike(song);
+                            }}
+                          >
+                            <Heart className={`w-4 h-4 ${isLiked(song.id) ? 'fill-current' : ''}`} />
+                          </Button>
+                          <div className="w-12 text-center text-sm text-muted-foreground hidden md:block">
+                            {formatDuration(song.duration)}
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-8 w-8 shrink-0"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48 z-9999">
+                              <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, song)}>
+                                <Plus className="w-4 h-4 mr-2" />
+                                Add to playlist
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={(e) => handleGoToArtist(e, song)}>
+                                <User className="w-4 h-4 mr-2" />
+                                Go to artist
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={(e) => handleDownload(e, song)}>
+                                <Download className="w-4 h-4 mr-2" />
+                                Download
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // Optimistic update - toggle immediately for better UX
+                                  toggleLike(song).catch(error => {
+                                    console.error('Error toggling song like:', error);
+                                  });
+                                }}
+                                className={isLiked(song.id) ? 'text-red-500' : ''}
+                              >
+                                <Heart className={`w-4 h-4 mr-2 ${isLiked(song.id) ? 'fill-current' : ''}`} />
+                                {isLiked(song.id) ? 'Unlike' : 'Like'}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {(!album.songs || album.songs.length === 0) && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No songs available in this album</p>
+                  );
+                })}
               </div>
-            )}
+
+              {(!album.songs || album.songs.length === 0) && (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">No songs available in this album</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </SidebarInset>

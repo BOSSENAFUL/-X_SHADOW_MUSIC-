@@ -80,9 +80,9 @@ export function FullscreenMusicPlayer({
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState(null);
   const [dominantColors, setDominantColors] = useState({
-    primary: "#6366f1", // Default indigo
-    secondary: "#8b5cf6", // Default purple
-    accent: "#a855f7", // Default purple
+    primary: "rgb(99, 102, 241)",
+    secondary: "rgb(139, 92, 246)",
+    accent: "rgb(168, 85, 247)",
   });
 
   // Drag and drop state
@@ -769,10 +769,10 @@ export function FullscreenMusicPlayer({
   };
 
 
-  // Extract dominant colors from album art
+  // Extract dominant colors from album art - Updated with high-quality logic from music-player.jsx
   const extractColorsFromImage = (imageUrl) => {
     return new Promise((resolve) => {
-      const img = new Image();
+      const img = new window.Image();
       img.crossOrigin = "anonymous";
 
       img.onload = () => {
@@ -780,92 +780,156 @@ export function FullscreenMusicPlayer({
           const canvas = document.createElement("canvas");
           const ctx = canvas.getContext("2d");
 
-          // Set canvas size
-          canvas.width = 100;
-          canvas.height = 100;
+          // Step 1: Downscale to 64x64 for speed and noise reduction
+          const size = 64;
+          canvas.width = size;
+          canvas.height = size;
+          ctx.drawImage(img, 0, 0, size, size);
 
-          // Draw image
-          ctx.drawImage(img, 0, 0, 100, 100);
-
-          // Get image data
-          const imageData = ctx.getImageData(0, 0, 100, 100);
+          // Step 2: Get center crop (avoid borders/logos)
+          const cropSize = Math.floor(size * 0.8); // 80% center crop
+          const cropOffset = Math.floor((size - cropSize) / 2);
+          const imageData = ctx.getImageData(
+            cropOffset,
+            cropOffset,
+            cropSize,
+            cropSize
+          );
           const data = imageData.data;
 
-          // Extract colors
+          // Step 3: Collect colors and quantize
           const colorCounts = {};
-          const step = 4; // Skip some pixels for performance
 
-          for (let i = 0; i < data.length; i += step * 4) {
+          for (let i = 0; i < data.length; i += 4) {
             const r = data[i];
             const g = data[i + 1];
             const b = data[i + 2];
-            const alpha = data[i + 3];
+            const a = data[i + 3] / 255;
 
-            // Skip transparent pixels
-            if (alpha < 128) continue;
+            // Step 4: Filter out junk colors
+            const rLinear = Math.pow(r / 255, 2.2);
+            const gLinear = Math.pow(g / 255, 2.2);
+            const bLinear = Math.pow(b / 255, 2.2);
+            const luminance = 0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear;
 
-            // Group similar colors
-            const key = `${Math.floor(r / 32) * 32},${Math.floor(g / 32) * 32
-              },${Math.floor(b / 32) * 32}`;
-            colorCounts[key] = (colorCounts[key] || 0) + 1;
+            // Skip near-black, near-white, or transparent pixels
+            if (luminance < 0.03 || luminance > 0.97 || a < 0.2) continue;
+
+            const quantizedR = Math.floor(r / 16) * 16;
+            const quantizedG = Math.floor(g / 16) * 16;
+            const quantizedB = Math.floor(b / 16) * 16;
+            const colorKey = `${quantizedR},${quantizedG},${quantizedB}`;
+
+            colorCounts[colorKey] = (colorCounts[colorKey] || 0) + 1;
           }
 
-          // Sort colors by frequency
-          const sortedColors = Object.entries(colorCounts)
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 5)
-            .map(([color]) => {
+          const palette = Object.entries(colorCounts)
+            .map(([color, count]) => {
               const [r, g, b] = color.split(",").map(Number);
-              return { r, g, b };
+              const max = Math.max(r, g, b);
+              const min = Math.min(r, g, b);
+              const saturation = max === 0 ? 0 : (max - min) / max;
+              const score = count * Math.pow(saturation, 1.2);
+              return { r, g, b, count, saturation, score };
+            })
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 6);
+
+          if (palette.length === 0) {
+            resolve({
+              primary: "rgb(40,40,40)",
+              secondary: "rgb(20,20,20)",
+              accent: "rgb(30,30,30)",
             });
+            return;
+          }
 
-          if (sortedColors.length > 0) {
-            // Create color variations
-            const primary = sortedColors[0];
-            const secondary = sortedColors[1] || primary;
-            const accent = sortedColors[2] || secondary;
+          let bestColor = palette[0];
+          for (let i = 1; i < Math.min(3, palette.length); i++) {
+            const candidate = palette[i];
+            if (candidate.score > bestColor.score * 0.7 && candidate.saturation > bestColor.saturation * 1.2) {
+              bestColor = candidate;
+            }
+          }
 
-            // Convert to hex and create variations
-            const toHex = (color) => {
-              const hex = (n) => n.toString(16).padStart(2, "0");
-              return `#${hex(color.r)}${hex(color.g)}${hex(color.b)}`;
+          // Function to tweak a color using HSL (from music-player.jsx)
+          const tweakColor = (r, g, b, sMult = 1.2, lMult = 0.6) => {
+            let rNorm = r / 255, gNorm = g / 255, bNorm = b / 255;
+            const max = Math.max(rNorm, gNorm, bNorm), min = Math.min(rNorm, gNorm, bNorm);
+            const diff = max - min;
+            let h = 0, s = 0, l = (max + min) / 2;
+
+            if (diff !== 0) {
+              s = l > 0.5 ? diff / (2 - max - min) : diff / (max + min);
+              switch (max) {
+                case rNorm: h = (gNorm - bNorm) / diff + (gNorm < bNorm ? 6 : 0); break;
+                case gNorm: h = (bNorm - rNorm) / diff + 2; break;
+                case bNorm: h = (rNorm - gNorm) / diff + 4; break;
+              }
+              h /= 6;
+            }
+
+            s = Math.min(1, s * sMult);
+            l = Math.max(0.2, Math.min(0.6, l * lMult));
+
+            const hue2rgb = (p, q, t) => {
+              if (t < 0) t += 1; if (t > 1) t -= 1;
+              if (t < 1 / 6) return p + (q - p) * 6 * t;
+              if (t < 1 / 2) return q;
+              if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+              return p;
             };
 
-            // Create darker variations for better contrast
-            const darken = (color, amount = 0.3) => ({
-              r: Math.max(0, Math.floor(color.r * (1 - amount))),
-              g: Math.max(0, Math.floor(color.g * (1 - amount))),
-              b: Math.max(0, Math.floor(color.b * (1 - amount))),
-            });
+            let resR, resG, resB;
+            if (s === 0) resR = resG = resB = l;
+            else {
+              const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+              const p = 2 * l - q;
+              resR = hue2rgb(p, q, h + 1 / 3);
+              resG = hue2rgb(p, q, h);
+              resB = hue2rgb(p, q, h - 1 / 3);
+            }
 
-            resolve({
-              primary: toHex(darken(primary, 0.2)),
-              secondary: toHex(darken(secondary, 0.4)),
-              accent: toHex(darken(accent, 0.6)),
-            });
-          } else {
-            // Fallback colors
-            resolve({
-              primary: "#1e293b",
-              secondary: "#334155",
-              accent: "#475569",
-            });
-          }
-        } catch (error) {
-          console.error("Error extracting colors:", error);
+            resR = Math.round(resR * 255);
+            resG = Math.round(resG * 255);
+            resB = Math.round(resB * 255);
+
+            // Contrast check (WCAG compliance from music-player.jsx)
+            const finalLuminance = 0.2126 * Math.pow(resR / 255, 2.2) + 0.7152 * Math.pow(resG / 255, 2.2) + 0.0722 * Math.pow(resB / 255, 2.2);
+            const whiteContrast = 1.05 / (finalLuminance + 0.05);
+            if (whiteContrast < 4.5) {
+              const factor = 0.7;
+              resR = Math.round(resR * factor);
+              resG = Math.round(resG * factor);
+              resB = Math.round(resB * factor);
+            }
+
+            return `rgb(${resR}, ${resG}, ${resB})`;
+          };
+
+          // Generate the 3 colors for the gradient
           resolve({
-            primary: "#1e293b",
-            secondary: "#334155",
-            accent: "#475569",
+            primary: tweakColor(bestColor.r, bestColor.g, bestColor.b, 1.2, 0.8),
+            secondary: tweakColor(bestColor.r, bestColor.g, bestColor.b, 1.1, 0.4),
+            accent: tweakColor(bestColor.r, bestColor.g, bestColor.b, 1.3, 0.6),
+            raw: `rgb(${bestColor.r},${bestColor.g},${bestColor.b})`
+          });
+
+        } catch (error) {
+          console.error("Error extracting colours:", error);
+          resolve({
+            primary: "rgb(40,40,40)",
+            secondary: "rgb(20,20,20)",
+            accent: "rgb(30,30,30)",
           });
         }
       };
 
       img.onerror = () => {
         resolve({
-          primary: "#1e293b",
-          secondary: "#334155",
-          accent: "#475569",
+          primary: "rgb(40,40,40)",
+          secondary: "rgb(20,20,20)",
+          accent: "rgb(30,30,30)",
         });
       };
 
@@ -1022,14 +1086,27 @@ export function FullscreenMusicPlayer({
     setIsPlaying,
   ]);
 
-  // Extract colors when song changes
+  // Extract colors when song changes - Updated with robust image selection from music-player.jsx
   useEffect(() => {
-    if (currentSong?.image?.[2]?.url) {
-      extractColorsFromImage(currentSong.image[2].url).then((colors) => {
-        setDominantColors(colors);
+    if (currentSong?.image?.length > 0) {
+      const imageUrl =
+        currentSong.image.find((img) => img.quality === "500x500")?.url ||
+        currentSong.image.find((img) => img.quality === "150x150")?.url ||
+        currentSong.image[currentSong.image.length - 1]?.url;
+
+      if (imageUrl) {
+        extractColorsFromImage(imageUrl).then((colors) => {
+          setDominantColors(colors);
+        });
+      }
+    } else {
+      setDominantColors({
+        primary: "rgb(40,40,40)",
+        secondary: "rgb(20,20,20)",
+        accent: "rgb(30,30,30)",
       });
     }
-  }, [currentSong?.id]);
+  }, [currentSong]);
 
   // Fetch lyrics when song changes
   useEffect(() => {
@@ -1077,7 +1154,12 @@ export function FullscreenMusicPlayer({
       <div
         className="fixed inset-0 z-100 overflow-hidden transition-all duration-1000 ease-out"
         style={{
-          background: `linear-gradient(135deg, ${dominantColors.primary} 0%, ${dominantColors.secondary} 50%, ${dominantColors.accent} 100%)`,
+          background: dominantColors.primary
+            ? `linear-gradient(to bottom, 
+                ${dominantColors.primary} 0%, 
+                ${dominantColors.accent} 50%, 
+                ${dominantColors.secondary} 100%)`
+            : '#121212',
         }}
       >
         {/* Enhanced Ambient Background */}
@@ -1111,10 +1193,10 @@ export function FullscreenMusicPlayer({
             className="absolute inset-0 transition-all duration-1000"
             style={{
               background: `
-              radial-gradient(ellipse at top, ${dominantColors.primary}15 0%, transparent 50%),
-              radial-gradient(ellipse at bottom left, ${dominantColors.secondary}20 0%, transparent 50%),
-              radial-gradient(ellipse at bottom right, ${dominantColors.accent}15 0%, transparent 50%),
-              linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.7) 50%, rgba(0,0,0,0.9) 100%)
+              radial-gradient(ellipse at top, ${dominantColors.primary.replace('rgb', 'rgba').replace(')', ', 0.4)')} 0%, transparent 70%),
+              radial-gradient(ellipse at bottom left, ${dominantColors.secondary.replace('rgb', 'rgba').replace(')', ', 0.25)')} 0%, transparent 60%),
+              radial-gradient(ellipse at bottom right, ${dominantColors.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')} 0%, transparent 60%),
+              linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0.90) 100%)
             `,
             }}
           />
@@ -1124,9 +1206,9 @@ export function FullscreenMusicPlayer({
             className="absolute inset-0 mix-blend-soft-light opacity-40 transition-all duration-1000"
             style={{
               background: `
-              radial-gradient(circle at 30% 20%, ${dominantColors.primary}30 0%, transparent 40%),
-              radial-gradient(circle at 70% 80%, ${dominantColors.secondary}25 0%, transparent 40%),
-              radial-gradient(circle at 50% 50%, ${dominantColors.accent}20 0%, transparent 60%)
+              radial-gradient(circle at 30% 20%, ${dominantColors.primary.replace('rgb', 'rgba').replace(')', ', 0.3)')} 0%, transparent 40%),
+              radial-gradient(circle at 70% 80%, ${dominantColors.secondary.replace('rgb', 'rgba').replace(')', ', 0.25)')} 0%, transparent 40%),
+              radial-gradient(circle at 50% 50%, ${dominantColors.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')} 0%, transparent 60%)
             `,
             }}
           />
