@@ -85,7 +85,7 @@ export async function PUT(request, { params }) {
 
     const { id } = await params;
     const body = await request.json();
-    const { name, description, isPublic } = body;
+    const { name, description, isPublic, image } = body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -125,6 +125,10 @@ export async function PUT(request, { params }) {
 
     if (isPublic !== undefined) {
       playlist.isPublic = isPublic;
+    }
+
+    if (image !== undefined) {
+      playlist.image = image.trim();
     }
 
     await playlist.save();
@@ -190,6 +194,8 @@ export async function PATCH(request, { params }) {
         playlist.description = body[key] ? body[key].trim() : '';
       } else if (key === 'songIds' && Array.isArray(body[key])) {
         playlist.songIds = body[key];
+      } else if (key === 'image') {
+        playlist.image = body[key] ? body[key].trim() : '';
       }
     });
 

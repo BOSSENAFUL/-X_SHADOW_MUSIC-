@@ -87,6 +87,7 @@ export default function PlaylistDetailPage({ params }) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [editImageUrl, setEditImageUrl] = useState('');
   const [isOwner, setIsOwner] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
@@ -526,6 +527,7 @@ export default function PlaylistDetailPage({ params }) {
   const handleEditPlaylist = () => {
     setEditName(playlist.name);
     setEditDescription(playlist.description || '');
+    setEditImageUrl(playlist.image || '');
     setEditDialogOpen(true);
   };
 
@@ -542,7 +544,8 @@ export default function PlaylistDetailPage({ params }) {
         },
         body: JSON.stringify({
           name: editName.trim(),
-          description: editDescription.trim()
+          description: editDescription.trim(),
+          image: editImageUrl.trim()
         }),
       });
 
@@ -555,7 +558,8 @@ export default function PlaylistDetailPage({ params }) {
         setPlaylist(prev => ({
           ...prev,
           name: editName.trim(),
-          description: editDescription.trim()
+          description: editDescription.trim(),
+          image: editImageUrl.trim()
         }));
         setEditDialogOpen(false);
         toast.success('Playlist info updated');
@@ -1852,6 +1856,18 @@ export default function PlaylistDetailPage({ params }) {
                 onChange={(e) => setEditName(e.target.value)}
                 className="col-span-3"
                 placeholder="Playlist name"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="image" className="text-right">
+                Image URL
+              </Label>
+              <Input
+                id="image"
+                value={editImageUrl}
+                onChange={(e) => setEditImageUrl(e.target.value)}
+                className="col-span-3"
+                placeholder="https://example.com/image.jpg"
               />
             </div>
             <div className="grid grid-cols-4 items-start gap-4">

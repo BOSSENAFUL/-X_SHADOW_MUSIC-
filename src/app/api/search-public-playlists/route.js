@@ -38,6 +38,7 @@ export async function GET(request) {
       songCount: playlist.songIds?.length || 0,
       userName: playlist.userId?.name || 'Unknown User',
       userImage: playlist.userId?.image,
+      image: playlist.image, // Include the main image field
       coverImage: playlist.coverImage,
       songIds: playlist.songIds || [],
       createdAt: playlist.createdAt,
