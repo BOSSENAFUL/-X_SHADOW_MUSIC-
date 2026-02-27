@@ -648,14 +648,12 @@ function PlaylistPageContent() {
         <div
           className="flex-1 relative transition-colors duration-1000"
           style={{
-            backgroundColor: dominantColor
-              ? `color-mix(in srgb, ${dominantColor}, black 94%)`
-              : '#121212'
+            backgroundColor: '#121212'
           }}
         >
           {/* Main Ambient Gradient Layer */}
           <div
-            className="absolute inset-0 h-[550px] pointer-events-none transition-all duration-1000"
+            className="absolute inset-0 h-[450px] pointer-events-none transition-all duration-1000"
             style={{
               background: dominantColor
                 ? `linear-gradient(to bottom, 

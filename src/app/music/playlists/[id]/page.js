@@ -1174,14 +1174,12 @@ export default function PlaylistDetailPage({ params }) {
         <div
           className="flex-1 relative transition-colors duration-1000"
           style={{
-            backgroundColor: dominantColors
-              ? `color-mix(in srgb, ${dominantColors}, black 94%)`
-              : '#121212'
+            backgroundColor: '#121212'
           }}
         >
           {/* Main Ambient Gradient Layer - Creates the deep Spotify-like fade */}
           <div
-            className="absolute inset-0 h-[550px] pointer-events-none transition-all duration-1000"
+            className="absolute inset-0 h-[450px] pointer-events-none transition-all duration-1000"
             style={{
               background: dominantColors
                 ? `linear-gradient(to bottom, 
