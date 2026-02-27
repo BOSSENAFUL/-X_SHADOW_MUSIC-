@@ -254,6 +254,11 @@ export default function ArtistPage() {
   };
 
   const extractDominantColor = (imageUrl) => {
+    // Use proxy for external images to bypass CORS issues during color extraction
+    const finalUrl = imageUrl.startsWith('http')
+      ? `/api/proxy/image?url=${encodeURIComponent(imageUrl)}`
+      : imageUrl;
+
     return new Promise((resolve) => {
       const img = new window.Image();
       img.crossOrigin = 'anonymous';
@@ -315,7 +320,7 @@ export default function ArtistPage() {
         resolve('rgb(40, 40, 40)'); // Default dark gray
       };
 
-      img.src = imageUrl;
+      img.src = finalUrl;
     });
   };
 

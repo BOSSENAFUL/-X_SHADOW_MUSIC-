@@ -144,6 +144,11 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
   // Professional color extraction algorithm following industry best practices
   const extractLeastDominantColor = (imageUrl) => {
+    // Use proxy for external images to bypass CORS issues during color extraction
+    const finalUrl = imageUrl.startsWith('http')
+      ? `/api/proxy/image?url=${encodeURIComponent(imageUrl)}`
+      : imageUrl;
+
     return new Promise((resolve) => {
       const img = new window.Image();
       img.crossOrigin = "anonymous";
@@ -326,7 +331,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
         resolve("rgb(40,40,40)");
       };
 
-      img.src = imageUrl;
+      img.src = finalUrl;
     });
   };
 

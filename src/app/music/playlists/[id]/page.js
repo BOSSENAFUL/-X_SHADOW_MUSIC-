@@ -115,6 +115,11 @@ export default function PlaylistDetailPage({ params }) {
 
   // Extract dominant colors from image and make them darker for ambient effect
   const extractColorsFromImage = (imageSrc) => {
+    // Use proxy for external images to bypass CORS issues during color extraction
+    const finalSrc = imageSrc.startsWith('http')
+      ? `/api/proxy/image?url=${encodeURIComponent(imageSrc)}`
+      : imageSrc;
+
     return new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
@@ -177,7 +182,7 @@ export default function PlaylistDetailPage({ params }) {
         resolve('rgb(80, 80, 80)'); // Default dark gray
       };
 
-      img.src = imageSrc;
+      img.src = finalSrc;
     });
   };
 
