@@ -75,6 +75,9 @@ import { toast } from "sonner";
 import { HiPause } from "react-icons/hi2";
 import { IoMdPlay } from "react-icons/io";
 
+// --- In-Memory Global Color Cache ---
+const globalColorCache = typeof window !== 'undefined' ? new Map() : null;
+
 export default function PlaylistDetailPage({ params }) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -115,6 +118,10 @@ export default function PlaylistDetailPage({ params }) {
 
   // Extract dominant colors from image and make them darker for ambient effect
   const extractColorsFromImage = (imageSrc) => {
+    if (globalColorCache && globalColorCache.has(imageSrc)) {
+      return Promise.resolve(globalColorCache.get(imageSrc));
+    }
+
     // Use proxy for external images to bypass CORS issues during color extraction
     const finalSrc = imageSrc.startsWith('http')
       ? `/api/proxy/image?url=${encodeURIComponent(imageSrc)}`
@@ -175,11 +182,15 @@ export default function PlaylistDetailPage({ params }) {
           }
         }
 
-        resolve(`rgb(${dominantColor})`);
+        const resultColor = `rgb(${dominantColor})`;
+        if (globalColorCache) globalColorCache.set(imageSrc, resultColor);
+        resolve(resultColor);
       };
 
       img.onerror = () => {
-        resolve('rgb(80, 80, 80)'); // Default dark gray
+        const fallback = 'rgb(80, 80, 80)';
+        if (globalColorCache) globalColorCache.set(imageSrc, fallback);
+        resolve(fallback);
       };
 
       img.src = finalSrc;
@@ -190,7 +201,26 @@ export default function PlaylistDetailPage({ params }) {
   useEffect(() => {
     const unwrapParams = async () => {
       const resolvedParams = await params;
-      setPlaylistId(resolvedParams.id);
+      const id = resolvedParams.id;
+      setPlaylistId(id);
+
+      // --- Simple Caching Check (Survives tab navigations) ---
+      try {
+        const cached = sessionStorage.getItem(`jammify_playlist_${id}`);
+        if (cached) {
+          const { playlist, songs, dominantColors, timestamp } = JSON.parse(cached);
+          // If less than 10 minutes old, load immediately
+          if (Date.now() - timestamp < 600000) {
+            setPlaylist(playlist);
+            setSongs(songs);
+            setDominantColors(dominantColors);
+            setIsOwner(playlist.isOwner || false);
+            setLoading(false);
+          }
+        }
+      } catch (e) {
+        console.warn('Cache load failed:', e);
+      }
     };
     unwrapParams();
   }, [params]);
@@ -217,6 +247,31 @@ export default function PlaylistDetailPage({ params }) {
 
   // Fetch playlist data and songs
   useEffect(() => {
+    const fetchSongs = async (songIds) => {
+      try {
+        if (!songIds || songIds.length === 0) return [];
+
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+        const response = await fetch(`${apiUrl}/api/songs?ids=${songIds.join(',')}`);
+        const data = await response.json();
+
+        if (data.success && data.data) {
+          const musicMap = {};
+          data.data.forEach(song => { musicMap[song.id] = song; });
+          const sortedSongs = songIds.map(id => musicMap[id]).filter(Boolean);
+          setSongs(sortedSongs);
+          return sortedSongs;
+        } else {
+          setSongs([]);
+          return [];
+        }
+      } catch (error) {
+        console.error('Error fetching songs:', error);
+        setSongs([]);
+        return [];
+      }
+    };
+
     const fetchPlaylist = async () => {
       if (!playlistId) return;
 
@@ -225,17 +280,61 @@ export default function PlaylistDetailPage({ params }) {
         const result = await response.json();
 
         if (result.success) {
-          setPlaylist(result.data);
-          setIsOwner(result.data.isOwner || false);
+          const playlistData = result.data;
+          setPlaylist(playlistData);
+          setIsOwner(playlistData.isOwner || false);
 
-          // Fetch actual song data using songIds
-          if (result.data.songIds && result.data.songIds.length > 0) {
-            await fetchSongs(result.data.songIds);
+          // 1. Determine if we can start color extraction immediately (if explicit image exists)
+          let colorPromise = null;
+          const imageSrc = playlistData.image;
+
+          if (imageSrc) {
+            colorPromise = extractColorsFromImage(imageSrc);
+          }
+
+          // 2. Fetch songs (and potentially start color extraction from first song afterward)
+          let currentSongs = [];
+          if (playlistData.songIds && playlistData.songIds.length > 0) {
+            currentSongs = await fetchSongs(playlistData.songIds);
           } else {
             setSongs([]);
           }
+
+          // 3. If we haven't started extraction yet (no explicit image), start it now from songs
+          if (!colorPromise) {
+            const cover = getPlaylistCover(playlistData, currentSongs);
+            let extractedSrc = '/def playlist image.jpg';
+            if (cover.type === 'single' && cover.src) {
+              extractedSrc = cover.src;
+            } else if (cover.type === 'collage' && cover.images[0]) {
+              extractedSrc = cover.images[0];
+            }
+            colorPromise = extractColorsFromImage(extractedSrc);
+          }
+
+          // 4. Wait for color extraction with a timeout
+          try {
+            const timeoutPromise = new Promise(resolve => setTimeout(() => resolve('rgb(80, 80, 80)'), 1500));
+            const color = await Promise.race([colorPromise, timeoutPromise]);
+
+            // Batch all state updates together for an "all at once" reveal
+            setDominantColors(color);
+            setSongs(currentSongs);
+
+            // SAVE TO CACHE
+            try {
+              sessionStorage.setItem(`jammify_playlist_${playlistId}`, JSON.stringify({
+                playlist: playlistData,
+                songs: currentSongs,
+                dominantColors: color,
+                timestamp: Date.now()
+              }));
+            } catch (e) { }
+          } catch (e) {
+            console.error('Initial color extraction failed:', e);
+            setSongs(currentSongs);
+          }
         } else {
-          // Handle privacy errors
           if (response.status === 403) {
             setAccessDenied(true);
           } else {
@@ -249,47 +348,24 @@ export default function PlaylistDetailPage({ params }) {
       }
     };
 
-    const fetchSongs = async (songIds) => {
-      try {
-        if (!songIds || songIds.length === 0) return;
-
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-        // Batch fetch all songs in one request
-        const response = await fetch(`${apiUrl}/api/songs?ids=${songIds.join(',')}`);
-        const data = await response.json();
-
-        if (data.success && data.data) {
-          // Sort songs back into original order from songIds
-          const musicMap = {};
-          data.data.forEach(song => { musicMap[song.id] = song; });
-          const sortedSongs = songIds.map(id => musicMap[id]).filter(Boolean);
-          setSongs(sortedSongs);
-        } else {
-          setSongs([]);
-        }
-      } catch (error) {
-        console.error('Error fetching songs:', error);
-        setSongs([]);
-      }
-    };
-
     fetchPlaylist();
   }, [playlistId]);
 
   // Generate playlist cover based on songs
-  const getPlaylistCover = () => {
-    // If playlist has an explicit image (e.g. from Spotify import), use it
-    if (playlist?.image) {
-      return { type: 'single', src: playlist.image };
+  const getPlaylistCover = (customPlaylist = null, customSongs = null) => {
+    const targetPlaylist = customPlaylist || playlist;
+    const targetSongs = customSongs || songs;
+
+    if (targetPlaylist?.image) {
+      return { type: 'single', src: targetPlaylist.image };
     }
 
-    if (!songs || songs.length === 0) {
+    if (!targetSongs || targetSongs.length === 0) {
       return { type: 'default', src: '/def playlist image.jpg' };
     }
 
-    if (songs.length >= 1 && songs.length <= 3) {
-      // Use first song's cover image
-      const firstSong = songs[0];
+    if (targetSongs.length >= 1 && targetSongs.length <= 3) {
+      const firstSong = targetSongs[0];
       const imageUrl = firstSong.image?.find(img => img.quality === '500x500')?.url ||
         firstSong.image?.find(img => img.quality === '150x150')?.url ||
         firstSong.image?.[firstSong.image.length - 1]?.url;
@@ -301,9 +377,8 @@ export default function PlaylistDetailPage({ params }) {
       };
     }
 
-    if (songs.length >= 4) {
-      // Create 4-image collage from first 4 songs
-      const firstFourSongs = songs.slice(0, 4);
+    if (targetSongs.length >= 4) {
+      const firstFourSongs = targetSongs.slice(0, 4);
       const images = firstFourSongs.map(song => {
         return song.image?.find(img => img.quality === '150x150')?.url ||
           song.image?.find(img => img.quality === '500x500')?.url ||
@@ -321,32 +396,7 @@ export default function PlaylistDetailPage({ params }) {
     return { type: 'default', src: '/def playlist image.jpg' };
   };
 
-  // Extract colors from playlist image when playlist loads
-  useEffect(() => {
-    if (playlist && songs.length >= 0) {
-      const extractColors = async () => {
-        try {
-          const cover = getPlaylistCover();
-          let imageSrc = '/def playlist image.jpg';
 
-          if (cover.type === 'single' && cover.src) {
-            imageSrc = cover.src;
-          } else if (cover.type === 'collage' && cover.images[0]) {
-            // Use first image from collage for color extraction
-            imageSrc = cover.images[0];
-          }
-
-          const color = await extractColorsFromImage(imageSrc);
-          setDominantColors(color);
-        } catch (error) {
-          console.error('Error extracting colors:', error);
-          // Keep default color
-        }
-      };
-
-      extractColors();
-    }
-  }, [playlist, songs]);
 
   // ── Recently Played Tracking ────────────────────────────────────────
   const trackRecentlyPlayed = () => {
@@ -487,6 +537,8 @@ export default function PlaylistDetailPage({ params }) {
           sessionStorage.removeItem(`created_playlists_${session.user.id}`);
         }
         toast.success(result.data.isPublic ? 'Playlist is now public' : 'Playlist is now private');
+        // Clear cache so changes reflect on reload
+        sessionStorage.removeItem(`jammify_playlist_${playlistId}`);
       } else {
         // Revert the optimistic update if the API call failed
         setPlaylist(prev => ({ ...prev, isPublic: previousState }));
@@ -568,6 +620,8 @@ export default function PlaylistDetailPage({ params }) {
         }));
         setEditDialogOpen(false);
         toast.success('Playlist info updated');
+        // Clear cache so changes reflect on reload
+        sessionStorage.removeItem(`jammify_playlist_${playlistId}`);
       } else {
         console.error('Failed to update playlist:', result.error);
         toast.error('Failed to update playlist');
@@ -591,6 +645,7 @@ export default function PlaylistDetailPage({ params }) {
           sessionStorage.removeItem(`created_playlists_${session.user.id}`);
         }
         toast.success('Playlist deleted');
+        sessionStorage.removeItem(`jammify_playlist_${playlistId}`);
         router.push('/music/playlists');
       } else {
         console.error('Failed to delete playlist:', result.error);
@@ -640,6 +695,8 @@ export default function PlaylistDetailPage({ params }) {
           ...prev,
           songIds: prev.songIds.filter(id => id !== songId)
         }));
+
+        sessionStorage.removeItem(`jammify_playlist_${playlistId}`);
 
         toast.success('Song removed from playlist');
       } else {
@@ -1002,7 +1059,20 @@ export default function PlaylistDetailPage({ params }) {
     return (
       <SidebarProvider >
         <AppSidebar />
-        <SidebarInset id="user-playlist-scroll-container" className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col">
+        <SidebarInset id="user-playlist-scroll-container" className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col bg-[#121212]">
+          {/* Main Ambient Gradient Layer - Added to skeleton to show color as soon as it's available */}
+          <div
+            className="absolute inset-0 h-[450px] pointer-events-none transition-all duration-1000"
+            style={{
+              background: dominantColors
+                ? `linear-gradient(to bottom, 
+                    ${dominantColors.replace('rgb', 'rgba').replace(')', ', 0.7)')} 0%, 
+                    ${dominantColors.replace('rgb', 'rgba').replace(')', ', 0.4)')} 40%, 
+                    ${dominantColors.replace('rgb', 'rgba').replace(')', ', 0.1)')} 80%, 
+                    transparent 100%)`
+                : 'transparent'
+            }}
+          />
           <header className="sticky top-0 z-50 hidden md:flex h-16 shrink-0 items-center gap-2 md:border-b bg-background">
             <div className="flex items-center gap-2 px-3 md:px-4">
               <SidebarTrigger className="-ml-1 hidden md:flex" />
@@ -1181,14 +1251,14 @@ export default function PlaylistDetailPage({ params }) {
         </header>
 
         <div
-          className="flex-1 relative transition-colors duration-1000"
+          className="flex-1 relative transition-colors duration-300"
           style={{
             backgroundColor: '#121212'
           }}
         >
           {/* Main Ambient Gradient Layer - Creates the deep Spotify-like fade */}
           <div
-            className="absolute inset-0 h-[450px] pointer-events-none transition-all duration-1000"
+            className="absolute inset-0 h-[450px] pointer-events-none transition-all duration-300"
             style={{
               background: dominantColors
                 ? `linear-gradient(to bottom, 
