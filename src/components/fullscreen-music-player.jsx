@@ -43,7 +43,19 @@ import { BiSkipNext, BiSkipPrevious } from "react-icons/bi";
 import { RxShuffle } from "react-icons/rx";
 import { BsRepeat } from "react-icons/bs";
 
+// Module-level color cache for fullscreen gradient colors — persists
+// across re-renders. Keyed by song ID.
+const _fsColorCache = new Map();
 
+// Helper to get the smallest image URL from a song's image array
+function _getFsSmallImageUrl(song) {
+  if (!song?.image?.length) return null;
+  return (
+    song.image.find((img) => img.quality === "50x50")?.url ||
+    song.image.find((img) => img.quality === "150x150")?.url ||
+    song.image[song.image.length - 1]?.url
+  );
+}
 
 export function FullscreenMusicPlayer({
   currentSong,
@@ -1086,29 +1098,58 @@ export function FullscreenMusicPlayer({
     setIsPlaying,
   ]);
 
-  // Extract colors when song changes - Updated with robust image selection from music-player.jsx
+  // Extract colors when song changes — with caching & pre-extraction
   useEffect(() => {
-    if (currentSong?.image?.length > 0) {
-      // Use the smallest image for color extraction — the algorithm downscales
-      // to 64x64 anyway, so a large image just adds download latency
-      const imageUrl =
-        currentSong.image.find((img) => img.quality === "50x50")?.url ||
-        currentSong.image.find((img) => img.quality === "150x150")?.url ||
-        currentSong.image[currentSong.image.length - 1]?.url;
+    const defaultColors = {
+      primary: "rgb(40,40,40)",
+      secondary: "rgb(20,20,20)",
+      accent: "rgb(30,30,30)",
+    };
 
+    if (!currentSong?.id) {
+      setDominantColors(defaultColors);
+      return;
+    }
+
+    const songId = currentSong.id;
+
+    // 1. Instant: check cache first (0ms — no network, no async)
+    if (_fsColorCache.has(songId)) {
+      setDominantColors(_fsColorCache.get(songId));
+    } else if (currentSong.image?.length > 0) {
+      // 2. Fallback: extract and cache
+      const imageUrl = _getFsSmallImageUrl(currentSong);
       if (imageUrl) {
         extractColorsFromImage(imageUrl).then((colors) => {
+          _fsColorCache.set(songId, colors);
           setDominantColors(colors);
         });
       }
     } else {
-      setDominantColors({
-        primary: "rgb(40,40,40)",
-        secondary: "rgb(20,20,20)",
-        accent: "rgb(30,30,30)",
-      });
+      setDominantColors(defaultColors);
     }
-  }, [currentSong]);
+
+    // 3. Pre-extract colors for adjacent songs
+    const idx = playlist.findIndex((s) => s.id === songId);
+    const adjacentIndices = [idx - 1, idx + 1, idx + 2].filter(
+      (i) => i >= 0 && i < playlist.length
+    );
+    const schedule = typeof window !== 'undefined' && window.requestIdleCallback
+      ? window.requestIdleCallback
+      : (cb) => setTimeout(cb, 50);
+    schedule(() => {
+      for (const adjIdx of adjacentIndices) {
+        const adjSong = playlist[adjIdx];
+        if (!adjSong?.id || _fsColorCache.has(adjSong.id)) continue;
+        const adjUrl = _getFsSmallImageUrl(adjSong);
+        if (adjUrl) {
+          extractColorsFromImage(adjUrl).then((colors) => {
+            _fsColorCache.set(adjSong.id, colors);
+          });
+        }
+      }
+    });
+  }, [currentSong?.id, playlist]);
 
   // Fetch lyrics when song changes
   useEffect(() => {

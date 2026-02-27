@@ -10,6 +10,19 @@ import { IoMdPlay } from "react-icons/io";
 import { HiPause } from "react-icons/hi2";
 import { BiSkipNext, BiSkipPrevious } from "react-icons/bi";
 
+// Module-level color cache — persists across re-renders and survives
+// component unmount/remount. Keyed by song ID for instant lookups.
+const _colorCache = new Map();
+
+// Helper to get the smallest image URL from a song's image array
+function _getSmallImageUrl(song) {
+  if (!song?.image?.length) return null;
+  return (
+    song.image.find((img) => img.quality === "50x50")?.url ||
+    song.image.find((img) => img.quality === "150x150")?.url ||
+    song.image[song.image.length - 1]?.url
+  );
+}
 
 export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   const {
@@ -144,11 +157,6 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
   // Professional color extraction algorithm following industry best practices
   const extractLeastDominantColor = (imageUrl) => {
-    // Use proxy for external images to bypass CORS issues during color extraction
-    const finalUrl = imageUrl.startsWith('http')
-      ? `/api/proxy/image?url=${encodeURIComponent(imageUrl)}`
-      : imageUrl;
-
     return new Promise((resolve) => {
       const img = new window.Image();
       img.crossOrigin = "anonymous";
@@ -331,29 +339,55 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
         resolve("rgb(40,40,40)");
       };
 
-      img.src = finalUrl;
+      img.src = imageUrl;
     });
   };
 
-  // Extract color when current song changes
+  // Extract color when current song changes — with caching & pre-extraction
   useEffect(() => {
-    if (currentSong?.image?.length > 0) {
-      // Use the smallest image for color extraction — the algorithm downscales
-      // to 64x64 anyway, so a large image just adds download latency
-      const imageUrl =
-        currentSong.image.find((img) => img.quality === "50x50")?.url ||
-        currentSong.image.find((img) => img.quality === "150x150")?.url ||
-        currentSong.image[currentSong.image.length - 1]?.url;
+    if (!currentSong?.id) {
+      setDominantColor("rgb(40, 40, 40)");
+      return;
+    }
 
+    const songId = currentSong.id;
+
+    // 1. Instant: check cache first (0ms — no network, no async)
+    if (_colorCache.has(songId)) {
+      setDominantColor(_colorCache.get(songId));
+    } else if (currentSong.image?.length > 0) {
+      // 2. Fallback: extract and cache
+      const imageUrl = _getSmallImageUrl(currentSong);
       if (imageUrl) {
         extractLeastDominantColor(imageUrl).then((color) => {
+          _colorCache.set(songId, color);
           setDominantColor(color);
         });
       }
     } else {
-      setDominantColor("rgb(40,40,40)"); // Default dark color
+      setDominantColor("rgb(40, 40, 40)");
     }
-  }, [currentSong]);
+
+    // 3. Pre-extract colors for adjacent songs so next/prev feels instant
+    const idx = playlist.findIndex((s) => s.id === songId);
+    const adjacentIndices = [idx - 1, idx + 1, idx + 2].filter(
+      (i) => i >= 0 && i < playlist.length
+    );
+    // Use requestIdleCallback (or setTimeout fallback) so this never blocks the UI
+    const schedule = window.requestIdleCallback || ((cb) => setTimeout(cb, 50));
+    schedule(() => {
+      for (const adjIdx of adjacentIndices) {
+        const adjSong = playlist[adjIdx];
+        if (!adjSong?.id || _colorCache.has(adjSong.id)) continue;
+        const adjUrl = _getSmallImageUrl(adjSong);
+        if (adjUrl) {
+          extractLeastDominantColor(adjUrl).then((color) => {
+            _colorCache.set(adjSong.id, color);
+          });
+        }
+      }
+    });
+  }, [currentSong?.id, playlist]);
 
   // Handle mobile back button to close fullscreen player
   useEffect(() => {
