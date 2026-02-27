@@ -865,27 +865,40 @@ export function FullscreenMusicPlayer({
           }
 
           // Function to tweak a color using HSL (from music-player.jsx)
-          const tweakColor = (r, g, b, sMult = 1.2, lMult = 0.6) => {
-            let rNorm = r / 255, gNorm = g / 255, bNorm = b / 255;
-            const max = Math.max(rNorm, gNorm, bNorm), min = Math.min(rNorm, gNorm, bNorm);
+          const tweakColor = (r, g, b, sMult = 1.2, lMult = 0.6, minL = 0.1, maxL = 0.25) => {
+            let rNorm = r / 255,
+              gNorm = g / 255,
+              bNorm = b / 255;
+            const max = Math.max(rNorm, gNorm, bNorm),
+              min = Math.min(rNorm, gNorm, bNorm);
             const diff = max - min;
-            let h = 0, s = 0, l = (max + min) / 2;
+            let h = 0,
+              s = 0,
+              l = (max + min) / 2;
 
             if (diff !== 0) {
               s = l > 0.5 ? diff / (2 - max - min) : diff / (max + min);
               switch (max) {
-                case rNorm: h = (gNorm - bNorm) / diff + (gNorm < bNorm ? 6 : 0); break;
-                case gNorm: h = (bNorm - rNorm) / diff + 2; break;
-                case bNorm: h = (rNorm - gNorm) / diff + 4; break;
+                case rNorm:
+                  h = (gNorm - bNorm) / diff + (gNorm < bNorm ? 6 : 0);
+                  break;
+                case gNorm:
+                  h = (bNorm - rNorm) / diff + 2;
+                  break;
+                case bNorm:
+                  h = (rNorm - gNorm) / diff + 4;
+                  break;
               }
               h /= 6;
             }
 
+            // Enhance saturation and adjust lightness for optimal contrast
             s = Math.min(1, s * sMult);
-            l = Math.max(0.2, Math.min(0.6, l * lMult));
+            l = Math.max(minL, Math.min(maxL, l * lMult)); // Configurable range
 
             const hue2rgb = (p, q, t) => {
-              if (t < 0) t += 1; if (t > 1) t -= 1;
+              if (t < 0) t += 1;
+              if (t > 1) t -= 1;
               if (t < 1 / 6) return p + (q - p) * 6 * t;
               if (t < 1 / 2) return q;
               if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
@@ -907,7 +920,10 @@ export function FullscreenMusicPlayer({
             resB = Math.round(resB * 255);
 
             // Contrast check (WCAG compliance from music-player.jsx)
-            const finalLuminance = 0.2126 * Math.pow(resR / 255, 2.2) + 0.7152 * Math.pow(resG / 255, 2.2) + 0.0722 * Math.pow(resB / 255, 2.2);
+            const finalLuminance =
+              0.2126 * Math.pow(resR / 255, 2.2) +
+              0.7152 * Math.pow(resG / 255, 2.2) +
+              0.0722 * Math.pow(resB / 255, 2.2);
             const whiteContrast = 1.05 / (finalLuminance + 0.05);
             if (whiteContrast < 4.5) {
               const factor = 0.7;
@@ -921,12 +937,11 @@ export function FullscreenMusicPlayer({
 
           // Generate the 3 colors for the gradient
           resolve({
-            primary: tweakColor(bestColor.r, bestColor.g, bestColor.b, 1.2, 0.8),
-            secondary: tweakColor(bestColor.r, bestColor.g, bestColor.b, 1.1, 0.4),
-            accent: tweakColor(bestColor.r, bestColor.g, bestColor.b, 1.3, 0.6),
-            raw: `rgb(${bestColor.r},${bestColor.g},${bestColor.b})`
+            primary: tweakColor(bestColor.r, bestColor.g, bestColor.b, 1.2, 0.7, 0.2, 0.4), // Bright top
+            secondary: tweakColor(bestColor.r, bestColor.g, bestColor.b, 1.1, 0.4, 0.1, 0.2), // Medium bottom
+            accent: tweakColor(bestColor.r, bestColor.g, bestColor.b, 1.2, 0.5, 0.12, 0.28), // Medium bottom
+            raw: `rgb(${bestColor.r},${bestColor.g},${bestColor.b})`,
           });
-
         } catch (error) {
           console.error("Error extracting colours:", error);
           resolve({
@@ -1237,9 +1252,9 @@ export function FullscreenMusicPlayer({
             style={{
               background: `
               radial-gradient(ellipse at top, ${dominantColors.primary.replace('rgb', 'rgba').replace(')', ', 0.4)')} 0%, transparent 70%),
-              radial-gradient(ellipse at bottom left, ${dominantColors.secondary.replace('rgb', 'rgba').replace(')', ', 0.25)')} 0%, transparent 60%),
-              radial-gradient(ellipse at bottom right, ${dominantColors.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')} 0%, transparent 60%),
-              linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0.90) 100%)
+              radial-gradient(ellipse at bottom left, ${dominantColors.secondary.replace('rgb', 'rgba').replace(')', ', 0.3)')} 0%, transparent 60%),
+              radial-gradient(ellipse at bottom right, ${dominantColors.accent.replace('rgb', 'rgba').replace(')', ', 0.25)')} 0%, transparent 60%),
+              linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.75) 100%)
             `,
             }}
           />
@@ -1473,17 +1488,19 @@ export function FullscreenMusicPlayer({
                     size="sm"
                     onClick={handleLikeToggle}
                     disabled={isLikeLoading}
-                    className={`shrink-0 ml-4 p-2 transform-gpu will-change-transform ${getCurrentLikeState()
+                    className={`shrink-0 ml-4 p-0 h-auto w-auto transform-gpu will-change-transform ${getCurrentLikeState()
                       ? "text-green-500"
                       : "text-white/60"
                       }`}
                     style={{
+                      padding: '8px', // Controlled padding
                       backfaceVisibility: 'hidden',
                       WebkitBackfaceVisibility: 'hidden',
                     }}
                   >
                     <Heart
-                      className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors duration-150 ${getCurrentLikeState() ? "fill-green-500" : ""
+                      style={{ width: '24px', height: '24px' }}
+                      className={`transition-colors duration-150 ${getCurrentLikeState() ? "fill-green-500" : ""
                         }`}
                     />
                   </Button>
@@ -1525,19 +1542,19 @@ export function FullscreenMusicPlayer({
                       disabled={playlist.length === 0}
                       className="text-white  hover:bg-transparent bg-transparent"
                     >
-                      <BiSkipPrevious style={{ width: '44px', height: '44px' }} />
+                      <BiSkipPrevious style={{ width: '52px', height: '52px' }} />
                     </Button>
 
                     <Button
                       variant="default"
                       size="lg"
                       onClick={onTogglePlayPause}
-                      className="rounded-full w-14 h-14 sm:w-16 sm:h-16 bg-white text-black hover:bg-white/90"
+                      className="rounded-full w-16 h-16 sm:w-20 sm:h-20 bg-white text-black hover:bg-white/90"
                     >
                       {isPlaying ? (
-                        <HiPause style={{ width: '24px', height: '24px' }} />
+                        <HiPause style={{ width: '30px', height: '30px' }} />
                       ) : (
-                        <IoMdPlay style={{ width: '24px', height: '24px', marginLeft: '4px' }} />
+                        <IoMdPlay style={{ width: '30px', height: '30px', marginLeft: '4px' }} />
                       )}
                     </Button>
 
@@ -1547,7 +1564,7 @@ export function FullscreenMusicPlayer({
                       disabled={playlist.length === 0}
                       className="text-white  hover:bg-transparent bg-transparent"
                     >
-                      <BiSkipNext style={{ width: '44px', height: '44px' }} />
+                      <BiSkipNext style={{ width: '52px', height: '52px' }} />
                     </Button>
                   </div>
 
@@ -1615,7 +1632,7 @@ export function FullscreenMusicPlayer({
                 <div className="flex-1 flex flex-col justify-center max-w-lg">
                   {/* Song Info with Like Button */}
                   <div className="mb-8">
-                    <div className="flex items-start justify-between mb-6">
+                    <div className="flex items-center justify-between mb-6">
                       <div className="flex-1 min-w-0 pr-4">
                         <h1 className="text-3xl xl:text-4xl font-bold mb-3 leading-tight">
                           <span
@@ -1641,17 +1658,19 @@ export function FullscreenMusicPlayer({
                         size="sm"
                         onClick={handleLikeToggle}
                         disabled={isLikeLoading}
-                        className={`shrink-0 text-white hover:bg-white/10 rounded-full p-3 transform-gpu will-change-transform ${getCurrentLikeState()
+                        className={`shrink-0 text-white hover:bg-white/10 rounded-full h-auto w-auto p-0 transform-gpu will-change-transform ${getCurrentLikeState()
                           ? "text-green-500"
                           : "text-white/60"
                           }`}
                         style={{
+                          padding: '12px', // Controlled padding for desktop
                           backfaceVisibility: 'hidden',
                           WebkitBackfaceVisibility: 'hidden',
                         }}
                       >
                         <Heart
-                          className={`w-7 h-7 transition-colors duration-150 ${getCurrentLikeState() ? "fill-green-500" : ""
+                          style={{ width: '28px', height: '28px' }}
+                          className={`transition-colors duration-150 ${getCurrentLikeState() ? "fill-green-500" : ""
                             }`}
                         />
                       </Button>
@@ -1693,19 +1712,19 @@ export function FullscreenMusicPlayer({
                       disabled={playlist.length === 0}
                       className="text-white/65 hover:text-white  hover:bg-transparent bg-transparent hover:cursor-pointer"
                     >
-                      <BiSkipPrevious style={{ width: '44px', height: '44px' }} />
+                      <BiSkipPrevious style={{ width: '52px', height: '52px' }} />
                     </Button>
 
                     <Button
                       variant="default"
                       size="lg"
                       onClick={onTogglePlayPause}
-                      className="rounded-full w-16 h-16 bg-white text-black hover:bg-white/90 hover:scale-105 transition-all duration-200 hover:cursor-pointer"
+                      className="rounded-full w-20 h-20 bg-white text-black hover:bg-white/90 hover:scale-105 transition-all duration-200 hover:cursor-pointer"
                     >
                       {isPlaying ? (
-                        <HiPause style={{ width: '24px', height: '24px' }} />
+                        <HiPause style={{ width: '32px', height: '32px' }} />
                       ) : (
-                        <IoMdPlay style={{ width: '24px', height: '24px' }} className="ml-1" />
+                        <IoMdPlay style={{ width: '32px', height: '32px' }} className="ml-1" />
                       )}
                     </Button>
 
@@ -1716,7 +1735,7 @@ export function FullscreenMusicPlayer({
                       disabled={playlist.length === 0}
                       className="text-white/65 hover:text-white  hover:bg-transparent bg-transparent hover:cursor-pointer"
                     >
-                      <BiSkipNext style={{ width: '44px', height: '44px' }} />
+                      <BiSkipNext style={{ width: '52px', height: '52px' }} />
                     </Button>
 
                     <Button

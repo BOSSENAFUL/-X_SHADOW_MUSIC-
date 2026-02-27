@@ -728,13 +728,10 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
       {/* Only show the bottom bar when fullscreen is NOT open */}
       {!isFullscreenOpen && (
-        <div className="fixed bottom-16 left-0 right-0 md:left-64 md:bottom-0 border-t border-border z-60 md:bg-background">
-          {/* Mobile background - uses least dominant color from album cover */}
+        <div className="fixed bottom-16 left-0 right-0 md:left-64 md:bottom-0 md:border-t md:border-border z-60 md:bg-background">
+          {/* Mobile background - transparent, the floating card has its own bg */}
           <div
             className="block md:hidden absolute inset-0"
-            style={{
-              backgroundColor: dominantColor,
-            }}
           />
 
           {/* Desktop background */}
@@ -742,102 +739,96 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
           {/* Content with relative positioning */}
           <div className="relative">
-            {/* Mobile Layout */}
-            <div className="block md:hidden">
-              {/* Top row: Song info and main controls */}
-              <div className="flex items-center justify-between pl-4 pr-3 py-2 pb-2.5">
-                <div
-                  className={`flex items-center gap-3 min-w-0 flex-1 ${!isRadioPlaying ? "cursor-pointer" : "cursor-default"
-                    }`}
-                  onClick={() => !isRadioPlaying && setIsFullscreenOpen(true)}
-                >
-                  <div className="w-10 h-10 rounded bg-muted shrink-0 overflow-hidden">
-                    {currentSong.image?.length > 0 ? (
-                      <img
-                        src={
-                          currentSong.image.find(
-                            (img) => img.quality === "500x500"
-                          )?.url ||
-                          currentSong.image.find(
-                            (img) => img.quality === "150x150"
-                          )?.url ||
-                          currentSong.image[currentSong.image.length - 1]?.url
-                        }
-                        alt={currentSong.name}
-                        className="w-full h-full object-cover rounded"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <IoMdPlay className="w-3 h-3 opacity-50 text-white" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1 flex flex-col justify-center py-1">
-                    <p className="font-medium truncate text-sm text-white drop-shadow-lg leading-none mb-0.5">
-                      {decodeHtmlEntities(currentSong.name)}
-                    </p>
-                    <p className="text-xs text-white/80 truncate drop-shadow-md leading-none">
-                      {currentSong.artists?.primary?.[0]?.name ||
-                        "Unknown Artist"}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Mobile Controls */}
-                <div className="flex items-center gap-1">
-                  <Button
-                    size="xm"
-                    onClick={handlePrevious}
-                    disabled={playlist.length === 0}
-                    className="bg-transparent hover:bg-transparent hover:cursor-pointer"
-                  >
-                    <BiSkipPrevious style={{ width: '32px', height: '32px' }} className="text-white/80" />
-                  </Button>
-
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={togglePlayPause}
-                    className="rounded-full w-10 h-10 p-0 bg-white/80 hover:bg-white text-black hover:text-black hover:cursor-pointer"
-                  >
-                    {isPlaying ? (
-                      <HiPause className="text-black" style={{ width: '20px', height: '20px' }} />
-                    ) : (
-                      <IoMdPlay style={{ width: '18px', height: '18px', marginLeft: '4px', }} className="text-black" />
-                    )}
-                  </Button>
-
-                  <Button
-                    size="xm"
-                    onClick={handleNext}
-                    disabled={playlist.length === 0}
-                    className="bg-transparent hover:bg-transparent hover:cursor-pointer"
-                  >
-                    <BiSkipNext style={{ width: '32px', height: '32px' }} className="text-white/80" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Bottom row: Slim interactive progress bar for mobile */}
+            {/* Mobile Layout - Floating rounded card */}
+            <div className="block md:hidden px-2 pt-1.5">
               <div
-                className="absolute bottom-0 left-0 right-0 h-0.5 z-10 px-4 cursor-pointer"
-                onClick={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const clickX = e.clientX - rect.left - 16; // Account for padding
-                  const width = rect.width - 32; // Account for padding on both sides
-                  const percentage = Math.max(0, Math.min(1, clickX / width));
-                  const newTime = percentage * (duration || 0);
-                  handleDirectSeek([newTime]);
-                }}
+                className="relative rounded-lg overflow-hidden"
+                style={{ backgroundColor: dominantColor }}
               >
-                <div className="w-full h-full bg-white/10">
+                {/* Top row: Song info and main controls */}
+                <div className="flex items-center justify-between pl-3 pr-2 py-2.5">
                   <div
-                    className="h-full bg-white transition-all duration-300 ease-out"
-                    style={{
-                      width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%`
-                    }}
-                  />
+                    className={`flex items-center gap-3 min-w-0 flex-1 ${!isRadioPlaying ? "cursor-pointer" : "cursor-default"
+                      }`}
+                    onClick={() => !isRadioPlaying && setIsFullscreenOpen(true)}
+                  >
+                    <div className="w-10 h-10 rounded-md bg-muted shrink-0 overflow-hidden shadow-lg">
+                      {currentSong.image?.length > 0 ? (
+                        <img
+                          src={
+                            currentSong.image.find(
+                              (img) => img.quality === "500x500"
+                            )?.url ||
+                            currentSong.image.find(
+                              (img) => img.quality === "150x150"
+                            )?.url ||
+                            currentSong.image[currentSong.image.length - 1]?.url
+                          }
+                          alt={currentSong.name}
+                          className="w-full h-full object-cover rounded-md"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <IoMdPlay className="w-3 h-3 opacity-50 text-white" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1 flex flex-col justify-center">
+                      <p className="font-semibold truncate text-[13px] text-white drop-shadow-lg leading-tight mb-0.5">
+                        {decodeHtmlEntities(currentSong.name)}
+                      </p>
+                      <p className="text-xs text-white/70 truncate drop-shadow-md leading-tight">
+                        {currentSong.artists?.primary
+                          ?.map((a) => a.name)
+                          .join(", ") || "Unknown Artist"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Mobile Controls */}
+                  <div className="flex items-center gap-2.5 pr-1">
+                    <button
+                      onClick={togglePlayPause}
+                      className="text-white hover:cursor-pointer"
+                    >
+                      {isPlaying ? (
+                        <HiPause style={{ width: '32px', height: '32px' }} />
+                      ) : (
+                        <IoMdPlay style={{ width: '30px', height: '30px', marginLeft: '2px' }} />
+                      )}
+                    </button>
+
+                    <button
+                      onClick={handleNext}
+                      disabled={playlist.length === 0}
+                      className="text-white hover:cursor-pointer disabled:opacity-50"
+                    >
+                      <BiSkipNext style={{ width: '36px', height: '36px' }} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Bottom row: Slim interactive progress bar for mobile */}
+                <div
+                  className="absolute bottom-0 left-0 right-0 h-[3px] z-10 cursor-pointer"
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const width = rect.width;
+                    const percentage = Math.max(0, Math.min(1, clickX / width));
+                    const newTime = percentage * (duration || 0);
+                    handleDirectSeek([newTime]);
+                  }}
+                >
+                  <div className="w-full h-full bg-white/15 rounded-b-lg overflow-hidden">
+                    <div
+                      className="h-full bg-white transition-all duration-300 ease-out"
+                      style={{
+                        width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%`
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
