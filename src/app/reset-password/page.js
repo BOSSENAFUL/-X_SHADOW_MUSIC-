@@ -1,5 +1,5 @@
 import ResetPasswordForm from "@/components/reset-password-form";
-import { ModeToggle } from "@/components/mode-toggle";
+
 
 export const metadata = {
   title: "Reset Password - Jammify",
@@ -9,10 +9,8 @@ export const metadata = {
 export default function ResetPasswordPage() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="absolute top-6 right-6">
-        <ModeToggle />
-      </div>
-      
+
+
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
@@ -21,7 +19,7 @@ export default function ResetPasswordPage() {
             Create a new password for your account
           </p>
         </div>
-        
+
         {/* Form */}
         <ResetPasswordForm />
       </div>

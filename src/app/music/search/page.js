@@ -2057,11 +2057,11 @@ function SearchPageContent() {
                               <div className="w-8 text-center">
                                 {isCurrentSong && isPlaying ? (
                                   <div className="flex items-center justify-center">
-                                    <div className="flex space-x-0.5">
-                                      <div className="w-0.5 h-3 bg-green-500 animate-pulse"></div>
-                                      <div className="w-0.5 h-2 bg-green-500 animate-pulse" style={{ animationDelay: '0.1s' }}></div>
-                                      <div className="w-0.5 h-4 bg-green-500 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                                      <div className="w-0.5 h-2 bg-green-500 animate-pulse" style={{ animationDelay: '0.3s' }}></div>
+                                    <div className="flex items-end justify-center gap-0.5 h-3">
+                                      <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
+                                      <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
+                                      <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
+                                      <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
                                     </div>
                                   </div>
                                 ) : isCurrentSong ? (

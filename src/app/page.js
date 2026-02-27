@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ModeToggle } from "@/components/mode-toggle";
+
 import { AppPreview } from "@/components/app-preview";
 import UserReviews from "@/components/user-reviews";
 import { ArrowRight, Download } from "lucide-react";
@@ -9,7 +9,7 @@ import { motion } from "framer-motion";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-white dark:bg-black">
+    <div className="min-h-screen bg-background">
       {/* Header */}
       <motion.header
         className="absolute top-0 left-0 right-0 z-10 p-4 sm:p-6"
@@ -18,10 +18,10 @@ export default function Home() {
         transition={{ duration: 0.6, ease: "easeOut" }}
       >
         <div className="flex items-center justify-between w-full max-w-5xl mx-auto">
-          <div className="text-base sm:text-lg md:text-xl font-medium text-black dark:text-white">
+          <div className="text-base sm:text-lg md:text-xl font-medium text-foreground">
             Jammify
           </div>
-          <ModeToggle />
+
         </div>
       </motion.header>
 
@@ -36,13 +36,13 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
           >
-            <h1 className="text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-light text-black dark:text-white tracking-tight leading-[1.1] mb-6 sm:mb-8">
+            <h1 className="text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-light text-foreground tracking-tight leading-[1.1] mb-6 sm:mb-8">
               Listen to music
               <br />
               <span className="font-normal">like never before</span>
             </h1>
 
-            <p className="text-sm xs:text-base sm:text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl mx-auto font-light leading-relaxed">
+            <p className="text-sm xs:text-base sm:text-lg md:text-xl text-muted-foreground max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl mx-auto font-light leading-relaxed">
               Stream millions of songs with exceptional quality.
               Discover new artists, create playlists, and enjoy your music anywhere.
             </p>
@@ -83,18 +83,18 @@ export default function Home() {
             transition={{ duration: 0.6, delay: 0.6, ease: "easeOut" }}
           >
             <div className="text-center">
-              <div className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl font-light text-black dark:text-white mb-2 sm:mb-3">50M+</div>
-              <p className="text-xs xs:text-sm sm:text-base text-gray-600 dark:text-gray-400 font-light">Songs available</p>
+              <div className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl font-light text-foreground mb-2 sm:mb-3">50M+</div>
+              <p className="text-xs xs:text-sm sm:text-base text-muted-foreground font-light">Songs available</p>
             </div>
 
             <div className="text-center">
-              <div className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl font-light text-black dark:text-white mb-2 sm:mb-3">320kbps</div>
-              <p className="text-xs xs:text-sm sm:text-base text-gray-600 dark:text-gray-400 font-light">High quality audio</p>
+              <div className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl font-light text-foreground mb-2 sm:mb-3">320kbps</div>
+              <p className="text-xs xs:text-sm sm:text-base text-muted-foreground font-light">High quality audio</p>
             </div>
 
             <div className="text-center">
-              <div className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl font-light text-black dark:text-white mb-2 sm:mb-3">24/7</div>
-              <p className="text-xs xs:text-sm sm:text-base text-gray-600 dark:text-gray-400 font-light">Always available</p>
+              <div className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl font-light text-foreground mb-2 sm:mb-3">24/7</div>
+              <p className="text-xs xs:text-sm sm:text-base text-muted-foreground font-light">Always available</p>
             </div>
           </motion.div>
 
@@ -107,7 +107,7 @@ export default function Home() {
           >
             <Link
               href="/music/search"
-              className="inline-flex items-center text-xs xs:text-sm sm:text-base text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors duration-300 font-light"
+              className="inline-flex items-center text-xs xs:text-sm sm:text-base text-muted-foreground hover:text-foreground transition-colors duration-300 font-light"
             >
               Browse music library
               <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 ml-1" />

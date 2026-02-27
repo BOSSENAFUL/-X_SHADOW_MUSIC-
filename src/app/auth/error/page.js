@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ModeToggle } from "@/components/mode-toggle";
+
 
 const errorMessages = {
   Configuration: "There is a problem with the server configuration.",
@@ -19,9 +19,7 @@ function ErrorContent() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="absolute top-6 right-6">
-        <ModeToggle />
-      </div>
+
 
       <div className="w-full max-w-md text-center">
         <div className="mb-8">
@@ -50,12 +48,10 @@ function ErrorContent() {
 
 export default function AuthError() {
   return (
-    <Suspense 
+    <Suspense
       fallback={
         <div className="min-h-screen bg-background flex items-center justify-center p-4">
-          <div className="absolute top-6 right-6">
-            <ModeToggle />
-          </div>
+
           <div className="w-full max-w-md text-center">
             <div className="mb-8">
               <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">

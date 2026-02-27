@@ -4,66 +4,6 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #fcfcfc;
-  --foreground: #171717;
-  --card: #fcfcfc;
-  --card-foreground: #171717;
-  --popover: #fcfcfc;
-  --popover-foreground: #525252;
-  --primary: #72e3ad;
-  --primary-foreground: #1e2723;
-  --secondary: #fdfdfd;
-  --secondary-foreground: #171717;
-  --muted: #ededed;
-  --muted-foreground: #202020;
-  --accent: #ededed;
-  --accent-foreground: #202020;
-  --destructive: #ca3214;
-  --destructive-foreground: #fffcfc;
-  --border: #dfdfdf;
-  --input: #f6f6f6;
-  --ring: #72e3ad;
-  --chart-1: #72e3ad;
-  --chart-2: #3b82f6;
-  --chart-3: #8b5cf6;
-  --chart-4: #f59e0b;
-  --chart-5: #10b981;
-  --sidebar: #fcfcfc;
-  --sidebar-foreground: #707070;
-  --sidebar-primary: #72e3ad;
-  --sidebar-primary-foreground: #1e2723;
-  --sidebar-accent: #ededed;
-  --sidebar-accent-foreground: #202020;
-  --sidebar-border: #dfdfdf;
-  --sidebar-ring: #72e3ad;
-  --font-sans: Outfit, sans-serif;
-  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-  --font-mono: monospace;
-  --radius: 0.5rem;
-  --shadow-x: 0px;
-  --shadow-y: 1px;
-  --shadow-blur: 3px;
-  --shadow-spread: 0px;
-  --shadow-opacity: 0.17;
-  --shadow-color: #000000;
-  --shadow-2xs: 0px 1px 3px 0px hsl(0 0% 0% / 0.09);
-  --shadow-xs: 0px 1px 3px 0px hsl(0 0% 0% / 0.09);
-  --shadow-sm: 0px 1px 3px 0px hsl(0 0% 0% / 0.17),
-    0px 1px 2px -1px hsl(0 0% 0% / 0.17);
-  --shadow: 0px 1px 3px 0px hsl(0 0% 0% / 0.17),
-    0px 1px 2px -1px hsl(0 0% 0% / 0.17);
-  --shadow-md: 0px 1px 3px 0px hsl(0 0% 0% / 0.17),
-    0px 2px 4px -1px hsl(0 0% 0% / 0.17);
-  --shadow-lg: 0px 1px 3px 0px hsl(0 0% 0% / 0.17),
-    0px 4px 6px -1px hsl(0 0% 0% / 0.17);
-  --shadow-xl: 0px 1px 3px 0px hsl(0 0% 0% / 0.17),
-    0px 8px 10px -1px hsl(0 0% 0% / 0.17);
-  --shadow-2xl: 0px 1px 3px 0px hsl(0 0% 0% / 0.43);
-  --tracking-normal: 0.025em;
-  --spacing: 0.25rem;
-}
-
-.dark {
   --background: #121212;
   --foreground: #e2e8f0;
   --card: #171717;
@@ -119,6 +59,8 @@
   --shadow-xl: 0px 1px 3px 0px hsl(0 0% 0% / 0.17),
     0px 8px 10px -1px hsl(0 0% 0% / 0.17);
   --shadow-2xl: 0px 1px 3px 0px hsl(0 0% 0% / 0.43);
+  --tracking-normal: 0.025em;
+  --spacing: 0.25rem;
 }
 
 @theme inline {

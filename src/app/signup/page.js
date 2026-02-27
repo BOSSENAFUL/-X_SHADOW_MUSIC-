@@ -1,5 +1,5 @@
 import SignupForm from "@/components/signup-form";
-import { ModeToggle } from "@/components/mode-toggle";
+
 
 export const metadata = {
   title: "Sign Up - Jammify",
@@ -9,9 +9,7 @@ export const metadata = {
 export default function SignupPage() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="absolute top-6 right-6">
-        <ModeToggle />
-      </div>
+
 
       <div className="w-full max-w-md">
         {/* Simple logo */}

@@ -78,8 +78,8 @@ export default function RootLayout({ children }) {
         <AuthProvider>
           <ThemeProvider
             attribute="class"
-            defaultTheme="system"
-            enableSystem
+            defaultTheme="dark"
+            forcedTheme="dark"
             disableTransitionOnChange
           >
             <MusicPlayerProvider>
