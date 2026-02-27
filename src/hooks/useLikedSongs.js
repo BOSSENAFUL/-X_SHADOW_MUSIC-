@@ -8,10 +8,27 @@ export function useLikedSongs(userId) {
 
   // Fetch all liked songs for the user
   const fetchLikedSongs = useCallback(async () => {
-    if (!userId) return;
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
 
-    setLoading(true);
-    setError(null);
+    // --- Simple Caching Check (Survives tab navigations) ---
+    try {
+      const cached = sessionStorage.getItem(`jammify_favorites_${userId}`);
+      if (cached) {
+        const { data, timestamp } = JSON.parse(cached);
+        // If less than 10 minutes old, load immediately
+        if (Date.now() - timestamp < 600000) {
+          setLikedSongs(data);
+          setLikedSongIds(new Set(data.map(song => song.songId)));
+          setLoading(false);
+          // Still fetch in background to sync, but skip skeleton
+        }
+      }
+    } catch (e) {
+      console.warn('Favorites cache load failed:', e);
+    }
 
     try {
       const response = await fetch(`/api/liked-songs?userId=${userId}`);
@@ -20,6 +37,14 @@ export function useLikedSongs(userId) {
       if (data.success) {
         setLikedSongs(data.data);
         setLikedSongIds(new Set(data.data.map(song => song.songId)));
+
+        // SAVE TO CACHE
+        try {
+          sessionStorage.setItem(`jammify_favorites_${userId}`, JSON.stringify({
+            data: data.data,
+            timestamp: Date.now()
+          }));
+        } catch (e) { }
       } else {
         setError(data.error);
       }
@@ -37,6 +62,9 @@ export function useLikedSongs(userId) {
       setError('User ID is required');
       return { success: false, error: 'User ID is required' };
     }
+
+    // Clear favorites cache on change to ensure freshness
+    try { sessionStorage.removeItem(`jammify_favorites_${userId}`); } catch (e) { }
 
     // Optimistic update - update UI immediately
     const wasLiked = likedSongIds.has(songData.id);
