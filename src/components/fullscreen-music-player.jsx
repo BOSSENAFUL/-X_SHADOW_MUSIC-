@@ -1089,8 +1089,10 @@ export function FullscreenMusicPlayer({
   // Extract colors when song changes - Updated with robust image selection from music-player.jsx
   useEffect(() => {
     if (currentSong?.image?.length > 0) {
+      // Use the smallest image for color extraction — the algorithm downscales
+      // to 64x64 anyway, so a large image just adds download latency
       const imageUrl =
-        currentSong.image.find((img) => img.quality === "500x500")?.url ||
+        currentSong.image.find((img) => img.quality === "50x50")?.url ||
         currentSong.image.find((img) => img.quality === "150x150")?.url ||
         currentSong.image[currentSong.image.length - 1]?.url;
 

@@ -8,10 +8,9 @@ export function useLikedSongs(userId) {
 
   // Fetch all liked songs for the user
   const fetchLikedSongs = useCallback(async () => {
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
+    if (!userId) return;
+
+    setLoading(true);
 
     // --- Simple Caching Check (Survives tab navigations) ---
     try {

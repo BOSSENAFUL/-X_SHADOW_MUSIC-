@@ -37,7 +37,7 @@ import { IoMdPlay } from "react-icons/io";
 
 export default function FavoritesPage() {
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [currentlyPlaying, setCurrentlyPlaying] = useState(null);
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState(null);
@@ -432,7 +432,7 @@ export default function FavoritesPage() {
     console.log(result.message);
   }, [toggleLike]);
 
-  if (loading) {
+  if (loading || status === "loading") {
     return (
       <SidebarProvider>
         <AppSidebar />
@@ -464,6 +464,10 @@ export default function FavoritesPage() {
     );
   }
 
+  if (status === "unauthenticated") {
+    router.push("/login");
+    return null;
+  }
   return (
     <SidebarProvider>
       <AppSidebar className="hidden md:flex" />
