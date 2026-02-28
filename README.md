@@ -94,7 +94,7 @@ The project prioritizes **clean architecture, UI/UX quality, and modern developm
 ![Full Screen](https://i.postimg.cc/4dvVxx6k/jammify-music-vercel-app-music-favorites(High-res)-(2).png)
 
 ### Lyrics-Page
-![Lyrics Page](https://i.postimg.cc/q7T7MXQm/Screenshot-2026-02-28-213420.jpg)
+![Lyrics Page](https://i.postimg.cc/YSMpw2C9/Screenshot-2026-02-28-213527.jpg)
 
 ---
 
