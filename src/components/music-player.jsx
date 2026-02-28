@@ -746,7 +746,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                 style={{ backgroundColor: dominantColor }}
               >
                 {/* Top row: Song info and main controls */}
-                <div className="flex items-center justify-between pl-3 pr-2 py-2.5">
+                <div className="flex items-center justify-between p-2.5">
                   <div
                     className={`flex items-center gap-3 min-w-0 flex-1 ${!isRadioPlaying ? "cursor-pointer" : "cursor-default"
                       }`}
@@ -811,7 +811,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
                 {/* Bottom row: Slim interactive progress bar for mobile */}
                 <div
-                  className="absolute bottom-0 left-0 right-0 h-[3px] z-10 cursor-pointer"
+                  className="absolute bottom-0 left-2.5 right-2.5 h-[3px] z-10 cursor-pointer"
                   onClick={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect();
                     const clickX = e.clientX - rect.left;
@@ -821,7 +821,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                     handleDirectSeek([newTime]);
                   }}
                 >
-                  <div className="w-full h-full bg-white/15 rounded-b-lg overflow-hidden">
+                  <div className="w-full h-full bg-white/15 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-white transition-all duration-300 ease-out"
                       style={{
