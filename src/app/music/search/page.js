@@ -15,7 +15,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, Play, Heart, Pause, MoreVertical, Plus, User, Disc, Share, Download, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Heart, Pause, MoreVertical, Plus, User, Disc, Share, Download, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { IoMdPlay } from "react-icons/io";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -327,76 +328,40 @@ function SearchPageContent() {
           );
 
           // Get unique artists from top songs with proper IDs by fetching detailed song info
-          const songArtists = [];
-
-          // Process top 3 songs to extract their artists
-          for (const song of transformedData.songs.results.slice(0, 3)) {
+          // Process top 3 songs to extract their artists in parallel
+          const artistPromises = transformedData.songs.results.slice(0, 3).map(async (song) => {
             try {
               // Fetch detailed song info to get proper artist data with IDs
               const songResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs/${song.id}`);
               const songData = await songResponse.json();
 
               if (songData.success && songData.data?.[0]?.artists?.primary) {
-                // Use the detailed artist information with real IDs
-                songData.data[0].artists.primary.forEach(artist => {
-                  const artistName = artist.name;
-                  if (artistName && !existingArtistNames.has(artistName.toLowerCase())) {
-                    songArtists.push({
-                      id: artist.id, // Real artist ID from detailed API
-                      title: artistName,
-                      name: artistName,
-                      type: 'artist',
-                      image: artist.image || song.image || [],
-                      isSongArtist: true,
-                      needsSearch: false // We have the real ID
-                    });
-                    existingArtistNames.add(artistName.toLowerCase());
-                  }
-                });
-              } else {
-                // Fallback to parsing primaryArtists string if detailed fetch fails
-                const artistName = getArtistNames(song);
-                if (artistName && artistName !== 'Unknown Artist') {
-                  const artists = artistName.split(',').map(name => name.trim());
-                  artists.forEach(name => {
-                    if (!existingArtistNames.has(name.toLowerCase())) {
-                      songArtists.push({
-                        id: `search-${name.toLowerCase().replace(/\s+/g, '-')}`,
-                        title: name,
-                        name: name,
-                        type: 'artist',
-                        image: song.image || [],
-                        isSongArtist: true,
-                        needsSearch: true // Flag that we need to search for real ID
-                      });
-                      existingArtistNames.add(name.toLowerCase());
-                    }
-                  });
-                }
+                return songData.data[0].artists.primary.map(artist => ({
+                  id: artist.id,
+                  title: artist.name,
+                  name: artist.name,
+                  type: 'artist',
+                  image: artist.image || song.image || [],
+                  isSongArtist: true,
+                  needsSearch: false
+                }));
               }
+              return [];
             } catch (error) {
               console.error('Error fetching song details for artist extraction:', error);
-              // Fallback to basic artist extraction
-              const artistName = getArtistNames(song);
-              if (artistName && artistName !== 'Unknown Artist') {
-                const artists = artistName.split(',').map(name => name.trim());
-                artists.forEach(name => {
-                  if (!existingArtistNames.has(name.toLowerCase())) {
-                    songArtists.push({
-                      id: `search-${name.toLowerCase().replace(/\s+/g, '-')}`,
-                      title: name,
-                      name: name,
-                      type: 'artist',
-                      image: song.image || [],
-                      isSongArtist: true,
-                      needsSearch: true
-                    });
-                    existingArtistNames.add(name.toLowerCase());
-                  }
-                });
-              }
+              return [];
             }
-          }
+          });
+
+          const artistResults = await Promise.all(artistPromises);
+          const songArtists = [];
+
+          artistResults.flat().forEach(artist => {
+            if (artist.title && !existingArtistNames.has(artist.title.toLowerCase())) {
+              songArtists.push(artist);
+              existingArtistNames.add(artist.title.toLowerCase());
+            }
+          });
 
           // Add song artists to the beginning of artists array
           if (songArtists.length > 0) {
@@ -1517,7 +1482,7 @@ function SearchPageContent() {
                                       />
                                     ) : (
                                       <div className="w-full h-full flex items-center justify-center bg-muted">
-                                        <Play className="w-6 h-6 sm:w-8 sm:h-8 text-white/70" />
+                                        <IoMdPlay className="w-6 h-6 sm:w-8 sm:h-8 text-white/70" />
                                       </div>
                                     )}
                                   </div>
@@ -1544,9 +1509,8 @@ function SearchPageContent() {
                                 </div>
                               </div>
 
-                              <Button
-                                size="icon"
-                                className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-green-500 hover:bg-green-600 hover:scale-110 rounded-full w-12 h-12 sm:w-14 sm:h-14 shadow-lg"
+                              <div
+                                className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 md:opacity-0 md:group-hover:opacity-100 transition-all duration-300 bg-green-500 hover:bg-green-400 hover:scale-110 rounded-full w-12 h-12 sm:w-14 sm:h-14 shadow-lg flex items-center justify-center cursor-pointer"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (resultType === 'song') {
@@ -1554,8 +1518,8 @@ function SearchPageContent() {
                                   }
                                 }}
                               >
-                                <Play className="w-5 h-5 sm:w-6 sm:h-6 ml-0.5" />
-                              </Button>
+                                <IoMdPlay className="w-6 h-6 sm:w-6 sm:h-6 fill-black translate-x-0.5" />
+                              </div>
                             </div>
                           );
                         })()}
@@ -1586,7 +1550,7 @@ function SearchPageContent() {
                                       </div>
                                     </div>
                                   ) : isCurrentSong ? (
-                                    <Play className="w-4 h-4 mx-auto text-green-500 fill-green-500" />
+                                    <IoMdPlay className="w-4 h-4 mx-auto text-green-500 fill-green-500" />
                                   ) : (
                                     index + 1
                                   )}
@@ -1604,7 +1568,7 @@ function SearchPageContent() {
                                       />
                                     ) : (
                                       <div className="w-full h-full flex items-center justify-center bg-muted">
-                                        <Play className="w-4 h-4 text-muted-foreground" />
+                                        <IoMdPlay className="w-4 h-4 text-muted-foreground" />
                                       </div>
                                     )}
                                   </div>
@@ -1795,7 +1759,7 @@ function SearchPageContent() {
                                 />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center bg-muted">
-                                  <Play className="w-6 h-6 sm:w-8 sm:h-8 text-white/70" />
+                                  <IoMdPlay className="w-6 h-6 sm:w-8 sm:h-8 text-white/70" />
                                 </div>
                               )}
                             </div>
@@ -1927,7 +1891,7 @@ function SearchPageContent() {
                                     </div>
                                   </div>
                                 ) : isCurrentSong ? (
-                                  <Play className="w-4 h-4 mx-auto text-green-500 fill-green-500" />
+                                  <IoMdPlay className="w-4 h-4 mx-auto text-green-500 fill-green-500" />
                                 ) : (
                                   index + 1
                                 )}
@@ -1945,7 +1909,7 @@ function SearchPageContent() {
                                     />
                                   ) : (
                                     <div className="w-full h-full flex items-center justify-center bg-muted">
-                                      <Play className="w-4 h-4 text-muted-foreground" />
+                                      <IoMdPlay className="w-4 h-4 text-muted-foreground" />
                                     </div>
                                   )}
                                 </div>
@@ -2065,13 +2029,13 @@ function SearchPageContent() {
                                     </div>
                                   </div>
                                 ) : isCurrentSong ? (
-                                  <Play className="w-4 h-4 mx-auto text-green-500" />
+                                  <IoMdPlay className="w-4 h-4 mx-auto text-green-500 fill-green-500" />
                                 ) : (
                                   <>
                                     <span className="text-muted-foreground group-hover:hidden text-sm">
                                       {index + 1}
                                     </span>
-                                    <Play className="w-4 h-4 mx-auto hidden group-hover:block" />
+                                    <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block fill-white" />
                                   </>
                                 )}
                               </div>
@@ -2089,7 +2053,7 @@ function SearchPageContent() {
                                     />
                                   ) : (
                                     <div className="w-full h-full flex items-center justify-center bg-muted">
-                                      <Play className="w-5 h-5 text-muted-foreground" />
+                                      <IoMdPlay className="w-5 h-5 text-muted-foreground" />
                                     </div>
                                   )}
                                 </div>
@@ -2252,7 +2216,7 @@ function SearchPageContent() {
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center bg-muted">
-                                <Play className="w-8 h-8 text-white/70" />
+                                <IoMdPlay className="w-8 h-8 text-white/70" />
                               </div>
                             )}
                           </div>

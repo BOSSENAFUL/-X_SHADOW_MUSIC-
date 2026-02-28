@@ -525,10 +525,23 @@ function PlaylistPageContent() {
 
   if (loading) {
     return (
-      <SidebarProvider>
+      <SidebarProvider >
         <AppSidebar />
-        <SidebarInset id="playlist-scroll-container" className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col">
-          <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background">
+        <SidebarInset id="playlist-scroll-container" className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col bg-[#121212]">
+          {/* Main Ambient Gradient Layer - Added to skeleton to show color as soon as it's available */}
+          <div
+            className="absolute inset-0 h-[450px] pointer-events-none transition-all duration-1000"
+            style={{
+              background: dominantColor
+                ? `linear-gradient(to bottom, 
+                    ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.7)')} 0%, 
+                    ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.4)')} 40%, 
+                    ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.1)')} 80%, 
+                    transparent 100%)`
+                : 'transparent'
+            }}
+          />
+          <header className="sticky top-0 z-50 hidden md:flex h-16 shrink-0 items-center gap-2 md:border-b bg-background">
             <div className="flex items-center gap-2 px-3 md:px-4">
               <SidebarTrigger className="-ml-1 hidden md:flex" />
               <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:flex" />
@@ -538,14 +551,18 @@ function PlaylistPageContent() {
               </Button>
             </div>
           </header>
-          <div className="flex-1 p-4 md:p-6">
-            <div className="animate-pulse space-y-6">
+          <div className="flex-1 p-4 pt-12 md:pt-20 md:pl-7.5">
+            <div className="animate-pulse space-y-8">
+              {/* Header Skeleton Only */}
               <div className="flex flex-col md:flex-row gap-6 items-center md:items-end">
-                <div className="w-48 h-48 md:w-60 md:h-60 bg-muted rounded-lg" />
-                <div className="flex-1 space-y-3 text-center md:text-left">
-                  <div className="h-6 bg-muted rounded w-24 mx-auto md:mx-0" />
-                  <div className="h-8 md:h-12 bg-muted rounded w-48 mx-auto md:mx-0" />
-                  <div className="h-4 bg-muted rounded w-32 mx-auto md:mx-0" />
+                <div className="w-64 h-64 md:w-64 md:h-64 bg-muted rounded-lg shadow-xl shrink-0" />
+                <div className="flex-1 space-y-4 w-full text-left md:text-left">
+                  {/* Title */}
+                  <div className="h-8 md:h-12 bg-muted rounded w-3/4 md:w-96" />
+
+                  {/* Description */}
+                  <div className="h-4 bg-muted rounded w-1/2 opacity-70" />
+
                 </div>
               </div>
             </div>

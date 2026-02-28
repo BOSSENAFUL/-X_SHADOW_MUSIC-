@@ -1083,7 +1083,7 @@ export default function PlaylistDetailPage({ params }) {
               </Button>
             </div>
           </header>
-          <div className="flex-1 p-4 pt-8 md:p-6">
+          <div className="flex-1 p-4 pt-12 md:pt-20 md:pl-7.5">
             <div className="animate-pulse space-y-8">
               {/* Header Skeleton Only */}
               <div className="flex flex-col md:flex-row gap-6 items-center md:items-end">
@@ -1096,7 +1096,7 @@ export default function PlaylistDetailPage({ params }) {
                   <div className="h-4 bg-muted rounded w-1/2 opacity-70" />
 
                   {/* Metadata Row */}
-                  <div className="flex items-center gap-3 pt-1">
+                  <div className="flex items-center gap-3 pt-0">
                     <div className="w-6 h-6 rounded-full bg-muted shrink-0" />
                     <div className="h-4 w-32 bg-muted rounded" />
                   </div>

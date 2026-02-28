@@ -497,8 +497,21 @@ export default function ArtistPage() {
     return (
       <SidebarProvider>
         <AppSidebar />
-        <SidebarInset id="artist-scroll-container" className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col">
-          <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background">
+        <SidebarInset id="artist-scroll-container" className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col bg-[#121212]">
+          {/* Main Ambient Gradient Layer - Matches the artist UI layout */}
+          <div
+            className="absolute inset-0 h-[390px] pointer-events-none transition-all duration-1000"
+            style={{
+              background: dominantColor
+                ? `linear-gradient(to bottom, 
+                    ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.8)')} 0%, 
+                    ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.4)')} 40%, 
+                    ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.1)')} 80%, 
+                    transparent 100%)`
+                : 'transparent'
+            }}
+          />
+          <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-md md:bg-background">
             <div className="flex items-center gap-2 px-3 md:px-4">
               <SidebarTrigger className="-ml-1 hidden md:flex" />
               <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:flex" />
@@ -508,14 +521,20 @@ export default function ArtistPage() {
               </Button>
             </div>
           </header>
-          <div className="flex-1 p-4 md:p-6">
+          <div className="flex-1 p-4 pt-12 md:p-8 md:pt-20 relative z-10">
             <div className="animate-pulse space-y-6">
+              {/* Header Skeleton Only - Circular for Artist */}
               <div className="flex flex-col md:flex-row gap-6 items-center md:items-end">
-                <div className="w-48 h-48 md:w-60 md:h-60 bg-muted rounded-full" />
-                <div className="flex-1 space-y-3 text-center md:text-left">
-                  <div className="h-6 bg-muted rounded w-24 mx-auto md:mx-0" />
-                  <div className="h-8 md:h-12 bg-muted rounded w-48 mx-auto md:mx-0" />
-                  <div className="h-4 bg-muted rounded w-32 mx-auto md:mx-0" />
+                <div className="w-48 h-48 md:w-60 md:h-60 bg-muted rounded-full shadow-2xl shrink-0" />
+                <div className="flex-1 space-y-4 text-center md:text-left w-full">
+                  {/* Verified Badge Skeleton */}
+                  <div className="h-6 bg-muted rounded w-32 mx-auto md:mx-0 opacity-80" />
+
+                  {/* Name Skeleton */}
+                  <div className="h-10 md:h-16 bg-muted rounded w-3/4 md:w-[500px] mx-auto md:mx-0" />
+
+                  {/* Followers Metadata Skeleton */}
+                  <div className="h-4 bg-muted rounded w-1/2 md:w-64 mx-auto md:mx-0 opacity-70" />
                 </div>
               </div>
             </div>

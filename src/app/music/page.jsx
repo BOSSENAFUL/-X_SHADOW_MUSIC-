@@ -49,6 +49,24 @@ const PlaylistCollage = memo(({ images }) => {
 
 PlaylistCollage.displayName = "PlaylistCollage";
 
+// Optimized Gradient Component to prevent full-page re-renders
+const AmbientGradient = memo(({ color }) => {
+  return (
+    <div
+      className="absolute top-0 left-0 w-full h-[260px] pointer-events-none transition-colors duration-1000 ease-out z-0"
+      style={{
+        backgroundColor: color
+          ? color.replace("rgb", "rgba").replace(")", ", 0.35)")
+          : "transparent",
+        WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.7) 20%, rgba(0,0,0,0) 100%)",
+        maskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.7) 20%, rgba(0,0,0,0) 100%)",
+      }}
+    />
+  );
+});
+
+AmbientGradient.displayName = "AmbientGradient";
+
 export default function MusicPage() {
   const router = useRouter();
   const { data: session } = useSession();
@@ -75,16 +93,23 @@ export default function MusicPage() {
       setHoveredColor("rgb(69, 10, 245)");
     }
 
+    let timeoutId;
     const handleResize = () => {
-      if (window.innerWidth >= 768) {
-        if (!hoveredColor) setHoveredColor("rgb(69, 10, 245)");
-      } else {
-        setHoveredColor(null);
-      }
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        if (window.innerWidth >= 768) {
+          if (!hoveredColor) setHoveredColor("rgb(69, 10, 245)");
+        } else {
+          setHoveredColor(null);
+        }
+      }, 250);
     };
 
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, []);
 
   // Fetch recently played playlists whenever session is ready
@@ -365,7 +390,8 @@ export default function MusicPage() {
           // Step 3: Collect colors and quantize
           const colorCounts = {};
 
-          for (let i = 0; i < data.length; i += 4) {
+          // Sample every 16th pixel for performance (plenty for ambient blur)
+          for (let i = 0; i < data.length; i += 16) {
             const r = data[i];
             const g = data[i + 1];
             const b = data[i + 2];
@@ -544,7 +570,8 @@ export default function MusicPage() {
       playlist.image?.[0]?.url;
 
     if (imageUrl) {
-      extractDominantColor(imageUrl, playlistId).then(color => {
+      const proxiedUrl = `/api/proxy/image?url=${encodeURIComponent(imageUrl)}`;
+      extractDominantColor(proxiedUrl, playlistId).then(color => {
         setHoveredColor(color);
       });
     } else {
@@ -599,17 +626,8 @@ export default function MusicPage() {
         </header>
 
         <div className="flex-1 p-3 md:p-6 space-y-6 md:space-y-8 pb-20 md:pb-6 relative">
-          {/* Ambient Background Gradient */}
-          <div
-            className="absolute h-[12%] w-full top-0 left-0 pointer-events-none transition-colors duration-1000 ease-in-out z-0"
-            style={{
-              backgroundColor: hoveredColor
-                ? hoveredColor.replace("rgb", "rgba").replace(")", ", 0.35)")
-                : "transparent",
-              maskImage: "linear-gradient(to bottom, black, transparent)",
-              WebkitMaskImage: "linear-gradient(to bottom, black, transparent)",
-            }}
-          />
+          {/* Ambient Background Gradient (Isolated Component) */}
+          <AmbientGradient color={hoveredColor} />
 
 
           {/* Quick Access Cards */}
