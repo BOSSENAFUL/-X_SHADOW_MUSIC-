@@ -16,11 +16,12 @@ const _colorCache = new Map();
 
 // Helper to get the smallest image URL from a song's image array
 function _getSmallImageUrl(song) {
-  if (!song?.image?.length) return null;
+  if (!song?.image?.length) return '/default-playlist-image.png';
   return (
     song.image.find((img) => img.quality === "50x50")?.url ||
     song.image.find((img) => img.quality === "150x150")?.url ||
-    song.image[song.image.length - 1]?.url
+    song.image[song.image.length - 1]?.url ||
+    '/default-playlist-image.png'
   );
 }
 
@@ -767,11 +768,16 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                           alt={currentSong.name}
                           className="w-full h-full object-cover rounded-md"
                           loading="lazy"
+                          onError={(e) => {
+                            e.target.src = '/default-playlist-image.png';
+                          }}
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <IoMdPlay className="w-3 h-3 opacity-50 text-white" />
-                        </div>
+                        <img
+                          src="/default-playlist-image.png"
+                          alt={currentSong.name}
+                          className="w-full h-full object-cover rounded-md"
+                        />
                       )}
                     </div>
                     <div className="min-w-0 flex-1 flex flex-col justify-center">
@@ -859,11 +865,16 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                         alt={currentSong.name}
                         className="w-full h-full object-cover rounded"
                         loading="lazy"
+                        onError={(e) => {
+                          e.target.src = '/default-playlist-image.png';
+                        }}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <IoMdPlay className="w-4 h-4 opacity-50 text-white" />
-                      </div>
+                      <img
+                        src="/default-playlist-image.png"
+                        alt={currentSong.name}
+                        className="w-full h-full object-cover rounded"
+                      />
                     )}
                   </div>
                   <div className="min-w-0 flex-1">

@@ -73,7 +73,7 @@ const PlaylistCard = memo(({ playlist, onClick }) => {
 
       return {
         type: 'single',
-        src: imageUrl || '/def playlist image.jpg'
+        src: imageUrl || '/default-playlist-image.png'
       };
     }
 
@@ -82,7 +82,7 @@ const PlaylistCard = memo(({ playlist, onClick }) => {
         return song.image?.find(img => img.quality === '150x150')?.url ||
           song.image?.find(img => img.quality === '500x500')?.url ||
           song.image?.[song.image.length - 1]?.url ||
-          '/def playlist image.jpg';
+          '/default-playlist-image.png';
       });
 
       return {
@@ -105,7 +105,7 @@ const PlaylistCard = memo(({ playlist, onClick }) => {
             src={cover.src}
             alt={playlist.name}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-            onError={(e) => { e.target.src = '/def playlist image.jpg'; }}
+            onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
           />
         ) : cover.type === 'collage' ? (
           <div className="w-full h-full grid grid-cols-2 grid-rows-2">
@@ -115,7 +115,7 @@ const PlaylistCard = memo(({ playlist, onClick }) => {
                   src={imageSrc}
                   alt={`Song ${index + 1}`}
                   className="w-full h-full object-cover"
-                  onError={(e) => { e.target.src = '/def playlist image.jpg'; }}
+                  onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
                 />
               </div>
             ))}

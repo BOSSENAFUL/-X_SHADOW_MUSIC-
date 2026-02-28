@@ -361,7 +361,7 @@ export default function PlaylistDetailPage({ params }) {
     }
 
     if (!targetSongs || targetSongs.length === 0) {
-      return { type: 'default', src: '/def playlist image.jpg' };
+      return { type: 'default', src: '/default-playlist-image.png' };
     }
 
     if (targetSongs.length >= 1 && targetSongs.length <= 3) {
@@ -372,7 +372,7 @@ export default function PlaylistDetailPage({ params }) {
 
       return {
         type: 'single',
-        src: imageUrl || '/def playlist image.jpg',
+        src: imageUrl || '/default-playlist-image.png',
         song: firstSong
       };
     }
@@ -383,7 +383,7 @@ export default function PlaylistDetailPage({ params }) {
         return song.image?.find(img => img.quality === '150x150')?.url ||
           song.image?.find(img => img.quality === '500x500')?.url ||
           song.image?.[song.image.length - 1]?.url ||
-          '/def playlist image.jpg';
+          '/default-playlist-image.png';
       });
 
       return {
@@ -393,7 +393,7 @@ export default function PlaylistDetailPage({ params }) {
       };
     }
 
-    return { type: 'default', src: '/def playlist image.jpg' };
+    return { type: 'default', src: '/default-playlist-image.png' };
   };
 
 
@@ -1300,7 +1300,7 @@ export default function PlaylistDetailPage({ params }) {
                             alt={playlist.name}
                             className="w-full h-full object-cover"
                             onError={(e) => {
-                              e.target.src = '/def playlist image.jpg';
+                              e.target.src = '/default-playlist-image.png';
                             }}
                           />
                         );
@@ -1314,7 +1314,7 @@ export default function PlaylistDetailPage({ params }) {
                                   alt={`Song ${index + 1}`}
                                   className="w-full h-full object-cover"
                                   onError={(e) => {
-                                    e.target.src = '/def playlist image.jpg';
+                                    e.target.src = '/default-playlist-image.png';
                                   }}
                                 />
                               </div>
@@ -1324,7 +1324,7 @@ export default function PlaylistDetailPage({ params }) {
                       } else {
                         return (
                           <img
-                            src="/def playlist image.jpg"
+                            src="/default-playlist-image.png"
                             alt={playlist.name}
                             className="w-full h-full object-cover"
                           />
@@ -1377,7 +1377,7 @@ export default function PlaylistDetailPage({ params }) {
                           alt={playlist.name}
                           className="w-full h-full object-cover"
                           onError={(e) => {
-                            e.target.src = '/def playlist image.jpg';
+                            e.target.src = '/default-playlist-image.png';
                           }}
                         />
                       );
@@ -1391,7 +1391,7 @@ export default function PlaylistDetailPage({ params }) {
                                 alt={`Song ${index + 1}`}
                                 className="w-full h-full object-cover"
                                 onError={(e) => {
-                                  e.target.src = '/def playlist image.jpg';
+                                  e.target.src = '/default-playlist-image.png';
                                 }}
                               />
                             </div>
@@ -1401,7 +1401,7 @@ export default function PlaylistDetailPage({ params }) {
                     } else {
                       return (
                         <img
-                          src="/def playlist image.jpg"
+                          src="/default-playlist-image.png"
                           alt={playlist.name}
                           className="w-full h-full object-cover"
                         />
@@ -1619,13 +1619,15 @@ export default function PlaylistDetailPage({ params }) {
                                   className="w-full h-full object-cover rounded"
                                   loading="lazy"
                                   onError={(e) => {
-                                    e.target.style.display = 'none';
+                                    e.target.src = '/default-playlist-image.png';
                                   }}
                                 />
                               ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <IoMdPlay className="w-4 h-4 opacity-50 text-white" />
-                                </div>
+                                <img
+                                  src="/default-playlist-image.png"
+                                  alt={song.name}
+                                  className="w-full h-full object-cover rounded"
+                                />
                               )}
                             </div>
 
@@ -1753,13 +1755,15 @@ export default function PlaylistDetailPage({ params }) {
                                     className="w-full h-full object-cover rounded"
                                     loading="lazy"
                                     onError={(e) => {
-                                      e.target.style.display = 'none';
+                                      e.target.src = '/default-playlist-image.png';
                                     }}
                                   />
                                 ) : (
-                                  <div className="w-full h-full flex items-center justify-center">
-                                    <IoMdPlay className="w-4 h-4 opacity-50 text-white" />
-                                  </div>
+                                  <img
+                                    src="/default-playlist-image.png"
+                                    alt={song.name}
+                                    className="w-full h-full object-cover rounded"
+                                  />
                                 )}
                               </div>
                               <div className="min-w-0">

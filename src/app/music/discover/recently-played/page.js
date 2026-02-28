@@ -88,11 +88,11 @@ export default function RecentlyPlayedPage() {
                                         if (details && details.data?.songIds) {
                                             const collageImages = details.data.songIds.slice(0, 4).map(id => {
                                                 const song = songCache[id];
-                                                if (!song) return '/def playlist image.jpg';
+                                                if (!song) return '/default-playlist-image.png';
                                                 return song.image?.find(img => img.quality === '150x150')?.url ||
                                                     song.image?.find(img => img.quality === '500x500')?.url ||
                                                     song.image?.[song.image.length - 1]?.url ||
-                                                    '/def playlist image.jpg';
+                                                    '/default-playlist-image.png';
                                             });
                                             if (collageImages.length >= 4) {
                                                 return { ...p, collageImages };

@@ -1479,11 +1479,16 @@ function SearchPageContent() {
                                         src={topResult.image[2].url}
                                         alt={topResult.title}
                                         className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                          e.target.src = '/default-playlist-image.png';
+                                        }}
                                       />
                                     ) : (
-                                      <div className="w-full h-full flex items-center justify-center bg-muted">
-                                        <IoMdPlay className="w-6 h-6 sm:w-8 sm:h-8 text-white/70" />
-                                      </div>
+                                      <img
+                                        src="/default-playlist-image.png"
+                                        alt={topResult.title}
+                                        className="w-full h-full object-cover"
+                                      />
                                     )}
                                   </div>
                                 </div>
@@ -1565,11 +1570,16 @@ function SearchPageContent() {
                                         alt={song.title}
                                         className="w-full h-full object-cover"
                                         loading="lazy"
+                                        onError={(e) => {
+                                          e.target.src = '/default-playlist-image.png';
+                                        }}
                                       />
                                     ) : (
-                                      <div className="w-full h-full flex items-center justify-center bg-muted">
-                                        <IoMdPlay className="w-4 h-4 text-muted-foreground" />
-                                      </div>
+                                      <img
+                                        src="/default-playlist-image.png"
+                                        alt={song.title}
+                                        className="w-full h-full object-cover"
+                                      />
                                     )}
                                   </div>
 
@@ -1756,11 +1766,16 @@ function SearchPageContent() {
                                   src={album.image[2].url}
                                   alt={album.title || album.name}
                                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                  onError={(e) => {
+                                    e.target.src = '/default-playlist-image.png';
+                                  }}
                                 />
                               ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-muted">
-                                  <IoMdPlay className="w-6 h-6 sm:w-8 sm:h-8 text-white/70" />
-                                </div>
+                                <img
+                                  src="/default-playlist-image.png"
+                                  alt={album.title || album.name}
+                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                />
                               )}
                             </div>
                             <p className="font-medium truncate text-xs sm:text-sm mb-1">
@@ -1906,11 +1921,16 @@ function SearchPageContent() {
                                       alt={song.title}
                                       className="w-full h-full object-cover"
                                       loading="lazy"
+                                      onError={(e) => {
+                                        e.target.src = '/default-playlist-image.png';
+                                      }}
                                     />
                                   ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-muted">
-                                      <IoMdPlay className="w-4 h-4 text-muted-foreground" />
-                                    </div>
+                                    <img
+                                      src="/default-playlist-image.png"
+                                      alt={song.title}
+                                      className="w-full h-full object-cover"
+                                    />
                                   )}
                                 </div>
 
@@ -2050,11 +2070,16 @@ function SearchPageContent() {
                                       alt={song.title}
                                       className="w-full h-full object-cover"
                                       loading="lazy"
+                                      onError={(e) => {
+                                        e.target.src = '/default-playlist-image.png';
+                                      }}
                                     />
                                   ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-muted">
-                                      <IoMdPlay className="w-5 h-5 text-muted-foreground" />
-                                    </div>
+                                    <img
+                                      src="/default-playlist-image.png"
+                                      alt={song.title}
+                                      className="w-full h-full object-cover"
+                                    />
                                   )}
                                 </div>
                                 <div className="min-w-0">
@@ -2213,11 +2238,16 @@ function SearchPageContent() {
                                 src={album.image[2].url}
                                 alt={album.title || album.name}
                                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                onError={(e) => {
+                                  e.target.src = '/default-playlist-image.png';
+                                }}
                               />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-muted">
-                                <IoMdPlay className="w-8 h-8 text-white/70" />
-                              </div>
+                              <img
+                                src="/default-playlist-image.png"
+                                alt={album.title || album.name}
+                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                              />
                             )}
                           </div>
                           <p className="font-semibold truncate text-sm sm:text-base mb-1">

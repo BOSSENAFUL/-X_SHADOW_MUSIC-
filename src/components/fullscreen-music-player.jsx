@@ -49,11 +49,12 @@ const _fsColorCache = new Map();
 
 // Helper to get the smallest image URL from a song's image array
 function _getFsSmallImageUrl(song) {
-  if (!song?.image?.length) return null;
+  if (!song?.image?.length) return '/default-playlist-image.png';
   return (
     song.image.find((img) => img.quality === "50x50")?.url ||
     song.image.find((img) => img.quality === "150x150")?.url ||
-    song.image[song.image.length - 1]?.url
+    song.image[song.image.length - 1]?.url ||
+    '/default-playlist-image.png'
   );
 }
 
@@ -1230,18 +1231,27 @@ export function FullscreenMusicPlayer({
                 src={currentSong.image[2].url}
                 alt={currentSong.name}
                 className="absolute inset-0 w-full h-full object-cover opacity-20 blur-3xl scale-125 transition-all duration-1000"
+                onError={(e) => {
+                  e.target.src = '/default-playlist-image.png';
+                }}
               />
               {/* Secondary ambient layer */}
               <img
                 src={currentSong.image[2].url}
                 alt={currentSong.name}
                 className="absolute inset-0 w-full h-full object-cover opacity-10 blur-[100px] scale-150 transition-all duration-1000"
+                onError={(e) => {
+                  e.target.src = '/default-playlist-image.png';
+                }}
               />
               {/* Tertiary glow layer */}
               <img
                 src={currentSong.image[2].url}
                 alt={currentSong.name}
                 className="absolute inset-0 w-full h-full object-cover opacity-5 blur-[150px] scale-[2] transition-all duration-1000"
+                onError={(e) => {
+                  e.target.src = '/default-playlist-image.png';
+                }}
               />
             </>
           )}
@@ -1460,11 +1470,16 @@ export function FullscreenMusicPlayer({
                         src={currentSong.image[2].url}
                         alt={currentSong.name}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.src = '/default-playlist-image.png';
+                        }}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <IoMdPlay className="w-12 h-12 sm:w-16 sm:h-16 text-white/50" />
-                      </div>
+                      <img
+                        src="/default-playlist-image.png"
+                        alt={currentSong.name}
+                        className="w-full h-full object-cover"
+                      />
                     )}
                   </div>
                 </div>
@@ -1619,11 +1634,16 @@ export function FullscreenMusicPlayer({
                         src={currentSong.image[2].url}
                         alt={currentSong.name}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.src = '/default-playlist-image.png';
+                        }}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <IoMdPlay className="w-24 h-24 text-white/50" />
-                      </div>
+                      <img
+                        src="/default-playlist-image.png"
+                        alt={currentSong.name}
+                        className="w-full h-full object-cover"
+                      />
                     )}
                   </div>
                 </div>

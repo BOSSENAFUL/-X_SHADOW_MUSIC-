@@ -94,7 +94,7 @@ export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
                                 alt=""
                                 className="w-full h-full object-cover"
                                 loading="lazy"
-                                onError={(e) => { e.target.src = "/def playlist image.jpg"; }}
+                                onError={(e) => { e.target.src = "/default-playlist-image.png"; }}
                             />
                         ))}
                     </div>
@@ -104,12 +104,12 @@ export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
                             playlist.image?.[2]?.url ||
                             playlist.image?.[1]?.url ||
                             playlist.image?.[0]?.url ||
-                            (typeof playlist.image === 'string' ? playlist.image : "/def playlist image.jpg")
+                            (typeof playlist.image === 'string' ? playlist.image : "/default-playlist-image.png")
                         }
                         alt={playlist.name || playlist.playlistName}
                         className="w-full h-full object-cover"
                         loading="lazy"
-                        onError={(e) => { e.target.src = "/def playlist image.jpg"; }}
+                        onError={(e) => { e.target.src = "/default-playlist-image.png"; }}
                     />
                 )}
 

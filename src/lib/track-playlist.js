@@ -18,7 +18,7 @@ export const trackRecentlyPlayed = async (playlist, source = 'jiosaavn', songLis
                     song.image?.find(img => img.quality === '150x150')?.url ||
                     song.image?.find(img => img.quality === '500x500')?.url ||
                     song.image?.[song.image.length - 1]?.url ||
-                    '/def playlist image.jpg';
+                    '/default-playlist-image.png';
                 return { quality: 'default', url };
             });
         }

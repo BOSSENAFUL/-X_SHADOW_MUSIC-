@@ -801,13 +801,15 @@ export default function ArtistPage() {
                                 className="w-full h-full object-cover rounded"
                                 loading="lazy"
                                 onError={(e) => {
-                                  e.target.style.display = 'none';
+                                  e.target.src = '/default-playlist-image.png';
                                 }}
                               />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <IoMdPlay className="w-4 h-4 opacity-50 text-white" />
-                              </div>
+                              <img
+                                src="/default-playlist-image.png"
+                                alt={song.name}
+                                className="w-full h-full object-cover rounded"
+                              />
                             )}
                           </div>
 

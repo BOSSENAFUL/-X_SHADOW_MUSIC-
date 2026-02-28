@@ -167,11 +167,11 @@ export default function MusicPage() {
               if (details && details.data?.songIds) {
                 const collageImages = details.data.songIds.slice(0, 4).map(id => {
                   const song = songCache[id];
-                  if (!song) return '/def playlist image.jpg';
+                  if (!song) return '/default-playlist-image.png';
                   return song.image?.find(img => img.quality === '150x150')?.url ||
                     song.image?.find(img => img.quality === '500x500')?.url ||
                     song.image?.[song.image.length - 1]?.url ||
-                    '/def playlist image.jpg';
+                    '/default-playlist-image.png';
                 });
                 if (collageImages.length >= 4) {
                   return { ...p, collageImages };
@@ -714,12 +714,12 @@ export default function MusicPage() {
                             playlist.image?.[2]?.url ||
                             playlist.image?.[1]?.url ||
                             playlist.image?.[0]?.url ||
-                            (typeof playlist.image === 'string' ? playlist.image : "/def playlist image.jpg")
+                            (typeof playlist.image === 'string' ? playlist.image : "/default-playlist-image.png")
                           }
                           alt={playlist.playlistName || "Playlist"}
                           className="w-full h-full object-cover"
                           loading="lazy"
-                          onError={(e) => { e.target.src = "/def playlist image.jpg"; }}
+                          onError={(e) => { e.target.src = "/default-playlist-image.png"; }}
                         />
                       );
                     })()}
