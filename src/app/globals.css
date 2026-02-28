@@ -127,21 +127,26 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
     letter-spacing: var(--tracking-normal);
   }
-  
-  /* Disable text selection for PWA app-like behavior */
-  /* * {
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    -webkit-touch-callout: none;
-    -webkit-tap-highlight-color: transparent;
-  } */
-  
+
+  /* Disable text selection and zoom for mobile for a native app feel */
+  @media (max-width: 768px) {
+    * {
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      -webkit-text-size-adjust: 100%;
+    }
+  }
+
   /* Allow text selection for input fields and editable content */
   input,
   textarea,
@@ -152,22 +157,26 @@
     -ms-user-select: text;
     user-select: text;
   }
-  
+
   /* Hide scrollbars globally while keeping scroll functionality */
   * {
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* Internet Explorer 10+ */
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* Internet Explorer 10+ */
   }
-  
+
   *::-webkit-scrollbar {
-    display: none; /* WebKit browsers (Chrome, Safari, Edge) */
+    display: none;
+    /* WebKit browsers (Chrome, Safari, Edge) */
   }
-  
-  html, body {
+
+  html,
+  body {
     scrollbar-width: none;
     -ms-overflow-style: none;
   }
-  
+
   html::-webkit-scrollbar,
   body::-webkit-scrollbar {
     display: none;
@@ -216,10 +225,12 @@
     transform: scale(1);
     box-shadow: 0 0 20px var(--primary);
   }
+
   20% {
     transform: scale(1, 2.5);
     box-shadow: 0 0 50px var(--primary);
   }
+
   40% {
     transform: scale(1);
     box-shadow: 0 0 20px var(--primary);
@@ -228,9 +239,17 @@
 
 /* Equalizer / Music Bar Animation */
 @keyframes equalizer {
-  0% { height: 15%; }
-  50% { height: 100%; }
-  100% { height: 15%; }
+  0% {
+    height: 15%;
+  }
+
+  50% {
+    height: 100%;
+  }
+
+  100% {
+    height: 15%;
+  }
 }
 
 .animate-music-bar {
