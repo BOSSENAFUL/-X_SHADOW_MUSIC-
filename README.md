@@ -85,7 +85,7 @@ The project prioritizes **clean architecture, UI/UX quality, and modern developm
 ## 📸 Screenshots
 
 ### 🎼 Music Dashboard
-![Dashboard Screenshot]([https://i.postimg.cc/WbfvgQ3r/image.png](https://i.postimg.cc/hPBZsXyd/jammify-music-vercel-app-music(High-res).png))
+![Dashboard Screenshot](https://i.postimg.cc/hPBZsXyd/jammify-music-vercel-app-music(High-res).png)
 
 ### ▶️ Music Player
 ![Player Screenshot](https://i.postimg.cc/cCMm2c90/jammify-music-vercel-app-music-favorites(High-res)-(1).png)
