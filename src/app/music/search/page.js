@@ -73,7 +73,7 @@ function SearchPageContent() {
   // Ref to track current search ID to prevent stale results
   const currentSearchId = useRef(0);
 
-  const { playSong, currentSong, isPlaying } = useMusicPlayer();
+  const { playSong, currentSong, isPlaying, togglePlayPause } = useMusicPlayer();
   const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
 
   // Ref to track if we're restoring from sessionStorage (to prevent re-searching)
@@ -881,141 +881,146 @@ function SearchPageContent() {
     }
   }, [searchQuery]);
 
-  // Combine lyrics search results with regular search results
+  // Combine and rank search results from all sources (Direct, Lyrics, Category-specific)
   const combinedSearchResults = React.useMemo(() => {
-    // Don't show any results while loading to prevent flash of old content
-    if (loading || lyricsLoading || !searchResults) return null;
-
-    // Start with regular search results
-    const combined = { ...searchResults };
-
-    // Ensure songs array exists
-    if (!combined.songs) {
-      combined.songs = { results: [] };
-    }
-    if (!combined.songs.results) {
-      combined.songs.results = [];
+    // Return null while fundamental loading is happening or if we have no base results
+    if (loading || lyricsLoading || !searchResults || (!searchResults.topQuery && !searchResults.songs?.results?.length)) {
+      return null;
     }
 
+    const searchTerm = (searchQuery || "").toLowerCase().trim();
+    if (!searchTerm) return searchResults;
+
+    // 1. Initial State: Start with a clone of regular search results
+    const combined = {
+      ...searchResults,
+      songs: { ...(searchResults.songs || { results: [] }) },
+      albums: { ...(searchResults.albums || { results: [] }) },
+      artists: { ...(searchResults.artists || { results: [] }) },
+      playlists: { ...(searchResults.playlists || { results: [] }) }
+    };
+
+    // 2. Hydrate with high-quality specific category fetches
+    // These specific fetches (limit 40) are almost always better than the generic search (limit 20)
+    if (categoryData.songs?.results?.length > 0) {
+      if (categoryData.songs.results.length > combined.songs.results.length || combined.songs.results.length === 0) {
+        combined.songs.results = categoryData.songs.results;
+      }
+    }
+    if (categoryData.albums?.results?.length > combined.albums.results.length) {
+      combined.albums.results = categoryData.albums.results;
+    }
+    if (categoryData.artists?.results?.length > combined.artists.results.length) {
+      combined.artists.results = categoryData.artists.results;
+    }
+
+    // 3. Merge Lyrics Matches
     let topLyricsMatch = null;
-
-    // Add songs from lyrics search that have JioSaavn matches
     if (lyricsResults && Array.isArray(lyricsResults) && lyricsResults.length > 0) {
       const lyricsBasedSongs = lyricsResults
-        .filter(result => {
-          // More robust filtering
-          return result &&
-            result.jiosaavn &&
-            result.jiosaavn.id &&
-            typeof result.jiosaavn.id === 'string' &&
-            result.jiosaavn.id.trim() !== '';
-        })
+        .filter(result => result?.jiosaavn?.id)
         .map((result, index) => ({
           ...result.jiosaavn,
-          // Add a flag to identify lyrics-based results
           isLyricsMatch: true,
           geniusData: result.genius,
-          // Add a unique identifier to prevent key conflicts
-          _lyricsIndex: index,
-          // Add the final score from lyrics search for prioritization
-          lyricsScore: result.finalScore || 0
+          lyricsScore: result.finalScore || 0,
+          _index: index
         }));
 
       if (lyricsBasedSongs.length > 0) {
-        // Get the top lyrics match (highest score)
         topLyricsMatch = lyricsBasedSongs[0];
-
-        // Create a more robust deduplication using both ID and title
-        const existingSongs = new Map();
-        combined.songs.results.forEach(song => {
-          if (song && song.id) {
-            existingSongs.set(song.id, song);
-          }
-        });
-
-        // Filter out duplicates more carefully
-        const newSongs = lyricsBasedSongs.filter(song => {
-          if (!song || !song.id) return false;
-
-          // Check if we already have this song ID
-          if (existingSongs.has(song.id)) {
-            return false;
-          }
-
-          // Add to our tracking map
-          existingSongs.set(song.id, song);
-          return true;
-        });
-
-        // Add new songs to the beginning of the results
-        if (newSongs.length > 0) {
-          combined.songs.results = [...newSongs, ...combined.songs.results];
-        }
+        const existingIds = new Set(combined.songs.results.map(s => s.id));
+        const uniqueLyricsSongs = lyricsBasedSongs.filter(s => !existingIds.has(s.id));
+        combined.songs.results = [...combined.songs.results, ...uniqueLyricsSongs];
       }
     }
 
-    // Override topQuery with the best lyrics match if it has a high score
-    if (topLyricsMatch && topLyricsMatch.lyricsScore > 200) {
-      console.log('🎯 Using lyrics match as top result:', topLyricsMatch.title, 'Score:', topLyricsMatch.lyricsScore);
-      combined.topQuery = {
-        ...topLyricsMatch,
-        type: 'song'
-      };
+    // 4. Robust Ranking & Sorting
+    const getRelevanceScore = (item) => {
+      if (!item) return -1000;
+      const title = (item.title || item.name || "").toLowerCase().trim();
+      const lyricsScore = item.lyricsScore || 0;
+
+      // Tier 1: Exact matches (always absolute top)
+      if (title === searchTerm) return 2000;
+
+      // Tier 2: Starts with the term
+      if (title.startsWith(searchTerm)) return 1500;
+
+      // Tier 3: Very high quality lyrics matches (> 500 score)
+      if (item.isLyricsMatch && lyricsScore > 500) return 1000 + lyricsScore;
+
+      // Tier 4: Contains the term as a word
+      if (title.includes(" " + searchTerm) || title.includes(searchTerm + " ")) return 800;
+
+      // Tier 5: Direct matches from song search generally have a base relevance
+      if (!item.isLyricsMatch) return 400;
+
+      // Tier 6: Regular lyrics matches
+      return lyricsScore;
+    };
+
+    // Deduplicate
+    const seen = new Set();
+    combined.songs.results = combined.songs.results.filter(s => {
+      if (!s.id || seen.has(s.id)) return false;
+      seen.add(s.id);
+      return true;
+    });
+
+    // Final Sort
+    combined.songs.results.sort((a, b) => getRelevanceScore(b) - getRelevanceScore(a));
+
+    // 5. Smart Top Result Picker
+    const firstSong = combined.songs.results[0];
+    const topQuery = combined.topQuery;
+    const songScore = getRelevanceScore(firstSong);
+    const currentTopScore = getRelevanceScore(topQuery);
+
+    if (songScore > currentTopScore + 50 || !topQuery) {
+      combined.topQuery = { ...firstSong, type: 'song' };
+    }
+    else if (topLyricsMatch && topLyricsMatch.lyricsScore > 400 && getRelevanceScore(topLyricsMatch) > currentTopScore) {
+      combined.topQuery = { ...topLyricsMatch, type: 'song' };
     }
 
     return combined;
-  }, [searchResults, lyricsResults]);
+  }, [searchResults, lyricsResults, categoryData, searchQuery, loading, lyricsLoading]);
 
   const handlePlayClick = async (song, playlist = []) => {
     try {
-      // Check if the same song is already playing - if so, do nothing
-      if (currentSong?.id === song.id && isPlaying) {
-        console.log('Song is already playing, ignoring click');
+      // 1. Check if the song is already current - and toggle playback
+      if (currentSong?.id === song.id) {
+        togglePlayPause();
         return;
       }
 
-      // Always fetch detailed data for the current song if it doesn't have downloadUrl
+      // 2. Always fetch DETAILED song data for playback to ensure highest quality (320kbps)
+      // Search results often only have low quality (96k or 160k) or incomplete downloadUrl arrays.
       let detailedCurrentSong = song;
-      if (!song.downloadUrl && song.id) {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs/${song.id}`);
-        const data = await response.json();
 
-        if (data.success && data.data && data.data.length > 0) {
-          detailedCurrentSong = data.data[0];
+      // Only skip fetch if we are 100% sure we already have the detailed object (e.g. from a previous detail fetch)
+      // Checking for downloadUrl length >= 5 is a good heuristic for full Saavn details.
+      if (!song.downloadUrl || !Array.isArray(song.downloadUrl) || song.downloadUrl.length < 5) {
+        try {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs/${song.id}`);
+          const data = await response.json();
+          if (data.success && data.data && data.data.length > 0) {
+            detailedCurrentSong = data.data[0];
+          }
+        } catch (error) {
+          console.error("Error fetching high-quality song details:", error);
         }
       }
 
-      // Create a detailed playlist by fetching complete data for songs that need it
-      const detailedPlaylist = await Promise.all(
-        playlist.map(async (playlistSong) => {
-          // If the song already has downloadUrl, return it as is
-          if (playlistSong.downloadUrl) {
-            return playlistSong;
-          }
+      // 3. Start playback with high quality data
+      // For the rest of the playlist, we can defer detailed fetching if needed,
+      // but for the current song we MUST have the quality link now.
+      playSong(detailedCurrentSong, playlist);
 
-          // If no downloadUrl, fetch detailed data
-          if (playlistSong.id) {
-            try {
-              const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs/${playlistSong.id}`);
-              const data = await response.json();
-
-              if (data.success && data.data && data.data.length > 0) {
-                return data.data[0];
-              }
-            } catch (error) {
-              console.error(`Error fetching details for song ${playlistSong.id}:`, error);
-            }
-          }
-
-          // Fallback: return the original song if detailed fetch fails
-          return playlistSong;
-        })
-      );
-
-      playSong(detailedCurrentSong, detailedPlaylist);
     } catch (error) {
       console.error('Error in handlePlayClick:', error);
-      // Fallback: play with original data
+      // Absolute fallback
       playSong(song, playlist);
     }
   };
@@ -1523,7 +1528,11 @@ function SearchPageContent() {
                                   }
                                 }}
                               >
-                                <IoMdPlay className="w-6 h-6 sm:w-6 sm:h-6 fill-black translate-x-0.5" />
+                                {currentSong?.id === topResult.id && isPlaying ? (
+                                  <Pause className="w-6 h-6 sm:w-6 sm:h-6 fill-black text-black" />
+                                ) : (
+                                  <IoMdPlay className="w-6 h-6 sm:w-6 sm:h-6 fill-black translate-x-0.5" />
+                                )}
                               </div>
                             </div>
                           );

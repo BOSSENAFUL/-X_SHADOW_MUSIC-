@@ -6,6 +6,7 @@ import { AppPreview } from "@/components/app-preview";
 import UserReviews from "@/components/user-reviews";
 import { ArrowRight, Download } from "lucide-react";
 import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
 
 export default function Home() {
   return (
@@ -20,6 +21,12 @@ export default function Home() {
         <div className="flex items-center justify-between w-full max-w-5xl mx-auto">
           <div className="text-base sm:text-lg md:text-xl font-medium text-foreground">
             Jammify
+          </div>
+
+          <div>
+            <Button variant="outline" className="rounded-full px-6 ">
+              <Link href="/features" className="text-sm sm:text-base md:text-lg font-medium text-foreground ">Features</Link>
+            </Button>
           </div>
 
         </div>
@@ -83,7 +90,7 @@ export default function Home() {
             transition={{ duration: 0.6, delay: 0.6, ease: "easeOut" }}
           >
             <div className="text-center">
-              <div className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl font-light text-foreground mb-2 sm:mb-3">50M+</div>
+              <div className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl font-light text-foreground mb-2 sm:mb-3">80M+</div>
               <p className="text-xs xs:text-sm sm:text-base text-muted-foreground font-light">Songs available</p>
             </div>
 

@@ -6,11 +6,11 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 
 const screenImages = [
-  { src: "/screens/1.jpg", alt: "Jammify Home Screen" },
-  { src: "/screens/2.jpg", alt: "Music Playlist Interface" },
-  { src: "/screens/3.jpg", alt: "Fullscreen Music Player" },
-  { src: "/screens/4.jpg", alt: "Lyrics Page" },
-  { src: "/screens/5.jpg", alt: "PC Screen" },
+  { src: "/screens/1.png", alt: "Jammify Home Screen" },
+  { src: "/screens/2.png", alt: "Music Playlist Interface" },
+  { src: "/screens/3.png", alt: "Fullscreen Music Player" },
+  { src: "/screens/4.png", alt: "Lyrics Page" },
+  { src: "/screens/5.png", alt: "PC Screen" },
 ];
 
 export function AppPreview() {
