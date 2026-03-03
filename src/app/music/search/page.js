@@ -699,10 +699,18 @@ function SearchPageContent() {
     if (currentCategoryState?.page === 0 && !currentCategoryState?.loading) {
       if (hasExistingResultsFromMainSearch) {
         console.log(`[Search] Hydrating ${activeTab} with existing results from main search`);
+
+        // For artists, make sure we preserve any injected song artists
+        let initialResults = searchResults[activeTab].results;
+        if (activeTab === 'artists' && searchResults.artists?.results) {
+          // If we have search results, they should already have been enhanced in performSearch
+          initialResults = searchResults.artists.results;
+        }
+
         setCategoryData(prev => ({
           ...prev,
           [activeTab]: {
-            results: searchResults[activeTab].results,
+            results: initialResults,
             page: 1, // Mark as page 1 so we don't re-fetch it
             hasMore: true, // Assume there's more
             loading: false
@@ -910,8 +918,35 @@ function SearchPageContent() {
     if (categoryData.albums?.results?.length > combined.albums.results.length) {
       combined.albums.results = categoryData.albums.results;
     }
-    if (categoryData.artists?.results?.length > combined.artists.results.length) {
-      combined.artists.results = categoryData.artists.results;
+    if (categoryData.artists?.results?.length > 0) {
+      // PRESERVE injected song artists (which have IDs/images fetched specially)
+      // when overwriting with full category results (which are often more but missing the song's specific artist)
+      const songArtists = combined.artists.results.filter(a => a.isSongArtist);
+
+      if (categoryData.artists.results.length > combined.artists.results.length) {
+        const existingNames = new Set(categoryData.artists.results.map(a =>
+          (a.title || a.name || "").toLowerCase()
+        ));
+
+        const uniqueSongArtists = songArtists.filter(a =>
+          !existingNames.has((a.title || a.name || "").toLowerCase())
+        );
+
+        combined.artists.results = [...uniqueSongArtists, ...categoryData.artists.results];
+      } else if (songArtists.length > 0) {
+        // Even if we don't swap, make sure song artists are at the front if they aren't already
+        const existingNames = new Set(combined.artists.results.map(a =>
+          a.isSongArtist ? "" : (a.title || a.name || "").toLowerCase()
+        ));
+
+        const uniqueSongArtists = songArtists.filter(a =>
+          !existingNames.has((a.title || a.name || "").toLowerCase())
+        );
+
+        // Deduplicate and prepend
+        const baseResults = combined.artists.results.filter(a => !a.isSongArtist);
+        combined.artists.results = [...uniqueSongArtists, ...baseResults];
+      }
     }
 
     // 3. Merge Lyrics Matches
@@ -962,14 +997,32 @@ function SearchPageContent() {
 
     // Deduplicate
     const seen = new Set();
-    combined.songs.results = combined.songs.results.filter(s => {
+    const uniqueSongs = combined.songs.results.filter(s => {
       if (!s.id || seen.has(s.id)) return false;
       seen.add(s.id);
       return true;
     });
 
-    // Final Sort
-    combined.songs.results.sort((a, b) => getRelevanceScore(b) - getRelevanceScore(a));
+    // Stability Fix for Infinite Scroll: 
+    // We only perform the "Smart Ranking" on the "Hero" section (the initial results and lyrics matches).
+    // Results from deeper pages (Page 2+) are kept in their stable API order to prevent the UI from jumping
+    // when more songs load.
+
+    // Identify which songs belong to the initial "Top Results" set vs "Infinite Scroll" set
+    // A song is a "Hero" if it was in the first 40 results OR it's a special high-priority lyrics match
+    const threshold = 40;
+    const heroSongs = uniqueSongs.slice(0, threshold);
+    const deepSongs = uniqueSongs.slice(threshold);
+
+    // Only sort the hero section to establish the "Top Results"
+    // We use a stable sort that falls back to original order for equal scores
+    heroSongs.sort((a, b) => {
+      const scoreDiff = getRelevanceScore(b) - getRelevanceScore(a);
+      return scoreDiff;
+    });
+
+    // Recombine: Smart Top results first, followed by stable infinite scroll results
+    combined.songs.results = [...heroSongs, ...deepSongs];
 
     // 5. Smart Top Result Picker
     const firstSong = combined.songs.results[0];
@@ -1392,7 +1445,7 @@ function SearchPageContent() {
 
         <div
           ref={scrollContainerRef}
-          className="flex flex-1 flex-col pb-32 md:pb-6 overflow-y-auto transition-opacity duration-150"
+          className="flex flex-1 flex-col pb-32 md:pb-6 overflow-y-auto transition-opacity duration-150 mb-24"
           style={{ opacity: isInitialRestore ? 0 : 1 }}
         >
           {/* Search Input */}
@@ -1894,7 +1947,7 @@ function SearchPageContent() {
                         </div>
                       </div>
 
-                      {(categoryData.songs.page > 0 ? categoryData.songs.results : combinedSearchResults.songs.results).map((song, index) => {
+                      {combinedSearchResults.songs.results.map((song, index) => {
 
                         const isCurrentSong = currentSong?.id === song.id;
                         return (
@@ -2235,7 +2288,7 @@ function SearchPageContent() {
                 <TabsContent value="albums">
                   {categoryData.albums.results.length > 0 || (combinedSearchResults.albums?.results?.length > 0) ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4 sm:gap-6">
-                      {(categoryData.albums.page > 0 ? categoryData.albums.results : combinedSearchResults.albums.results).map((album, index) => (
+                      {combinedSearchResults.albums.results.map((album, index) => (
                         <div
                           key={album.id || index}
                           className="group cursor-pointer hover:scale-105 transition-transform duration-200"
@@ -2293,7 +2346,7 @@ function SearchPageContent() {
                 <TabsContent value="artists">
                   {categoryData.artists.results.length > 0 || (combinedSearchResults.artists?.results?.length > 0) ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4 sm:gap-6">
-                      {(categoryData.artists.page > 0 ? categoryData.artists.results : combinedSearchResults.artists.results).map((artist, index) => (
+                      {combinedSearchResults.artists.results.map((artist, index) => (
                         <div
                           key={artist.id || index}
                           className="text-center group cursor-pointer hover:scale-105 transition-transform duration-200"
@@ -2370,8 +2423,8 @@ function SearchPageContent() {
 
                   {(categoryData.playlists.results.length > 0 || combinedSearchResults.playlists?.results?.length > 0 || publicPlaylists?.length > 0) ? (
                     <div className="space-y-8">
-                      {/* User-created Public Playlists - only show on first page or mixed view */}
-                      {publicPlaylists?.length > 0 && categoryData.playlists.page <= 1 && (
+                      {/* User-created Public Playlists */}
+                      {publicPlaylists?.length > 0 && (
                         <div>
                           <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-semibold">Community Playlists</h3>
@@ -2420,16 +2473,16 @@ function SearchPageContent() {
                       )}
 
                       {/* JioSaavn Playlists */}
-                      {(categoryData.playlists.page > 0 ? categoryData.playlists.results : combinedSearchResults.playlists.results).length > 0 && (
+                      {combinedSearchResults.playlists.results.length > 0 && (
                         <div>
                           <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-semibold">Featured Playlists</h3>
                             <span className="text-sm text-muted-foreground">
-                              {(categoryData.playlists.page > 0 ? categoryData.playlists.results : combinedSearchResults.playlists.results).length} playlist{(categoryData.playlists.page > 0 ? categoryData.playlists.results : combinedSearchResults.playlists.results).length !== 1 ? 's' : ''}
+                              {combinedSearchResults.playlists.results.length} playlist{combinedSearchResults.playlists.results.length !== 1 ? 's' : ''}
                             </span>
                           </div>
                           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4 sm:gap-6">
-                            {(categoryData.playlists.page > 0 ? categoryData.playlists.results : combinedSearchResults.playlists.results).map((playlist, index) => (
+                            {combinedSearchResults.playlists.results.map((playlist, index) => (
                               <div
                                 key={`jiosaavn-${playlist.id || index}`}
                                 className="group cursor-pointer hover:scale-105 transition-transform duration-200"
@@ -2550,6 +2603,7 @@ function SearchPageContent() {
         open={addToPlaylistDialogOpen}
         onOpenChange={setAddToPlaylistDialogOpen}
         song={selectedSong}
+
       />
     </SidebarProvider >
   );
