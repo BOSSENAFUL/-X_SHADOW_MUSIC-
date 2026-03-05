@@ -59,7 +59,7 @@ export default function AlbumPage() {
   const { toggleLike: toggleAlbumLike, isLiked: isAlbumLiked } = useLikedAlbums(session?.user?.id);
 
   // Initialize music player
-  const { playSong, currentSong, isPlaying, togglePlayPause, currentPlaylistId } = useMusicPlayer();
+  const { playSong, currentSong, currentIndex, isPlaying, togglePlayPause, currentPlaylistId } = useMusicPlayer();
 
   useEffect(() => {
     const fetchAlbumDetails = async () => {
@@ -131,7 +131,7 @@ export default function AlbumPage() {
   }, [loading, album?.name]);
 
   const handlePlayClick = (song, index) => {
-    playSong(song, album.songs, albumId);
+    playSong(song, album.songs, albumId, index);
     setCurrentlyPlaying({ song, index });
     console.log(`Playing song:`, song);
   };
@@ -143,7 +143,7 @@ export default function AlbumPage() {
       if (isPlaylistPlaying) {
         togglePlayPause();
       } else {
-        playSong(album.songs[0], album.songs, albumId);
+        playSong(album.songs[0], album.songs, albumId, 0);
         setCurrentlyPlaying({ song: album.songs[0], index: 0 });
       }
       console.log('Album action:', isPlaylistPlaying ? 'toggling play/pause' : 'starting from beginning');
@@ -724,7 +724,9 @@ export default function AlbumPage() {
 
               <div className="space-y-0">
                 {album.songs?.map((song, index) => {
-                  const isCurrentSong = currentSong?.id === song.id;
+                  const isCurrentSong = currentSong?.id === song.id &&
+                    currentPlaylistId === albumId &&
+                    currentIndex === index;
                   return (
                     <div key={song.id || index}>
                       {/* Mobile Layout */}

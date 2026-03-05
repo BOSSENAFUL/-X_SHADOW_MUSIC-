@@ -103,7 +103,7 @@ export default function PlaylistDetailPage({ params }) {
   const desktopTitleRef = useRef(null);
 
   // Initialize music player
-  const { playSong, currentSong, isPlaying, togglePlayPause, currentPlaylistId: activePlaylistId } = useMusicPlayer();
+  const { playSong, currentSong, currentIndex, isPlaying, togglePlayPause, currentPlaylistId: activePlaylistId } = useMusicPlayer();
 
   // Initialize liked songs hook
   const { toggleLike: toggleSongLike, isLiked: isSongLiked } = useLikedSongs(session?.user?.id);
@@ -460,7 +460,7 @@ export default function PlaylistDetailPage({ params }) {
       downloadUrl: playlistSong.downloadUrl
     }));
 
-    playSong(songData, playlistData, playlistId);
+    playSong(songData, playlistData, playlistId, index);
     setCurrentlyPlaying({ song, index });
     trackRecentlyPlayed();
     console.log(`Playing song from playlist:`, song);
@@ -503,7 +503,7 @@ export default function PlaylistDetailPage({ params }) {
         downloadUrl: playlistSong.downloadUrl
       }));
 
-      playSong(firstSong, playlistData, playlistId);
+      playSong(firstSong, playlistData, playlistId, 0);
       setCurrentlyPlaying({ song: songs[0], index: 0 });
       trackRecentlyPlayed();
       console.log('Playing all songs from playlist starting with:', songs[0]);
@@ -1579,7 +1579,9 @@ export default function PlaylistDetailPage({ params }) {
 
                   <div className="space-y-0">
                     {songs.map((song, index) => {
-                      const isCurrentSong = currentSong?.id === song.id;
+                      const isCurrentSong = currentSong?.id === song.id &&
+                        activePlaylistId === playlistId &&
+                        currentIndex === index;
                       return (
                         <div key={`${song.id}-${index}`} >
                           {/* Mobile Layout */}

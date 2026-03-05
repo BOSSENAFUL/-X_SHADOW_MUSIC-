@@ -32,6 +32,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     isRadioPlaying,
     isFullscreenOpen,
     setIsFullscreenOpen,
+    currentIndex: playerCurrentIndex,
   } = useMusicPlayer();
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -43,9 +44,8 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   const audioRef = useRef(null);
   const isScrubbingRef = useRef(false);
 
-  // Find current song index in playlist
-  const currentIndex =
-    playlist.findIndex((song) => song.id === currentSong?.id) || 0;
+  // Use currentIndex from context if available, fallback to findIndex
+  const currentIndex = playerCurrentIndex ?? (playlist.findIndex((song) => song.id === currentSong?.id) || 0);
 
   // Helper functions
   const formatTime = (time) => {

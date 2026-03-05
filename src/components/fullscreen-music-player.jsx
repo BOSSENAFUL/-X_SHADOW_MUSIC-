@@ -80,7 +80,7 @@ export function FullscreenMusicPlayer({
   playingFrom = "Search Results", // Add playingFrom prop with default
 }) {
   const { data: session } = useSession();
-  const { setIsPlaying, setIsFullscreenOpen } = useMusicPlayer();
+  const { setIsPlaying, setIsFullscreenOpen, currentIndex: playerCurrentIndex } = useMusicPlayer();
   const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
   const router = useRouter();
   const [isShuffled, setIsShuffled] = useState(false);
@@ -1865,7 +1865,7 @@ export function FullscreenMusicPlayer({
                           setShowPlaylist(false); // Close queue on mobile after selection
                         }
                       }}
-                      className={`flex items-center gap-3 p-4 active:bg-white/5 cursor-move transition-[opacity,transform] duration-200 select-none ${song.id === currentSong.id ? "bg-white/10" : ""
+                      className={`flex items-center gap-3 p-4 active:bg-white/5 cursor-move transition-[opacity,transform] duration-200 select-none ${index === playerCurrentIndex ? "bg-white/10" : ""
                         } ${dragOverIndex === index && draggedIndex !== index
                           ? "border-t-2 border-green-400"
                           : ""
@@ -1896,7 +1896,7 @@ export function FullscreenMusicPlayer({
                       </div>
                       <div className="flex-1 min-w-0">
                         <p
-                          className={`font-medium truncate text-base ${song.id === currentSong.id
+                          className={`font-medium truncate text-base ${index === playerCurrentIndex
                             ? "text-green-400"
                             : "text-white"
                             }`}
@@ -1971,7 +1971,7 @@ export function FullscreenMusicPlayer({
                         onSongChange?.(song, index, localPlaylist);
                       }
                     }}
-                    className={`flex items-center gap-3 p-3 hover:bg-white/5 cursor-move transition-all duration-200 select-none ${song.id === currentSong.id ? "bg-white/10" : ""
+                    className={`flex items-center gap-3 p-3 hover:bg-white/5 cursor-move transition-all duration-200 select-none ${index === playerCurrentIndex ? "bg-white/10" : ""
                       } ${dragOverIndex === index && draggedIndex !== index
                         ? "border-t-2 border-green-400"
                         : ""
@@ -1999,7 +1999,7 @@ export function FullscreenMusicPlayer({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p
-                        className={`font-medium truncate text-sm ${song.id === currentSong.id
+                        className={`font-medium truncate text-sm ${index === playerCurrentIndex
                           ? "text-green-400"
                           : "text-white"
                           }`}

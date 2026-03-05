@@ -79,7 +79,7 @@ export default function FavoritesPage() {
   }, [loading, likedSongs.length]);
 
   // Initialize music player
-  const { playSong, currentSong, isPlaying, togglePlayPause, currentPlaylistId } = useMusicPlayer();
+  const { playSong, currentSong, currentIndex, isPlaying, togglePlayPause, currentPlaylistId } = useMusicPlayer();
 
   // Pre-calculate playlist data for the player to avoid mapping on every click
   const playlistData = useMemo(() => {
@@ -115,7 +115,7 @@ export default function FavoritesPage() {
       downloadUrl: song.downloadUrl
     };
 
-    playSong(songData, playlistData, 'favorites');
+    playSong(songData, playlistData, 'favorites', index);
     setCurrentlyPlaying({ song, index });
   }, [currentSong?.id, playlistData, playSong]);
 
@@ -142,7 +142,7 @@ export default function FavoritesPage() {
         downloadUrl: likedSongs[0].downloadUrl
       };
 
-      playSong(firstSong, playlistData, 'favorites');
+      playSong(firstSong, playlistData, 'favorites', 0);
       setCurrentlyPlaying({ song: likedSongs[0], index: 0 });
     }
   }, [likedSongs, currentPlaylistId, togglePlayPause, playSong, playlistData]);
@@ -625,7 +625,9 @@ export default function FavoritesPage() {
 
                 <div className="space-y-0">
                   {likedSongs.map((likedSong, index) => {
-                    const isCurrentSong = currentSong?.id === likedSong.songId;
+                    const isCurrentSong = currentSong?.id === likedSong.songId &&
+                      currentPlaylistId === 'favorites' &&
+                      currentIndex === index;
                     return (
                       <div key={likedSong.songId || index} >
                         {/* Mobile Layout */}
@@ -757,7 +759,7 @@ export default function FavoritesPage() {
 
                         {/* Desktop Layout */}
                         <div
-                          className={`hidden md:grid grid-cols-[auto_1fr_1fr_120px_100px] gap-4 items-center p-1.5 py-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
+                          className={`hidden md:grid grid-cols-[auto_1fr_1fr_120px_100px] gap-4 items-center p-1.5 py-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? 'bg-muted/30' : ''
                             }`}
                           onClick={() => handlePlayClick(likedSong, index)}
                         >

@@ -6,6 +6,7 @@ const MusicPlayerContext = createContext();
 
 export function MusicPlayerProvider({ children }) {
   const [currentSong, setCurrentSong] = useState(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [playlist, setPlaylist] = useState([]);
   const [currentPlaylistId, setCurrentPlaylistId] = useState(null);
   const [isPlayerVisible, setIsPlayerVisible] = useState(false);
@@ -21,8 +22,9 @@ export function MusicPlayerProvider({ children }) {
   // Helper function to check if current song is a radio station
   const isRadioPlaying = currentSong?.isRadio === true;
 
-  const playSong = (song, songList = [], playlistId = null) => {
+  const playSong = (song, songList = [], playlistId = null, index = 0) => {
     setCurrentSong(song);
+    setCurrentIndex(index);
     setPlaylist(songList);
     setCurrentPlaylistId(playlistId);
     setIsPlayerVisible(true);
@@ -31,10 +33,12 @@ export function MusicPlayerProvider({ children }) {
 
   const handleSongChange = (song, index) => {
     setCurrentSong(song);
+    setCurrentIndex(index);
   };
 
   const clearPlayer = () => {
     setCurrentSong(null);
+    setCurrentIndex(0);
     setPlaylist([]);
     setCurrentPlaylistId(null);
     setIsPlayerVisible(false);
@@ -70,6 +74,7 @@ export function MusicPlayerProvider({ children }) {
     <MusicPlayerContext.Provider
       value={{
         currentSong,
+        currentIndex,
         playlist,
         currentPlaylistId,
         isPlayerVisible,
