@@ -162,8 +162,9 @@ export default function PlaylistsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [importStage, setImportStage] = useState(0); // 0: input, 1: processing, 2: success
   const [importMessage, setImportMessage] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0); // bumped to force re-fetch
 
-  // Fetch user's playlists with song data for covers
+  // Fetch user's playlists - show immediately, load covers in background
   useEffect(() => {
     const fetchPlaylists = async () => {
       if (status === "loading") return;
@@ -173,8 +174,10 @@ export default function PlaylistsPage() {
         return;
       }
 
-      // Check session cache for "back" navigation
       const cacheKey = `user_playlists_page_${session.user.id}`;
+
+      // Check session cache for "back" navigation
+      // But only use it if we haven't just invalidated it (import/create clears it)
       const cached = sessionStorage.getItem(cacheKey);
       if (cached) {
         setPlaylists(JSON.parse(cached));
@@ -190,66 +193,72 @@ export default function PlaylistsPage() {
         const result = await response.json();
 
         if (result.success) {
-          // BATCH OPTIMIZATION: Collect all song IDs across all playlists
+          // ✅ STEP 1: Show playlists IMMEDIATELY without waiting for covers
+          setPlaylists(result.data);
+          setLoading(false);
+          setHasLoaded(true);
+
+          // ✅ STEP 2: Load song covers in the BACKGROUND (non-blocking)
           const allSongIds = new Set();
           result.data.forEach(p => {
             if (p.songIds) p.songIds.slice(0, 4).forEach(id => allSongIds.add(id));
           });
 
-          const songCache = {};
           if (allSongIds.size > 0) {
             const idsArray = Array.from(allSongIds);
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
             const chunkSize = 20;
+            const songCache = {};
 
+            const chunks = [];
             for (let i = 0; i < idsArray.length; i += chunkSize) {
-              const chunk = idsArray.slice(i, i + chunkSize);
-              try {
-                const songRes = await fetch(`${apiUrl}/api/songs?ids=${chunk.join(',')}`);
-                const songData = await songRes.json();
-                if (songData.success && songData.data) {
-                  songData.data.forEach(song => {
-                    if (song) songCache[song.id] = song;
-                  });
-                }
-              } catch (e) {
-                console.error("Batch song fetch error:", e);
+              chunks.push(idsArray.slice(i, i + chunkSize));
+            }
+
+            // Fetch all song chunks in parallel
+            const chunkResults = await Promise.allSettled(
+              chunks.map(chunk =>
+                fetch(`${apiUrl}/api/songs?ids=${chunk.join(',')}`).then(r => r.json())
+              )
+            );
+
+            chunkResults.forEach(res => {
+              if (res.status === 'fulfilled' && res.value?.success && res.value?.data) {
+                res.value.data.forEach(song => { if (song) songCache[song.id] = song; });
               }
-            }
+            });
+
+            // Update playlists with covers
+            const playlistsWithCovers = result.data.map((playlist) => {
+              if (playlist.songIds && playlist.songIds.length > 0) {
+                const validSongs = playlist.songIds.slice(0, 4)
+                  .map(id => songCache[id])
+                  .filter(Boolean);
+                return { ...playlist, songs: validSongs };
+              }
+              return playlist;
+            });
+
+            setPlaylists(playlistsWithCovers);
+            sessionStorage.setItem(cacheKey, JSON.stringify(playlistsWithCovers));
+          } else {
+            sessionStorage.setItem(cacheKey, JSON.stringify(result.data));
           }
-
-          // Map the cached song data back to the playlists
-          const playlistsWithCovers = result.data.map((playlist) => {
-            if (playlist.songIds && playlist.songIds.length > 0) {
-              const songsToFetch = playlist.songIds.slice(0, 4);
-              const validSongs = songsToFetch
-                .map(id => songCache[id])
-                .filter(Boolean);
-
-              return {
-                ...playlist,
-                songs: validSongs
-              };
-            }
-            return playlist;
-          });
-
-          setPlaylists(playlistsWithCovers);
-          // Save to session storage
-          sessionStorage.setItem(cacheKey, JSON.stringify(playlistsWithCovers));
         } else {
           console.error('Failed to fetch playlists:', result.error);
+          setLoading(false);
+          setHasLoaded(true);
         }
       } catch (error) {
         console.error('Error fetching playlists:', error);
-      } finally {
         setLoading(false);
         setHasLoaded(true);
       }
     };
 
     fetchPlaylists();
-  }, [session, status]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, status, refreshKey]);
 
   // Filter playlists based on search query
   const filteredPlaylists = useMemo(() => {
@@ -320,16 +329,19 @@ export default function PlaylistsPage() {
         setImportStage(2);
         toast.success(`Playlist imported successfully! Added ${result.data.songIds.length} songs.`);
         
-        // Wait a bit to show success state before closing or reloading
+        // Clear the cache NOW (before the dialog closes) so the next fetch is fresh
+        if (session?.user?.id) {
+          sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
+          sessionStorage.removeItem(`created_playlists_${session.user.id}`);
+        }
+
+        // Wait a bit to show success state, then close dialog and re-fetch
         setTimeout(() => {
           setShowImportDialog(false);
           setImportUrl("");
           setImportStage(0);
-          if (session?.user?.id) {
-            sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
-            sessionStorage.removeItem(`created_playlists_${session.user.id}`);
-          }
-          window.location.reload();
+          // Trigger a fresh fetch by bumping the refresh key (cache was already cleared above)
+          setRefreshKey(k => k + 1);
         }, 2000);
       } else {
         setImportStage(0);
