@@ -5,6 +5,7 @@ import connectDB from '@/lib/mongodb';
 import Playlist from '@/models/Playlist';
 import { cookies } from 'next/headers';
 import { getPlaylistDetails, getPlaylistTracks } from '@/lib/spotify';
+import { compareTwoStrings } from 'string-similarity';
 
 // --- CONFIGURATION ---
 const CONCURRENCY_LIMIT = 10;
@@ -20,13 +21,22 @@ const RAW_ARTIST_ALIASES = {
 // Normalize text - remove special chars, lowercase, trim, remove accents
 const normalize = (text) => {
     if (!text) return '';
-    return text
+    let normalized = text
         .normalize("NFD") // Decompose chars (e.g. "ō" -> "o" + "¯")
         .replace(/[\u0300-\u036f]/g, "") // Remove diacritics
         .toLowerCase()
         .replace(/[^\p{L}\p{N}\s]/gu, ' ')
         .replace(/\s+/g, ' ')
         .trim();
+
+    // Genre & Common Variations normalization
+    normalized = normalized
+        .replace(/\blo\s+fi\b/g, 'lofi') // "lo fi" -> "lofi"
+        .replace(/\blo\s*-\s*fi\b/g, 'lofi') // "lo-fi" -> "lofi"
+        .replace(/\bslowed\s+reverb\b/g, 'slowed')
+        .replace(/\bo\s+s\s+t\b/g, 'ost');
+
+    return normalized;
 };
 
 // Pre-compute normalized aliases for O(1) lookup
@@ -41,7 +51,7 @@ const tokenize = (text) => {
     return normalize(text).split(' ').filter(w => w.length > 0);
 };
 
-// Calculate similarity between two strings (Jaccard + Levenshtein hybrid)
+// Calculate similarity between two strings (Sørensen–Dice + Containment fallback)
 const calculateSimilarity = (str1, str2) => {
     const norm1 = normalize(str1);
     const norm2 = normalize(str2);
@@ -49,19 +59,17 @@ const calculateSimilarity = (str1, str2) => {
     // Exact match
     if (norm1 === norm2) return 1.0;
 
-    // Containment
-    if (norm1.includes(norm2) || norm2.includes(norm1)) return 0.9;
+    // Use string-similarity for better fuzzy matching
+    const sim = compareTwoStrings(norm1, norm2);
 
-    // Token overlap (Jaccard)
-    const tokens1 = tokenize(str1);
-    const tokens2 = tokenize(str2);
+    // Containment bonus - if one title is completely inside another, it's likely a version match
+    if (norm1.length > 3 && norm2.length > 3) {
+        if (norm1.includes(norm2) || norm2.includes(norm1)) {
+            return Math.max(sim, 0.85);
+        }
+    }
 
-    if (tokens1.length === 0 || tokens2.length === 0) return 0;
-
-    const intersection = tokens1.filter(t => tokens2.includes(t));
-    const union = [...new Set([...tokens1, ...tokens2])];
-
-    return intersection.length / union.length;
+    return sim;
 };
 
 export async function POST(request) {
@@ -124,35 +132,23 @@ export async function POST(request) {
             const albumTokens = tokenize(normAlbum);
 
             // STEP 2 — BUILD MULTI QUERIES (SMART + FALLBACK)
-            // UPDATED: Added Artist-first patterns for better search engine hitting
             const queries = [
-                // 1. Artist + Title (Industry Standard)
-                `${primaryArtist} ${rawTitle}`,
+                // 1. Clean Search: Title + First Artist (Best for Lofi)
+                `${rawTitle} ${primaryArtist.replace(/\./g, '')}`,
 
-                // 2. Artist + Title (Normalized Tokens - specific fix)
-                `${artistTokens.join(' ')} ${titleTokens.join(' ')}`,
-
-                // 3. Title + Artist
-                `${rawTitle} ${primaryArtist}`,
-
-                // 3. Title + Artist + Album (first 2 words)
-                `${rawTitle} ${primaryArtist} ${albumTokens.slice(0, 2).join(' ')}`,
-
-                // 4. Artist + Album + Title (Strong context)
-                `${primaryArtist} ${albumTokens.slice(0, 2).join(' ')} ${rawTitle}`,
-
-                // 5. Title + Album
-                `${rawTitle} ${albumTokens.slice(0, 3).join(' ')}`,
-
-                // 6. Title + "Minecraft" (Strong fallback for C418 tracks)
-                `${rawTitle} Minecraft`,
-
-                // 7. Title only
+                // 2. Just the Title (High risk, but good for rare small artists)
                 `${rawTitle}`,
 
-                // 8. Full context
-                `${rawTitle} ${albumName} ${primaryArtist}`
+                // 3. Artist + Title
+                `${primaryArtist.replace(/\./g, '')} ${rawTitle}`,
+
+                // 4. Tokenized Fallback
+                `${titleTokens.join(' ')} ${artistTokens.join(' ')}`,
+
+                // 5. Normalized Joined Query (Specifically for Lofi variations)
+                `${normalize(rawTitle)} ${normalize(primaryArtist)}`
             ].filter(q => q.trim().length > 2);
+
 
             // Remove duplicates
             const uniqueQueries = [...new Set(queries)];
@@ -211,9 +207,13 @@ export async function POST(request) {
 
                 // 3. HARD FILTER: VERSION TAGS (Critical)
                 // If target has specific tags, candidate MUST have them too
-                if (targetVersionTags.length > 0) {
-                    const hasAllTags = targetVersionTags.every(tag => normCTitle.includes(tag));
-                    if (!hasAllTags) return null;
+                // RELAXATION: Don't be strict about 'lofi' and 'instrumental' as they are often mismatched
+                const STRICT_VERSION_TAGS = VERSION_TAGS.filter(tag => tag !== 'lofi' && tag !== 'instrumental');
+                const targetStrictTags = targetVersionTags.filter(tag => STRICT_VERSION_TAGS.includes(tag));
+                
+                if (targetStrictTags.length > 0) {
+                    const hasAllStrictTags = targetStrictTags.every(tag => normCTitle.includes(tag));
+                    if (!hasAllStrictTags) return null;
                 }
 
                 // Also, if target DOES NOT have tags, reject candidate if it has them (e.g. dont match "Remix" to original)
@@ -225,11 +225,12 @@ export async function POST(request) {
                     }
                 }
 
-                // HARD FILTER 1: Title Similarity
+                // HARD FILTER 1: Title Similarity (Very relaxed for unofficial API + Lofi)
                 const titleSim = calculateSimilarity(rawTitle, cTitle);
-                if (titleSim < 0.55) return null;
+                if (titleSim < 0.35) return null;
 
                 // 4. ADVANCED ARTIST SIMILARITY
+
                 let artistSim = 0;
                 const normCArtist = normalize(cArtist);
 
@@ -253,10 +254,9 @@ export async function POST(request) {
                     // Matrix comparison of all artist parts
                     for (const tArt of targetArtists) {
                         for (const cArt of candidateArtists) {
-                            if (cArt.includes(tArt) || tArt.includes(cArt)) {
-                                const sim = calculateSimilarity(tArt, cArt);
-                                if (sim > bestArtistMatch) bestArtistMatch = sim;
-                            }
+                            const sim = calculateSimilarity(tArt, cArt);
+                            if (sim > bestArtistMatch) bestArtistMatch = sim;
+                            
                             // Handle aliases within loop
                             if (NORMALIZED_ALIASES[tArt] && NORMALIZED_ALIASES[tArt].includes(cArt)) {
                                 bestArtistMatch = 1.0;
@@ -266,26 +266,27 @@ export async function POST(request) {
                 }
                 artistSim = bestArtistMatch;
 
-                // STRICT REJECTION: Artist must match
-                // Exception: Allow lower artist match if title is very strong (community uploads often have slight artist variations)
-                if (artistSim < 0.45) return null; // Hard floor
-                if (artistSim < 0.50 && titleSim < 0.80) return null; // Relaxed for slowed/reverb
+                // RELAXED REJECTION: Artist must match
+                // Floor is lowered to 0.35 if title match is exceptionally strong.
+                // Lofi artists often have many variations (Lo-Fi, Lo Fi, Lofi, etc.)
+                if (artistSim < 0.35) return null; // Hard floor
+                if (artistSim < 0.45 && titleSim < 0.85) return null; // Relaxed floor requires stronger title match
 
-                // HARD FILTER 3: Forbidden Keywords
-                for (const kw of forbiddenKeywords) {
-                    if (normCTitle.includes(kw) && !targetHasForbidden(kw)) return null;
-                }
+                // REMOVED: Forbidden Keywords hard filter. 
+                // Unofficial API metadata often mismatches tags (slowed/reverb).
+                // We let the similarity score handle this instead of a hard reject.
 
-                // HARD FILTER 4: Duration Check (Robust)
+
+                // HARD FILTER 4: Duration Check (Relaxed)
+                // Unofficial API durations are often rounded or incorrect.
+                // We calculate similarity but NEVER hard-reject (null).
                 let durationSim = 1.0;
                 if (durationSec > 0 && cDuration > 0) {
                     const diff = Math.abs(durationSec - cDuration);
                     const tolerance = durationSec < 60 ? 5 : Math.max(7, durationSec * 0.08);
-
-                    if (diff > tolerance * 2.0) return null; // Too different (strict)
-
-                    durationSim = Math.max(0, 1 - (diff / tolerance));
+                    durationSim = Math.max(0, 1 - (diff / (tolerance * 3))); // Very loose weighting
                 }
+
 
                 // FINAL SCORE
                 const finalScore = (0.65 * titleSim) + (0.25 * artistSim) + (0.10 * durationSim);
@@ -313,7 +314,7 @@ export async function POST(request) {
                         { headers: { 'Cookie': cookieHeader } }
                     );
                     const data = await res.json();
-                    
+
                     let bestInQuery = null;
                     let bestScoreInQuery = 0;
 
@@ -336,7 +337,7 @@ export async function POST(request) {
 
             // Process queries in parallel batches to optimize speed
             const QUERY_BATCH_SIZE = 3;
-            
+
             for (let i = 0; i < uniqueQueries.length; i += QUERY_BATCH_SIZE) {
                 // If we already found an excellent match in previous batch, stop
                 if (bestScore >= 0.95) {
@@ -345,7 +346,7 @@ export async function POST(request) {
                 }
 
                 const batch = uniqueQueries.slice(i, i + QUERY_BATCH_SIZE);
-                
+
                 // Fetch current batch in parallel
                 const results = await Promise.all(batch.map(q => executeQuery(q)));
 
@@ -356,7 +357,7 @@ export async function POST(request) {
                         bestMatch = result.match;
                     }
                     // Check threshold inside the loop to break inner processing if needed (optimization)
-                     if (bestScore >= 0.95) break; 
+                    if (bestScore >= 0.95) break;
                 }
             }
 

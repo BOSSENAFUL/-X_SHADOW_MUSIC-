@@ -14,13 +14,17 @@ export async function POST(request) {
       );
     }
 
-    await connectDB();
+    const body = await request.json().catch(() => ({}));
+    const { date } = body;
 
+    await connectDB();
+ 
     // Record user activity for today
     const result = await DailyActiveUser.recordUserActivity(
       session.user.email,
       session.user.name,
-      request
+      request,
+      date
     );
 
     return NextResponse.json({
@@ -52,7 +56,7 @@ export async function GET(request) {
 
     await connectDB();
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
     const existingRecord = await DailyActiveUser.findOne({
       date: today,
       'users.email': session.user.email

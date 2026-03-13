@@ -110,7 +110,7 @@ function fillMissingDates(stats, days) {
   for (let i = days - 1; i >= 0; i--) {
     const currentDate = new Date();
     currentDate.setDate(endDate.getDate() - i);
-    const dateStr = currentDate.toISOString().split('T')[0];
+    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
 
     const existingStat = stats.find(stat => stat.date === dateStr);
     filledStats.push({

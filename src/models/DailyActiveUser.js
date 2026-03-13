@@ -122,8 +122,9 @@ async function getLocationFromIP(request) {
 }
 
 // Static method to record user activity
-dailyActiveUserSchema.statics.recordUserActivity = async function (userEmail, userName = null, request = null) {
-  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+dailyActiveUserSchema.statics.recordUserActivity = async function (userEmail, userName = null, request = null, clientDate = null) {
+  // Use client-provided date if available, otherwise get India local date (IST)
+  const today = clientDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); 
 
   try {
     // Get location and OS data if request is provided
@@ -236,8 +237,8 @@ dailyActiveUserSchema.statics.getDailyStats = async function (days = 30) {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const startDateStr = startDate.toISOString().split('T')[0];
-    const endDateStr = endDate.toISOString().split('T')[0];
+    const startDateStr = startDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    const endDateStr = endDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
     const stats = await this.find({
       date: {
