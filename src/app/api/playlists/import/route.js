@@ -4,71 +4,57 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import connectDB from '@/lib/mongodb';
 import Playlist from '@/models/Playlist';
 import { cookies } from 'next/headers';
-import { getPlaylistDetails, getPlaylistTracks } from '@/lib/spotify';
+import { getPlaylistData } from '@/lib/spotify';
 import { compareTwoStrings } from 'string-similarity';
 
 // --- CONFIGURATION ---
-const CONCURRENCY_LIMIT = 10;
-const ACCEPT_THRESHOLD = 0.72; // Adjusted for community slowed tracks
+const ACCEPT_THRESHOLD = 0.72; // Raised back — 0.62 was causing false matches (e.g. "Doce" matching "DOCE MALDIÇÃO")
+const WIN_FAST_THRESHOLD = 0.90; // Stop searching if we hit this score
+const SEARCH_LIMIT = 15;         // Results per search query
 
-// Known Artist Aliases (Raw)
+// Known Artist Aliases
 const RAW_ARTIST_ALIASES = {
     'c418': ['daniel rosenfeld'],
     'daniel rosenfeld': ['c418'],
     'lena raine': ['lena raine kuhlmann'],
 };
 
-// Normalize text - remove special chars, lowercase, trim, remove accents
 const normalize = (text) => {
     if (!text) return '';
     let normalized = text
-        .normalize("NFD") // Decompose chars (e.g. "ō" -> "o" + "¯")
-        .replace(/[\u0300-\u036f]/g, "") // Remove diacritics
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase()
-        .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+        .replace(/ø/g, 'o')
+        .replace(/([^a-z0-9\s])/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
 
-    // Genre & Common Variations normalization
     normalized = normalized
-        .replace(/\blo\s+fi\b/g, 'lofi') // "lo fi" -> "lofi"
-        .replace(/\blo\s*-\s*fi\b/g, 'lofi') // "lo-fi" -> "lofi"
+        .replace(/\blo\s+fi\b/g, 'lofi')
+        .replace(/\blo\s*-\s*fi\b/g, 'lofi')
         .replace(/\bslowed\s+reverb\b/g, 'slowed')
         .replace(/\bo\s+s\s+t\b/g, 'ost');
 
     return normalized;
 };
 
-// Pre-compute normalized aliases for O(1) lookup
 const NORMALIZED_ALIASES = {};
 for (const [key, values] of Object.entries(RAW_ARTIST_ALIASES)) {
     const normKey = normalize(key);
     NORMALIZED_ALIASES[normKey] = values.map(v => normalize(v));
 }
 
-// Tokenize text into words
-const tokenize = (text) => {
-    return normalize(text).split(' ').filter(w => w.length > 0);
-};
-
-// Calculate similarity between two strings (Sørensen–Dice + Containment fallback)
 const calculateSimilarity = (str1, str2) => {
     const norm1 = normalize(str1);
     const norm2 = normalize(str2);
-
-    // Exact match
     if (norm1 === norm2) return 1.0;
-
-    // Use string-similarity for better fuzzy matching
     const sim = compareTwoStrings(norm1, norm2);
-
-    // Containment bonus - if one title is completely inside another, it's likely a version match
     if (norm1.length > 3 && norm2.length > 3) {
         if (norm1.includes(norm2) || norm2.includes(norm1)) {
             return Math.max(sim, 0.85);
         }
     }
-
     return sim;
 };
 
@@ -91,304 +77,220 @@ export async function POST(request) {
             return NextResponse.json({ success: false, error: 'Could not extract playlist ID' }, { status: 400 });
         }
 
-        const details = await getPlaylistDetails(playlistId);
-        if (!details) {
+        // OPTIMIZATION: Single API call to get both details AND tracks
+        const playlistData = await getPlaylistData(playlistId);
+        if (!playlistData) {
             return NextResponse.json({ success: false, error: 'Failed to fetch playlist from Spotify' }, { status: 404 });
         }
 
-        const spotifyTracks = await getPlaylistTracks(playlistId);
+        const { details, tracks: spotifyTracks } = playlistData;
+
         if (!spotifyTracks || spotifyTracks.length === 0) {
             return NextResponse.json({ success: false, error: 'No tracks in playlist' }, { status: 404 });
         }
+
+        console.log(`[Import] Processing playlist: ${details.name} (${spotifyTracks.length} tracks)`);
+
+        const importStart = Date.now();
 
         await connectDB();
         const cookieStore = await cookies();
         const cookieHeader = cookieStore.toString();
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
-        const jammifySongIds = [];
+        const matchCache = new Map();
 
-        // --- CORE MATCHING ENGINE ---
-        const processTrack = async (track) => {
+        // --- SCORING ENGINE ---
+        const buildScorer = (track) => {
             const rawTitle = track.name;
             const primaryArtist = track.artists[0]?.name || '';
             const allArtists = track.artists.map(a => a.name);
-            const albumName = track.album?.name || '';
             const durationMs = track.duration_ms || 0;
             const durationSec = Math.round(durationMs / 1000);
-
-            console.log(`\n[Import] "${rawTitle}" by ${primaryArtist}`);
-
-            // STEP 1 — NORMALIZE METADATA
             const normTitle = normalize(rawTitle);
             const normArtist = normalize(primaryArtist);
-            const normAlbum = normalize(albumName)
-                .replace(/original.*soundtrack/g, '')
-                .replace(/ost/g, '')
-                .trim();
 
-            const titleTokens = tokenize(rawTitle);
-            const artistTokens = tokenize(primaryArtist);
-            const albumTokens = tokenize(normAlbum);
-
-            // STEP 2 — BUILD MULTI QUERIES (SMART + FALLBACK)
-            const queries = [
-                // 1. Clean Search: Title + First Artist (Best for Lofi)
-                `${rawTitle} ${primaryArtist.replace(/\./g, '')}`,
-
-                // 2. Just the Title (High risk, but good for rare small artists)
-                `${rawTitle}`,
-
-                // 3. Artist + Title
-                `${primaryArtist.replace(/\./g, '')} ${rawTitle}`,
-
-                // 4. Tokenized Fallback
-                `${titleTokens.join(' ')} ${artistTokens.join(' ')}`,
-
-                // 5. Normalized Joined Query (Specifically for Lofi variations)
-                `${normalize(rawTitle)} ${normalize(primaryArtist)}`
-            ].filter(q => q.trim().length > 2);
-
-
-            // Remove duplicates
-            const uniqueQueries = [...new Set(queries)];
-
-            // Forbidden keywords (reject covers/remixes unless target has them)
-            const forbiddenKeywords = ['lofi', 'slowed', 'reverb', 'cover', 'remix', 'remake', 'instrumental', 'piano', 'ambient', 'karaoke'];
-            const targetHasForbidden = (kw) => normTitle.includes(kw);
-
-            // Version tags to enforce
             const VERSION_TAGS = ['slowed', 'reverb', 'sped up', 'spedup', 'remix', 'live', 'acoustic', 'lofi', 'nightcore', 'instrumental'];
             const targetVersionTags = VERSION_TAGS.filter(tag => normTitle.includes(tag));
+            const STRICT_VERSION_TAGS = VERSION_TAGS.filter(tag => tag !== 'lofi' && tag !== 'instrumental');
+            const targetStrictTags = targetVersionTags.filter(tag => STRICT_VERSION_TAGS.includes(tag));
 
-            // STEP 4 & 5 — CANDIDATE FILTERING + SCORING
-            const scoreCandidate = (candidate) => {
-                // 1. ROBUST DURATION PARSING
+            return (candidate) => {
+                // Duration Parsing
                 let cDuration = 0;
                 if (candidate.duration_ms) {
                     cDuration = Math.round(parseInt(candidate.duration_ms) / 1000);
                 } else if (candidate.duration) {
                     const d = parseInt(candidate.duration, 10);
-                    // If > 10000, likely ms
                     cDuration = (d > 10000) ? Math.round(d / 1000) : d;
                 }
 
-                // 2. ISRC EXACT MATCH (Golden Key)
+                // ISRC Golden Key
                 if (track.external_ids?.isrc && candidate.more_info?.isrc) {
                     if (track.external_ids.isrc === candidate.more_info.isrc) {
-                        console.log(`    ✓ ISRC MATCH: ${track.external_ids.isrc}`);
-                        return { id: candidate.id, title: candidate.title, artist: candidate.primaryArtists, score: 1.0, isrcMatch: true };
+                        return { id: candidate.id, title: candidate.title, artist: candidate.primaryArtists, score: 1.0, durationSim: 1.0 };
                     }
                 }
 
-                // Extract Metadata
                 const cTitle = candidate.title || candidate.name || '';
-                // Robust artist extraction (Expanded)
-                let cArtistRaw = candidate.primaryArtists ||
-                    candidate.artist ||
-                    candidate.singers ||
-                    candidate.subtitle ||
-                    candidate.description ||
-                    candidate.artists?.primary?.[0]?.name ||
-                    candidate.artists?.all?.[0]?.name ||
-                    '';
-
+                let cArtistRaw = candidate.primaryArtists || candidate.artist || candidate.singers ||
+                    candidate.subtitle || candidate.artists?.primary?.[0]?.name || candidate.artists?.all?.[0]?.name || '';
                 if (!cArtistRaw && candidate.more_info) {
                     cArtistRaw = candidate.more_info.primary_artists ||
                         candidate.more_info.artistMap?.primary_artists?.[0]?.name ||
-                        candidate.more_info.singers ||
-                        candidate.more_info.music ||
-                        candidate.more_info.performer ||
-                        '';
+                        candidate.more_info.singers || candidate.more_info.music || '';
                 }
 
                 const cArtist = normalize(cArtistRaw);
                 const normCTitle = normalize(cTitle);
 
-                // 3. HARD FILTER: VERSION TAGS (Critical)
-                // If target has specific tags, candidate MUST have them too
-                // RELAXATION: Don't be strict about 'lofi' and 'instrumental' as they are often mismatched
-                const STRICT_VERSION_TAGS = VERSION_TAGS.filter(tag => tag !== 'lofi' && tag !== 'instrumental');
-                const targetStrictTags = targetVersionTags.filter(tag => STRICT_VERSION_TAGS.includes(tag));
-                
+                // Hard filter: version tags
                 if (targetStrictTags.length > 0) {
-                    const hasAllStrictTags = targetStrictTags.every(tag => normCTitle.includes(tag));
-                    if (!hasAllStrictTags) return null;
+                    if (!targetStrictTags.every(tag => normCTitle.includes(tag))) return null;
                 }
 
-                // Also, if target DOES NOT have tags, reject candidate if it has them (e.g. dont match "Remix" to original)
-                // This is tricky, let's just enforce: neither should have unshared tags
-                for (const tag of VERSION_TAGS) {
-                    if (!normTitle.includes(tag) && normCTitle.includes(tag)) {
-                        // Candidate has a tag that target doesn't. Reject unless target has forbidden keywords handled elsewhere.
-                        // Actually, let's trust the Forbidden Keywords filter below for that.
-                    }
-                }
-
-                // HARD FILTER 1: Title Similarity (Very relaxed for unofficial API + Lofi)
+                // Hard filter: title similarity floor
                 const titleSim = calculateSimilarity(rawTitle, cTitle);
                 if (titleSim < 0.35) return null;
 
-                // 4. ADVANCED ARTIST SIMILARITY
-
-                let artistSim = 0;
+                // Hard filter: artist must exist
                 const normCArtist = normalize(cArtist);
+                if (!cArtist || normCArtist.length < 2) return null;
 
-                // CRITICAL FIX: Reject if candidate has no artist data
-                if (!cArtist || cArtist.trim().length < 2 || normCArtist.length < 2) {
-                    return null;
-                }
-
-                // Helper to split artists
+                // Artist similarity
                 const splitArtists = (str) => str.split(/,|&|feat\.|ft\./).map(s => normalize(s)).filter(s => s.length > 0);
-                const targetArtists = [normalize(primaryArtist), ...(allArtists || []).map(normalize)];
+                const targetArtists = [normalize(primaryArtist), ...allArtists.map(normalize)];
                 const candidateArtists = splitArtists(cArtistRaw);
-
-                // Check direct match or alias
                 let bestArtistMatch = 0;
 
-                // Check aliases (O(1))
-                if (NORMALIZED_ALIASES[normArtist] && NORMALIZED_ALIASES[normArtist].includes(normCArtist)) {
+                if (NORMALIZED_ALIASES[normArtist]?.includes(normCArtist)) {
                     bestArtistMatch = 1.0;
                 } else {
-                    // Matrix comparison of all artist parts
                     for (const tArt of targetArtists) {
                         for (const cArt of candidateArtists) {
                             const sim = calculateSimilarity(tArt, cArt);
                             if (sim > bestArtistMatch) bestArtistMatch = sim;
-                            
-                            // Handle aliases within loop
-                            if (NORMALIZED_ALIASES[tArt] && NORMALIZED_ALIASES[tArt].includes(cArt)) {
-                                bestArtistMatch = 1.0;
-                            }
+                            if (NORMALIZED_ALIASES[tArt]?.includes(cArt)) bestArtistMatch = 1.0;
                         }
                     }
                 }
-                artistSim = bestArtistMatch;
 
-                // RELAXED REJECTION: Artist must match
-                // Floor is lowered to 0.35 if title match is exceptionally strong.
-                // Lofi artists often have many variations (Lo-Fi, Lo Fi, Lofi, etc.)
-                if (artistSim < 0.35) return null; // Hard floor
-                if (artistSim < 0.45 && titleSim < 0.85) return null; // Relaxed floor requires stronger title match
+                if (bestArtistMatch < 0.35) return null;
+                if (bestArtistMatch < 0.45 && titleSim < 0.85) return null;
 
-                // REMOVED: Forbidden Keywords hard filter. 
-                // Unofficial API metadata often mismatches tags (slowed/reverb).
-                // We let the similarity score handle this instead of a hard reject.
-
-
-                // HARD FILTER 4: Duration Check (Relaxed)
-                // Unofficial API durations are often rounded or incorrect.
-                // We calculate similarity but NEVER hard-reject (null).
+                // Duration similarity
                 let durationSim = 1.0;
                 if (durationSec > 0 && cDuration > 0) {
                     const diff = Math.abs(durationSec - cDuration);
-                    const tolerance = durationSec < 60 ? 5 : Math.max(7, durationSec * 0.08);
-                    durationSim = Math.max(0, 1 - (diff / (tolerance * 3))); // Very loose weighting
+                    const tolerance = durationSec < 60 ? 5 : Math.max(7, durationSec * 0.10);
+                    if (diff > 45 && diff > durationSec * 0.25) return null;
+                    durationSim = Math.max(0, 1 - (diff / (tolerance * 3)));
                 }
 
-
-                // FINAL SCORE
-                const finalScore = (0.65 * titleSim) + (0.25 * artistSim) + (0.10 * durationSim);
-
-                return {
-                    id: candidate.id,
-                    title: cTitle,
-                    artist: cArtist,
-                    score: finalScore,
-                    titleSim,
-                    artistSim,
-                    durationSim
-                };
+                const finalScore = (0.50 * titleSim) + (0.30 * bestArtistMatch) + (0.20 * durationSim);
+                return { id: candidate.id, title: cTitle, artist: cArtist, score: finalScore, titleSim, artistSim: bestArtistMatch, durationSim };
             };
+        };
 
-            let bestMatch = null;
-            let bestScore = 0;
-
-            // STEP 3 — SEARCH EACH QUERY (Center optimization here)
-            // Function to execute a single query
-            const executeQuery = async (query) => {
-                try {
-                    const res = await fetch(
-                        `${apiUrl}/api/search/songs?query=${encodeURIComponent(query)}&limit=20`,
-                        { headers: { 'Cookie': cookieHeader } }
-                    );
-                    const data = await res.json();
-
-                    let bestInQuery = null;
-                    let bestScoreInQuery = 0;
-
-                    if (data.success && data.data?.results) {
-                        for (const candidate of data.data.results) {
-                            const scored = scoreCandidate(candidate);
-
-                            if (scored && scored.score > bestScoreInQuery) {
-                                bestScoreInQuery = scored.score;
-                                bestInQuery = scored;
-                            }
-                        }
-                    }
-                    return { match: bestInQuery, score: bestScoreInQuery };
-                } catch (e) {
-                    console.error(`  Error searching "${query}":`, e.message);
-                    return { match: null, score: 0 };
-                }
-            };
-
-            // Process queries in parallel batches to optimize speed
-            const QUERY_BATCH_SIZE = 3;
-
-            for (let i = 0; i < uniqueQueries.length; i += QUERY_BATCH_SIZE) {
-                // If we already found an excellent match in previous batch, stop
-                if (bestScore >= 0.95) {
-                    console.log(`  Early exit - excellent match found`);
-                    break;
-                }
-
-                const batch = uniqueQueries.slice(i, i + QUERY_BATCH_SIZE);
-
-                // Fetch current batch in parallel
-                const results = await Promise.all(batch.map(q => executeQuery(q)));
-
-                // Evaluate results IN ORDER to respect query priority
-                for (const result of results) {
-                    if (result && result.match && result.score > bestScore) {
-                        bestScore = result.score;
-                        bestMatch = result.match;
-                    }
-                    // Check threshold inside the loop to break inner processing if needed (optimization)
-                    if (bestScore >= 0.95) break;
-                }
-            }
-
-            // AUTO DECISION
-            console.log('Best Score:', bestScore);
-            if (bestMatch && bestScore >= ACCEPT_THRESHOLD) {
-                const artistDisplay = bestMatch.artist || 'Unknown';
-                console.log(`  ✓ MATCH: "${bestMatch.title}" by ${artistDisplay} (Score: ${bestScore.toFixed(2)})`);
-                return bestMatch.id;
-            } else {
-                console.log(`  ✗ SKIP: No valid match (Best: ${bestScore.toFixed(2)})`);
-                return null;
+        // --- SEARCH EXECUTOR ---
+        const searchQuery = async (query, cookieHeader, apiUrl) => {
+            try {
+                const res = await fetch(
+                    `${apiUrl}/api/search/songs?query=${encodeURIComponent(query)}&limit=${SEARCH_LIMIT}`,
+                    { headers: { 'Cookie': cookieHeader } }
+                );
+                const data = await res.json();
+                return (data.success && data.data?.results) ? data.data.results : [];
+            } catch {
+                return [];
             }
         };
 
-        // Process tracks in batches
-        const chunkArray = (arr, size) =>
-            Array.from({ length: Math.ceil(arr.length / size) }, (v, i) =>
-                arr.slice(i * size, i * size + size)
-            );
+        // --- TWO-PHASE PARALLEL STRATEGY ---
+        // Phase 1: Fire the BEST query for ALL songs simultaneously
+        // Phase 2: Only run fallback queries for songs that didn't win fast in Phase 1
 
-        const chunks = chunkArray(spotifyTracks, CONCURRENCY_LIMIT);
+        const primaryQueries = spotifyTracks.map(track => {
+            const cacheKey = `${track.name.toLowerCase()}|${(track.artists[0]?.name || '').toLowerCase()}|${Math.round((track.duration_ms || 0) / 1000)}`;
+            return { track, cacheKey, query: `${track.name} ${track.artists[0]?.name || ''}` };
+        });
 
-        for (const chunk of chunks) {
-            const results = await Promise.all(chunk.map(processTrack));
-            results.forEach(id => {
+        // Phase 1: ALL songs searched in parallel simultaneously
+        console.log(`[Import] Phase 1: Parallel primary search for all ${spotifyTracks.length} tracks...`);
+        const phase1Results = await Promise.all(
+            primaryQueries.map(async ({ track, cacheKey, query }) => {
+                if (matchCache.has(cacheKey)) return { track, cacheKey, result: matchCache.get(cacheKey), done: true };
+                const scorer = buildScorer(track);
+                const candidates = await searchQuery(query, cookieHeader, apiUrl);
+                let best = null, bestScore = 0;
+                for (const c of candidates) {
+                    const s = scorer(c);
+                    if (s && s.score > bestScore) { bestScore = s.score; best = s; }
+                }
+                const won = bestScore >= WIN_FAST_THRESHOLD;
+                if (won) {
+                    console.log(`  ✓ [P1] "${track.name}" → "${best.title}" (${bestScore.toFixed(2)})`);
+                    matchCache.set(cacheKey, best.id);
+                }
+                return { track, cacheKey, result: won ? best.id : null, bestScore, best, done: won };
+            })
+        );
+
+        // Phase 2: Run fallback queries for songs that are NOT yet matched
+        const needsFallback = phase1Results.filter(r => !r.done);
+        console.log(`[Import] Phase 2: Fallback search for ${needsFallback.length} unmatched tracks...`);
+
+        const phase2Results = await Promise.all(
+            needsFallback.map(async ({ track, cacheKey, bestScore: p1Score, best: p1Best }) => {
+                const scorer = buildScorer(track);
+                const normTitle = normalize(track.name);
+                const normArtist = normalize(track.artists[0]?.name || '');
+
+                const fallbackQueries = [
+                    `${track.artists[0]?.name || ''} ${track.name}`,  // Artist first
+                    `${normTitle} ${normArtist}`,                       // Clean normalized
+                    track.name,                                          // Title only
+                ].filter(q => q.trim().length > 2);
+
+                // OPTIMIZATION: Run all fallback queries in parallel, then pick the best
+                const fallbackCandidates = await Promise.all(
+                    [...new Set(fallbackQueries)].map(q => searchQuery(q, cookieHeader, apiUrl))
+                );
+
+                let bestMatch = p1Best;
+                let bestScore = p1Score || 0;
+
+                for (const candidates of fallbackCandidates) {
+                    for (const c of candidates) {
+                        const s = scorer(c);
+                        if (s && s.score > bestScore) { bestScore = s.score; bestMatch = s; }
+                    }
+                }
+
+                if (bestMatch && bestScore >= ACCEPT_THRESHOLD) {
+                    console.log(`  ✓ [P2] "${track.name}" → "${bestMatch.title}" (${bestScore.toFixed(2)})`);
+                    matchCache.set(cacheKey, bestMatch.id);
+                    return bestMatch.id;
+                } else {
+                    console.log(`  ✗ SKIP: "${track.name}" (Best: ${bestScore.toFixed(2)})`);
+                    matchCache.set(cacheKey, null);
+                    return null;
+                }
+            })
+        );
+
+        // Merge results in original order
+        let fallbackIdx = 0;
+        const jammifySongIds = [];
+        for (const r of phase1Results) {
+            if (r.done) {
+                if (r.result) jammifySongIds.push(r.result);
+            } else {
+                const id = phase2Results[fallbackIdx++];
                 if (id) jammifySongIds.push(id);
-            });
+            }
         }
 
-        // Create playlist
         const newPlaylist = new Playlist({
             name: details.name || 'Imported Playlist',
             userId: session.user.id,
@@ -399,6 +301,9 @@ export async function POST(request) {
         });
 
         await newPlaylist.save();
+
+        const elapsed = ((Date.now() - importStart) / 1000).toFixed(1);
+        console.log(`[Import] ✅ Done: ${jammifySongIds.length}/${spotifyTracks.length} songs matched in ${elapsed}s`);
 
         return NextResponse.json({
             success: true,
