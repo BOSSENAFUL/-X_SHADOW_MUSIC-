@@ -252,12 +252,39 @@ export default function PlaylistDetailPage({ params }) {
         if (!songIds || songIds.length === 0) return [];
 
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-        const response = await fetch(`${apiUrl}/api/songs?ids=${songIds.join(',')}`);
-        const data = await response.json();
+        const chunkSize = 50;
+        const chunks = [];
+        
+        for (let i = 0; i < songIds.length; i += chunkSize) {
+          chunks.push(songIds.slice(i, i + chunkSize));
+        }
 
-        if (data.success && data.data) {
+        const allSongsData = await Promise.all(
+          chunks.map(async (chunk) => {
+            try {
+              const response = await fetch(`${apiUrl}/api/songs?ids=${chunk.join(',')}`);
+              if (!response.ok) {
+                 console.error(`Failed to fetch chunk: ${response.status}`);
+                 return [];
+              }
+              const data = await response.json();
+              return data.success && data.data ? data.data : [];
+            } catch (err) {
+              console.error('Error fetching song chunk:', err);
+              return [];
+            }
+          })
+        );
+
+        const flattenedSongs = allSongsData.flat();
+
+        if (flattenedSongs.length > 0) {
           const musicMap = {};
-          data.data.forEach(song => { musicMap[song.id] = song; });
+          flattenedSongs.forEach(song => {
+             if (song && song.id) {
+               musicMap[song.id] = song;
+             }
+          });
           const sortedSongs = songIds.map(id => musicMap[id]).filter(Boolean);
           setSongs(sortedSongs);
           return sortedSongs;
