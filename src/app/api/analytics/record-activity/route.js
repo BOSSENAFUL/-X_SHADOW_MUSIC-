@@ -14,8 +14,9 @@ export async function POST(request) {
       );
     }
 
+    // Read isPWA from client — only the browser can detect if it's running as an installed PWA
     const body = await request.json().catch(() => ({}));
-    const { date } = body;
+    const { isPWA = false } = body;
 
     await connectDB();
  
@@ -24,7 +25,7 @@ export async function POST(request) {
       session.user.email,
       session.user.name,
       request,
-      date
+      isPWA
     );
 
     return NextResponse.json({

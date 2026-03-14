@@ -34,8 +34,9 @@ dailyActiveUserSchema.index({ date: 1 }, { unique: true });
 // Compound index for efficient user lookup within dates
 dailyActiveUserSchema.index({ date: 1, 'users.email': 1 });
 
-// Helper function to get OS from User-Agent
-function getOSFromUserAgent(request) {
+// Helper function to detect platform (OS + Browser vs PWA)
+// isPWA must come from the client side since only the browser knows the display-mode
+function getPlatform(request, isPWA = false) {
   try {
     const userAgent = request.headers.get('user-agent');
     if (!userAgent) return 'Unknown';
@@ -43,12 +44,17 @@ function getOSFromUserAgent(request) {
     const parser = new UAParser(userAgent);
     const os = parser.getOS();
 
-    // Return OS name and version if available
-    if (os.name) {
-      return os.version ? `${os.name} ${os.version}` : os.name;
-    }
+    // Build OS string e.g. "Android 10", "Windows 11", "iOS 17", "macOS 14"
+    let osStr = os.name || 'Unknown';
+    if (os.version) osStr += ` ${os.version}`;
+
+    // Append display mode — only client can know if running as installed PWA
+    const modeStr = isPWA ? 'PWA' : 'Browser';
+
+    // Final format: "Android 10 (PWA)", "Windows 11 (Browser)", "iOS 17 (PWA)"
+    return `${osStr} (${modeStr})`;
   } catch (error) {
-    console.warn('Failed to parse User-Agent:', error.message);
+    console.warn('Failed to detect platform:', error.message);
   }
 
   return 'Unknown';
@@ -122,17 +128,19 @@ async function getLocationFromIP(request) {
 }
 
 // Static method to record user activity
-dailyActiveUserSchema.statics.recordUserActivity = async function (userEmail, userName = null, request = null, clientDate = null) {
-  // Use client-provided date if available, otherwise get India local date (IST)
-  const today = clientDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); 
+// isPWA: boolean sent from the client (server cannot detect this)
+dailyActiveUserSchema.statics.recordUserActivity = async function (userEmail, userName = null, request = null, isPWA = false) {
+  // Always compute the date server-side using IST (Asia/Kolkata)
+  // Never trust the client-provided date — this avoids timezone mismatches
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
   try {
-    // Get location and OS data if request is provided
+    // Get location and platform data if request is provided
     let locationData = { country: 'Unknown', city: 'Unknown' };
     let osData = 'Unknown';
     if (request) {
       locationData = await getLocationFromIP(request);
-      osData = getOSFromUserAgent(request);
+      osData = getPlatform(request, isPWA); // e.g. "Android 10 (PWA)"
     }
 
     // First, try to add user to existing document (if user doesn't already exist)
@@ -194,7 +202,7 @@ dailyActiveUserSchema.statics.recordUserActivity = async function (userEmail, us
       let osData = 'Unknown';
       if (request) {
         locationData = await getLocationFromIP(request);
-        osData = getOSFromUserAgent(request);
+        osData = getPlatform(request, isPWA); // e.g. "Android 10 (PWA)"
       }
 
       const updateResult = await this.findOneAndUpdate(

@@ -37,6 +37,13 @@ export default function UserActivityTracker({
     try {
       isRecording.current = true;
 
+      // Detect if the user is running the app as an installed PWA
+      // - matchMedia standalone: Chrome/Edge/Samsung Browser on Android & desktop
+      // - navigator.standalone: Safari on iOS when added to Home Screen
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+      const isIOSPWA = window.navigator.standalone === true;
+      const isPWA = isStandalone || isIOSPWA;
+
       const response = await fetch('/api/analytics/record-activity', {
         method: 'POST',
         headers: {
@@ -44,7 +51,7 @@ export default function UserActivityTracker({
         },
         body: JSON.stringify({
           source,
-          date: today,
+          isPWA,                           // tells server: Browser vs PWA
           timestamp: new Date().toISOString()
         })
       });
