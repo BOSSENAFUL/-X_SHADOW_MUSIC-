@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -78,6 +78,287 @@ import { IoMdPlay } from "react-icons/io";
 // --- In-Memory Global Color Cache ---
 const globalColorCache = typeof window !== 'undefined' ? new Map() : null;
 
+// ─── Virtual Song List ──────────────────────────────────────────────────────
+const ITEM_HEIGHT = 64; // px per row (mobile ≈ desktop row height)
+const OVERSCAN = 5;     // extra rows above/below viewport
+
+const SongRow = React.memo(function SongRow({
+  song, index, isCurrentSong, isPlaying, isOwner,
+  isSongLiked, handlePlayClick, handleToggleSongLike,
+  handleRemoveFromPlaylist, handleDownloadSong,
+  decodeHtmlEntities, formatDuration, router,
+}) {
+  const imageUrl = song.image?.find(img => img.quality === '500x500')?.url ||
+    song.image?.find(img => img.quality === '150x150')?.url ||
+    song.image?.[song.image.length - 1]?.url;
+
+  return (
+    <div>
+      {/* Mobile */}
+      <div
+        className="md:hidden flex items-center gap-2 p-1 py-2 rounded hover:bg-muted/50 group cursor-pointer"
+        onClick={() => handlePlayClick(song, index)}
+      >
+        <div className="w-6 text-center shrink-0">
+          {isCurrentSong && isPlaying ? (
+            <div className="flex items-end justify-center gap-0.5 h-3">
+              <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0s' }} />
+              <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.2s' }} />
+              <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.4s' }} />
+              <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.1s' }} />
+            </div>
+          ) : isCurrentSong ? (
+            <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
+          ) : (
+            <>
+              <span className="text-muted-foreground group-hover:hidden text-sm">{index + 1}</span>
+              <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
+            </>
+          )}
+        </div>
+        <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
+          <img src={imageUrl || '/default-playlist-image.png'} alt={song.name}
+            className="w-full h-full object-cover rounded" loading="lazy"
+            onError={(e) => { e.target.src = '/default-playlist-image.png'; }} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''}`}>
+            {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
+          </p>
+          <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'}`}>
+            {song.artists?.primary?.length > 0
+              ? song.artists.primary.map((a, ai) => <span key={a.id || ai}>{a.name}{ai < song.artists.primary.length - 1 && ', '}</span>)
+              : 'Unknown Artist'}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="p-2 h-8 w-8 text-muted-foreground" onClick={(e) => e.stopPropagation()}>
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 z-9999">
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleToggleSongLike(song); }}>
+                <Heart className={`w-4 h-4 mr-2 ${isSongLiked(song.id) ? 'fill-current text-red-500' : ''}`} />
+                {isSongLiked(song.id) ? 'Unlike' : 'Like'}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {isOwner && (
+                <>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleRemoveFromPlaylist(song.id); }} className="text-red-500 hover:text-red-600 focus:text-red-600 hover:bg-red-50 focus:bg-red-50 dark:hover:bg-red-950 dark:focus:bg-red-950">
+                    <Minus className="w-4 h-4 mr-2" />Remove
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); if (song.artists?.primary?.length > 0) router.push(`/music/artist/${song.artists.primary[0].id}`); }}>
+                <User className="w-4 h-4 mr-2" />Go to artist
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); if (song.album?.id) router.push(`/music/album/${song.album.id}`); }}>
+                <Disc className="w-4 h-4 mr-2" />Go to album
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDownloadSong(song); }}>
+                <Download className="w-4 h-4 mr-2" />Download
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      {/* Desktop */}
+      <div
+        className="hidden md:grid grid-cols-[auto_1fr_1fr_120px_100px] gap-4 items-center p-1.5 py-2 rounded hover:bg-muted/50 group cursor-pointer"
+        onClick={() => handlePlayClick(song, index)}
+      >
+        <div className="w-8 text-center">
+          {isCurrentSong && isPlaying ? (
+            <div className="flex items-end justify-center gap-0.5 h-3">
+              <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0s' }} />
+              <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.2s' }} />
+              <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.4s' }} />
+              <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.1s' }} />
+            </div>
+          ) : isCurrentSong ? (
+            <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
+          ) : (
+            <>
+              <span className="text-muted-foreground group-hover:hidden">{index + 1}</span>
+              <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
+            <img src={imageUrl || '/default-playlist-image.png'} alt={song.name}
+              className="w-full h-full object-cover rounded" loading="lazy"
+              onError={(e) => { e.target.src = '/default-playlist-image.png'; }} />
+          </div>
+          <div className="min-w-0">
+            <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''}`}>
+              {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
+            </p>
+            <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'}`}>
+              {song.artists?.primary?.length > 0
+                ? song.artists.primary.map((artist, ai) => (
+                  <span key={artist.id || ai}>
+                    <button
+                      className={`hover:underline transition-colors ${isCurrentSong ? 'hover:text-green-300' : 'hover:text-foreground'}`}
+                      onClick={(e) => { e.stopPropagation(); router.push(`/music/artist/${artist.id}`); }}
+                    >{decodeHtmlEntities(artist.name)}</button>
+                    {ai < song.artists.primary.length - 1 && ', '}
+                  </span>
+                ))
+                : 'Unknown Artist'}
+            </p>
+          </div>
+        </div>
+        <div className="text-sm text-muted-foreground truncate">
+          {song.album?.name ? (
+            <button className="hover:underline hover:text-foreground transition-colors" onClick={(e) => { e.stopPropagation(); if (song.album.id) router.push(`/music/album/${song.album.id}`); }}>
+              {decodeHtmlEntities(song.album.name)}
+            </button>
+          ) : 'Unknown Album'}
+        </div>
+        <div className="text-sm text-muted-foreground">
+          {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+        </div>
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            variant="ghost" size="sm"
+            className={`h-8 w-8 hidden md:inline-flex shrink-0 p-0 opacity-0 group-hover:opacity-100 transition-opacity ${isSongLiked(song.id) ? 'text-green-500 hover:text-green-600' : 'text-muted-foreground hover:text-foreground'}`}
+            onClick={async (e) => { e.stopPropagation(); await handleToggleSongLike(song); }}
+          >
+            <Heart className={`w-4 h-4 ${isSongLiked(song.id) ? 'fill-current' : ''}`} />
+          </Button>
+          <div className="min-w-[40px] text-right text-sm text-muted-foreground font-mono hidden md:block">
+            {formatDuration(song.duration)}
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-8 w-8 shrink-0" onClick={(e) => e.stopPropagation()}>
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 z-9999">
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleToggleSongLike(song); }}>
+                <Heart className={`w-4 h-4 mr-2 ${isSongLiked(song.id) ? 'fill-current text-red-500' : ''}`} />
+                {isSongLiked(song.id) ? 'Unlike' : 'Like'}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {isOwner && (
+                <>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleRemoveFromPlaylist(song.id); }} className="text-red-500 hover:text-red-600 focus:text-red-600 hover:bg-red-50 focus:bg-red-50 dark:hover:bg-red-950 dark:focus:bg-red-950">
+                    <Minus className="w-4 h-4 mr-2" />Remove
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); if (song.artists?.primary?.length > 0) router.push(`/music/artist/${song.artists.primary[0].id}`); }}>
+                <User className="w-4 h-4 mr-2" />Go to artist
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); if (song.album?.id) router.push(`/music/album/${song.album.id}`); }}>
+                <Disc className="w-4 h-4 mr-2" />Go to album
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDownloadSong(song); }}>
+                <Download className="w-4 h-4 mr-2" />Download
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+function VirtualSongList({ 
+  songs, currentSong, activePlaylistId, playlistId, currentIndex, isPlaying, isOwner,
+  isSongLiked, handlePlayClick, handleToggleSongLike, handleRemoveFromPlaylist,
+  handleDownloadSong, decodeHtmlEntities, formatDuration, router 
+}) {
+  const containerRef = useRef(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(800);
+  const [listOffsetTop, setListOffsetTop] = useState(0);
+
+  useEffect(() => {
+    const scrollEl = document.getElementById('user-playlist-scroll-container');
+    if (!scrollEl) return;
+
+    const onScroll = () => setScrollTop(scrollEl.scrollTop);
+    scrollEl.addEventListener('scroll', onScroll, { passive: true });
+
+    const updateMeasurements = () => {
+      setContainerHeight(scrollEl.clientHeight);
+      if (containerRef.current) {
+        const scrollRect = scrollEl.getBoundingClientRect();
+        const listRect = containerRef.current.getBoundingClientRect();
+        setListOffsetTop(listRect.top - scrollRect.top + scrollEl.scrollTop);
+      }
+    };
+
+    const ro = new ResizeObserver(updateMeasurements);
+    ro.observe(scrollEl);
+    updateMeasurements();
+
+    return () => {
+      scrollEl.removeEventListener('scroll', onScroll);
+      ro.disconnect();
+    };
+  }, []);
+
+  // Re-measure when songs change
+  useEffect(() => {
+    const scrollEl = document.getElementById('user-playlist-scroll-container');
+    if (!scrollEl || !containerRef.current) return;
+    const scrollRect = scrollEl.getBoundingClientRect();
+    const listRect = containerRef.current.getBoundingClientRect();
+    setListOffsetTop(listRect.top - scrollRect.top + scrollEl.scrollTop);
+  }, [songs.length]);
+
+  const relativeScroll = Math.max(0, scrollTop - listOffsetTop);
+  const startIndex = Math.max(0, Math.floor(relativeScroll / ITEM_HEIGHT) - OVERSCAN);
+  const visibleCount = Math.ceil(containerHeight / ITEM_HEIGHT) + OVERSCAN * 2;
+  const endIndex = Math.min(songs.length - 1, startIndex + visibleCount);
+
+  const totalHeight = songs.length * ITEM_HEIGHT;
+  const paddingTop = startIndex * ITEM_HEIGHT;
+
+  return (
+    <div ref={containerRef} style={{ height: totalHeight, position: 'relative' }}>
+      <div style={{ paddingTop }}>
+        {songs.slice(startIndex, endIndex + 1).map((song, i) => {
+          const index = startIndex + i;
+          const isCurrentSong = currentSong?.id === song.id &&
+            activePlaylistId === playlistId &&
+            currentIndex === index;
+          return (
+            <SongRow
+              key={`${song.id}-${index}`}
+              song={song}
+              index={index}
+              isCurrentSong={isCurrentSong}
+              isPlaying={isPlaying}
+              isOwner={isOwner}
+              isSongLiked={isSongLiked}
+              handlePlayClick={handlePlayClick}
+              handleToggleSongLike={handleToggleSongLike}
+              handleRemoveFromPlaylist={handleRemoveFromPlaylist}
+              handleDownloadSong={handleDownloadSong}
+              decodeHtmlEntities={decodeHtmlEntities}
+              formatDuration={formatDuration}
+              router={router}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
 export default function PlaylistDetailPage({ params }) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -108,13 +389,17 @@ export default function PlaylistDetailPage({ params }) {
   // Initialize liked songs hook
   const { toggleLike: toggleSongLike, isLiked: isSongLiked } = useLikedSongs(session?.user?.id);
 
-  // Function to decode HTML entities
-  const decodeHtmlEntities = (text) => {
+  // Function to decode HTML entities - cached to avoid repeated DOM work
+  const htmlEntityCache = useRef(new Map());
+  const decodeHtmlEntities = useCallback((text) => {
     if (!text) return text;
+    if (htmlEntityCache.current.has(text)) return htmlEntityCache.current.get(text);
     const textarea = document.createElement('textarea');
     textarea.innerHTML = text;
-    return textarea.value;
-  };
+    const result = textarea.value;
+    htmlEntityCache.current.set(text, result);
+    return result;
+  }, []);
 
   // Extract dominant colors from image and make them darker for ambient effect
   const extractColorsFromImage = (imageSrc) => {
@@ -451,91 +736,42 @@ export default function PlaylistDetailPage({ params }) {
     }).catch(() => { });
   };
 
-  const handlePlayClick = (song, index) => {
-    const isCurrentSong = currentSong?.id === song.id;
+  // Pre-map songs ONCE — avoids O(n) re-map on every interaction
+  const mappedPlaylistData = useMemo(() => songs.map(s => ({
+    id: s.id,
+    name: s.name,
+    artists: { primary: s.artists?.primary || [] },
+    album: s.album,
+    duration: s.duration,
+    image: s.image,
+    releaseDate: s.releaseDate,
+    language: s.language,
+    playCount: s.playCount,
+    downloadUrl: s.downloadUrl
+  })), [songs]);
 
-    // If clicking on the currently playing song, do nothing
-    if (isCurrentSong) {
-      return;
-    }
-
-    // Convert JioSaavn song format to standard format for the player
+  const handlePlayClick = useCallback((song, index) => {
+    if (currentSong?.id === song.id) return;
+    // Map individual song if somehow not mapped, but usually we use mapped data in bulk
     const songData = {
-      id: song.id,
-      name: song.name,
+      id: song.id, name: song.name,
       artists: { primary: song.artists?.primary || [] },
-      album: song.album,
-      duration: song.duration,
-      image: song.image,
-      releaseDate: song.releaseDate,
-      language: song.language,
-      playCount: song.playCount,
-      downloadUrl: song.downloadUrl
+      album: song.album, duration: song.duration, image: song.image,
+      releaseDate: song.releaseDate, language: song.language,
+      playCount: song.playCount, downloadUrl: song.downloadUrl
     };
-
-    // Convert all playlist songs to standard format for playlist
-    const playlistData = songs.map(playlistSong => ({
-      id: playlistSong.id,
-      name: playlistSong.name,
-      artists: { primary: playlistSong.artists?.primary || [] },
-      album: playlistSong.album,
-      duration: playlistSong.duration,
-      image: playlistSong.image,
-      releaseDate: playlistSong.releaseDate,
-      language: playlistSong.language,
-      playCount: playlistSong.playCount,
-      downloadUrl: playlistSong.downloadUrl
-    }));
-
-    playSong(songData, playlistData, playlistId, index);
+    playSong(songData, mappedPlaylistData, playlistId, index);
     setCurrentlyPlaying({ song, index });
     trackRecentlyPlayed();
-    console.log(`Playing song from playlist:`, song);
-  };
+  }, [currentSong?.id, mappedPlaylistData, playlistId, playSong, trackRecentlyPlayed]);
 
-  const handlePlayAll = () => {
-    if (songs.length > 0) {
-      const isPlaylistPlaying = activePlaylistId === playlistId;
-
-      if (isPlaylistPlaying) {
-        togglePlayPause();
-        return;
-      }
-
-      // Convert first song to standard format
-      const firstSong = {
-        id: songs[0].id,
-        name: songs[0].name,
-        artists: { primary: songs[0].artists?.primary || [] },
-        album: songs[0].album,
-        duration: songs[0].duration,
-        image: songs[0].image,
-        releaseDate: songs[0].releaseDate,
-        language: songs[0].language,
-        playCount: songs[0].playCount,
-        downloadUrl: songs[0].downloadUrl
-      };
-
-      // Convert all playlist songs to standard format for playlist
-      const playlistData = songs.map(playlistSong => ({
-        id: playlistSong.id,
-        name: playlistSong.name,
-        artists: { primary: playlistSong.artists?.primary || [] },
-        album: playlistSong.album,
-        duration: playlistSong.duration,
-        image: playlistSong.image,
-        releaseDate: playlistSong.releaseDate,
-        language: playlistSong.language,
-        playCount: playlistSong.playCount,
-        downloadUrl: playlistSong.downloadUrl
-      }));
-
-      playSong(firstSong, playlistData, playlistId, 0);
-      setCurrentlyPlaying({ song: songs[0], index: 0 });
-      trackRecentlyPlayed();
-      console.log('Playing all songs from playlist starting with:', songs[0]);
-    }
-  };
+  const handlePlayAll = useCallback(() => {
+    if (songs.length === 0) return;
+    if (activePlaylistId === playlistId) { togglePlayPause(); return; }
+    playSong(mappedPlaylistData[0], mappedPlaylistData, playlistId, 0);
+    setCurrentlyPlaying({ song: songs[0], index: 0 });
+    trackRecentlyPlayed();
+  }, [songs, activePlaylistId, playlistId, togglePlayPause, mappedPlaylistData, playSong, trackRecentlyPlayed]);
 
   const handleGoBack = () => {
     router.back();
@@ -801,23 +1037,15 @@ export default function PlaylistDetailPage({ params }) {
     });
   };
 
-  const calculateTotalDuration = () => {
+  // Memoized — only recalculates when songs change
+  const totalDuration = useMemo(() => {
     if (!songs || songs.length === 0) return null;
-
-    // song.duration is usually in seconds based on formatDuration
     const totalSeconds = songs.reduce((acc, song) => acc + (parseInt(song.duration) || 0), 0);
-
     if (totalSeconds === 0) return null;
-
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
-
-    if (hours > 0) {
-      return `${hours} hr ${minutes} min`;
-    } else {
-      return `${minutes} min`;
-    }
-  };
+    return hours > 0 ? `${hours} hr ${minutes} min` : `${minutes} min`;
+  }, [songs]);
 
   // Effect to handle scroll and smooth animations (highly optimized)
   useEffect(() => {
@@ -1380,10 +1608,10 @@ export default function PlaylistDetailPage({ params }) {
                       <span className="font-semibold">{playlist.ownerName || 'Unknown User'}</span>
                       <span>•</span>
                       <span>{playlist.songIds?.length || 0} songs</span>
-                      {calculateTotalDuration() && (
+                      {totalDuration && (
                         <>
                           <span>•</span>
-                          <span>{calculateTotalDuration()}</span>
+                          <span>{totalDuration}</span>
                         </>
                       )}
                     </div>
@@ -1459,10 +1687,10 @@ export default function PlaylistDetailPage({ params }) {
                     <span className="font-semibold">{playlist.ownerName || 'Unknown User'}</span>
                     <span>•</span>
                     <span>{playlist.songIds?.length || 0} songs</span>
-                    {calculateTotalDuration() && (
+                    {totalDuration && (
                       <>
                         <span>•</span>
-                        <span>{calculateTotalDuration()}</span>
+                        <span>{totalDuration}</span>
                       </>
                     )}
                     {playlist.createdAt && (
@@ -1604,330 +1832,23 @@ export default function PlaylistDetailPage({ params }) {
                     </div>
                   </div>
 
-                  <div className="space-y-0">
-                    {songs.map((song, index) => {
-                      const isCurrentSong = currentSong?.id === song.id &&
-                        activePlaylistId === playlistId &&
-                        currentIndex === index;
-                      return (
-                        <div key={`${song.id}-${index}`} >
-                          {/* Mobile Layout */}
-                          <div
-                            className={`md:hidden flex items-center gap-2 p-1 py-2 rounded hover:bg-muted/50 group cursor-pointer`}
-                            onClick={() => handlePlayClick(song, index)}
-                          >
-                            <div className="w-6 text-center shrink-0">
-                              {isCurrentSong && isPlaying ? (
-                                <div className="flex items-center justify-center">
-                                  <div className="flex items-end justify-center gap-0.5 h-3">
-                                    <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
-                                    <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
-                                    <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
-                                    <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
-                                  </div>
-                                </div>
-                              ) : isCurrentSong ? (
-                                <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
-                              ) : (
-                                <>
-                                  <span className="text-muted-foreground group-hover:hidden text-sm">
-                                    {index + 1}
-                                  </span>
-                                  <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
-                                </>
-                              )}
-                            </div>
-
-                            <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
-                              {song.image?.length > 0 ? (
-                                <img
-                                  src={song.image.find(img => img.quality === '500x500')?.url ||
-                                    song.image.find(img => img.quality === '150x150')?.url ||
-                                    song.image[song.image.length - 1]?.url}
-                                  alt={song.name}
-                                  className="w-full h-full object-cover rounded"
-                                  loading="lazy"
-                                  onError={(e) => {
-                                    e.target.src = '/default-playlist-image.png';
-                                  }}
-                                />
-                              ) : (
-                                <img
-                                  src="/default-playlist-image.png"
-                                  alt={song.name}
-                                  className="w-full h-full object-cover rounded"
-                                />
-                              )}
-                            </div>
-
-                            <div className="min-w-0 flex-1">
-                              <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''}`}>
-                                {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
-                              </p>
-                              <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'}`}>
-                                {song.artists?.primary?.length > 0 ? (
-                                  song.artists.primary.map((artist, artistIndex) => (
-                                    <span key={artist.id || artistIndex}>
-                                      {artist.name}
-                                      {artistIndex < song.artists.primary.length - 1 && ', '}
-                                    </span>
-                                  ))
-                                ) : (
-                                  'Unknown Artist'
-                                )}
-                              </p>
-                            </div>
-
-                            <div className="flex items-center gap-2 shrink-0">
-
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="p-2 h-8 w-8 text-muted-foreground"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <MoreVertical className="w-4 h-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48 z-9999">
-                                  <DropdownMenuItem onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleToggleSongLike(song);
-                                  }}>
-                                    <Heart className={`w-4 h-4 mr-2 ${isSongLiked(song.id) ? 'fill-current text-red-500' : ''}`} />
-                                    {isSongLiked(song.id) ? 'Unlike' : 'Like'}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  {isOwner && (
-                                    <>
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleRemoveFromPlaylist(song.id);
-                                        }}
-                                        className="text-red-500 hover:text-red-600 focus:text-red-600 hover:bg-red-50 focus:bg-red-50 dark:hover:bg-red-950 dark:focus:bg-red-950"
-                                      >
-                                        <Minus className="w-4 h-4 mr-2" />
-                                        Remove
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                    </>
-                                  )}
-                                  <DropdownMenuItem onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (song.artists?.primary?.length > 0) {
-                                      router.push(`/music/artist/${song.artists.primary[0].id}`);
-                                    }
-                                  }}>
-                                    <User className="w-4 h-4 mr-2" />
-                                    Go to artist
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (song.album?.id) {
-                                      router.push(`/music/album/${song.album.id}`);
-                                    }
-                                  }}>
-                                    <Disc className="w-4 h-4 mr-2" />
-                                    Go to album
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDownloadSong(song);
-                                  }}>
-                                    <Download className="w-4 h-4 mr-2" />
-                                    Download
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </div>
-
-                          {/* Desktop Layout */}
-                          <div
-                            className={`hidden md:grid grid-cols-[auto_1fr_1fr_120px_100px] gap-4 items-center p-1.5 py-2 rounded hover:bg-muted/50 group cursor-pointer`}
-                            onClick={() => handlePlayClick(song, index)}
-                          >
-                            <div className="w-8 text-center">
-                              {isCurrentSong && isPlaying ? (
-                                <div className="flex items-center justify-center">
-                                  <div className="flex items-end justify-center gap-0.5 h-3">
-                                    <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
-                                    <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
-                                    <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
-                                    <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
-                                  </div>
-                                </div>
-                              ) : isCurrentSong ? (
-                                <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
-                              ) : (
-                                <>
-                                  <span className="text-muted-foreground group-hover:hidden">
-                                    {index + 1}
-                                  </span>
-                                  <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
-                                </>
-                              )}
-                            </div>
-
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
-                                {song.image?.length > 0 ? (
-                                  <img
-                                    src={song.image.find(img => img.quality === '500x500')?.url ||
-                                      song.image.find(img => img.quality === '150x150')?.url ||
-                                      song.image[song.image.length - 1]?.url}
-                                    alt={song.name}
-                                    className="w-full h-full object-cover rounded"
-                                    loading="lazy"
-                                    onError={(e) => {
-                                      e.target.src = '/default-playlist-image.png';
-                                    }}
-                                  />
-                                ) : (
-                                  <img
-                                    src="/default-playlist-image.png"
-                                    alt={song.name}
-                                    className="w-full h-full object-cover rounded"
-                                  />
-                                )}
-                              </div>
-                              <div className="min-w-0">
-                                <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''}`}>
-                                  {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
-                                </p>
-                                <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'}`}>
-                                  {song.artists?.primary?.length > 0 ? (
-                                    song.artists.primary.map((artist, artistIndex) => (
-                                      <span key={artist.id || artistIndex}>
-                                        <button
-                                          className={`hover:underline transition-colors ${isCurrentSong ? 'hover:text-green-300' : 'hover:text-foreground'}`}
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            router.push(`/music/artist/${artist.id}`);
-                                          }}
-                                        >
-                                          {decodeHtmlEntities(artist.name)}
-                                        </button>
-                                        {artistIndex < song.artists.primary.length - 1 && ', '}
-                                      </span>
-                                    ))
-                                  ) : (
-                                    'Unknown Artist'
-                                  )}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="text-sm text-muted-foreground truncate">
-                              {song.album?.name ? (
-                                <button
-                                  className="hover:underline hover:text-foreground transition-colors"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (song.album.id) {
-                                      router.push(`/music/album/${song.album.id}`);
-                                    }
-                                  }}
-                                >
-                                  {decodeHtmlEntities(song.album.name)}
-                                </button>
-                              ) : (
-                                'Unknown Album'
-                              )}
-                            </div>
-
-                            <div className="text-sm text-muted-foreground">
-                              {formatDate(new Date())}
-                            </div>
-
-                            <div className="flex items-center justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className={`h-8 w-8 hidden md:inline-flex shrink-0 p-0 opacity-0 group-hover:opacity-100 transition-opacity ${isSongLiked(song.id) ? 'text-green-500 hover:text-green-600' : 'text-muted-foreground hover:text-foreground'}`}
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  await handleToggleSongLike(song);
-                                }}
-                              >
-                                <Heart className={`w-4 h-4 ${isSongLiked(song.id) ? 'fill-current' : ''}`} />
-                              </Button>
-                              <div className="min-w-[40px] text-right text-sm text-muted-foreground font-mono hidden md:block">
-                                {formatDuration(song.duration)}
-                              </div>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-8 w-8 shrink-0"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <MoreVertical className="w-4 h-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48 z-9999">
-                                  <DropdownMenuItem onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleToggleSongLike(song);
-                                  }}>
-                                    <Heart className={`w-4 h-4 mr-2 ${isSongLiked(song.id) ? 'fill-current text-red-500' : ''}`} />
-                                    {isSongLiked(song.id) ? 'Unlike' : 'Like'}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  {isOwner && (
-                                    <>
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleRemoveFromPlaylist(song.id);
-                                        }}
-                                        className="text-red-500 hover:text-red-600 focus:text-red-600 hover:bg-red-50 focus:bg-red-50 dark:hover:bg-red-950 dark:focus:bg-red-950"
-                                      >
-                                        <Minus className="w-4 h-4 mr-2" />
-                                        Remove
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                    </>
-                                  )}
-                                  <DropdownMenuItem onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (song.artists?.primary?.length > 0) {
-                                      router.push(`/music/artist/${song.artists.primary[0].id}`);
-                                    }
-                                  }}>
-                                    <User className="w-4 h-4 mr-2" />
-                                    Go to artist
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (song.album?.id) {
-                                      router.push(`/music/album/${song.album.id}`);
-                                    }
-                                  }}>
-                                    <Disc className="w-4 h-4 mr-2" />
-                                    Go to album
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDownloadSong(song);
-                                  }}>
-                                    <Download className="w-4 h-4 mr-2" />
-                                    Download
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <VirtualSongList
+                    songs={songs}
+                    currentSong={currentSong}
+                    activePlaylistId={activePlaylistId}
+                    playlistId={playlistId}
+                    currentIndex={currentIndex}
+                    isPlaying={isPlaying}
+                    isOwner={isOwner}
+                    isSongLiked={isSongLiked}
+                    handlePlayClick={handlePlayClick}
+                    handleToggleSongLike={handleToggleSongLike}
+                    handleRemoveFromPlaylist={handleRemoveFromPlaylist}
+                    handleDownloadSong={handleDownloadSong}
+                    decodeHtmlEntities={decodeHtmlEntities}
+                    formatDuration={formatDuration}
+                    router={router}
+                  />
                 </>
               ) : (
                 <div className="text-center py-12">
