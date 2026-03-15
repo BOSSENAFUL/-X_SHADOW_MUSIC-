@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Heart, Search } from "lucide-react";
 
 import { PlaylistSection } from "@/components/music/playlist-section";
+import { PWAInstallBanner } from "@/components/music/pwa-install-banner";
 import { IoMdPlay } from "react-icons/io";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { Loader2 } from "lucide-react";
@@ -629,6 +630,8 @@ export default function MusicPage() {
           {/* Ambient Background Gradient (Isolated Component) */}
           <AmbientGradient color={hoveredColor} />
 
+          {/* PWA Install Banner — mobile only */}
+          <PWAInstallBanner />
 
           {/* Quick Access Cards */}
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
