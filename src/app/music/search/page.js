@@ -1760,7 +1760,7 @@ function SearchPageContent() {
                   {combinedSearchResults.artists?.results?.length > 0 && (
                     <div>
                       <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Artists</h2>
-                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-3 sm:gap-4">
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 gap-3 sm:gap-4">
                         {combinedSearchResults.artists.results.slice(0, 8).map((artist, index) => (
                           <div
                             key={artist.id || index}
@@ -1815,8 +1815,8 @@ function SearchPageContent() {
                   {combinedSearchResults.albums?.results?.length > 0 && (
                     <div>
                       <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Albums</h2>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
-                        {combinedSearchResults.albums.results.slice(0, 6).map((album, index) => (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 gap-3 sm:gap-4">
+                        {combinedSearchResults.albums.results.slice(0, 8).map((album, index) => (
                           <div
                             key={album.id || index}
                             className="group cursor-pointer hover:scale-105 transition-transform duration-200"
@@ -1861,7 +1861,7 @@ function SearchPageContent() {
                       {publicPlaylists?.length > 0 && (
                         <div className="mb-6">
                           <h3 className="text-lg font-semibold mb-3 text-muted-foreground">Community Playlists</h3>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 gap-3 sm:gap-4">
                             {publicPlaylists.map((playlist, index) => (
                               <div
                                 key={`public-${playlist.id || index}`}
@@ -1890,7 +1890,7 @@ function SearchPageContent() {
                       {searchResults.playlists?.results?.length > 0 && (
                         <div>
                           <h3 className="text-lg font-semibold mb-3 text-muted-foreground">Featured Playlists</h3>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 gap-3 sm:gap-4">
                             {combinedSearchResults.playlists.results.map((playlist, index) => (
                               <div
                                 key={`jiosaavn-${playlist.id || index}`}
@@ -2287,7 +2287,7 @@ function SearchPageContent() {
                 {/* Albums Tab */}
                 <TabsContent value="albums">
                   {categoryData.albums.results.length > 0 || (combinedSearchResults.albums?.results?.length > 0) ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4 sm:gap-6">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 gap-4 sm:gap-6">
                       {combinedSearchResults.albums.results.map((album, index) => (
                         <div
                           key={album.id || index}
@@ -2345,7 +2345,7 @@ function SearchPageContent() {
                 {/* Artists Tab */}
                 <TabsContent value="artists">
                   {categoryData.artists.results.length > 0 || (combinedSearchResults.artists?.results?.length > 0) ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4 sm:gap-6">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 gap-4 sm:gap-6">
                       {combinedSearchResults.artists.results.map((artist, index) => (
                         <div
                           key={artist.id || index}
@@ -2432,7 +2432,7 @@ function SearchPageContent() {
                               {publicPlaylists.length} playlist{publicPlaylists.length !== 1 ? 's' : ''}
                             </span>
                           </div>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4 sm:gap-6">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 gap-4 sm:gap-6">
                             {publicPlaylists.map((playlist, index) => (
                               <div
                                 key={`public-${playlist.id || index}`}
@@ -2481,7 +2481,7 @@ function SearchPageContent() {
                               {combinedSearchResults.playlists.results.length} playlist{combinedSearchResults.playlists.results.length !== 1 ? 's' : ''}
                             </span>
                           </div>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4 sm:gap-6">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 gap-4 sm:gap-6">
                             {combinedSearchResults.playlists.results.map((playlist, index) => (
                               <div
                                 key={`jiosaavn-${playlist.id || index}`}

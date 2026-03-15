@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -38,7 +39,6 @@ import { IoMdPlay } from "react-icons/io";
 export default function FavoritesPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const [currentlyPlaying, setCurrentlyPlaying] = useState(null);
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState(null);
   const [showHeaderTitle, setShowHeaderTitle] = useState(false);
@@ -116,7 +116,6 @@ export default function FavoritesPage() {
     };
 
     playSong(songData, playlistData, 'favorites', index);
-    setCurrentlyPlaying({ song, index });
   }, [currentSong?.id, playlistData, playSong]);
 
   const handlePlayAll = useCallback(() => {
@@ -143,7 +142,6 @@ export default function FavoritesPage() {
       };
 
       playSong(firstSong, playlistData, 'favorites', 0);
-      setCurrentlyPlaying({ song: likedSongs[0], index: 0 });
     }
   }, [likedSongs, currentPlaylistId, togglePlayPause, playSong, playlistData]);
 
@@ -693,16 +691,16 @@ export default function FavoritesPage() {
                                     <span className="md:hidden">
                                       {artist.name}
                                     </span>
-                                    <button
+                                    <Link
+                                      href={`/music/artist/${artist.id}`}
                                       className={`hidden md:inline hover:underline transition-colors ${isCurrentSong ? 'hover:text-green-300' : 'hover:text-foreground'
                                         }`}
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        router.push(`/music/artist/${artist.id}`);
                                       }}
                                     >
                                       {artist.name}
-                                    </button>
+                                    </Link>
                                     {artistIndex < likedSong.artists.length - 1 && ', '}
                                   </span>
                                 ))
@@ -817,16 +815,16 @@ export default function FavoritesPage() {
                                 {likedSong.artists?.length > 0 ? (
                                   likedSong.artists.map((artist, artistIndex) => (
                                     <span key={artist.id || artistIndex}>
-                                      <button
+                                      <Link
+                                        href={`/music/artist/${artist.id}`}
                                         className={`hover:underline transition-colors ${isCurrentSong ? 'hover:text-green-300' : 'hover:text-foreground'
                                           }`}
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          router.push(`/music/artist/${artist.id}`);
                                         }}
                                       >
                                         {artist.name}
-                                      </button>
+                                      </Link>
                                       {artistIndex < likedSong.artists.length - 1 && ', '}
                                     </span>
                                   ))
@@ -839,17 +837,15 @@ export default function FavoritesPage() {
 
                           <div className="text-sm text-muted-foreground truncate">
                             {likedSong.album?.name ? (
-                              <button
+                              <Link
+                                href={`/music/album/${likedSong.album.id}`}
                                 className="hover:underline hover:text-foreground transition-colors"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  if (likedSong.album.id) {
-                                    router.push(`/music/album/${likedSong.album.id}`);
-                                  }
                                 }}
                               >
                                 {decodeHtmlEntities(likedSong.album.name)}
-                              </button>
+                              </Link>
                             ) : (
                               'Unknown Album'
                             )}

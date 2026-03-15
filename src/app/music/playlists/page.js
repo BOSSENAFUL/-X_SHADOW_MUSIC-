@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, memo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar"
 import {
@@ -21,8 +22,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Plus, Loader2, Music, Lock, Unlock, Search, LayoutGrid, List, Grid, Download } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { Plus, Loader2, Music, Lock, Unlock, Search, Download } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -39,7 +39,7 @@ import { toast } from "sonner"
 // --- Memoized Components ---
 
 const PlaylistSkeleton = memo(() => (
-  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 min-[2400px]:grid-cols-11 gap-6">
     {[...Array(12)].map((_, i) => (
       <div key={i} className="space-y-3">
         <Skeleton className="aspect-square w-full rounded-md bg-zinc-800/50" />
@@ -53,7 +53,7 @@ const PlaylistSkeleton = memo(() => (
 ));
 PlaylistSkeleton.displayName = "PlaylistSkeleton";
 
-const PlaylistCard = memo(({ playlist, onClick }) => {
+const PlaylistCard = memo(({ playlist }) => {
   // Generate playlist cover based on songs
   const cover = useMemo(() => {
     if (playlist.image) {
@@ -96,8 +96,7 @@ const PlaylistCard = memo(({ playlist, onClick }) => {
 
   return (
     <div
-      onClick={onClick}
-      className="group cursor-pointer space-y-3 transition-all"
+      className="group space-y-3 transition-all"
     >
       <div className="aspect-square w-full relative overflow-hidden rounded-md shadow-sm transition-all duration-300 group-hover:shadow-xl group-hover:scale-[1.02]">
         {cover.type === 'single' ? (
@@ -106,6 +105,7 @@ const PlaylistCard = memo(({ playlist, onClick }) => {
             alt={playlist.name}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
             onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
+            loading="lazy"
           />
         ) : cover.type === 'collage' ? (
           <div className="w-full h-full grid grid-cols-2 grid-rows-2">
@@ -116,6 +116,7 @@ const PlaylistCard = memo(({ playlist, onClick }) => {
                   alt={`Song ${index + 1}`}
                   className="w-full h-full object-cover"
                   onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
+                  loading="lazy"
                 />
               </div>
             ))}
@@ -158,7 +159,6 @@ export default function PlaylistsPage() {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [playlists, setPlaylists] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [hasLoaded, setHasLoaded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [importStage, setImportStage] = useState(0); // 0: input, 1: processing, 2: success
   const [importMessage, setImportMessage] = useState("");
@@ -166,11 +166,13 @@ export default function PlaylistsPage() {
 
   // Fetch user's playlists - show immediately, load covers in background
   useEffect(() => {
+    let isMounted = true;
+
     const fetchPlaylists = async () => {
       if (status === "loading") return;
 
       if (status !== "authenticated" || !session?.user?.id) {
-        setLoading(false);
+        if (isMounted) setLoading(false);
         return;
       }
 
@@ -180,13 +182,14 @@ export default function PlaylistsPage() {
       // But only use it if we haven't just invalidated it (import/create clears it)
       const cached = sessionStorage.getItem(cacheKey);
       if (cached) {
-        setPlaylists(JSON.parse(cached));
-        setLoading(false);
-        setHasLoaded(true);
+        if (isMounted) {
+          setPlaylists(JSON.parse(cached));
+          setLoading(false);
+        }
         return;
       }
 
-      setLoading(true);
+      if (isMounted) setLoading(true);
 
       try {
         const response = await fetch('/api/playlists', { cache: 'no-store' });
@@ -207,7 +210,7 @@ export default function PlaylistsPage() {
           if (allSongIds.size > 0) {
             const idsArray = Array.from(allSongIds);
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-            const chunkSize = 20;
+            const chunkSize = 50; // Increased chunk size for fewer requests
             const songCache = {};
 
             const chunks = [];
@@ -239,24 +242,28 @@ export default function PlaylistsPage() {
               return playlist;
             });
 
-            setPlaylists(playlistsWithCovers);
-            sessionStorage.setItem(cacheKey, JSON.stringify(playlistsWithCovers));
+            if (isMounted) {
+              setPlaylists(playlistsWithCovers);
+              sessionStorage.setItem(cacheKey, JSON.stringify(playlistsWithCovers));
+            }
           } else {
-            sessionStorage.setItem(cacheKey, JSON.stringify(result.data));
+            if (isMounted) sessionStorage.setItem(cacheKey, JSON.stringify(result.data));
           }
         } else {
           console.error('Failed to fetch playlists:', result.error);
-          setLoading(false);
-          setHasLoaded(true);
         }
       } catch (error) {
         console.error('Error fetching playlists:', error);
-        setLoading(false);
-        setHasLoaded(true);
+      } finally {
+        if (isMounted) setLoading(false);
       }
     };
 
     fetchPlaylists();
+
+    return () => {
+      isMounted = false;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, status, refreshKey]);
 
@@ -269,7 +276,6 @@ export default function PlaylistsPage() {
     );
   }, [playlists, searchQuery]);
 
-  console.log("Playlists received from API:", playlists.length, playlists);
 
   const handleCreatePlaylist = useCallback(async () => {
     if (status !== "authenticated" || !session?.user?.id) {
@@ -440,7 +446,7 @@ export default function PlaylistsPage() {
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[450px] overflow-hidden p-0 border-zinc-800 bg-zinc-950">
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 opacity-50" />
+                  <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-green-500 via-emerald-500 to-teal-500 opacity-50" />
                   
                   {importStage === 0 && (
                     <>
@@ -632,13 +638,16 @@ export default function PlaylistsPage() {
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 min-[2400px]:grid-cols-11 gap-6">
               {filteredPlaylists.map((playlist) => (
-                <PlaylistCard
-                  key={playlist._id}
-                  playlist={playlist}
-                  onClick={() => router.push(`/music/playlists/${playlist._id}`)}
-                />
+                <Link 
+                  key={playlist._id} 
+                  href={`/music/playlists/${playlist._id}`}
+                  className="outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md"
+                  aria-label={`View playlist ${playlist.name}`}
+                >
+                  <PlaylistCard playlist={playlist} />
+                </Link>
               ))}
             </div>
           )}

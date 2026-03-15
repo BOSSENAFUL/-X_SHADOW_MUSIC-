@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useCallback, memo, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -27,6 +28,7 @@ import { PWAInstallBanner } from "@/components/music/pwa-install-banner";
 import { IoMdPlay } from "react-icons/io";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const PlaylistCollage = memo(({ images }) => {
   if (!images || images.length === 0) return null;
@@ -71,7 +73,6 @@ AmbientGradient.displayName = "AmbientGradient";
 export default function MusicPage() {
   const router = useRouter();
   const { data: session } = useSession();
-  const [, setCurrentlyPlaying] = useState(null);
   const [newReleases, setNewReleases] = useState([]);
   const [trendingPlaylists, setTrendingPlaylists] = useState([]);
   const [topHitsPlaylists, setTopHitsPlaylists] = useState([]);
@@ -89,8 +90,9 @@ export default function MusicPage() {
   const { playSong } = useMusicPlayer();
 
   useEffect(() => {
-    // Set default color only on desktop
-    if (window.innerWidth >= 768) {
+    let isMounted = true;
+    // Set default color only on desktop - only once on mount
+    if (window.innerWidth >= 768 && isMounted) {
       setHoveredColor("rgb(69, 10, 245)");
     }
 
@@ -98,8 +100,10 @@ export default function MusicPage() {
     const handleResize = () => {
       if (timeoutId) clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
+        if (!isMounted) return;
         if (window.innerWidth >= 768) {
-          if (!hoveredColor) setHoveredColor("rgb(69, 10, 245)");
+          // Only set if not already hovering something specific
+          setHoveredColor(prev => prev || "rgb(69, 10, 245)");
         } else {
           setHoveredColor(null);
         }
@@ -108,6 +112,7 @@ export default function MusicPage() {
 
     window.addEventListener("resize", handleResize);
     return () => {
+      isMounted = false;
       window.removeEventListener("resize", handleResize);
       if (timeoutId) clearTimeout(timeoutId);
     };
@@ -119,12 +124,15 @@ export default function MusicPage() {
       setRecentlyPlayedLoading(false);
       return;
     }
+
+    let isMounted = true;
     const fetchRecentlyPlayed = async () => {
       try {
-        setRecentlyPlayedLoading(true);
+        if (isMounted) setRecentlyPlayedLoading(true);
         const res = await fetch('/api/recently-played-playlists');
         const data = await res.json();
 
+        if (!isMounted) return;
         if (!data.success || !data.data) {
           setRecentlyPlayedLoading(false);
           return;
@@ -136,8 +144,10 @@ export default function MusicPage() {
         );
 
         if (needsCollage.length === 0) {
-          setRecentlyPlayed(rawPlaylists);
-          setRecentlyPlayedLoading(false);
+          if (isMounted) {
+            setRecentlyPlayed(rawPlaylists);
+            setRecentlyPlayedLoading(false);
+          }
           return;
         }
 
@@ -145,6 +155,8 @@ export default function MusicPage() {
         const playlistDetails = await Promise.all(
           needsCollage.map(p => fetch(`/api/playlists/${p.playlistId}`).then(r => r.json()))
         );
+
+        if (!isMounted) return;
 
         // 2. Collect unique song IDs from first 4 songs of each playlist
         const songIdsToFetch = new Set();
@@ -158,6 +170,8 @@ export default function MusicPage() {
           const apiUrl = process.env.NEXT_PUBLIC_API_URL;
           const songsRes = await fetch(`${apiUrl}/api/songs?ids=${Array.from(songIdsToFetch).join(',')}`);
           const songsData = await songsRes.json();
+
+          if (!isMounted) return;
 
           if (songsData.success && songsData.data) {
             const songCache = {};
@@ -180,27 +194,29 @@ export default function MusicPage() {
               }
               return p;
             });
-            setRecentlyPlayed(processed);
+            if (isMounted) setRecentlyPlayed(processed);
           } else {
-            setRecentlyPlayed(rawPlaylists);
+            if (isMounted) setRecentlyPlayed(rawPlaylists);
           }
         } else {
-          setRecentlyPlayed(rawPlaylists);
+          if (isMounted) setRecentlyPlayed(rawPlaylists);
         }
       } catch (err) {
         console.error('Error fetching recently played playlists:', err);
       } finally {
-        setRecentlyPlayedLoading(false);
+        if (isMounted) setRecentlyPlayedLoading(false);
       }
     };
     fetchRecentlyPlayed();
+    return () => { isMounted = false; };
   }, [session?.user?.id]);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchHomeSections = async () => {
       // Check session cache first
       const cached = sessionStorage.getItem('home_sections');
-      if (cached) {
+      if (cached && isMounted) {
         try {
           const homeData = JSON.parse(cached);
           setNewReleases(homeData.newReleases || []);
@@ -220,7 +236,7 @@ export default function MusicPage() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
       try {
-        if (!cached) {
+        if (!cached && isMounted) {
           setLoading(true);
           setTrendingLoading(true);
           setTopHitsLoading(true);
@@ -233,6 +249,8 @@ export default function MusicPage() {
           fetch(`${apiUrl}/api/search/playlists?query=top%20hits&page=0&limit=20`).then(r => r.json()),
           fetch(`${apiUrl}/api/search/playlists?query=english%20top&page=0&limit=20`).then(r => r.json())
         ]);
+
+        if (!isMounted) return;
 
         const [newRes, trending, topHits, englishTop] = results;
 
@@ -252,18 +270,20 @@ export default function MusicPage() {
       } catch (error) {
         console.error("Error fetching home sections:", error);
       } finally {
-        setLoading(false);
-        setTrendingLoading(false);
-        setTopHitsLoading(false);
-        setEnglishTopLoading(false);
+        if (isMounted) {
+          setLoading(false);
+          setTrendingLoading(false);
+          setTopHitsLoading(false);
+          setEnglishTopLoading(false);
+        }
       }
     };
 
     fetchHomeSections();
+    return () => { isMounted = false; };
   }, []);
 
   const handlePlayClick = useCallback((item, type) => {
-    setCurrentlyPlaying({ item, type });
     console.log(`Playing ${type}:`, item);
   }, []);
 
@@ -636,9 +656,9 @@ export default function MusicPage() {
           {/* Quick Access Cards */}
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
             {/* Liked Songs */}
-            <div
-              className="group relative flex items-center bg-white/5 hover:bg-white/10 transition-colors rounded-[4px] overflow-hidden cursor-pointer h-14 md:h-16 lg:h-20 z-10 "
-              onClick={() => router.push("/music/favorites")}
+            <Link
+              href="/music/favorites"
+              className="group relative flex items-center bg-white/5 hover:bg-white/10 transition-colors rounded-[4px] overflow-hidden cursor-pointer h-14 md:h-16 lg:h-20 z-10"
               onMouseEnter={() => setHoveredColor("rgb(69, 10, 245)")}
               onMouseLeave={handleMouseLeave}
             >
@@ -662,6 +682,7 @@ export default function MusicPage() {
                 <div
                   className="rounded-full w-8 h-8 md:w-12 md:h-12 bg-green-500 hover:bg-green-400 flex items-center justify-center text-black shadow-lg hover:scale-105 transition-transform"
                   onClick={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     handlePlayClick({ type: "liked-songs" }, "liked-songs");
                   }}
@@ -669,7 +690,7 @@ export default function MusicPage() {
                   <IoMdPlay className="w-4 h-4 md:w-6 md:h-6 fill-black translate-x-0.5" />
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* Recently Played Playlists */}
             {recentlyPlayedLoading
@@ -686,18 +707,12 @@ export default function MusicPage() {
                 </div>
               ))
               : recentlyPlayed.slice(0, 5).map((playlist) => (
-                <div
+                <Link
                   key={playlist.playlistId}
+                  href={playlist.source === 'user' ? `/music/playlists/${playlist.playlistId}` : `/music/playlist/${playlist.playlistId}?songCount=${playlist.songCount || 50}`}
                   className="group relative flex items-center bg-white/5 hover:bg-white/10 transition-colors rounded-[4px] overflow-hidden cursor-pointer h-14 md:h-16 lg:h-20 z-10"
                   onMouseEnter={() => handlePlaylistHover(playlist)}
                   onMouseLeave={handleMouseLeave}
-                  onClick={() => {
-                    if (playlist.source === 'user') {
-                      router.push(`/music/playlists/${playlist.playlistId}`);
-                    } else {
-                      router.push(`/music/playlist/${playlist.playlistId}?songCount=${playlist.songCount || 50}`);
-                    }
-                  }}
                 >
                   <div className="h-full aspect-square shrink-0 relative bg-neutral-900 border-r border-white/5">
                     {(() => {
@@ -740,7 +755,10 @@ export default function MusicPage() {
                   <div className={`absolute right-2 md:right-3 transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-20 hidden md:block ${playingId === (playlist.playlistId || playlist.id) ? 'opacity-100 translate-y-0' : 'opacity-0 group-hover:opacity-100'}`}>
                     <div
                       className="rounded-full w-8 h-8 md:w-12 md:h-12 bg-green-500 hover:bg-green-400 flex items-center justify-center text-black shadow-lg hover:scale-105 transition-transform "
-                      onClick={(e) => handlePlaylistPlay(playlist, e)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handlePlaylistPlay(playlist, e);
+                      }}
                     >
                       {playingId === (playlist.playlistId || playlist.id)
                         ? <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin text-black" />
@@ -748,7 +766,7 @@ export default function MusicPage() {
                       }
                     </div>
                   </div>
-                </div>
+                </Link>
               ))}
           </div>
 

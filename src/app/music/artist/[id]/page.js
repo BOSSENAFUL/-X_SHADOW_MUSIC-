@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -42,7 +43,6 @@ export default function ArtistPage() {
 
   const [artist, setArtist] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [currentlyPlaying, setCurrentlyPlaying] = useState(null);
   const [dominantColor, setDominantColor] = useState('rgb(40, 40, 40)'); // Default dark gray
   const [isArtistLiked, setIsArtistLiked] = useState(false);
   const [artistLikeLoading, setArtistLikeLoading] = useState(false);
@@ -64,15 +64,18 @@ export default function ArtistPage() {
   const { playSong, currentSong, isPlaying, togglePlayPause, currentPlaylistId } = useMusicPlayer();
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchArtistDetails = async () => {
       try {
-        setLoading(true);
+        if (isMounted) setLoading(true);
         console.log(`Fetching artist ${artistId}`);
 
         const artistResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/artists?id=${artistId}`);
         const artistData = await artistResponse.json();
 
         if (artistData.success && artistData.data) {
+          if (!isMounted) return;
           console.log(`Fetched artist "${artistData.data.name}"`);
 
           // Extract dominant color from artist image
@@ -104,13 +107,17 @@ export default function ArtistPage() {
       } catch (error) {
         console.error('Error fetching artist details:', error);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
     if (artistId) {
       fetchArtistDetails();
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [artistId]);
 
   // Effect to handle scroll and show/hide title in header
@@ -230,9 +237,7 @@ export default function ArtistPage() {
   }, [session, artistId]);
 
   const handlePlayClick = (song, index) => {
-    playSong(song, artist.topSongs, artistId);
-    setCurrentlyPlaying({ song, index });
-    console.log(`Playing song:`, song);
+    playSong(song, artist.topSongs, artistId, index);
   };
 
   const handlePlayAll = () => {
@@ -242,10 +247,8 @@ export default function ArtistPage() {
       if (isPlaylistPlaying) {
         togglePlayPause();
       } else {
-        playSong(artist.topSongs[0], artist.topSongs, artistId);
-        setCurrentlyPlaying({ song: artist.topSongs[0], index: 0 });
+        playSong(artist.topSongs[0], artist.topSongs, artistId, 0);
       }
-      console.log('Artist action:', isPlaylistPlaying ? 'toggling play/pause' : 'starting from beginning');
     }
   };
 
@@ -342,12 +345,18 @@ export default function ArtistPage() {
     return count.toString();
   };
 
-  const decodeHtmlEntities = (text) => {
-    if (!text) return text;
-    const textarea = document.createElement('textarea');
-    textarea.innerHTML = text;
-    return textarea.value;
-  };
+  const decodeHtmlEntities = useCallback((text) => {
+    if (!text || !text.includes('&')) return text;
+    const entities = {
+      '&amp;': '&',
+      '&lt;': '<',
+      '&gt;': '>',
+      '&quot;': '"',
+      '&#39;': "'",
+      '&apos;': "'"
+    };
+    return text.replace(/&amp;|&lt;|&gt;|&quot;|&#39;|&apos;/g, m => entities[m]);
+  }, []);
 
   const toggleArtistLike = async () => {
     if (!session?.user?.id) {
@@ -898,10 +907,10 @@ export default function ArtistPage() {
                   <h2 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">Albums</h2>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-6">
                     {albums.map((album) => (
-                      <div
+                      <Link
                         key={album.id}
+                        href={`/music/album/${album.id}`}
                         className="group cursor-pointer hover:scale-105 transition-transform"
-                        onClick={() => router.push(`/music/album/${album.id}`)}
                       >
                         <div className="relative rounded-lg aspect-square overflow-hidden mb-2 md:mb-3 bg-muted">
                           {album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url ? (
@@ -934,7 +943,7 @@ export default function ArtistPage() {
                             {album.year} • Album
                           </p>
                         </div>
-                      </div>
+                      </Link>
                     ))}
                   </div>
                   {hasMoreAlbums && (

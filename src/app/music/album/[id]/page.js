@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -44,7 +45,6 @@ export default function AlbumPage() {
 
   const [album, setAlbum] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [currentlyPlaying, setCurrentlyPlaying] = useState(null);
   const [dominantColor, setDominantColor] = useState('rgb(40, 40, 40)'); // Default dark gray
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState(null);
@@ -62,9 +62,11 @@ export default function AlbumPage() {
   const { playSong, currentSong, currentIndex, isPlaying, togglePlayPause, currentPlaylistId } = useMusicPlayer();
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchAlbumDetails = async () => {
       try {
-        setLoading(true);
+        if (isMounted) setLoading(true);
         console.log(`Fetching album ${albumId}`);
 
         const albumResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/albums?id=${albumId}`);
@@ -85,19 +87,25 @@ export default function AlbumPage() {
             }
           }
 
-          setDominantColor(extractedColor);
-          setAlbum(albumData.data);
+          if (isMounted) {
+            setDominantColor(extractedColor);
+            setAlbum(albumData.data);
+          }
         }
       } catch (error) {
         console.error('Error fetching album details:', error);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
     if (albumId) {
       fetchAlbumDetails();
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [albumId]);
 
   // Effect to handle scroll and show/hide title in header
@@ -130,13 +138,11 @@ export default function AlbumPage() {
     };
   }, [loading, album?.name]);
 
-  const handlePlayClick = (song, index) => {
+  const handlePlayClick = useCallback((song, index) => {
     playSong(song, album.songs, albumId, index);
-    setCurrentlyPlaying({ song, index });
-    console.log(`Playing song:`, song);
-  };
+  }, [playSong, album?.songs, albumId]);
 
-  const handlePlayAll = () => {
+  const handlePlayAll = useCallback(() => {
     if (album?.songs && album.songs.length > 0) {
       const isPlaylistPlaying = currentPlaylistId === albumId;
 
@@ -144,19 +150,17 @@ export default function AlbumPage() {
         togglePlayPause();
       } else {
         playSong(album.songs[0], album.songs, albumId, 0);
-        setCurrentlyPlaying({ song: album.songs[0], index: 0 });
       }
-      console.log('Album action:', isPlaylistPlaying ? 'toggling play/pause' : 'starting from beginning');
     }
-  };
+  }, [album?.songs, currentPlaylistId, albumId, togglePlayPause, playSong]);
 
-  const handleGoBack = () => {
+  const handleGoBack = useCallback(() => {
     router.back();
-  };
+  }, [router]);
 
-  const handleArtistClick = (artistId) => {
+  const handleArtistClick = useCallback((artistId) => {
     router.push(`/music/artist/${artistId}`);
-  };
+  }, [router]);
 
   const extractDominantColor = (imageUrl) => {
     // Use proxy for external images to bypass CORS issues during color extraction
@@ -229,12 +233,12 @@ export default function AlbumPage() {
     });
   };
 
-  const formatDuration = (duration) => {
+  const formatDuration = useCallback((duration) => {
     if (!duration) return "0:00";
     const minutes = Math.floor(duration / 60);
     const seconds = duration % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
+  }, []);
 
   const getTotalDuration = () => {
     if (!album?.songs) return "0 min";
@@ -248,12 +252,18 @@ export default function AlbumPage() {
     return `${minutes} min`;
   };
 
-  const decodeHtmlEntities = (text) => {
-    if (!text) return text;
-    const textarea = document.createElement('textarea');
-    textarea.innerHTML = text;
-    return textarea.value;
-  };
+  const decodeHtmlEntities = useCallback((text) => {
+    if (!text || !text.includes('&')) return text;
+    const entities = {
+      '&amp;': '&',
+      '&lt;': '<',
+      '&gt;': '>',
+      '&quot;': '"',
+      '&#39;': "'",
+      '&apos;': "'"
+    };
+    return text.replace(/&amp;|&lt;|&gt;|&quot;|&#39;|&apos;/g, m => entities[m]);
+  }, []);
 
   const truncateTitle = (title, maxLength = 50) => {
     if (!title || title.length <= maxLength) return title;
@@ -582,12 +592,12 @@ export default function AlbumPage() {
                         <>
                           {album.artists.primary.map((artist, index) => (
                             <span key={artist.id || index}>
-                              <button
+                              <Link
+                                href={`/music/artist/${artist.id}`}
                                 className="font-semibold hover:underline transition-colors"
-                                onClick={() => handleArtistClick(artist.id)}
                               >
                                 {decodeHtmlEntities(artist.name)}
-                              </button>
+                              </Link>
                               {index < album.artists.primary.length - 1 && ', '}
                             </span>
                           ))}
@@ -640,12 +650,12 @@ export default function AlbumPage() {
                       <>
                         {album.artists.primary.map((artist, index) => (
                           <span key={artist.id || index}>
-                            <button
+                            <Link
+                              href={`/music/artist/${artist.id}`}
                               className="font-semibold hover:underline transition-colors"
-                              onClick={() => handleArtistClick(artist.id)}
                             >
                               {decodeHtmlEntities(artist.name)}
-                            </button>
+                            </Link>
                             {index < album.artists.primary.length - 1 && ', '}
                           </span>
                         ))}
@@ -791,16 +801,16 @@ export default function AlbumPage() {
                                   <span className="md:hidden">
                                     {decodeHtmlEntities(artist.name)}
                                   </span>
-                                  <button
+                                  <Link
+                                    href={`/music/artist/${artist.id}`}
                                     className={`hidden md:inline hover:underline transition-colors ${isCurrentSong ? 'hover:text-green-300' : 'hover:text-foreground'
                                       }`}
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleArtistClick(artist.id);
                                     }}
                                   >
                                     {decodeHtmlEntities(artist.name)}
-                                  </button>
+                                  </Link>
                                   {artistIndex < song.artists.primary.length - 1 && ', '}
                                 </span>
                               ))

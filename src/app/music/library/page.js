@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback, memo } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { AppSidebar } from "@/components/app-sidebar"
 import {
@@ -10,7 +11,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Search, Plus, Heart } from "lucide-react"
+import { ArrowLeft, Heart } from "lucide-react"
 import { useLikedPlaylists } from "@/hooks/useLikedPlaylists"
 import { useLikedAlbums } from "@/hooks/useLikedAlbums"
 import { useLikedArtists } from "@/hooks/useLikedArtists"
@@ -42,6 +43,7 @@ const PlaylistCollage = memo(({ images }) => {
             src={src}
             alt={`Collage ${idx}`}
             className="w-full h-full object-cover"
+            loading="lazy"
           />
         </div>
       ))}
@@ -51,7 +53,7 @@ const PlaylistCollage = memo(({ images }) => {
 PlaylistCollage.displayName = "PlaylistCollage";
 
 const LibrarySkeleton = memo(() => (
-  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 min-[2400px]:grid-cols-11 gap-6">
     {Array.from({ length: 12 }).map((_, i) => (
       <div key={i} className="p-3">
         <Skeleton className="aspect-square w-full mb-3 rounded-md bg-zinc-800/50" />
@@ -79,7 +81,12 @@ export default function LibraryPage() {
 
   // Memoized cache for session to avoid refetching on "back" navigation
   useEffect(() => {
-    if (!userId) return
+    let isMounted = true
+
+    if (!userId) {
+      if (isMounted) setLoadingCreated(false)
+      return
+    }
 
     const fetchCreatedPlaylists = async () => {
       // Check if we have data in session storage to avoid refetching on back navigation
@@ -107,7 +114,7 @@ export default function LibraryPage() {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || ''
 
             // Fetch in chunks to avoid URL length limits
-            const chunkSize = 20
+            const chunkSize = 50 // Increased for efficiency
             for (let i = 0; i < idsArray.length; i += chunkSize) {
               const chunk = idsArray.slice(i, i + chunkSize)
               try {
@@ -156,17 +163,23 @@ export default function LibraryPage() {
             return playlist
           })
 
-          setCreatedPlaylists(playlistsWithCovers)
-          // Store in session storage for "back" navigation
-          sessionStorage.setItem(cacheKey, JSON.stringify(playlistsWithCovers))
+          if (isMounted) {
+            setCreatedPlaylists(playlistsWithCovers)
+            // Store in session storage for "back" navigation
+            sessionStorage.setItem(cacheKey, JSON.stringify(playlistsWithCovers))
+          }
         }
       } catch (error) {
         console.error("Failed to fetch created playlists", error)
       } finally {
-        setLoadingCreated(false)
+        if (isMounted) setLoadingCreated(false)
       }
     }
     fetchCreatedPlaylists()
+
+    return () => {
+      isMounted = false
+    }
   }, [userId])
 
   const isAnyLoading = loadingPlaylists || loadingAlbums || loadingArtists || loadingSongs || loadingCreated
@@ -199,7 +212,7 @@ export default function LibraryPage() {
         subtitle: `Playlist • ${likedSongsCount} songs`,
         type: "playlist",
         isLikedSongs: true,
-        onClick: () => router.push("/music/favorites"),
+        onClick: "/music/favorites",
       })
     }
 
@@ -215,7 +228,7 @@ export default function LibraryPage() {
           collageImages: playlist.collageImages,
           isCollage: playlist.isCollage,
           type: "playlist",
-          onClick: () => router.push(`/music/playlists/${playlist._id || playlist.playlistId}`),
+          onClick: `/music/playlists/${playlist._id || playlist.playlistId}`,
         })
       })
 
@@ -235,7 +248,7 @@ export default function LibraryPage() {
           collageImages: playlist.collageImages,
           isCollage: playlist.isCollage,
           type: "playlist",
-          onClick: () => router.push(playlistUrl),
+          onClick: playlistUrl,
         })
       })
     }
@@ -249,7 +262,7 @@ export default function LibraryPage() {
           subtitle: `Album • ${artistName}`,
           image: album.image,
           type: "album",
-          onClick: () => router.push(`/music/album/${album.albumId}`),
+          onClick: `/music/album/${album.albumId}`,
         })
       })
     }
@@ -263,7 +276,7 @@ export default function LibraryPage() {
           subtitle: "Artist",
           image: artist.image,
           type: "artist",
-          onClick: () => router.push(`/music/artist/${artist.artistId}`),
+          onClick: `/music/artist/${artist.artistId}`,
         })
       })
     }
@@ -328,12 +341,13 @@ export default function LibraryPage() {
             <LibrarySkeleton />
           ) : (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6  ">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 min-[2400px]:grid-cols-11 gap-6">
                 {filteredItems.map((item) => (
-                  <div
+                  <Link
                     key={`${item.type}-${item.id}`}
-                    className="group relative p-3 rounded-md hover:bg-zinc-800/50 transition-colors cursor-pointer"
-                    onClick={item.onClick}
+                    href={item.onClick}
+                    className="group relative p-3 rounded-md hover:bg-zinc-800/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    aria-label={`View ${item.type} ${item.title}`}
                   >
                     {/* Image Container */}
                     <div className={cn(
@@ -351,6 +365,7 @@ export default function LibraryPage() {
                           src={getImageSrc(item.image)}
                           alt={item.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          loading="lazy"
                         />
                       ) : (
                         <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
@@ -370,7 +385,7 @@ export default function LibraryPage() {
                         {item.subtitle}
                       </p>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
 

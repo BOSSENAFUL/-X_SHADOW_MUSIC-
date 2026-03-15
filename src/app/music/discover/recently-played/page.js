@@ -41,12 +41,14 @@ export default function RecentlyPlayedPage() {
     }, [loading, playlists.length]);
 
     useEffect(() => {
+        let isMounted = true;
         const fetchRecentlyPlayed = async () => {
             if (!session?.user?.id) return;
             try {
-                setLoading(true);
+                if (isMounted) setLoading(true);
                 const res = await fetch('/api/recently-played-playlists');
                 const data = await res.json();
+                if (!isMounted) return;
                 if (data.success && data.data) {
                     const rawPlaylists = data.data || [];
 
@@ -106,16 +108,17 @@ export default function RecentlyPlayedPage() {
                             console.error('Error batch fetching collages in history page:', err);
                         }
                     }
-                    setPlaylists(processed);
+                    if (isMounted) setPlaylists(processed);
                 }
             } catch (error) {
                 console.error('Error fetching recently played:', error);
             } finally {
-                setLoading(false);
+                if (isMounted) setLoading(false);
             }
         };
 
         fetchRecentlyPlayed();
+        return () => { isMounted = false; };
     }, [session?.user?.id]);
 
     const handleCardClick = (playlist) => {
@@ -196,7 +199,7 @@ export default function RecentlyPlayedPage() {
                         </div>
 
                         {loading ? (
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 gap-6">
                                 {Array.from({ length: 12 }).map((_, index) => (
                                     <div key={index} className="space-y-3">
                                         <div className="bg-muted animate-pulse rounded-lg aspect-square" />
@@ -206,7 +209,7 @@ export default function RecentlyPlayedPage() {
                                 ))}
                             </div>
                         ) : (
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 gap-6">
                                 {playlists.map((playlist) => (
                                     <PlaylistCard
                                         key={playlist.id}
