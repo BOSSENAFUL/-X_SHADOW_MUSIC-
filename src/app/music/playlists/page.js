@@ -199,7 +199,6 @@ export default function PlaylistsPage() {
           // ✅ STEP 1: Show playlists IMMEDIATELY without waiting for covers
           setPlaylists(result.data);
           setLoading(false);
-          setHasLoaded(true);
 
           // ✅ STEP 2: Load song covers in the BACKGROUND (non-blocking)
           const allSongIds = new Set();
@@ -265,7 +264,7 @@ export default function PlaylistsPage() {
       isMounted = false;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, status, refreshKey]);
+  }, [session?.user?.id, status, refreshKey]);
 
   // Filter playlists based on search query
   const filteredPlaylists = useMemo(() => {
