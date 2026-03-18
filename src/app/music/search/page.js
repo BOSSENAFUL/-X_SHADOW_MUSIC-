@@ -1684,7 +1684,7 @@ function SearchPageContent() {
 
           {combinedSearchResults && (
             <div
-              className="px-2 sm:px-6 relative"
+              className="pl-2 pr-1 sm:px-6 relative"
             >
               {/* Overlay loading state for when results are updating */}
               {loading && combinedSearchResults && (
@@ -1813,7 +1813,7 @@ function SearchPageContent() {
                             return (
                               <div
                                 key={`all-tab-${song.isLyricsMatch ? 'lyrics' : 'regular'}-${song.id || `fallback-${index}`}-${index}`}
-                                className={`flex items-center gap-2 p-1 py-1.5 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150`}
+                                className={`flex items-center gap-2 pl-1 pr-0 py-1.5 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150`}
                                 onClick={() => handlePlayClick(song, combinedSearchResults.songs.results)}
                               >
                                 <div className="text-sm text-muted-foreground w-6 text-center shrink-0">
@@ -2100,7 +2100,7 @@ function SearchPageContent() {
                           <div key={`songs-tab-${song.isLyricsMatch ? 'lyrics' : 'regular'}-${song.id || `fallback-${index}`}-${index}`}>
                             {/* Mobile Layout */}
                             <div
-                              className={`md:hidden flex items-center gap-2 p-1 py-1.5 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150`}
+                              className={`md:hidden flex items-center gap-2 pl-1 pr-0 py-1.5 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150`}
                               onClick={() => handlePlayClick(song, categoryData.songs.page > 0 ? categoryData.songs.results : combinedSearchResults.songs.results)}
                             >
                               <div className="text-sm text-muted-foreground w-6 text-center shrink-0">

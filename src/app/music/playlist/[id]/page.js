@@ -1059,7 +1059,7 @@ function PlaylistPageContent() {
             </div>
 
             {/* Songs List */}
-            <div className="px-2 md:px-6 pb-32 md:pb-24">
+            <div className="pl-2 pr-1 md:px-6 pb-32 md:pb-24">
 
               {/* Desktop Table Header */}
               <div className="hidden md:grid grid-cols-[auto_1fr_1fr_120px_100px] gap-4 items-center text-sm text-muted-foreground border-b pb-2 mb-4">
@@ -1082,7 +1082,7 @@ function PlaylistPageContent() {
                     <div key={song.id || index} >
                       {/* Mobile Layout */}
                       <div
-                        className={`md:hidden flex items-center gap-2 p-1 py-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
+                        className={`md:hidden flex items-center gap-2 pl-1 pr-0 py-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
                           }`}
                         onClick={() => handlePlayClick(song, index)}
                       >

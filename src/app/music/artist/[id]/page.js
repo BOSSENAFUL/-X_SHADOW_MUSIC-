@@ -958,7 +958,7 @@ export default function ArtistPage() {
               </div>
             </div>
 
-            <div className="px-2 md:px-6 pb-32 md:pb-24 space-y-6 md:space-y-8">
+            <div className="pl-2 pr-1 md:px-6 pb-32 md:pb-24 space-y-6 md:space-y-8">
               {/* Popular Songs */}
               {artist.topSongs && artist.topSongs.length > 0 && (
                 <div>
@@ -969,7 +969,7 @@ export default function ArtistPage() {
                       return (
                         <div
                           key={song.id || index}
-                          className={`flex items-center gap-2 md:gap-4 p-1 py-2
+                          className={`flex items-center gap-2 md:gap-4 pl-1 pr-0 py-2
                            rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''}`}
                           onClick={() => handlePlayClick(song, index)}
                         >

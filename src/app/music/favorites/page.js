@@ -791,7 +791,7 @@ export default function FavoritesPage() {
           </div>
 
           {/* Songs List */}
-          <div className="px-2 md:px-6 pb-32 md:pb-24">
+          <div className="pl-2 pr-1 md:px-6 pb-32 md:pb-24">
             {loading ? (
               <div className="space-y-2">
                 {Array.from({ length: 5 }).map((_, index) => (
@@ -835,7 +835,7 @@ export default function FavoritesPage() {
                       <div key={likedSong.songId || index} >
                         {/* Mobile Layout */}
                         <div
-                          className={`md:hidden flex items-center gap-2 p-1 py-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
+                          className={`md:hidden flex items-center gap-2 pl-1 pr-0 py-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
                             }`}
                           onClick={() => handlePlayClick(likedSong, index)}
                         >

@@ -914,7 +914,7 @@ export default function AlbumPage() {
             </div>
 
             {/* Songs List */}
-            <div className="px-2 md:px-6 pb-32 md:pb-24">
+            <div className="pl-2 pr-1 md:px-6 pb-32 md:pb-24">
               {/* Desktop Table Header */}
               <div className="hidden md:grid grid-cols-[auto_1fr_auto] gap-4 items-center text-sm text-muted-foreground border-b pb-2 mb-4">
                 <div className="w-8 text-center">#</div>
@@ -936,7 +936,7 @@ export default function AlbumPage() {
                     <div key={song.id || index}>
                       {/* Mobile Layout */}
                       <div
-                        className="md:hidden flex items-center gap-2 p-1 py-2 rounded hover:bg-muted/50 group cursor-pointer"
+                        className="md:hidden flex items-center gap-2 pl-1 pr-0 py-2 rounded hover:bg-muted/50 group cursor-pointer"
                         onClick={() => handlePlayClick(song, index)}
                       >
                         <div className="w-6 text-center shrink-0">
