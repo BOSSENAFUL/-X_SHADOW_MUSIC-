@@ -35,6 +35,223 @@ import { useMusicPlayer } from "@/contexts/music-player-context";
 import { AddToPlaylistDialog } from "@/components/playlists/AddToPlaylistDialog";
 import { HiPause } from "react-icons/hi2";
 import { IoMdPlay } from "react-icons/io";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerTrigger,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerPortal,
+} from "@/components/ui/drawer";
+import { memo } from "react";
+import { Share } from "lucide-react";
+
+// --- Helper Components ---
+const SongActionMenu = memo(({ 
+  song, 
+  onAddToPlaylist, 
+  onGoToArtist, 
+  onGoToAlbum,
+  onDownload, 
+  toggleLike,
+  isLiked,
+  decodeHtmlEntities 
+}) => {
+  const isMobile = useIsMobile();
+  const [open, setOpen] = useState(false);
+
+  const artistNames = song.artists?.primary?.map(a => a.name).join(', ') || 
+                      song.artists?.map(a => a.name).join(', ') || 
+                      'Unknown Artist';
+  const songImageUrl = song.image?.find(img => img.quality === '150x150')?.url || 
+                       song.image?.[song.image.length - 1]?.url || 
+                       '/default-playlist-image.png';
+
+  const ActionItems = ({ onItemClick }) => (
+    <>
+      <div 
+        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        onClick={(e) => {
+          onItemClick();
+          onAddToPlaylist(e, song);
+        }}
+      >
+        <Plus className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Add to playlist</span>
+      </div>
+      <div 
+        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        onClick={(e) => {
+          onItemClick();
+          if (navigator.share) {
+            navigator.share({
+              title: song.name,
+              text: `Check out "${song.name}" by ${artistNames}`,
+              url: window.location.href
+            });
+          } else {
+            navigator.clipboard.writeText(window.location.href);
+            toast.success('Link copied to clipboard');
+          }
+        }}
+      >
+        <Share className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Share</span>
+      </div>
+      <div 
+        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        onClick={(e) => {
+          onItemClick();
+          onGoToArtist(e, song);
+        }}
+      >
+        <User className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Go to artist</span>
+      </div>
+      {onGoToAlbum && (
+        <div 
+          className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+          onClick={(e) => {
+            onItemClick();
+            onGoToAlbum(e, song);
+          }}
+        >
+          <Disc className="w-5 h-5 text-muted-foreground" />
+          <span className="font-medium">Go to album</span>
+        </div>
+      )}
+      <div 
+        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        onClick={(e) => {
+          onItemClick();
+          onDownload(e, song);
+        }}
+      >
+        <Download className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Download</span>
+      </div>
+      <div className="h-px bg-white/5 my-1" />
+      <div 
+        className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${isLiked(song.id) ? 'text-red-500' : ''}`}
+        onClick={(e) => {
+          onItemClick();
+          e.stopPropagation();
+          toggleLike(song).catch(error => console.error('Error toggling song like:', error));
+        }}
+      >
+        <Heart className={`w-5 h-5 ${isLiked(song.id) ? 'fill-current' : ''}`} />
+        <span className="font-medium">{isLiked(song.id) ? 'Unlike' : 'Like'}</span>
+      </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={setOpen}>
+        <DrawerTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="p-2 h-10 w-10 text-muted-foreground hover:bg-white/5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MoreVertical className="w-5 h-5" />
+          </Button>
+        </DrawerTrigger>
+        <div onClick={(e) => e.stopPropagation()}>
+          <DrawerContent className="bg-[#121212] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
+            <DrawerHeader className="p-0">
+              <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
+                <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0">
+                  <img 
+                    src={songImageUrl} 
+                    alt={song.name} 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="flex-1 min-w-0 flex flex-col justify-center text-left">
+                  <DrawerTitle className="text-base font-bold truncate text-white text-left">
+                    {decodeHtmlEntities(song.name)}
+                  </DrawerTitle>
+                  <DrawerDescription className="text-sm text-muted-foreground truncate mt-0.5 text-left">
+                    {artistNames}
+                  </DrawerDescription>
+                </div>
+              </div>
+            </DrawerHeader>
+            <div className="px-2 py-4 pb-8 space-y-1">
+              <ActionItems onItemClick={() => setOpen(false)} />
+            </div>
+          </DrawerContent>
+        </div>
+      </Drawer>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="p-1 h-8 w-8 text-muted-foreground md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreVertical className="w-4 h-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
+        <DropdownMenuItem 
+          onClick={(e) => onAddToPlaylist(e, song)}
+          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Add to playlist
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuItem 
+          onClick={(e) => onGoToArtist(e, song)}
+          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+        >
+          <User className="w-4 h-4 mr-2" />
+          Go to artist
+        </DropdownMenuItem>
+        {onGoToAlbum && (
+          <DropdownMenuItem 
+            onClick={(e) => onGoToAlbum(e, song)}
+            className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+          >
+            <Disc className="w-4 h-4 mr-2" />
+            Go to album
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuItem 
+          onClick={(e) => onDownload(e, song)}
+          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Download
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuItem
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleLike(song).catch(error => console.error('Error toggling song like:', error));
+          }}
+          className={`${isLiked(song.id) ? 'text-red-500' : ''} hover:bg-white/10 focus:bg-white/10 cursor-pointer`}
+        >
+          <Heart className={`w-4 h-4 mr-2 ${isLiked(song.id) ? 'fill-current' : ''}`} />
+          {isLiked(song.id) ? 'Unlike' : 'Like'}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+});
+
+SongActionMenu.displayName = "SongActionMenu";
 
 function PlaylistPageContent() {
   const router = useRouter();
@@ -945,52 +1162,17 @@ function PlaylistPageContent() {
                           </p>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
-
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="p-2 h-8 w-8 text-muted-foreground"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <MoreVertical className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 z-9999">
-                              <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, song)}>
-                                <Plus className="w-4 h-4 mr-2" />
-                                Add to playlist
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={(e) => handleGoToArtist(e, song)}>
-                                <User className="w-4 h-4 mr-2" />
-                                Go to artist
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={(e) => handleGoToAlbum(e, song)}>
-                                <Disc className="w-4 h-4 mr-2" />
-                                Go to album
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={(e) => handleDownload(e, song)}>
-                                <Download className="w-4 h-4 mr-2" />
-                                Download
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  const result = await toggleLike(song);
-                                  console.log(result.message);
-                                }}
-                                className={isLiked(song.id) ? 'text-red-500' : ''}
-                              >
-                                <Heart className={`w-4 h-4 mr-2 ${isLiked(song.id) ? 'fill-current' : ''}`} />
-                                {isLiked(song.id) ? 'Unlike' : 'Like'}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                        <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                          <SongActionMenu 
+                            song={song}
+                            onAddToPlaylist={handleAddToPlaylist}
+                            onGoToArtist={handleGoToArtist}
+                            onGoToAlbum={handleGoToAlbum}
+                            onDownload={handleDownload}
+                            toggleLike={toggleLike}
+                            isLiked={isLiked}
+                            decodeHtmlEntities={decodeHtmlEntities}
+                          />
                         </div>
                       </div>
 
@@ -1101,7 +1283,7 @@ function PlaylistPageContent() {
                           }) : 'Unknown date'}
                         </div>
 
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -1116,50 +1298,16 @@ function PlaylistPageContent() {
                           <div className="min-w-[40px] text-right text-sm text-muted-foreground font-mono hidden md:block">
                             {formatDuration(song.duration)}
                           </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-8 w-8 shrink-0"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <MoreVertical className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 z-9999">
-                              <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, song)}>
-                                <Plus className="w-4 h-4 mr-2" />
-                                Add to playlist
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={(e) => handleGoToArtist(e, song)}>
-                                <User className="w-4 h-4 mr-2" />
-                                Go to artist
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={(e) => handleGoToAlbum(e, song)}>
-                                <Disc className="w-4 h-4 mr-2" />
-                                Go to album
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={(e) => handleDownload(e, song)}>
-                                <Download className="w-4 h-4 mr-2" />
-                                Download
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  const result = await toggleLike(song);
-                                  console.log(result.message);
-                                }}
-                                className={isLiked(song.id) ? 'text-red-500' : ''}
-                              >
-                                <Heart className={`w-4 h-4 mr-2 ${isLiked(song.id) ? 'fill-current' : ''}`} />
-                                {isLiked(song.id) ? 'Unlike' : 'Like'}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <SongActionMenu 
+                            song={song}
+                            onAddToPlaylist={handleAddToPlaylist}
+                            onGoToArtist={handleGoToArtist}
+                            onGoToAlbum={handleGoToAlbum}
+                            onDownload={handleDownload}
+                            toggleLike={toggleLike}
+                            isLiked={isLiked}
+                            decodeHtmlEntities={decodeHtmlEntities}
+                          />
                         </div>
                       </div>
                     </div>

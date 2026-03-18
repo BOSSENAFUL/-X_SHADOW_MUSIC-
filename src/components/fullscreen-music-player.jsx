@@ -42,6 +42,17 @@ import { HiPause } from "react-icons/hi2";
 import { BiSkipNext, BiSkipPrevious } from "react-icons/bi";
 import { RxShuffle } from "react-icons/rx";
 import { BsRepeat } from "react-icons/bs";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerTrigger,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerPortal,
+} from "@/components/ui/drawer";
+import { memo } from "react";
 
 // Module-level color cache for fullscreen gradient colors — persists
 // across re-renders. Keyed by song ID.
@@ -79,6 +90,7 @@ export function FullscreenMusicPlayer({
   isPlaying,
   playingFrom = "Search Results", // Add playingFrom prop with default
 }) {
+  const isMobile = useIsMobile();
   const { data: session } = useSession();
   const { setIsPlaying, setIsFullscreenOpen, currentIndex: playerCurrentIndex } = useMusicPlayer();
   const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
@@ -92,6 +104,7 @@ export function FullscreenMusicPlayer({
   const [lyricsLoading, setLyricsLoading] = useState(false);
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState(null);
+  const [openActionMenu, setOpenActionMenu] = useState(false);
   const [dominantColors, setDominantColors] = useState({
     primary: "rgb(99, 102, 241)",
     secondary: "rgb(139, 92, 246)",
@@ -747,6 +760,91 @@ export function FullscreenMusicPlayer({
     const nextIndex = (currentIndex + 1) % modes.length;
     setRepeatMode(modes[nextIndex]);
   };
+  
+  const handleDownloadClick = async (e) => {
+    if (e) e.stopPropagation();
+    if (!currentSong) return;
+
+    const toastId = toast.loading(`Preparing "${decodeHtmlEntities(currentSong.name || currentSong.title)}"...`);
+
+    try {
+      // 1. Resolve Best Quality URL
+      let downloadUrl = null;
+      if (currentSong.downloadUrl && Array.isArray(currentSong.downloadUrl)) {
+        const mp3s = currentSong.downloadUrl.filter(u => u.url.toLowerCase().includes('.mp3'));
+        const bestMp3 = mp3s.find(u => u.quality === '320kbps') ||
+          mp3s.find(u => u.quality === '160kbps') ||
+          mp3s[0];
+        const bestOverall = currentSong.downloadUrl.find(u => u.quality === '320kbps') ||
+          currentSong.downloadUrl[currentSong.downloadUrl.length - 1];
+        downloadUrl = bestMp3?.url || bestOverall?.url;
+      }
+
+      if (!downloadUrl && currentSong.id) {
+        const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs/${currentSong.id}`);
+        const d = await resp.json();
+        if (d.success && d.data?.[0]?.downloadUrl) {
+          const freshUrls = d.data[0].downloadUrl;
+          const mp3s = freshUrls.filter(u => u.url.toLowerCase().includes('.mp3'));
+          const bestMp3 = mp3s.find(u => u.quality === '320kbps') || mp3s.find(u => u.quality === '160kbps') || mp3s[0];
+          const bestOverall = freshUrls.find(u => u.quality === '320kbps') || freshUrls[freshUrls.length - 1];
+          downloadUrl = bestMp3?.url || bestOverall?.url;
+        }
+      }
+
+      if (!downloadUrl) throw new Error('No download URL available');
+
+      // 2. Resolve Best Image
+      const imageUrl = currentSong.image?.find(img => img.quality === '500x500')?.url ||
+        currentSong.image?.find(img => img.quality === '150x150')?.url ||
+        currentSong.image?.[currentSong.image.length - 1]?.url;
+
+      const title = decodeHtmlEntities(currentSong.name || currentSong.title);
+      const artist = getArtistNames(currentSong);
+      const album = currentSong.album?.name ? decodeHtmlEntities(currentSong.album.name) : (typeof currentSong.album === 'string' ? decodeHtmlEntities(currentSong.album) : 'Unknown Album');
+      const year = currentSong.year || (currentSong.releaseDate ? new Date(currentSong.releaseDate).getFullYear() : '');
+
+      toast.loading(`Injecting metadata for "${title}"...`, { id: toastId });
+
+      // 3. Call Backend API
+      const response = await fetch('/api/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          songUrl: downloadUrl,
+          imageUrl,
+          title,
+          artist,
+          album,
+          year
+        }),
+      });
+
+      if (!response.ok) throw new Error('Backend failed to process song');
+
+      const isTagged = response.headers.get('X-Tagged') === 'true';
+      const isConverted = response.headers.get('X-Converted') === 'true';
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${title} - ${artist}.mp3`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      if (isTagged) {
+        toast.success(`Downloaded "${title}" with album art! ${isConverted ? '(High-Quality MP3)' : ''}`, { id: toastId });
+      } else {
+        toast.error(`Download successful, but metadata injection failed for "${title}".`, { id: toastId });
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error(`Failed to download: ${error.message}`, { id: toastId });
+    }
+  };
 
   // Add to playlist handler
   const handleAddToPlaylist = (e, song) => {
@@ -1312,149 +1410,162 @@ export function FullscreenMusicPlayer({
               <p className="text-xs opacity-60">{playingFrom}</p>
             </div>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-white hover:bg-white/10 rounded-full p-2 transform-gpu will-change-transform"
-                  style={{
-                    backfaceVisibility: 'hidden',
-                    WebkitBackfaceVisibility: 'hidden',
-                  }}
-                >
-                  <MoreHorizontal style={{ width: '20px', height: '20px' }} />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-48 transform-gpu will-change-transform backdrop-blur-sm"
-                style={{
-                  zIndex: 10001,
-                  backfaceVisibility: 'hidden',
-                  WebkitBackfaceVisibility: 'hidden',
-                }}
-                sideOffset={8}
-              >
-                <DropdownMenuItem
-                  onClick={async () => {
-                    if (!currentSong) return;
-                    handleLikeToggle();
-                  }}
-                  className={`transform-gpu will-change-transform ${getCurrentLikeState() ? "text-red-500" : ""}`}
-                  disabled={isLikeLoading}
-                >
-                  <Heart
-                    className={`w-4 h-4 mr-2 transition-colors duration-150 ${getCurrentLikeState()
-                      ? "fill-red-500 text-red-500"
-                      : ""
-                      }`}
-                  />
-                  {isLikeLoading ? "..." : getCurrentLikeState() ? "Unlike" : "Like"}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => handleAddToPlaylist(null, currentSong)}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add to playlist
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => setShowPlaylist(!showPlaylist)}
-                >
-                  <ListMusic className="w-4 h-4 mr-2" />
-                  {showPlaylist ? "Hide Queue" : "Show Queue"}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={async () => {
-                    if (!currentSong) return;
-                    const toastId = toast.loading(`Preparing "${decodeHtmlEntities(currentSong.name || currentSong.title)}"...`);
-
-                    try {
-                      // 1. Resolve Best Quality URL
-                      let downloadUrl = null;
-                      if (currentSong.downloadUrl && Array.isArray(currentSong.downloadUrl)) {
-                        const mp3s = currentSong.downloadUrl.filter(u => u.url.toLowerCase().includes('.mp3'));
-                        const bestMp3 = mp3s.find(u => u.quality === '320kbps') ||
-                          mp3s.find(u => u.quality === '160kbps') ||
-                          mp3s[0];
-                        const bestOverall = currentSong.downloadUrl.find(u => u.quality === '320kbps') ||
-                          currentSong.downloadUrl[currentSong.downloadUrl.length - 1];
-                        downloadUrl = bestMp3?.url || bestOverall?.url;
-                      }
-
-                      if (!downloadUrl && currentSong.id) {
-                        const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs/${currentSong.id}`);
-                        const d = await resp.json();
-                        if (d.success && d.data?.[0]?.downloadUrl) {
-                          const freshUrls = d.data[0].downloadUrl;
-                          const mp3s = freshUrls.filter(u => u.url.toLowerCase().includes('.mp3'));
-                          const bestMp3 = mp3s.find(u => u.quality === '320kbps') || mp3s.find(u => u.quality === '160kbps') || mp3s[0];
-                          const bestOverall = freshUrls.find(u => u.quality === '320kbps') || freshUrls[freshUrls.length - 1];
-                          downloadUrl = bestMp3?.url || bestOverall?.url;
-                        }
-                      }
-
-                      if (!downloadUrl) throw new Error('No download URL available');
-
-                      // 2. Resolve Best Image
-                      const imageUrl = currentSong.image?.find(img => img.quality === '500x500')?.url ||
-                        currentSong.image?.find(img => img.quality === '150x150')?.url ||
-                        currentSong.image?.[currentSong.image.length - 1]?.url;
-
-                      const title = decodeHtmlEntities(currentSong.name || currentSong.title);
-                      const artist = getArtistNames(currentSong);
-                      const album = currentSong.album?.name ? decodeHtmlEntities(currentSong.album.name) : (typeof currentSong.album === 'string' ? decodeHtmlEntities(currentSong.album) : 'Unknown Album');
-                      const year = currentSong.year || (currentSong.releaseDate ? new Date(currentSong.releaseDate).getFullYear() : '');
-
-                      toast.loading(`Injecting metadata for "${title}"...`, { id: toastId });
-
-                      // 3. Call Backend API
-                      const response = await fetch('/api/download', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          songUrl: downloadUrl,
-                          imageUrl,
-                          title,
-                          artist,
-                          album,
-                          year
-                        }),
-                      });
-
-                      if (!response.ok) throw new Error('Backend failed to process song');
-
-                      const isTagged = response.headers.get('X-Tagged') === 'true';
-                      const isConverted = response.headers.get('X-Converted') === 'true';
-
-                      const blob = await response.blob();
-                      const url = window.URL.createObjectURL(blob);
-                      const link = document.createElement('a');
-                      link.href = url;
-                      link.download = `${title} - ${artist}.mp3`;
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                      window.URL.revokeObjectURL(url);
-
-                      if (isTagged) {
-                        toast.success(`Downloaded "${title}" with album art! ${isConverted ? '(High-Quality MP3)' : ''}`, { id: toastId });
-                      } else {
-                        toast.error(`Download successful, but metadata injection failed for "${title}".`, { id: toastId });
-                      }
-                    } catch (error) {
-                      console.error('Download error:', error);
-                      toast.error(`Failed to download: ${error.message}`, { id: toastId });
-                    }
-                  }}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div onClick={(e) => e.stopPropagation()}>
+              <Drawer open={openActionMenu} onOpenChange={setOpenActionMenu}>
+                <DrawerTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-white hover:bg-white/10 rounded-full p-2 transform-gpu will-change-transform"
+                    style={{
+                      backfaceVisibility: 'hidden',
+                      WebkitBackfaceVisibility: 'hidden',
+                    }}
+                  >
+                    <MoreHorizontal style={{ width: '20px', height: '20px' }} />
+                  </Button>
+                </DrawerTrigger>
+                
+                {isMobile ? (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <DrawerContent className="bg-[#121212] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
+                      <DrawerHeader className="p-0">
+                        <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
+                          <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0">
+                            <img 
+                              src={_getFsSmallImageUrl(currentSong)} 
+                              alt={currentSong.name || currentSong.title} 
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0 flex flex-col justify-center text-left">
+                            <DrawerTitle className="text-base font-bold truncate text-white text-left">
+                              {decodeHtmlEntities(currentSong.name || currentSong.title)}
+                            </DrawerTitle>
+                            <DrawerDescription className="text-sm text-muted-foreground truncate mt-0.5 text-left">
+                              {getArtistNames(currentSong)}
+                            </DrawerDescription>
+                          </div>
+                        </div>
+                      </DrawerHeader>
+                      <div className="px-2 py-4 pb-8 space-y-1">
+                        <div 
+                          className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${getCurrentLikeState() ? 'text-red-500' : ''}`}
+                          onClick={() => {
+                            setOpenActionMenu(false);
+                            handleLikeToggle();
+                          }}
+                        >
+                          <Heart className={`w-5 h-5 ${getCurrentLikeState() ? 'fill-current' : ''}`} />
+                          <span className="font-medium">{getCurrentLikeState() ? 'Unlike' : 'Like'}</span>
+                        </div>
+                        <div 
+                          className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+                          onClick={(e) => {
+                            setOpenActionMenu(false);
+                            handleAddToPlaylist(e, currentSong);
+                          }}
+                        >
+                          <Plus className="w-5 h-5 text-muted-foreground" />
+                          <span className="font-medium">Add to playlist</span>
+                        </div>
+                        <div 
+                          className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+                          onClick={() => {
+                            setOpenActionMenu(false);
+                            if (navigator.share) {
+                              navigator.share({
+                                title: currentSong.name || currentSong.title,
+                                text: `Check out "${currentSong.name || currentSong.title}" by ${getArtistNames(currentSong)}`,
+                                url: window.location.href
+                              });
+                            } else {
+                              navigator.clipboard.writeText(window.location.href);
+                              toast.success('Link copied to clipboard');
+                            }
+                          }}
+                        >
+                          <Share className="w-5 h-5 text-muted-foreground" />
+                          <span className="font-medium">Share</span>
+                        </div>
+                        <div 
+                          className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+                          onClick={() => {
+                            setOpenActionMenu(false);
+                            setShowPlaylist(!showPlaylist);
+                          }}
+                        >
+                          <ListMusic className="w-5 h-5 text-muted-foreground" />
+                          <span className="font-medium">{showPlaylist ? "Hide Queue" : "Show Queue"}</span>
+                        </div>
+                        <div className="h-px bg-white/5 my-1" />
+                        <div 
+                          className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+                          onClick={(e) => {
+                            setOpenActionMenu(false);
+                            handleDownloadClick(e);
+                          }}
+                        >
+                          <Download className="w-5 h-5 text-muted-foreground" />
+                          <span className="font-medium">Download</span>
+                        </div>
+                      </div>
+                    </DrawerContent>
+                  </div>
+                ) : (
+                  <DropdownMenuContent
+                    align="end"
+                    className="w-56 transform-gpu will-change-transform bg-neutral-900 border-white/10 text-white p-1"
+                    style={{
+                      zIndex: 10001,
+                      backfaceVisibility: 'hidden',
+                      WebkitBackfaceVisibility: 'hidden',
+                    }}
+                    sideOffset={8}
+                  >
+                    <DropdownMenuItem
+                      onClick={async () => {
+                        if (!currentSong) return;
+                        handleLikeToggle();
+                      }}
+                      className={`hover:bg-white/10 focus:bg-white/10 cursor-pointer ${getCurrentLikeState() ? "text-red-500" : ""}`}
+                      disabled={isLikeLoading}
+                    >
+                      <Heart
+                        className={`w-4 h-4 mr-2 transition-colors duration-150 ${getCurrentLikeState()
+                          ? "fill-red-500 text-red-500"
+                          : ""
+                          }`}
+                      />
+                      {isLikeLoading ? "..." : getCurrentLikeState() ? "Unlike" : "Like"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => handleAddToPlaylist(e, currentSong)}
+                      className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add to playlist
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-white/5" />
+                    <DropdownMenuItem
+                      onClick={() => setShowPlaylist(!showPlaylist)}
+                      className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+                    >
+                      <ListMusic className="w-4 h-4 mr-2" />
+                      {showPlaylist ? "Hide Queue" : "Show Queue"}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-white/5" />
+                    <DropdownMenuItem
+                      onClick={(e) => handleDownloadClick(e)}
+                      className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                )}
+              </Drawer>
+            </div>
           </div>
 
           {/* Main Content - Mobile First Design */}

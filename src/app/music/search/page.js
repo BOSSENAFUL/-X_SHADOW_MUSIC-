@@ -35,9 +35,219 @@ import {
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { AddToPlaylistDialog } from "@/components/playlists/AddToPlaylistDialog";
-import { PlaylistCover } from "@/components/ui/playlist-cover";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerTrigger,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerPortal,
+} from "@/components/ui/drawer";
+import { memo } from "react";
 import { genres } from "@/data/genres";
-import { toast } from "sonner";
+import { PlaylistCover } from "@/components/ui/playlist-cover";
+
+// --- Helper Components ---
+const SongActionMenu = memo(({ 
+  song, 
+  onAddToPlaylist, 
+  onGoToArtist, 
+  onGoToAlbum,
+  onDownload, 
+  onShare,
+  toggleLike,
+  isLiked,
+  decodeHtmlEntities 
+}) => {
+  const isMobile = useIsMobile();
+  const [open, setOpen] = useState(false);
+
+  const artistNames = song.artists?.primary?.map(a => a.name).join(', ') || 
+                      song.artists?.map(a => a.name).join(', ') || 
+                      (song.primaryArtists || 'Unknown Artist');
+                      
+  const songImageUrl = song.image?.find(img => img.quality === '150x150')?.url || 
+                       song.image?.[song.image.length - 1]?.url || 
+                       '/default-playlist-image.png';
+
+  const ActionItems = ({ onItemClick }) => (
+    <>
+      <div 
+        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        onClick={(e) => {
+          onItemClick();
+          onAddToPlaylist(e, song);
+        }}
+      >
+        <Plus className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Add to playlist</span>
+      </div>
+      <div 
+        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        onClick={(e) => {
+          onItemClick();
+          onShare(e, song);
+        }}
+      >
+        <Share className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Share</span>
+      </div>
+      <div 
+        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        onClick={(e) => {
+          onItemClick();
+          onGoToArtist(e, song);
+        }}
+      >
+        <User className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Go to artist</span>
+      </div>
+      <div 
+        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        onClick={(e) => {
+          onItemClick();
+          onGoToAlbum(e, song);
+        }}
+      >
+        <Disc className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Go to album</span>
+      </div>
+      <div 
+        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        onClick={(e) => {
+          onItemClick();
+          onDownload(e, song);
+        }}
+      >
+        <Download className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Download</span>
+      </div>
+      <div className="h-px bg-white/5 my-1" />
+      <div 
+        className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${isLiked(song.id) ? 'text-red-500' : ''}`}
+        onClick={(e) => {
+          onItemClick();
+          e.stopPropagation();
+          toggleLike(song).catch(error => console.error('Error toggling song like:', error));
+        }}
+      >
+        <Heart className={`w-5 h-5 ${isLiked(song.id) ? 'fill-current' : ''}`} />
+        <span className="font-medium">{isLiked(song.id) ? 'Unlike' : 'Like'}</span>
+      </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={setOpen}>
+        <DrawerTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="p-1 h-8 w-8 text-muted-foreground hover:bg-white/5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MoreVertical className="w-4 h-4" />
+          </Button>
+        </DrawerTrigger>
+        <div onClick={(e) => e.stopPropagation()}>
+          <DrawerContent className="bg-[#121212] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
+            <DrawerHeader className="p-0">
+              <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
+                <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0">
+                  <img 
+                    src={songImageUrl} 
+                    alt={song.name || song.title} 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="flex-1 min-w-0 flex flex-col justify-center text-left">
+                  <DrawerTitle className="text-base font-bold truncate text-white text-left">
+                    {decodeHtmlEntities(song.name || song.title)}
+                  </DrawerTitle>
+                  <DrawerDescription className="text-sm text-muted-foreground truncate mt-0.5 text-left">
+                    {artistNames}
+                  </DrawerDescription>
+                </div>
+              </div>
+            </DrawerHeader>
+            <div className="px-2 py-4 pb-8 space-y-1">
+              <ActionItems onItemClick={() => setOpen(false)} />
+            </div>
+          </DrawerContent>
+        </div>
+      </Drawer>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 h-6 w-6 text-muted-foreground"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreVertical className="w-3 h-3" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1 z-9999">
+        <DropdownMenuItem 
+          onClick={(e) => onAddToPlaylist(e, song)}
+          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Add to playlist
+        </DropdownMenuItem>
+        <DropdownMenuItem 
+          onClick={(e) => onShare(e, song)}
+          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+        >
+          <Share className="w-4 h-4 mr-2" />
+          Share
+        </DropdownMenuItem>
+        <DropdownMenuItem 
+          onClick={(e) => onGoToArtist(e, song)}
+          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+        >
+          <User className="w-4 h-4 mr-2" />
+          Go to artist
+        </DropdownMenuItem>
+        <DropdownMenuItem 
+          onClick={(e) => onGoToAlbum(e, song)}
+          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+        >
+          <Disc className="w-4 h-4 mr-2" />
+          Go to album
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuItem 
+          onClick={(e) => onDownload(e, song)}
+          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Download
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuItem 
+          onClick={async (e) => {
+            e.stopPropagation();
+            await toggleLike(song);
+          }}
+          className={`hover:bg-white/10 focus:bg-white/10 cursor-pointer ${isLiked(song.id) ? 'text-red-500' : ''}`}
+        >
+          <Heart className={`w-4 h-4 mr-2 ${isLiked(song.id) ? 'fill-current' : ''}`} />
+          {isLiked(song.id) ? 'Unlike' : 'Like'}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+});
+
+SongActionMenu.displayName = "SongActionMenu";
 
 function SearchPageContent() {
   const searchParams = useSearchParams();
@@ -1551,7 +1761,7 @@ function SearchPageContent() {
                                   </div>
                                 </div>
 
-                                <div className="space-y-2">
+                                <div className="space-y-2 pr-14 sm:pr-16">
                                   <h3 className="text-2xl sm:text-3xl xl:text-4xl font-bold leading-tight line-clamp-2">
                                     {decodeHtmlEntities(topResult.title || topResult.name)}
                                   </h3>
@@ -1672,81 +1882,17 @@ function SearchPageContent() {
                                       {formatDuration(song.duration)}
                                     </span>
                                   ) : null}
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 h-6 w-6 text-muted-foreground"
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        <MoreVertical className="w-3 h-3" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-48 z-9999">
-                                      <DropdownMenuItem
-                                        onClick={async (e) => {
-                                          e.stopPropagation();
-                                          try {
-                                            // Fetch detailed song info to get complete data for liking
-                                            let detailedSong = song;
-
-                                            if (!song.downloadUrl && song.id) {
-                                              const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs/${song.id}`);
-                                              const data = await response.json();
-
-                                              if (data.success && data.data && data.data.length > 0) {
-                                                detailedSong = data.data[0];
-                                              }
-                                            }
-
-                                            // Create proper song data structure for the like function
-                                            const songData = {
-                                              id: detailedSong.id,
-                                              name: detailedSong.name || detailedSong.title,
-                                              title: detailedSong.name || detailedSong.title,
-                                              artists: detailedSong.artists || { primary: [] },
-                                              primaryArtists: detailedSong.primaryArtists || getArtistNames(detailedSong),
-                                              album: detailedSong.album || { id: '', name: song.album || '' },
-                                              duration: detailedSong.duration || 0,
-                                              image: detailedSong.image || [],
-                                              releaseDate: detailedSong.releaseDate || '',
-                                              language: detailedSong.language || '',
-                                              playCount: detailedSong.playCount || 0,
-                                              downloadUrl: detailedSong.downloadUrl || [],
-                                              url: detailedSong.url || '',
-                                              type: 'song'
-                                            };
-                                            await toggleLike(songData);
-                                          } catch (error) {
-                                            console.error('Error toggling like:', error);
-                                          }
-                                        }}
-                                        className={isLiked(song.id) ? "text-red-500" : ""}
-                                      >
-                                        <Heart className={`w-3 h-3 mr-2 ${isLiked(song.id) ? 'fill-red-500 text-red-500' : ''}`} />
-                                        {isLiked(song.id) ? 'Unlike' : 'Like'}
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, song)}>
-                                        <Plus className="w-3 h-3 mr-2" />
-                                        Add to playlist
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem onClick={(e) => handleGoToArtist(e, song)}>
-                                        <User className="w-3 h-3 mr-2" />
-                                        Go to artist
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem onClick={(e) => handleGoToAlbum(e, song)}>
-                                        <Disc className="w-3 h-3 mr-2" />
-                                        Go to album
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem onClick={(e) => handleDownload(e, song)}>
-                                        <Download className="w-3 h-3 mr-2" />
-                                        Download
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
+                                  <SongActionMenu
+                                    song={song}
+                                    onAddToPlaylist={handleAddToPlaylist}
+                                    onGoToArtist={handleGoToArtist}
+                                    onGoToAlbum={handleGoToAlbum}
+                                    onDownload={handleDownload}
+                                    onShare={handleShare}
+                                    toggleLike={toggleLike}
+                                    isLiked={isLiked}
+                                    decodeHtmlEntities={decodeHtmlEntities}
+                                  />
                                 </div>
                               </div>
                             );
@@ -2018,80 +2164,17 @@ function SearchPageContent() {
                                 </p>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="p-1.5 h-8 w-8 text-muted-foreground"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <MoreVertical className="w-4 h-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-48 z-9999">
-                                    <DropdownMenuItem
-                                      onClick={async (e) => {
-                                        e.stopPropagation();
-                                        try {
-                                          let detailedSong = song;
-                                          if (!song.downloadUrl && song.id) {
-                                            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs/${song.id}`);
-                                            const data = await response.json();
-                                            if (data.success && data.data && data.data.length > 0) {
-                                              detailedSong = data.data[0];
-                                            }
-                                          }
-                                          const songData = {
-                                            id: detailedSong.id,
-                                            name: detailedSong.name || detailedSong.title,
-                                            title: detailedSong.name || detailedSong.title,
-                                            artists: detailedSong.artists || { primary: [] },
-                                            primaryArtists: detailedSong.primaryArtists || getArtistNames(detailedSong),
-                                            album: detailedSong.album || { id: '', name: song.album || '' },
-                                            duration: detailedSong.duration || 0,
-                                            image: detailedSong.image || [],
-                                            releaseDate: detailedSong.releaseDate || '',
-                                            language: detailedSong.language || '',
-                                            playCount: detailedSong.playCount || 0,
-                                            downloadUrl: detailedSong.downloadUrl || [],
-                                            url: detailedSong.url || '',
-                                            type: 'song'
-                                          };
-                                          await toggleLike(songData);
-                                        } catch (error) {
-                                          console.error('Error toggling like:', error);
-                                        }
-                                      }}
-                                      className={isLiked(song.id) ? "text-red-500" : ""}
-                                    >
-                                      <Heart className={`w-4 h-4 mr-2 ${isLiked(song.id) ? 'fill-red-500 text-red-500' : ''}`} />
-                                      {isLiked(song.id) ? 'Unlike' : 'Like'}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, song)}>
-                                      <Plus className="w-4 h-4 mr-2" />
-                                      Add to playlist
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={(e) => handleGoToArtist(e, song)}>
-                                      <User className="w-4 h-4 mr-2" />
-                                      Go to artist
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={(e) => handleGoToAlbum(e, song)}>
-                                      <Disc className="w-4 h-4 mr-2" />
-                                      Go to album
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={(e) => handleShare(e, song)}>
-                                      <Share className="w-4 h-4 mr-2" />
-                                      Share
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={(e) => handleDownload(e, song)}>
-                                      <Download className="w-4 h-4 mr-2" />
-                                      Download
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                                <SongActionMenu
+                                  song={song}
+                                  onAddToPlaylist={handleAddToPlaylist}
+                                  onGoToArtist={handleGoToArtist}
+                                  onGoToAlbum={handleGoToAlbum}
+                                  onDownload={handleDownload}
+                                  onShare={handleShare}
+                                  toggleLike={toggleLike}
+                                  isLiked={isLiked}
+                                  decodeHtmlEntities={decodeHtmlEntities}
+                                />
                               </div>
                             </div>
 
@@ -2184,80 +2267,17 @@ function SearchPageContent() {
                                 ) : (
                                   <span className="w-[40px]"></span>
                                 )}
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-8 w-8 text-muted-foreground"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <MoreVertical className="w-4 h-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-48 z-9999">
-                                    <DropdownMenuItem
-                                      onClick={async (e) => {
-                                        e.stopPropagation();
-                                        try {
-                                          let detailedSong = song;
-                                          if (!song.downloadUrl && song.id) {
-                                            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs/${song.id}`);
-                                            const data = await response.json();
-                                            if (data.success && data.data && data.data.length > 0) {
-                                              detailedSong = data.data[0];
-                                            }
-                                          }
-                                          const songData = {
-                                            id: detailedSong.id,
-                                            name: detailedSong.name || detailedSong.title,
-                                            title: detailedSong.name || detailedSong.title,
-                                            artists: detailedSong.artists || { primary: [] },
-                                            primaryArtists: detailedSong.primaryArtists || getArtistNames(detailedSong),
-                                            album: detailedSong.album || { id: '', name: song.album || '' },
-                                            duration: detailedSong.duration || 0,
-                                            image: detailedSong.image || [],
-                                            releaseDate: detailedSong.releaseDate || '',
-                                            language: detailedSong.language || '',
-                                            playCount: detailedSong.playCount || 0,
-                                            downloadUrl: detailedSong.downloadUrl || [],
-                                            url: detailedSong.url || '',
-                                            type: 'song'
-                                          };
-                                          await toggleLike(songData);
-                                        } catch (error) {
-                                          console.error('Error toggling like:', error);
-                                        }
-                                      }}
-                                      className={isLiked(song.id) ? "text-red-500" : ""}
-                                    >
-                                      <Heart className={`w-4 h-4 mr-2 ${isLiked(song.id) ? 'fill-red-500 text-red-500' : ''}`} />
-                                      {isLiked(song.id) ? 'Unlike' : 'Like'}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={(e) => handleAddToPlaylist(e, song)}>
-                                      <Plus className="w-4 h-4 mr-2" />
-                                      Add to playlist
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={(e) => handleGoToArtist(e, song)}>
-                                      <User className="w-4 h-4 mr-2" />
-                                      Go to artist
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={(e) => handleGoToAlbum(e, song)}>
-                                      <Disc className="w-4 h-4 mr-2" />
-                                      Go to album
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={(e) => handleShare(e, song)}>
-                                      <Share className="w-4 h-4 mr-2" />
-                                      Share
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={(e) => handleDownload(e, song)}>
-                                      <Download className="w-4 h-4 mr-2" />
-                                      Download
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                                <SongActionMenu
+                                  song={song}
+                                  onAddToPlaylist={handleAddToPlaylist}
+                                  onGoToArtist={handleGoToArtist}
+                                  onGoToAlbum={handleGoToAlbum}
+                                  onDownload={handleDownload}
+                                  onShare={handleShare}
+                                  toggleLike={toggleLike}
+                                  isLiked={isLiked}
+                                  decodeHtmlEntities={decodeHtmlEntities}
+                                />
                               </div>
                             </div>
                           </div>

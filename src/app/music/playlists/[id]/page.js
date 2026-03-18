@@ -27,6 +27,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerTrigger,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerPortal,
+} from "@/components/ui/drawer";
+import { memo } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -78,6 +89,416 @@ import { IoMdPlay } from "react-icons/io";
 // --- In-Memory Global Color Cache ---
 const globalColorCache = typeof window !== 'undefined' ? new Map() : null;
 
+// --- Helper Components ---
+const SongActionMenu = memo(({ 
+  song, 
+  onGoToArtist, 
+  onGoToAlbum,
+  onDownload, 
+  onShare,
+  onRemove,
+  toggleLike,
+  isLiked,
+  isOwner,
+  decodeHtmlEntities 
+}) => {
+  const isMobile = useIsMobile();
+  const [open, setOpen] = useState(false);
+
+  const artistNames = song.artists?.primary?.map(a => a.name).join(', ') || 
+                      song.artists?.map(a => a.name).join(', ') || 
+                      'Unknown Artist';
+  const songImageUrl = song.image?.find(img => img.quality === '150x150')?.url || 
+                       song.image?.[song.image.length - 1]?.url || 
+                       '/default-playlist-image.png';
+
+  const ActionItems = ({ onItemClick }) => (
+    <>
+      <div 
+        className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${isLiked(song.id) ? 'text-red-500' : ''}`}
+        onClick={(e) => {
+          onItemClick();
+          e.stopPropagation();
+          toggleLike(song);
+        }}
+      >
+        <Heart className={`w-5 h-5 ${isLiked(song.id) ? 'fill-current' : ''}`} />
+        <span className="font-medium">{isLiked(song.id) ? 'Unlike' : 'Like'}</span>
+      </div>
+
+      {isOwner && onRemove && (
+        <div 
+          className="flex items-center gap-4 p-3 hover:bg-red-500/10 text-red-500 cursor-pointer transition-colors px-3 font-medium"
+          onClick={(e) => {
+            onItemClick();
+            onRemove(song.id);
+          }}
+        >
+          <Minus className="w-5 h-5" />
+          <span>Remove from playlist</span>
+        </div>
+      )}
+
+      <div 
+        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        onClick={(e) => {
+          onItemClick();
+          onShare(song);
+        }}
+      >
+        <Share className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Share</span>
+      </div>
+
+      <div 
+        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        onClick={(e) => {
+          onItemClick();
+          onGoToArtist(e, song);
+        }}
+      >
+        <User className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Go to artist</span>
+      </div>
+
+      {onGoToAlbum && (
+        <div 
+          className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+          onClick={(e) => {
+            onItemClick();
+            onGoToAlbum(e, song);
+          }}
+        >
+          <Disc className="w-5 h-5 text-muted-foreground" />
+          <span className="font-medium">Go to album</span>
+        </div>
+      )}
+
+      <div 
+        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        onClick={(e) => {
+          onItemClick();
+          onDownload(song);
+        }}
+      >
+        <Download className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Download</span>
+      </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={setOpen}>
+        <DrawerTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="p-2 h-10 w-10 text-muted-foreground hover:bg-white/5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MoreVertical className="w-5 h-5" />
+          </Button>
+        </DrawerTrigger>
+        <div onClick={(e) => e.stopPropagation()}>
+          <DrawerContent className="bg-[#121212] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
+            <DrawerHeader className="p-0 text-left">
+              <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
+                <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0">
+                  <img 
+                    src={songImageUrl} 
+                    alt={song.name} 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="flex-1 min-w-0 flex flex-col justify-center text-left">
+                  <DrawerTitle className="text-base font-bold truncate text-white text-left">
+                    {decodeHtmlEntities(song.name)}
+                  </DrawerTitle>
+                  <DrawerDescription className="text-sm text-muted-foreground truncate mt-0.5 text-left">
+                    {artistNames}
+                  </DrawerDescription>
+                </div>
+              </div>
+            </DrawerHeader>
+            <div className="px-2 py-4 pb-8 space-y-1">
+              <ActionItems onItemClick={() => setOpen(false)} />
+            </div>
+          </DrawerContent>
+        </div>
+      </Drawer>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="p-1 h-8 w-8 text-muted-foreground md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreVertical className="w-4 h-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
+        <DropdownMenuItem 
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleLike(song);
+          }}
+          className={`${isLiked(song.id) ? 'text-red-500' : ''} hover:bg-white/10 focus:bg-white/10 cursor-pointer`}
+        >
+          <Heart className={`w-4 h-4 mr-2 ${isLiked(song.id) ? 'fill-current' : ''}`} />
+          {isLiked(song.id) ? 'Unlike' : 'Like'}
+        </DropdownMenuItem>
+        
+        {isOwner && onRemove && (
+          <>
+            <DropdownMenuSeparator className="bg-white/5" />
+            <DropdownMenuItem 
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove(song.id);
+              }}
+              className="text-red-500 hover:bg-red-500/10 focus:bg-red-500/10 cursor-pointer font-medium"
+            >
+              <Minus className="w-4 h-4 mr-2" />
+              Remove from playlist
+            </DropdownMenuItem>
+          </>
+        )}
+
+        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuItem 
+          onClick={(e) => {
+            e.stopPropagation();
+            onShare(song);
+          }}
+          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+        >
+          <Share className="w-4 h-4 mr-2" />
+          Share
+        </DropdownMenuItem>
+
+        <DropdownMenuItem 
+          onClick={(e) => {
+            e.stopPropagation();
+            onGoToArtist(e, song);
+          }}
+          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+        >
+          <User className="w-4 h-4 mr-2" />
+          Go to artist
+        </DropdownMenuItem>
+
+        <DropdownMenuItem 
+          onClick={(e) => {
+            e.stopPropagation();
+            onGoToAlbum(e, song);
+          }}
+          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+        >
+          <Disc className="w-4 h-4 mr-2" />
+          Go to album
+        </DropdownMenuItem>
+
+        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuItem 
+          onClick={(e) => {
+            e.stopPropagation();
+            onDownload(song);
+          }}
+          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Download
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+});
+
+SongActionMenu.displayName = "SongActionMenu";
+
+// --- Playlist Action Menu ---
+const PlaylistActionMenu = memo(({ 
+  playlist, 
+  isOwner, 
+  onEdit, 
+  onTogglePrivacy, 
+  onShare, 
+  onDelete,
+  open,
+  setOpen,
+  isMobile,
+  getPlaylistCover,
+  decodeHtmlEntities
+}) => {
+  const cover = getPlaylistCover();
+  const playlistImageUrl = cover.type === 'single' ? cover.src : (cover.type === 'collage' ? cover.images[0] : '/default-playlist-image.png');
+
+  const ActionItems = ({ onItemClick }) => (
+    <>
+      {isOwner && (
+        <>
+          <div 
+            className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+            onClick={() => {
+              onItemClick();
+              onEdit();
+            }}
+          >
+            <Edit className="w-5 h-5 text-muted-foreground" />
+            <span className="font-medium">Edit playlist</span>
+          </div>
+          <div 
+            className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+            onClick={() => {
+              onItemClick();
+              onTogglePrivacy();
+            }}
+          >
+            {playlist.isPublic ? (
+              <>
+                <Lock className="w-5 h-5 text-muted-foreground" />
+                <span className="font-medium">Make private</span>
+              </>
+            ) : (
+              <>
+                <Unlock className="w-5 h-5 text-muted-foreground" />
+                <span className="font-medium">Make public</span>
+              </>
+            )}
+          </div>
+        </>
+      )}
+
+      <div 
+        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        onClick={() => {
+          onItemClick();
+          onShare();
+        }}
+      >
+        <Share className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Share playlist</span>
+      </div>
+
+      {isOwner && (
+        <>
+          <div className="h-px bg-white/5 my-1" />
+          <div 
+            className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors text-red-500"
+            onClick={() => {
+              onItemClick();
+              onDelete();
+            }}
+          >
+            <Trash2 className="w-5 h-5 text-current" />
+            <span className="font-medium">Delete playlist</span>
+          </div>
+        </>
+      )}
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={setOpen}>
+        <DrawerTrigger asChild>
+          <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
+            <MoreVertical className="w-5 h-5 md:w-6 md:h-6" />
+          </Button>
+        </DrawerTrigger>
+        <div onClick={(e) => e.stopPropagation()}>
+          <DrawerContent className="bg-[#121212] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
+            <DrawerHeader className="p-0 text-left">
+              <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
+                <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0 bg-neutral-800">
+                  {cover.type === 'collage' ? (
+                    <div className="w-full h-full grid grid-cols-2 gap-0">
+                      {cover.images.map((img, i) => (
+                        <img key={i} src={img} alt="" className="w-full h-full object-cover" />
+                      ))}
+                    </div>
+                  ) : (
+                    <img src={playlistImageUrl} alt={playlist.name} className="w-full h-full object-cover" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0 flex flex-col justify-center text-left">
+                  <DrawerTitle className="text-base font-bold truncate text-white text-left">
+                    {playlist.name}
+                  </DrawerTitle>
+                  <DrawerDescription className="text-sm text-muted-foreground truncate mt-0.5 text-left">
+                    Playlist • {playlist.ownerName || 'Unknown User'}
+                  </DrawerDescription>
+                </div>
+              </div>
+            </DrawerHeader>
+            <div className="px-2 py-4 pb-8 space-y-1">
+              <ActionItems onItemClick={() => setOpen(false)} />
+            </div>
+          </DrawerContent>
+        </div>
+      </Drawer>
+    );
+  }
+
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
+          <MoreVertical className="w-5 h-5 md:w-6 md:h-6" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
+        {isOwner && (
+          <>
+            <DropdownMenuItem onClick={onEdit} className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
+              <Edit className="w-4 h-4 mr-2" />
+              Edit playlist
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onTogglePrivacy} className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
+              {playlist.isPublic ? (
+                <>
+                  <Lock className="w-4 h-4 mr-2" />
+                  Make private
+                </>
+              ) : (
+                <>
+                  <Unlock className="w-4 h-4 mr-2" />
+                  Make public
+                </>
+              )}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-white/5" />
+          </>
+        )}
+        <DropdownMenuItem onClick={onShare} className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
+          <Share className="w-4 h-4 mr-2" />
+          Share playlist
+        </DropdownMenuItem>
+        {isOwner && (
+          <>
+            <DropdownMenuSeparator className="bg-white/5" />
+            <DropdownMenuItem 
+              onClick={onDelete}
+              className="text-red-500 hover:bg-red-500/10 focus:bg-red-500/10 cursor-pointer font-medium"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete playlist
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+});
+
+PlaylistActionMenu.displayName = "PlaylistActionMenu";
+
 // ─── Virtual Song List ──────────────────────────────────────────────────────
 const ITEM_HEIGHT = 64; // px per row (mobile ≈ desktop row height)
 const OVERSCAN = 5;     // extra rows above/below viewport
@@ -85,8 +506,8 @@ const OVERSCAN = 5;     // extra rows above/below viewport
 const SongRow = React.memo(function SongRow({
   song, index, isCurrentSong, isPlaying, isOwner,
   isSongLiked, handlePlayClick, handleToggleSongLike,
-  handleRemoveFromPlaylist, handleDownloadSong,
-  decodeHtmlEntities, formatDuration, router,
+  handleRemoveFromPlaylist, handleDownloadSong, handleShareSong,
+  decodeHtmlEntities, formatDuration, router, playlistId
 }) {
   const imageUrl = song.image?.find(img => img.quality === '500x500')?.url ||
     song.image?.find(img => img.quality === '150x150')?.url ||
@@ -131,39 +552,23 @@ const SongRow = React.memo(function SongRow({
               : 'Unknown Artist'}
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="p-2 h-8 w-8 text-muted-foreground" onClick={(e) => e.stopPropagation()}>
-                <MoreVertical className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 z-9999">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleToggleSongLike(song); }}>
-                <Heart className={`w-4 h-4 mr-2 ${isSongLiked(song.id) ? 'fill-current text-red-500' : ''}`} />
-                {isSongLiked(song.id) ? 'Unlike' : 'Like'}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {isOwner && (
-                <>
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleRemoveFromPlaylist(song.id); }} className="text-red-500 hover:text-red-600 focus:text-red-600 hover:bg-red-50 focus:bg-red-50 dark:hover:bg-red-950 dark:focus:bg-red-950">
-                    <Minus className="w-4 h-4 mr-2" />Remove
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                </>
-              )}
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); if (song.artists?.primary?.length > 0) router.push(`/music/artist/${song.artists.primary[0].id}`); }}>
-                <User className="w-4 h-4 mr-2" />Go to artist
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); if (song.album?.id) router.push(`/music/album/${song.album.id}`); }}>
-                <Disc className="w-4 h-4 mr-2" />Go to album
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDownloadSong(song); }}>
-                <Download className="w-4 h-4 mr-2" />Download
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+          <SongActionMenu 
+            song={song}
+            onGoToArtist={(e, s) => {
+               if (s.artists?.primary?.length > 0) router.push(`/music/artist/${s.artists.primary[0].id}`);
+            }}
+            onGoToAlbum={(e, s) => {
+               if (s.album?.id) router.push(`/music/album/${s.album.id}`);
+            }}
+            onDownload={handleDownloadSong}
+            onShare={handleShareSong}
+            onRemove={handleRemoveFromPlaylist}
+            toggleLike={handleToggleSongLike}
+            isLiked={isSongLiked}
+            isOwner={isOwner}
+            decodeHtmlEntities={decodeHtmlEntities}
+          />
         </div>
       </div>
 
@@ -235,38 +640,24 @@ const SongRow = React.memo(function SongRow({
           <div className="min-w-[40px] text-right text-sm text-muted-foreground font-mono hidden md:block">
             {formatDuration(song.duration)}
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-8 w-8 shrink-0" onClick={(e) => e.stopPropagation()}>
-                <MoreVertical className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 z-9999">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleToggleSongLike(song); }}>
-                <Heart className={`w-4 h-4 mr-2 ${isSongLiked(song.id) ? 'fill-current text-red-500' : ''}`} />
-                {isSongLiked(song.id) ? 'Unlike' : 'Like'}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {isOwner && (
-                <>
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleRemoveFromPlaylist(song.id); }} className="text-red-500 hover:text-red-600 focus:text-red-600 hover:bg-red-50 focus:bg-red-50 dark:hover:bg-red-950 dark:focus:bg-red-950">
-                    <Minus className="w-4 h-4 mr-2" />Remove
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                </>
-              )}
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); if (song.artists?.primary?.length > 0) router.push(`/music/artist/${song.artists.primary[0].id}`); }}>
-                <User className="w-4 h-4 mr-2" />Go to artist
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); if (song.album?.id) router.push(`/music/album/${song.album.id}`); }}>
-                <Disc className="w-4 h-4 mr-2" />Go to album
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDownloadSong(song); }}>
-                <Download className="w-4 h-4 mr-2" />Download
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+            <SongActionMenu 
+              song={song}
+              onGoToArtist={(e, s) => {
+                 if (s.artists?.primary?.length > 0) router.push(`/music/artist/${s.artists.primary[0].id}`);
+              }}
+              onGoToAlbum={(e, s) => {
+                 if (s.album?.id) router.push(`/music/album/${s.album.id}`);
+              }}
+              onDownload={handleDownloadSong}
+              onShare={handleShareSong}
+              onRemove={handleRemoveFromPlaylist}
+              toggleLike={handleToggleSongLike}
+              isLiked={isSongLiked}
+              isOwner={isOwner}
+              decodeHtmlEntities={decodeHtmlEntities}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -276,7 +667,7 @@ const SongRow = React.memo(function SongRow({
 function VirtualSongList({ 
   songs, currentSong, activePlaylistId, playlistId, currentIndex, isPlaying, isOwner,
   isSongLiked, handlePlayClick, handleToggleSongLike, handleRemoveFromPlaylist,
-  handleDownloadSong, decodeHtmlEntities, formatDuration, router 
+  handleDownloadSong, handleShareSong, decodeHtmlEntities, formatDuration, router 
 }) {
   const containerRef = useRef(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -347,9 +738,11 @@ function VirtualSongList({
               handleToggleSongLike={handleToggleSongLike}
               handleRemoveFromPlaylist={handleRemoveFromPlaylist}
               handleDownloadSong={handleDownloadSong}
+              handleShareSong={handleShareSong}
               decodeHtmlEntities={decodeHtmlEntities}
               formatDuration={formatDuration}
               router={router}
+              playlistId={playlistId}
             />
           );
         })}
@@ -382,6 +775,7 @@ export default function PlaylistDetailPage({ params }) {
   const [scrollProgress, setScrollProgress] = useState(0);
   const mobileTitleRef = useRef(null);
   const desktopTitleRef = useRef(null);
+  const isMobile = useIsMobile();
 
   // Initialize music player
   const { playSong, currentSong, currentIndex, isPlaying, togglePlayPause, currentPlaylistId: activePlaylistId } = useMusicPlayer();
@@ -1756,61 +2150,22 @@ export default function PlaylistDetailPage({ params }) {
                 >
                   <Download className="w-5 h-5 md:w-6 md:h-6" />
                 </Button>
-                <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
-                      <MoreVertical className="w-5 h-5 md:w-6 md:h-6" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48 z-9999">
-                    {/* Owner-only options */}
-                    {isOwner && (
-                      <>
-                        <DropdownMenuItem onClick={handleEditPlaylist}>
-                          <Edit className="w-4 h-4 mr-2" />
-                          Edit playlist
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={handleTogglePrivacy}>
-                          {playlist.isPublic ? (
-                            <>
-                              <Lock className="w-4 h-4 mr-2" />
-                              Make private
-                            </>
-                          ) : (
-                            <>
-                              <Unlock className="w-4 h-4 mr-2" />
-                              Make public
-                            </>
-                          )}
-                        </DropdownMenuItem>
-                      </>
-                    )}
-
-                    {/* Share option - available to everyone for public playlists */}
-                    <DropdownMenuItem onClick={handleSharePlaylist}>
-                      <Share className="w-4 h-4 mr-2" />
-                      Share playlist
-                    </DropdownMenuItem>
-
-                    {/* Delete option - owner only */}
-                    {isOwner && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setDropdownOpen(false); // Close dropdown first
-                            setDeleteDialogOpen(true); // Then open delete dialog
-                          }}
-                          className="text-red-500 hover:text-red-600 focus:text-red-600 hover:bg-red-50 focus:bg-red-50 dark:hover:bg-red-950 dark:focus:bg-red-950"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Delete playlist
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <PlaylistActionMenu 
+                  playlist={playlist}
+                  isOwner={isOwner}
+                  onEdit={handleEditPlaylist}
+                  onTogglePrivacy={handleTogglePrivacy}
+                  onShare={handleSharePlaylist}
+                  onDelete={() => {
+                    setDropdownOpen(false);
+                    setDeleteDialogOpen(true);
+                  }}
+                  open={dropdownOpen}
+                  setOpen={setDropdownOpen}
+                  isMobile={isMobile}
+                  getPlaylistCover={getPlaylistCover}
+                  decodeHtmlEntities={decodeHtmlEntities}
+                />
               </div>
             </div>
 

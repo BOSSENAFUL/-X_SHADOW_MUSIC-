@@ -81,6 +81,7 @@ export default function RootLayout({ children }) {
     <html lang="en" suppressHydrationWarning className="overflow-x-hidden">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-x-hidden`}
+        suppressHydrationWarning
       >
         <AuthProvider>
           <ThemeProvider
