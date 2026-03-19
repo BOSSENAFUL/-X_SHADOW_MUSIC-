@@ -1411,108 +1411,121 @@ export function FullscreenMusicPlayer({
             </div>
 
             <div onClick={(e) => e.stopPropagation()}>
-              <Drawer open={openActionMenu} onOpenChange={setOpenActionMenu}>
-                <DrawerTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-white hover:bg-white/10 rounded-full p-2 transform-gpu will-change-transform"
-                    style={{
-                      backfaceVisibility: 'hidden',
-                      WebkitBackfaceVisibility: 'hidden',
-                    }}
-                  >
-                    <MoreHorizontal style={{ width: '20px', height: '20px' }} />
-                  </Button>
-                </DrawerTrigger>
-                
-                {isMobile ? (
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <DrawerContent className="bg-[#121212] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
-                      <DrawerHeader className="p-0">
-                        <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
-                          <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0">
-                            <img 
-                              src={_getFsSmallImageUrl(currentSong)} 
-                              alt={currentSong.name || currentSong.title} 
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <div className="flex-1 min-w-0 flex flex-col justify-center text-left">
-                            <DrawerTitle className="text-base font-bold truncate text-white text-left">
-                              {decodeHtmlEntities(currentSong.name || currentSong.title)}
-                            </DrawerTitle>
-                            <DrawerDescription className="text-sm text-muted-foreground truncate mt-0.5 text-left">
-                              {getArtistNames(currentSong)}
-                            </DrawerDescription>
-                          </div>
+              {isMobile ? (
+                <Drawer open={openActionMenu} onOpenChange={setOpenActionMenu}>
+                  <DrawerTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-white hover:bg-white/10 rounded-full p-2 transform-gpu will-change-transform"
+                      style={{
+                        backfaceVisibility: 'hidden',
+                        WebkitBackfaceVisibility: 'hidden',
+                      }}
+                    >
+                      <MoreHorizontal style={{ width: '20px', height: '20px' }} />
+                    </Button>
+                  </DrawerTrigger>
+
+                  <DrawerContent className="bg-[#121212] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
+                    <DrawerHeader className="p-0">
+                      <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
+                        <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0">
+                          <img
+                            src={_getFsSmallImageUrl(currentSong)}
+                            alt={currentSong.name || currentSong.title}
+                            className="w-full h-full object-cover"
+                          />
                         </div>
-                      </DrawerHeader>
-                      <div className="px-2 py-4 pb-8 space-y-1">
-                        <div 
-                          className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${getCurrentLikeState() ? 'text-red-500' : ''}`}
-                          onClick={() => {
-                            setOpenActionMenu(false);
-                            handleLikeToggle();
-                          }}
-                        >
-                          <Heart className={`w-5 h-5 ${getCurrentLikeState() ? 'fill-current' : ''}`} />
-                          <span className="font-medium">{getCurrentLikeState() ? 'Unlike' : 'Like'}</span>
-                        </div>
-                        <div 
-                          className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
-                          onClick={(e) => {
-                            setOpenActionMenu(false);
-                            handleAddToPlaylist(e, currentSong);
-                          }}
-                        >
-                          <Plus className="w-5 h-5 text-muted-foreground" />
-                          <span className="font-medium">Add to playlist</span>
-                        </div>
-                        <div 
-                          className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
-                          onClick={() => {
-                            setOpenActionMenu(false);
-                            if (navigator.share) {
-                              navigator.share({
-                                title: currentSong.name || currentSong.title,
-                                text: `Check out "${currentSong.name || currentSong.title}" by ${getArtistNames(currentSong)}`,
-                                url: window.location.href
-                              });
-                            } else {
-                              navigator.clipboard.writeText(window.location.href);
-                              toast.success('Link copied to clipboard');
-                            }
-                          }}
-                        >
-                          <Share className="w-5 h-5 text-muted-foreground" />
-                          <span className="font-medium">Share</span>
-                        </div>
-                        <div 
-                          className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
-                          onClick={() => {
-                            setOpenActionMenu(false);
-                            setShowPlaylist(!showPlaylist);
-                          }}
-                        >
-                          <ListMusic className="w-5 h-5 text-muted-foreground" />
-                          <span className="font-medium">{showPlaylist ? "Hide Queue" : "Show Queue"}</span>
-                        </div>
-                        <div className="h-px bg-white/5 my-1" />
-                        <div 
-                          className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
-                          onClick={(e) => {
-                            setOpenActionMenu(false);
-                            handleDownloadClick(e);
-                          }}
-                        >
-                          <Download className="w-5 h-5 text-muted-foreground" />
-                          <span className="font-medium">Download</span>
+                        <div className="flex-1 min-w-0 flex flex-col justify-center text-left">
+                          <DrawerTitle className="text-base font-bold truncate text-white text-left">
+                            {decodeHtmlEntities(currentSong.name || currentSong.title)}
+                          </DrawerTitle>
+                          <DrawerDescription className="text-sm text-muted-foreground truncate mt-0.5 text-left">
+                            {getArtistNames(currentSong)}
+                          </DrawerDescription>
                         </div>
                       </div>
-                    </DrawerContent>
-                  </div>
-                ) : (
+                    </DrawerHeader>
+                    <div className="px-2 py-4 pb-8 space-y-1">
+                      <div
+                        className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${getCurrentLikeState() ? 'text-red-500' : ''}`}
+                        onClick={() => {
+                          setOpenActionMenu(false);
+                          handleLikeToggle();
+                        }}
+                      >
+                        <Heart className={`w-5 h-5 ${getCurrentLikeState() ? 'fill-current' : ''}`} />
+                        <span className="font-medium">{getCurrentLikeState() ? 'Unlike' : 'Like'}</span>
+                      </div>
+                      <div
+                        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+                        onClick={(e) => {
+                          setOpenActionMenu(false);
+                          handleAddToPlaylist(e, currentSong);
+                        }}
+                      >
+                        <Plus className="w-5 h-5 text-muted-foreground" />
+                        <span className="font-medium">Add to playlist</span>
+                      </div>
+                      <div
+                        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+                        onClick={() => {
+                          setOpenActionMenu(false);
+                          if (navigator.share) {
+                            navigator.share({
+                              title: currentSong.name || currentSong.title,
+                              text: `Check out "${currentSong.name || currentSong.title}" by ${getArtistNames(currentSong)}`,
+                              url: window.location.href
+                            });
+                          } else {
+                            navigator.clipboard.writeText(window.location.href);
+                            toast.success('Link copied to clipboard');
+                          }
+                        }}
+                      >
+                        <Share className="w-5 h-5 text-muted-foreground" />
+                        <span className="font-medium">Share</span>
+                      </div>
+                      <div
+                        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+                        onClick={() => {
+                          setOpenActionMenu(false);
+                          setShowPlaylist(!showPlaylist);
+                        }}
+                      >
+                        <ListMusic className="w-5 h-5 text-muted-foreground" />
+                        <span className="font-medium">{showPlaylist ? "Hide Queue" : "Show Queue"}</span>
+                      </div>
+                      <div className="h-px bg-white/5 my-1" />
+                      <div
+                        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+                        onClick={(e) => {
+                          setOpenActionMenu(false);
+                          handleDownloadClick(e);
+                        }}
+                      >
+                        <Download className="w-5 h-5 text-muted-foreground" />
+                        <span className="font-medium">Download</span>
+                      </div>
+                    </div>
+                  </DrawerContent>
+                </Drawer>
+              ) : (
+                <DropdownMenu open={openActionMenu} onOpenChange={setOpenActionMenu}>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-white hover:bg-white/10 rounded-full p-2 transform-gpu will-change-transform"
+                      style={{
+                        backfaceVisibility: 'hidden',
+                        WebkitBackfaceVisibility: 'hidden',
+                      }}
+                    >
+                      <MoreHorizontal style={{ width: '20px', height: '20px' }} />
+                    </Button>
+                  </DropdownMenuTrigger>
                   <DropdownMenuContent
                     align="end"
                     className="w-56 transform-gpu will-change-transform bg-neutral-900 border-white/10 text-white p-1"
@@ -1563,8 +1576,8 @@ export function FullscreenMusicPlayer({
                       Download
                     </DropdownMenuItem>
                   </DropdownMenuContent>
-                )}
-              </Drawer>
+                </DropdownMenu>
+              )}
             </div>
           </div>
 
