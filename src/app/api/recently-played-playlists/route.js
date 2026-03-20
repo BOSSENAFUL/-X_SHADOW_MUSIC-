@@ -103,14 +103,24 @@ export async function DELETE(request) {
             );
         }
 
+        const { searchParams } = new URL(request.url);
+        const playlistId = searchParams.get('playlistId');
+
         await connectDB();
 
-        await RecentlyPlayedPlaylist.clearForUser(session.user.id);
-
-        return NextResponse.json({
-            success: true,
-            message: 'Recently played history cleared',
-        });
+        if (playlistId) {
+            await RecentlyPlayedPlaylist.removePlaylistForUser(session.user.id, playlistId);
+            return NextResponse.json({
+                success: true,
+                message: 'Playlist removed from recently played',
+            });
+        } else {
+            await RecentlyPlayedPlaylist.clearForUser(session.user.id);
+            return NextResponse.json({
+                success: true,
+                message: 'Recently played history cleared',
+            });
+        }
     } catch (error) {
         console.error('Error clearing recently played playlists:', error);
         return NextResponse.json(

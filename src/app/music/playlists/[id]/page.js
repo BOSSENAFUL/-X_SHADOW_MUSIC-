@@ -1302,6 +1302,12 @@ export default function PlaylistDetailPage({ params }) {
           sessionStorage.removeItem(`created_playlists_${session.user.id}`);
         }
         toast.success('Playlist deleted');
+        
+        // Also remove from recently played
+        fetch(`/api/recently-played-playlists?playlistId=${playlistId}`, {
+          method: 'DELETE',
+        }).catch(err => console.error('Failed to remove from recently played:', err));
+
         sessionStorage.removeItem(`jammify_playlist_${playlistId}`);
         router.push('/music/playlists');
       } else {

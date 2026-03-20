@@ -4,6 +4,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import connectDB from '@/lib/mongodb';
 import Playlist from '@/models/Playlist';
 import User from '@/models/User';
+import RecentlyPlayedPlaylist from '@/models/RecentlyPlayedPlaylist';
 import mongoose from 'mongoose';
 
 // GET - Get specific playlist (with privacy controls)
@@ -249,6 +250,13 @@ export async function DELETE(request, { params }) {
         { success: false, error: 'Playlist not found' },
         { status: 404 }
       );
+    }
+
+    // Also remove from recently played
+    try {
+      await RecentlyPlayedPlaylist.removePlaylistForUser(session.user.id, id);
+    } catch (err) {
+      console.error('Failed to remove from recently played:', err);
     }
 
     return NextResponse.json({

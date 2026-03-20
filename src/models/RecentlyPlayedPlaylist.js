@@ -169,6 +169,23 @@ recentlyPlayedPlaylistSchema.statics.clearForUser = async function (userId) {
     await this.findOneAndUpdate({ userId }, { $set: { playlists: [] } }, { upsert: true });
 };
 
+/**
+ * Remove a specific playlist from the recently played list for a user.
+ *
+ * @param {string|ObjectId} userId
+ * @param {string} playlistId
+ * @returns {Promise<void>}
+ */
+recentlyPlayedPlaylistSchema.statics.removePlaylistForUser = async function (userId, playlistId) {
+    await this.findOneAndUpdate(
+        { userId },
+        {
+            $pull: { playlists: { playlistId } },
+        },
+        { new: true }
+    );
+};
+
 /* ------------------------------------------------------------------ */
 /*  Instance method – toJSON                                            */
 /* ------------------------------------------------------------------ */
@@ -182,11 +199,16 @@ recentlyPlayedPlaylistSchema.methods.toJSON = function () {
     };
 };
 
-// Force refresh the model to pick up schema changes (like the new 50-item limit)
+// Use the standard Next.js pattern: check models object first to avoid re-defining
+let RecentlyPlayedPlaylist;
 if (mongoose.models.RecentlyPlayedPlaylist) {
-    delete mongoose.models.RecentlyPlayedPlaylist;
+    RecentlyPlayedPlaylist = mongoose.models.RecentlyPlayedPlaylist;
+    // For development/hot-reloading: Ensure the new static method is attached if missing
+    if (!RecentlyPlayedPlaylist.removePlaylistForUser) {
+        RecentlyPlayedPlaylist.removePlaylistForUser = recentlyPlayedPlaylistSchema.statics.removePlaylistForUser;
+    }
+} else {
+    RecentlyPlayedPlaylist = mongoose.model('RecentlyPlayedPlaylist', recentlyPlayedPlaylistSchema);
 }
-
-const RecentlyPlayedPlaylist = mongoose.model('RecentlyPlayedPlaylist', recentlyPlayedPlaylistSchema);
 
 export default RecentlyPlayedPlaylist;
