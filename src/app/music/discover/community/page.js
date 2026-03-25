@@ -237,10 +237,10 @@ export default function CommunityPlaylistsPage() {
             </div>
 
             {/* Infinite scroll loading indicator or end message */}
-            <div ref={loadingRef} className="py-16 flex justify-center w-full">
+            <div ref={loadingRef} className="pt-16 pb-40 md:pb-24 flex justify-center w-full">
               {loadingMore && (
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 </div>
               )}
               {!hasMore && playlists.length > 0 && (
