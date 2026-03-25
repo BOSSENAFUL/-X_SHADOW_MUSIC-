@@ -21,8 +21,10 @@ export default function UserActivityTracker({
       return;
     }
 
-    const now = new Date();
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    // Always use IST (Asia/Kolkata) to match the server-side date computation.
+    // Using the browser's local timezone here would cause the dedup guard to
+    // diverge from the server's "today", potentially firing duplicate requests.
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
     
     // Check if already recorded today
     if (hasRecordedToday.current && lastRecordedDate.current === today) {
@@ -80,9 +82,9 @@ export default function UserActivityTracker({
   useEffect(() => {
     if (!enabled || status !== 'authenticated') return;
 
-    // Reset daily flag if date changed
-    const now = new Date();
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    // Reset daily flag if date changed.
+    // Use IST to match the server — same as in recordActivity().
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
     if (lastRecordedDate.current !== today) {
       hasRecordedToday.current = false;
     }

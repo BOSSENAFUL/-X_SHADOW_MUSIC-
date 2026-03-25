@@ -134,93 +134,73 @@ dailyActiveUserSchema.statics.recordUserActivity = async function (userEmail, us
   // Never trust the client-provided date — this avoids timezone mismatches
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
-  try {
-    // Get location and platform data if request is provided
-    let locationData = { country: 'Unknown', city: 'Unknown' };
-    let osData = 'Unknown';
-    if (request) {
-      locationData = await getLocationFromIP(request);
-      osData = getPlatform(request, isPWA); // e.g. "Android 10 (PWA)"
-    }
+  // Hoist these OUTSIDE try/catch so they are never fetched twice.
+  // The old code re-fetched them inside the `catch` block (wasting a geo-IP
+  // API call on every race condition hit).
+  let locationData = { country: 'Unknown', city: 'Unknown' };
+  let osData = 'Unknown';
+  if (request) {
+    locationData = await getLocationFromIP(request);
+    osData = getPlatform(request, isPWA); // e.g. "Android 10 (PWA)"
+  }
 
-    // First, try to add user to existing document (if user doesn't already exist)
+  const userPayload = {
+    email: userEmail,
+    name: userName,
+    country: locationData.country,
+    city: locationData.city,
+    os: osData,
+    firstSeenAt: new Date()
+  };
+
+  try {
+    // ─── Atomic upsert ────────────────────────────────────────────────────────
+    // This single operation:
+    //   1. Creates the document for `today` if it does not exist (upsert:true).
+    //   2. Adds the user to the `users` array ONLY if their email is not yet
+    //      present ($ne guard on 'users.email').
+    //   3. Increments totalUsers only when a user is actually pushed.
+    //
+    // Because upsert is a single atomic write, there is NO check-then-create
+    // race window — concurrent requests cannot both see "no document" and both
+    // call this.create(), which was the original source of duplicate documents.
+    // ──────────────────────────────────────────────────────────────────────────
     const result = await this.findOneAndUpdate(
       {
         date: today,
-        'users.email': { $ne: userEmail } // Only update if user email doesn't exist
+        'users.email': { $ne: userEmail } // skip if user already recorded
       },
       {
-        $push: {
-          users: {
-            email: userEmail,
-            name: userName,
-            country: locationData.country,
-            city: locationData.city,
-            os: osData,
-            firstSeenAt: new Date()
-          }
-        },
+        $setOnInsert: { date: today },    // only set date when creating a new doc
+        $push: { users: userPayload },
         $inc: { totalUsers: 1 }
       },
-      { new: true }
+      {
+        upsert: true,  // create the document if it doesn't exist
+        new: true
+      }
     );
 
+    // result is null when the filter matched nothing (user already in doc)
     if (result) {
       return { success: true, message: 'User activity recorded', isNew: true };
     }
 
-    // If no result, either document doesn't exist or user already exists
-    // Check if document exists for today
-    const existingDoc = await this.findOne({ date: today });
-
-    if (existingDoc) {
-      // Document exists, so user must already be recorded
-      return { success: true, message: 'User already recorded for today', isNew: false };
-    }
-
-    // Document doesn't exist, create it with this user
-    const newDoc = await this.create({
-      date: today,
-      users: [{
-        email: userEmail,
-        name: userName,
-        country: locationData.country,
-        city: locationData.city,
-        os: osData,
-        firstSeenAt: new Date()
-      }],
-      totalUsers: 1
-    });
-
-    return { success: true, message: 'User activity recorded', isNew: true };
+    return { success: true, message: 'User already recorded for today', isNew: false };
 
   } catch (error) {
-    // Handle duplicate key error for date (if two requests try to create same date document)
+    // Edge-case: two truly simultaneous requests may both attempt the upsert
+    // insert path at the same nanosecond. MongoDB raises a duplicate-key error
+    // (code 11000) on the unique `date` index in that scenario.
+    // Retry with a plain update (no upsert needed — the doc now exists).
     if (error.code === 11000 && error.keyPattern?.date) {
-      // Document was created by another request, try to add user to it
-      let locationData = { country: 'Unknown', city: 'Unknown' };
-      let osData = 'Unknown';
-      if (request) {
-        locationData = await getLocationFromIP(request);
-        osData = getPlatform(request, isPWA); // e.g. "Android 10 (PWA)"
-      }
-
       const updateResult = await this.findOneAndUpdate(
         {
           date: today,
           'users.email': { $ne: userEmail }
         },
         {
-          $push: {
-            users: {
-              email: userEmail,
-              name: userName,
-              country: locationData.country,
-              city: locationData.city,
-              os: osData,
-              firstSeenAt: new Date()
-            }
-          },
+          $push: { users: userPayload },
           $inc: { totalUsers: 1 }
         },
         { new: true }
@@ -228,9 +208,8 @@ dailyActiveUserSchema.statics.recordUserActivity = async function (userEmail, us
 
       if (updateResult) {
         return { success: true, message: 'User activity recorded', isNew: true };
-      } else {
-        return { success: true, message: 'User already recorded for today', isNew: false };
       }
+      return { success: true, message: 'User already recorded for today', isNew: false };
     }
 
     console.error('Error recording user activity:', error);
