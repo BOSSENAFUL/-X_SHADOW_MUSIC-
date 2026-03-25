@@ -10,6 +10,7 @@ import UserActivityTracker from "@/components/analytics/UserActivityTracker";
 import { Analytics } from "@vercel/analytics/next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import AppRating from "@/components/app-rating";
+import { RouteChangeHandler } from "@/components/analytics/RouteChangeHandler";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -94,6 +95,7 @@ export default function RootLayout({ children }) {
               <GlobalOnlineTracker />
               <UserActivityTracker />
               <AppRating />
+              <RouteChangeHandler />
               {children}
               <Analytics />
               <SpeedInsights />

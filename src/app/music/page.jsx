@@ -81,6 +81,8 @@ export default function MusicPage() {
   const [trendingLoading, setTrendingLoading] = useState(true);
   const [topHitsLoading, setTopHitsLoading] = useState(true);
   const [englishTopLoading, setEnglishTopLoading] = useState(true);
+  const [communityPlaylists, setCommunityPlaylists] = useState([]);
+  const [communityLoading, setCommunityLoading] = useState(true);
   const [recentlyPlayed, setRecentlyPlayed] = useState([]);
   const [recentlyPlayedLoading, setRecentlyPlayedLoading] = useState(true);
   const [playlistColors, setPlaylistColors] = useState({});
@@ -223,10 +225,12 @@ export default function MusicPage() {
           setTrendingPlaylists(homeData.trending || []);
           setTopHitsPlaylists(homeData.topHits || []);
           setEnglishTopPlaylists(homeData.englishTop || []);
+          setCommunityPlaylists(homeData.community || []);
           setLoading(false);
           setTrendingLoading(false);
           setTopHitsLoading(false);
           setEnglishTopLoading(false);
+          setCommunityLoading(false);
           // Still fetch in background to refresh cache
         } catch (e) {
           console.error("Cache parse error:", e);
@@ -244,28 +248,31 @@ export default function MusicPage() {
         }
 
         const results = await Promise.all([
-          fetch(`${apiUrl}/api/search/playlists?query=new%20releases&page=0&limit=20`).then(r => r.json()),
-          fetch(`${apiUrl}/api/search/playlists?query=trending&page=0&limit=20`).then(r => r.json()),
-          fetch(`${apiUrl}/api/search/playlists?query=top%20hits&page=0&limit=20`).then(r => r.json()),
-          fetch(`${apiUrl}/api/search/playlists?query=english%20top&page=0&limit=20`).then(r => r.json())
+          fetch(`${apiUrl}/api/search/playlists?query=new%20releases&page=0&limit=20`).then(r => r.json()).catch(() => ({ success: false })),
+          fetch(`${apiUrl}/api/search/playlists?query=trending&page=0&limit=20`).then(r => r.json()).catch(() => ({ success: false })),
+          fetch(`${apiUrl}/api/search/playlists?query=top%20hits&page=0&limit=20`).then(r => r.json()).catch(() => ({ success: false })),
+          fetch(`${apiUrl}/api/search/playlists?query=english%20top&page=0&limit=20`).then(r => r.json()).catch(() => ({ success: false })),
+          fetch(`/api/playlists/community`).then(r => r.json()).catch(() => ({ success: false }))
         ]);
-
+  
         if (!isMounted) return;
-
-        const [newRes, trending, topHits, englishTop] = results;
-
+  
+        const [newRes, trending, topHits, englishTop, communityRes] = results;
+  
         const homeData = {
           newReleases: newRes.success ? newRes.data.results : [],
           trending: trending.success ? trending.data.results : [],
           topHits: topHits.success ? topHits.data.results : [],
-          englishTop: englishTop.success ? englishTop.data.results : []
+          englishTop: englishTop.success ? englishTop.data.results : [],
+          community: communityRes.success ? communityRes.data : []
         };
-
+  
         setNewReleases(homeData.newReleases);
         setTrendingPlaylists(homeData.trending);
         setTopHitsPlaylists(homeData.topHits);
         setEnglishTopPlaylists(homeData.englishTop);
-
+        setCommunityPlaylists(homeData.community);
+  
         sessionStorage.setItem('home_sections', JSON.stringify(homeData));
       } catch (error) {
         console.error("Error fetching home sections:", error);
@@ -275,10 +282,11 @@ export default function MusicPage() {
           setTrendingLoading(false);
           setTopHitsLoading(false);
           setEnglishTopLoading(false);
+          setCommunityLoading(false);
         }
       }
     };
-
+  
     fetchHomeSections();
     return () => { isMounted = false; };
   }, []);
@@ -788,6 +796,22 @@ export default function MusicPage() {
                 } else {
                   router.push(`/music/playlist/${pid}?songCount=${playlist.songCount || 50}`);
                 }
+              }}
+              onPlayClick={handlePlaylistPlay}
+              playingId={playingId}
+            />
+          )}
+
+          {/* Community Playlists Section */}
+          {(communityLoading || communityPlaylists.length > 0) && (
+            <PlaylistSection
+              title="Community Playlists"
+              playlists={communityPlaylists}
+              loading={communityLoading}
+              onShowAll={() => router.push("/music/discover/community")}
+              onPlaylistClick={(playlist) => {
+                const pid = playlist.id || playlist.playlistId;
+                router.push(`/music/playlists/${pid}`);
               }}
               onPlayClick={handlePlaylistPlay}
               playingId={playingId}

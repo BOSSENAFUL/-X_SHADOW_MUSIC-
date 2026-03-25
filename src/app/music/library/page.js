@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect, useCallback, memo } from "react"
+import { useState, useMemo, useEffect, useCallback, memo, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
@@ -70,6 +70,8 @@ export default function LibraryPage() {
   const { data: session } = useSession()
   const userId = session?.user?.id
   const [activeTab, setActiveTab] = useState("All") // All, Playlists, Albums, Artists
+  const [scrollRestored, setScrollRestored] = useState(false)
+  const scrollContainerRef = useRef(null)
 
   const { likedPlaylists, loading: loadingPlaylists } = useLikedPlaylists(userId)
   const { likedAlbums, loading: loadingAlbums } = useLikedAlbums(userId)
@@ -89,13 +91,23 @@ export default function LibraryPage() {
     }
 
     const fetchCreatedPlaylists = async () => {
+      // Check if we reached this page from a music subpage
+      const referrer = document.referrer
+      const isReturningFromMusic = referrer.includes('/music/')
+
       // Check if we have data in session storage to avoid refetching on back navigation
       const cacheKey = `created_playlists_${userId}`
+      const scrollKey = `library_scroll_${userId}`
       const cached = sessionStorage.getItem(cacheKey)
-      if (cached) {
+
+      if (cached && isReturningFromMusic) {
         setCreatedPlaylists(JSON.parse(cached))
         setLoadingCreated(false)
         return
+      } else if (!isReturningFromMusic && referrer && !referrer.includes('/music/library')) {
+        // Clear cache ONLY if coming from a completely different page (Home, Search, etc.)
+        sessionStorage.removeItem(cacheKey)
+        sessionStorage.removeItem(scrollKey)
       }
 
       try {
@@ -160,13 +172,28 @@ export default function LibraryPage() {
                 }
               }
             }
-            return playlist
           })
 
           if (isMounted) {
             setCreatedPlaylists(playlistsWithCovers)
-            // Store in session storage for "back" navigation
-            sessionStorage.setItem(cacheKey, JSON.stringify(playlistsWithCovers))
+
+            // OPTIMIZATION: Store slim version of data to save session quota
+            const litePlaylists = playlistsWithCovers.map(p => ({
+              ...p,
+              songs: p.songs?.map(s => ({ id: s.id, image: s.image }))
+            }))
+
+            try {
+              sessionStorage.setItem(cacheKey, JSON.stringify(litePlaylists))
+            } catch (e) {
+              console.warn("Library storage quota error", e);
+              // Clean up on quota error
+              Object.keys(sessionStorage).forEach(k => {
+                if (k.startsWith('created_playlists_') || k.startsWith('library_scroll_')) {
+                  sessionStorage.removeItem(k);
+                }
+              });
+            }
           }
         }
       } catch (error) {
@@ -183,28 +210,12 @@ export default function LibraryPage() {
   }, [userId])
 
   const isAnyLoading = loadingPlaylists || loadingAlbums || loadingArtists || loadingSongs || loadingCreated
-
   const likedSongsCount = getLikedCount()
-
-  const toggleTab = useCallback((tab) => {
-    setActiveTab(prev => prev === tab ? "All" : tab)
-  }, [])
-
-  const handleBack = useCallback(() => router.back(), [router])
-
-  const getImageSrc = useCallback((image) => {
-    if (!image) return null
-    if (Array.isArray(image)) {
-      return image.find((img) => img.quality === "500x500")?.url || image[0]?.url
-    }
-    return image
-  }, [])
 
   const filteredItems = useMemo(() => {
     const items = []
 
     // 1. Liked Songs (Special Playlist)
-    // Show in "All" or "Playlists"
     if (activeTab === "All" || activeTab === "Playlists") {
       items.push({
         id: "liked-songs",
@@ -218,12 +229,11 @@ export default function LibraryPage() {
 
     // 2. Playlists (Created & Liked)
     if (activeTab === "All" || activeTab === "Playlists") {
-      // Add Created Playlists first
       createdPlaylists.forEach((playlist) => {
         items.push({
           id: playlist._id || playlist.playlistId,
           title: playlist.name || playlist.playlistName || "Unknown Playlist",
-          subtitle: `Playlist • You`,
+          subtitle: `${playlist.songIds?.length || 0} songs`,
           image: playlist.image,
           collageImages: playlist.collageImages,
           isCollage: playlist.isCollage,
@@ -232,18 +242,13 @@ export default function LibraryPage() {
         })
       })
 
-      // Add Liked Playlists (filter out duplicates if they are already in created)
       likedPlaylists?.forEach((playlist) => {
         if (createdPlaylists.some(cp => cp._id === playlist.playlistId)) return
-
-        const playlistUrl = playlist.isUserPlaylist
-          ? `/music/playlists/${playlist.playlistId}`
-          : `/music/playlist/${playlist.playlistId}`
-
+        const playlistUrl = playlist.isUserPlaylist ? `/music/playlists/${playlist.playlistId}` : `/music/playlist/${playlist.playlistId}`
         items.push({
           id: playlist.playlistId,
           title: playlist.playlistName || playlist.name || playlist.title || "Unknown Playlist",
-          subtitle: `Playlist • ${playlist.owner || playlist.subtitle || "Jammify"}`,
+          subtitle: `${playlist.songIds?.length || 0} songs`,
           image: playlist.image,
           collageImages: playlist.collageImages,
           isCollage: playlist.isCollage,
@@ -252,6 +257,7 @@ export default function LibraryPage() {
         })
       })
     }
+
     // 3. Albums
     if (activeTab === "All" || activeTab === "Albums") {
       likedAlbums?.forEach((album) => {
@@ -280,14 +286,65 @@ export default function LibraryPage() {
         })
       })
     }
-
     return items
-  }, [activeTab, likedPlaylists, likedAlbums, likedArtists, likedSongsCount, createdPlaylists, router])
+  }, [activeTab, likedPlaylists, likedAlbums, likedArtists, likedSongsCount, createdPlaylists])
+
+  // Robust scroll restoration
+  useEffect(() => {
+    if (!isAnyLoading && filteredItems.length > 0 && scrollContainerRef.current && !scrollRestored && userId) {
+      const scrollKey = `library_scroll_${userId}`
+      const savedPosition = sessionStorage.getItem(scrollKey)
+
+      if (savedPosition) {
+        const pos = parseInt(savedPosition)
+        let frames = 0
+        const attemptScroll = () => {
+          if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTop = pos
+            if (scrollContainerRef.current.scrollTop >= pos || frames > 5) {
+              setScrollRestored(true)
+            } else {
+              frames++
+              requestAnimationFrame(attemptScroll)
+            }
+          }
+        }
+        requestAnimationFrame(attemptScroll)
+      } else {
+        setScrollRestored(true)
+      }
+    } else if (!isAnyLoading && filteredItems.length === 0) {
+      setScrollRestored(true)
+    }
+  }, [isAnyLoading, filteredItems.length, scrollRestored, userId])
+
+  const toggleTab = useCallback((tab) => {
+    setActiveTab(prev => prev === tab ? "All" : tab)
+  }, [])
+
+  const handleBack = useCallback(() => router.back(), [router])
+
+  const getImageSrc = useCallback((image) => {
+    if (!image) return null
+    if (Array.isArray(image)) {
+      return image.find((img) => img.quality === "500x500")?.url || image[0]?.url
+    }
+    return image
+  }, [])
 
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col">
+      <SidebarInset
+        className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col"
+        onScroll={(e) => {
+          if (userId && !isAnyLoading && scrollRestored) {
+            const scrollKey = `library_scroll_${userId}`
+            sessionStorage.setItem(scrollKey, e.currentTarget.scrollTop.toString())
+          }
+        }}
+        ref={scrollContainerRef}
+      >
         <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background px-4">
           <SidebarTrigger className="-ml-1 hidden md:inline" />
           <Button variant="ghost" size="sm" onClick={handleBack} className="mr-2 hidden md:flex">
@@ -303,7 +360,9 @@ export default function LibraryPage() {
           </Breadcrumb>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-24">
+        <div
+          className="flex-1 p-4 md:p-6 pb-24"
+        >
           {/* Tabs */}
           <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
             {/* Clear filter button (optional, but "X" pattern is common) - implicit by toggling off or clicking 'All' if we had one, but effectively unselecting current tab works */}
@@ -341,17 +400,17 @@ export default function LibraryPage() {
             <LibrarySkeleton />
           ) : (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 min-[2400px]:grid-cols-11 gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 min-[2400px]:grid-cols-11 gap-x-3 gap-y-6 md:gap-x-4 md:gap-y-8">
                 {filteredItems.map((item) => (
                   <Link
                     key={`${item.type}-${item.id}`}
                     href={item.onClick}
-                    className="group relative p-3 rounded-md hover:bg-zinc-800/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="group relative rounded-md hover:bg-zinc-800/30 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     aria-label={`View ${item.type} ${item.title}`}
                   >
                     {/* Image Container */}
                     <div className={cn(
-                      "aspect-square w-full mb-3 overflow-hidden shadow-lg relative",
+                      "aspect-square w-full mb-2 overflow-hidden shadow-lg relative",
                       item.type === "artist" ? "rounded-full" : "rounded-md"
                     )}>
                       {item.isLikedSongs ? (
@@ -377,11 +436,11 @@ export default function LibraryPage() {
                     </div>
 
                     {/* Text Content */}
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-white truncate mb-1">
+                    <div className="min-w-0 space-y-0.5">
+                      <h3 className="font-bold text-white truncate text-[15px]">
                         {item.title}
                       </h3>
-                      <p className="text-sm text-zinc-400 truncate">
+                      <p className="text-sm text-zinc-400 truncate font-medium">
                         {item.subtitle}
                       </p>
                     </div>

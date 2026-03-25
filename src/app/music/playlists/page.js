@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, memo } from "react";
+import { useState, useEffect, useCallback, useMemo, memo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -163,6 +163,29 @@ export default function PlaylistsPage() {
   const [importStage, setImportStage] = useState(0); // 0: input, 1: processing, 2: success
   const [importMessage, setImportMessage] = useState("");
   const [refreshKey, setRefreshKey] = useState(0); // bumped to force re-fetch
+  const [scrollRestored, setScrollRestored] = useState(false);
+  const scrollContainerRef = useRef(null);
+
+  // Safe storage helper to avoid QuotaExceededError
+  const safeSessionStorageSet = useCallback((key, value) => {
+    try {
+      sessionStorage.setItem(key, value);
+    } catch (e) {
+      if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+        console.warn('sessionStorage quota exceeded. Clearing community caches to make room.');
+        // Try clearing other community caches first to make room
+        Object.keys(sessionStorage).forEach(k => {
+          if (k.startsWith('communityPlaylists') || k.startsWith('user_playlists_page_')) {
+            sessionStorage.removeItem(k);
+          }
+        });
+        // Try one more time
+        try { sessionStorage.setItem(key, value); } catch (e2) {
+          console.error('Still unable to save to sessionStorage after clearing.', e2);
+        }
+      }
+    }
+  }, []);
 
   // Fetch user's playlists - show immediately, load covers in background
   useEffect(() => {
@@ -177,16 +200,30 @@ export default function PlaylistsPage() {
       }
 
       const cacheKey = `user_playlists_page_${session.user.id}`;
+      const scrollKey = `user_playlists_scroll_${session.user.id}`;
+
+      // Check if we reached this page from a music subpage
+      const referrer = document.referrer;
+      const isReturningFromMusic = referrer.includes('/music/');
 
       // Check session cache for "back" navigation
-      // But only use it if we haven't just invalidated it (import/create clears it)
       const cached = sessionStorage.getItem(cacheKey);
-      if (cached) {
+      if (cached && isReturningFromMusic) {
         if (isMounted) {
-          setPlaylists(JSON.parse(cached));
-          setLoading(false);
+          try {
+            setPlaylists(JSON.parse(cached));
+            setLoading(false);
+          } catch (e) {
+            console.error("Cache parse error", e);
+            sessionStorage.removeItem(cacheKey);
+          }
         }
         return;
+      } else if (!isReturningFromMusic && referrer && !referrer.includes('/music/playlists')) {
+        // Clear cache ONLY if coming from a completely different page (Home, Search, etc.)
+        // But NOT if we are simply navigating between music-related views
+        sessionStorage.removeItem(cacheKey);
+        sessionStorage.removeItem(scrollKey);
       }
 
       if (isMounted) setLoading(true);
@@ -243,10 +280,21 @@ export default function PlaylistsPage() {
 
             if (isMounted) {
               setPlaylists(playlistsWithCovers);
-              sessionStorage.setItem(cacheKey, JSON.stringify(playlistsWithCovers));
+
+              // Only store essential data in cache to save quota space
+              const litePlaylists = playlistsWithCovers.map(p => ({
+                ...p,
+                // We keep the songs but only the absolute minimum fields for the covers
+                songs: p.songs?.map(s => ({
+                  id: s.id,
+                  image: s.image
+                }))
+              }));
+
+              safeSessionStorageSet(cacheKey, JSON.stringify(litePlaylists));
             }
           } else {
-            if (isMounted) sessionStorage.setItem(cacheKey, JSON.stringify(result.data));
+            if (isMounted) safeSessionStorageSet(cacheKey, JSON.stringify(result.data));
           }
         } else {
           console.error('Failed to fetch playlists:', result.error);
@@ -263,8 +311,37 @@ export default function PlaylistsPage() {
     return () => {
       isMounted = false;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.user?.id, status, refreshKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id, status, refreshKey, safeSessionStorageSet]);
+
+  // Robust scroll restoration
+  useEffect(() => {
+    if (!loading && playlists.length > 0 && scrollContainerRef.current && !scrollRestored && session?.user?.id) {
+      const scrollKey = `user_playlists_scroll_${session.user.id}`;
+      const savedPosition = sessionStorage.getItem(scrollKey);
+
+      if (savedPosition) {
+        const pos = parseInt(savedPosition);
+        let frames = 0;
+        const attemptScroll = () => {
+          if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTop = pos;
+            if (scrollContainerRef.current.scrollTop >= pos || frames > 5) {
+              setScrollRestored(true);
+            } else {
+              frames++;
+              requestAnimationFrame(attemptScroll);
+            }
+          }
+        };
+        requestAnimationFrame(attemptScroll);
+      } else {
+        setScrollRestored(true);
+      }
+    } else if (!loading && playlists.length === 0) {
+      setScrollRestored(true);
+    }
+  }, [loading, playlists.length, scrollRestored, session?.user?.id]);
 
   // Filter playlists based on search query
   const filteredPlaylists = useMemo(() => {
@@ -333,7 +410,7 @@ export default function PlaylistsPage() {
       if (result.success) {
         setImportStage(2);
         toast.success(`Playlist imported successfully! Added ${result.data.songIds.length} songs.`);
-        
+
         // Clear the cache NOW (before the dialog closes) so the next fetch is fresh
         if (session?.user?.id) {
           sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
@@ -398,7 +475,12 @@ export default function PlaylistsPage() {
   return (
     <SidebarProvider>
       <AppSidebar className="hidden md:flex" />
-      <SidebarInset className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col">
+      <SidebarInset className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col" onScroll={(e) => {
+        if (session?.user?.id && !loading && scrollRestored) {
+          const scrollKey = `user_playlists_scroll_${session.user.id}`;
+          sessionStorage.setItem(scrollKey, e.currentTarget.scrollTop.toString());
+        }
+      }} ref={scrollContainerRef}>
         <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center justify-between gap-2 border-b bg-background/95 backdrop-blur px-4 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2">
             <SidebarTrigger className="-ml-1 hidden md:flex" />
@@ -446,15 +528,15 @@ export default function PlaylistsPage() {
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[450px] overflow-hidden p-0 border-zinc-800 bg-zinc-950">
                   <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-green-500 via-emerald-500 to-teal-500 opacity-50" />
-                  
+
                   {importStage === 0 && (
                     <>
                       <DialogHeader className="p-6 pb-0">
                         <div className="flex items-center gap-3 mb-2">
                           <div className="w-10 h-10 rounded-full bg-[#1DB954]/10 flex items-center justify-center">
                             <svg viewBox="0 0 496 512" className="w-6 h-6" xmlns="http://www.w3.org/2000/svg">
-                              <path fill="#1ed760" d="M248 8C111.1 8 0 119.1 0 256s111.1 248 248 248 248-111.1 248-248S384.9 8 248 8Z"/>
-                              <path d="M406.6 231.1c-5.2 0-8.4-1.3-12.9-3.9-71.2-42.5-198.5-52.7-280.9-29.7-3.6 1-8.1 2.6-12.9 2.6-13.2 0-23.3-10.3-23.3-23.6 0-13.6 8.4-21.3 17.4-23.9 35.2-10.3 74.6-15.2 117.5-15.2 73 0 149.5 15.2 205.4 47.8 7.8 4.5 12.9 10.7 12.9 22.6 0 13.6-11 23.3-23.2 23.3zm-31 76.2c-5.2 0-8.7-2.3-12.3-4.2-62.5-37-155.7-51.9-238.6-29.4-4.8 1.3-7.4 2.6-11.9 2.6-10.7 0-19.4-8.7-19.4-19.4s5.2-17.8 15.5-20.7c27.8-7.8 56.2-13.6 97.8-13.6 64.9 0 127.6 16.1 177 45.5 8.1 4.8 11.3 11 11.3 19.7-.1 10.8-8.5 19.5-19.4 19.5zm-26.9 65.6c-4.2 0-6.8-1.3-10.7-3.6-62.4-37.6-135-39.2-206.7-24.5-3.9 1-9 2.6-11.9 2.6-9.7 0-15.8-7.7-15.8-15.8 0-10.3 6.1-15.2 13.6-16.8 81.9-18.1 165.6-16.5 237 26.2 6.1 3.9 9.7 7.4 9.7 16.5s-7.1 15.4-15.2 15.4z" fill="#000000"/>
+                              <path fill="#1ed760" d="M248 8C111.1 8 0 119.1 0 256s111.1 248 248 248 248-111.1 248-248S384.9 8 248 8Z" />
+                              <path d="M406.6 231.1c-5.2 0-8.4-1.3-12.9-3.9-71.2-42.5-198.5-52.7-280.9-29.7-3.6 1-8.1 2.6-12.9 2.6-13.2 0-23.3-10.3-23.3-23.6 0-13.6 8.4-21.3 17.4-23.9 35.2-10.3 74.6-15.2 117.5-15.2 73 0 149.5 15.2 205.4 47.8 7.8 4.5 12.9 10.7 12.9 22.6 0 13.6-11 23.3-23.2 23.3zm-31 76.2c-5.2 0-8.7-2.3-12.3-4.2-62.5-37-155.7-51.9-238.6-29.4-4.8 1.3-7.4 2.6-11.9 2.6-10.7 0-19.4-8.7-19.4-19.4s5.2-17.8 15.5-20.7c27.8-7.8 56.2-13.6 97.8-13.6 64.9 0 127.6 16.1 177 45.5 8.1 4.8 11.3 11 11.3 19.7-.1 10.8-8.5 19.5-19.4 19.5zm-26.9 65.6c-4.2 0-6.8-1.3-10.7-3.6-62.4-37.6-135-39.2-206.7-24.5-3.9 1-9 2.6-11.9 2.6-9.7 0-15.8-7.7-15.8-15.8 0-10.3 6.1-15.2 13.6-16.8 81.9-18.1 165.6-16.5 237 26.2 6.1 3.9 9.7 7.4 9.7 16.5s-7.1 15.4-15.2 15.4z" fill="#000000" />
                             </svg>
 
 
@@ -468,7 +550,7 @@ export default function PlaylistsPage() {
                           </div>
                         </div>
                       </DialogHeader>
-                      
+
                       <div className="p-6 space-y-4">
                         <div className="space-y-2">
                           <Label htmlFor="url" className="text-xs font-medium uppercase tracking-wider text-zinc-500">
@@ -496,7 +578,7 @@ export default function PlaylistsPage() {
                             Make sure the playlist is set to <span className="text-zinc-300">Public</span> on Spotify.
                           </p>
                         </div>
-                        
+
                         <div className="rounded-lg bg-zinc-900/50 border border-zinc-800/50 p-4 space-y-3">
                           <h4 className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">How to get the link</h4>
                           <div className="flex gap-3">
@@ -507,9 +589,9 @@ export default function PlaylistsPage() {
                             </div>
                             <div className="w-px bg-zinc-800" />
                             <div className="flex-1 flex items-center justify-center">
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 className="h-8 text-[11px] text-[#1DB954] hover:text-[#1DB954] hover:bg-[#1DB954]/10"
                                 onClick={async () => {
                                   try {
@@ -526,11 +608,11 @@ export default function PlaylistsPage() {
                           </div>
                         </div>
                       </div>
-                      
+
                       <DialogFooter className="p-6 bg-zinc-900/30 border-t border-zinc-800/50">
-                        <Button 
+                        <Button
                           className="w-full h-11 bg-[#1DB954] hover:bg-[#1ed760] text-black font-bold transition-all shadow-lg shadow-[#1DB954]/10"
-                          onClick={handleImportPlaylist} 
+                          onClick={handleImportPlaylist}
                           disabled={isImporting || !importUrl.includes('spotify.com/playlist/')}
                         >
                           Import Playlist
@@ -546,23 +628,23 @@ export default function PlaylistsPage() {
                           <Loader2 className="w-8 h-8 text-[#1DB954] animate-spin" />
                         </div>
                         <div className="absolute -bottom-2 -right-2">
-                           <div className="w-8 h-8 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center">
-                              <Music className="w-4 h-4 text-zinc-400" />
-                           </div>
+                          <div className="w-8 h-8 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+                            <Music className="w-4 h-4 text-zinc-400" />
+                          </div>
                         </div>
                       </div>
-                      
+
                       <div className="text-center space-y-2">
                         <h3 className="text-lg font-bold text-white">Importing your music</h3>
                         <p className="text-sm text-zinc-400 animate-pulse">{importMessage}</p>
                       </div>
-                      
+
                       <div className="w-full max-w-[240px] h-1.5 bg-zinc-900 rounded-full overflow-hidden">
                         <div className="h-full bg-[#1DB954] animate-progress" />
                       </div>
-                      
+
                       <p className="text-[10px] text-zinc-500 text-center max-w-[280px]">
-                        This may take a minute or two depending on the playlist size. 
+                        This may take a minute or two depending on the playlist size.
                         We are matching songs with the highest quality versions available.
                       </p>
                     </div>
@@ -571,16 +653,16 @@ export default function PlaylistsPage() {
                   {importStage === 2 && (
                     <div className="p-10 flex flex-col items-center justify-center space-y-6 min-h-[300px]">
                       <div className="w-20 h-20 rounded-full bg-green-500/10 border-2 border-green-500/20 flex items-center justify-center">
-                         <svg className="w-10 h-10 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                         </svg>
+                        <svg className="w-10 h-10 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
                       </div>
-                      
+
                       <div className="text-center space-y-1">
                         <h3 className="text-xl font-bold text-white">Import Successful!</h3>
                         <p className="text-sm text-zinc-400">Your playlist has been added to your library.</p>
                       </div>
-                      
+
                       <p className="text-xs text-zinc-500">Refreshing your library...</p>
                     </div>
                   )}
@@ -639,8 +721,8 @@ export default function PlaylistsPage() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 min-[2400px]:grid-cols-11 gap-6">
               {filteredPlaylists.map((playlist) => (
-                <Link 
-                  key={playlist._id} 
+                <Link
+                  key={playlist._id}
                   href={`/music/playlists/${playlist._id}`}
                   className="outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md"
                   aria-label={`View playlist ${playlist.name}`}

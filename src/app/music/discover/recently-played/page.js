@@ -178,28 +178,28 @@ export default function RecentlyPlayedPage() {
 
                 <div
                     ref={scrollContainerRef}
-                    className="flex-1 overflow-y-auto p-6"
+                    className="flex-1 overflow-y-auto p-4 md:p-6"
                 >
                     <div className="space-y-6">
-                        <div className="flex items-end justify-between">
-                            <div>
-                                <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
-
-                                    Recently Played
-                                </h1>
-                                <p className="text-muted-foreground">
+                        <div className="flex items-start justify-between gap-x-4">
+                            <div className="min-w-0 flex-1">
+                                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight truncate">Recently Played</h1>
+                                <p className="text-muted-foreground text-xs sm:text-sm md:text-base line-clamp-2">
                                     Your listening history across all playlists
                                 </p>
                             </div>
                             {!loading && playlists.length > 0 && (
-                                <p className="text-muted-foreground text-sm font-medium pb-1">
-                                    {playlists.length} playlists
-                                </p>
+                                <div className="text-right shrink-0 mt-2 sm:mt-0 pt-1">
+                                    <p className="text-muted-foreground text-[10px] sm:text-xs md:text-sm font-medium leading-tight">
+                                        <span className="text-foreground font-bold block sm:inline sm:mr-1 text-xs sm:text-sm">{playlists.length}</span>
+                                        playlists
+                                    </p>
+                                </div>
                             )}
                         </div>
 
                         {loading ? (
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 gap-6">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-10 min-[1800px]:grid-cols-11 min-[2100px]:grid-cols-12 gap-x-3 gap-y-6 md:gap-x-4 md:gap-y-8">
                                 {Array.from({ length: 12 }).map((_, index) => (
                                     <div key={index} className="space-y-3">
                                         <div className="bg-muted animate-pulse rounded-lg aspect-square" />
@@ -209,7 +209,7 @@ export default function RecentlyPlayedPage() {
                                 ))}
                             </div>
                         ) : (
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 gap-6">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-10 min-[1800px]:grid-cols-11 min-[2100px]:grid-cols-12 gap-x-3 gap-y-6 md:gap-x-4 md:gap-y-8">
                                 {playlists.map((playlist) => (
                                     <PlaylistCard
                                         key={playlist.id}
