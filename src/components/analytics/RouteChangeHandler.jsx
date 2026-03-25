@@ -12,8 +12,11 @@ export function RouteChangeHandler() {
     // We only want to KEEP the scroll and playlists if we are on any of the discovery/library pages
     const isAllowedPath = pathname.startsWith("/music");
     const isPlaylistPath = pathname === "/music/playlists" || pathname.startsWith("/music/playlists/");
+    
+    // Reset all caches when clicking "Home" (Discovery) or "Search"
+    const isHomeOrSearch = pathname === "/music" || pathname === "/music/search";
 
-    if (!isAllowedPath) {
+    if (!isAllowedPath || isHomeOrSearch) {
       // 1. Clear Community cache
       sessionStorage.removeItem("communityPlaylistsState");
       sessionStorage.removeItem("communityPlaylistsScrollPosition");
@@ -40,7 +43,8 @@ export function RouteChangeHandler() {
         sessionStorage.removeItem(`library_scroll_${userId}`);
       }
     } else {
-      // Even if we ARE on a music path, we might want to clear specific parts
+      // Normal within-app navigation: keep general music cache, but might clear specific scrolls
+      
       // User specifically wants to reset playlist scroll if NOT on /music/playlists or /music/playlists/[id]
       if (session?.user?.id && !isPlaylistPath) {
         sessionStorage.removeItem(`user_playlists_scroll_${session.user.id}`);

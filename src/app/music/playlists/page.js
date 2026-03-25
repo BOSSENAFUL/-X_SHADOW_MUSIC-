@@ -202,13 +202,9 @@ export default function PlaylistsPage() {
       const cacheKey = `user_playlists_page_${session.user.id}`;
       const scrollKey = `user_playlists_scroll_${session.user.id}`;
 
-      // Check if we reached this page from a music subpage
-      const referrer = document.referrer;
-      const isReturningFromMusic = referrer.includes('/music/');
-
       // Check session cache for "back" navigation
       const cached = sessionStorage.getItem(cacheKey);
-      if (cached && isReturningFromMusic) {
+      if (cached) {
         if (isMounted) {
           try {
             setPlaylists(JSON.parse(cached));
@@ -219,11 +215,6 @@ export default function PlaylistsPage() {
           }
         }
         return;
-      } else if (!isReturningFromMusic && referrer && !referrer.includes('/music/playlists')) {
-        // Clear cache ONLY if coming from a completely different page (Home, Search, etc.)
-        // But NOT if we are simply navigating between music-related views
-        sessionStorage.removeItem(cacheKey);
-        sessionStorage.removeItem(scrollKey);
       }
 
       if (isMounted) setLoading(true);

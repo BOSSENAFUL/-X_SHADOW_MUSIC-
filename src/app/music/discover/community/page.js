@@ -229,7 +229,7 @@ export default function CommunityPlaylistsPage() {
 
               {loading && Array.from({ length: 24 }).map((_, index) => (
                 <div key={`skeleton-${index}`} className="space-y-3">
-                  <div className="bg-muted animate-pulse rounded-full aspect-square" />
+                  <div className="bg-muted animate-pulse rounded-lg aspect-square" />
                   <div className="bg-muted animate-pulse h-4 rounded" />
                   <div className="bg-muted animate-pulse h-3 rounded w-2/3" />
                 </div>
@@ -237,11 +237,10 @@ export default function CommunityPlaylistsPage() {
             </div>
 
             {/* Infinite scroll loading indicator or end message */}
-            <div ref={loadingRef} className="py-8 flex justify-center w-full">
+            <div ref={loadingRef} className="py-16 flex justify-center w-full">
               {loadingMore && (
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Loading more...</span>
+                  
                 </div>
               )}
               {!hasMore && playlists.length > 0 && (

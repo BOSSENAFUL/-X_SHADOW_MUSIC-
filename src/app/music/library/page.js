@@ -91,23 +91,15 @@ export default function LibraryPage() {
     }
 
     const fetchCreatedPlaylists = async () => {
-      // Check if we reached this page from a music subpage
-      const referrer = document.referrer
-      const isReturningFromMusic = referrer.includes('/music/')
-
       // Check if we have data in session storage to avoid refetching on back navigation
       const cacheKey = `created_playlists_${userId}`
       const scrollKey = `library_scroll_${userId}`
       const cached = sessionStorage.getItem(cacheKey)
 
-      if (cached && isReturningFromMusic) {
+      if (cached) {
         setCreatedPlaylists(JSON.parse(cached))
         setLoadingCreated(false)
         return
-      } else if (!isReturningFromMusic && referrer && !referrer.includes('/music/library')) {
-        // Clear cache ONLY if coming from a completely different page (Home, Search, etc.)
-        sessionStorage.removeItem(cacheKey)
-        sessionStorage.removeItem(scrollKey)
       }
 
       try {
