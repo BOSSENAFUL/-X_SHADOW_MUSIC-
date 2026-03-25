@@ -23,6 +23,11 @@ export const trackRecentlyPlayed = async (playlist, source = 'jiosaavn', songLis
             });
         }
 
+        // Normalize image to the expected array format if it's a string
+        const normalizedImage = typeof image === 'string'
+            ? [{ quality: 'default', url: image }]
+            : image;
+
         await fetch('/api/recently-played-playlists', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -30,10 +35,10 @@ export const trackRecentlyPlayed = async (playlist, source = 'jiosaavn', songLis
                 playlistData: {
                     id: id,
                     name: name,
-                    image: image,
+                    image: normalizedImage,
                     songCount: songList.length || playlist.songCount || 0,
                     source: source,
-                    owner: playlist.owner || playlist.subtitle || playlist.description || (source === 'user' ? 'You' : 'JioSaavn')
+                    owner: playlist.userName || playlist.owner || playlist.subtitle || playlist.description || (source === 'user' ? 'You' : 'JioSaavn')
                 }
             }),
         });

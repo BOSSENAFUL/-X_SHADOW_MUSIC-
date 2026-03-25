@@ -335,27 +335,32 @@ export default function MusicPage() {
         playSong(songs[0], songs, pid);
 
         if (session?.user?.id) {
-          const trackRes = await fetch('/api/recently-played-playlists', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              playlistData: {
-                id: pid,
-                name: name,
-                image: image,
-                songCount: songs.length,
-                source: source,
-                owner: playlist.owner || playlist.subtitle || (source === 'user' ? 'You' : 'JioSaavn')
-              }
-            }),
-          });
+        // Normalize image to the expected array format if it's a string
+        const normalizedImage = typeof image === 'string'
+          ? [{ quality: 'default', url: image }]
+          : image;
 
-          if (trackRes.ok) {
-            const updatedData = await trackRes.json();
-            if (updatedData.success && updatedData.data) {
-              setRecentlyPlayed(updatedData.data);
+        const trackRes = await fetch('/api/recently-played-playlists', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            playlistData: {
+              id: pid,
+              name: name,
+              image: normalizedImage,
+              songCount: songs.length,
+              source: source,
+              owner: playlist.userName || playlist.owner || playlist.subtitle || (source === 'user' ? 'You' : 'JioSaavn')
             }
+          }),
+        });
+
+        if (trackRes.ok) {
+          const updatedData = await trackRes.json();
+          if (updatedData.success && updatedData.data) {
+            setRecentlyPlayed(updatedData.data);
           }
+        }
         }
       }
     } catch (err) {
