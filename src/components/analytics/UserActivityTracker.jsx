@@ -82,29 +82,57 @@ export default function UserActivityTracker({
   useEffect(() => {
     if (!enabled || status !== 'authenticated') return;
 
-    // Reset daily flag if date changed.
-    // Use IST to match the server — same as in recordActivity().
+    // Use IST to match the server and the recordActivity logic.
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-    if (lastRecordedDate.current !== today) {
-      hasRecordedToday.current = false;
+
+    // Try to restore state from localStorage to persist across reloads
+    try {
+      const persistedDate = localStorage.getItem('last_recorded_activity_date');
+      if (persistedDate === today) {
+        hasRecordedToday.current = true;
+        lastRecordedDate.current = today;
+      } else if (lastRecordedDate.current !== today) {
+        // Reset if date changed
+        hasRecordedToday.current = false;
+      }
+    } catch (e) {
+      // localStorage might be blocked
     }
 
     // Record activity on mount (only once per day)
     if (recordOnMount && !hasRecordedToday.current) {
-      recordActivity('mount');
+      recordActivity('mount').then(result => {
+        if (result?.success) {
+          try {
+            localStorage.setItem('last_recorded_activity_date', today);
+          } catch (e) {}
+        }
+      });
     }
 
     // Record activity on window focus
     const handleFocus = () => {
       if (recordOnFocus && !hasRecordedToday.current) {
-        recordActivity('focus');
+        recordActivity('focus').then(result => {
+          if (result?.success) {
+            try {
+              localStorage.setItem('last_recorded_activity_date', today);
+            } catch (e) {}
+          }
+        });
       }
     };
 
     // Record activity on visibility change (tab becomes visible)
     const handleVisibilityChange = () => {
       if (recordOnVisibilityChange && !document.hidden && !hasRecordedToday.current) {
-        recordActivity('visibility');
+        recordActivity('visibility').then(result => {
+          if (result?.success) {
+            try {
+              localStorage.setItem('last_recorded_activity_date', today);
+            } catch (e) {}
+          }
+        });
       }
     };
 

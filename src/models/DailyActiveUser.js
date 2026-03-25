@@ -154,34 +154,29 @@ dailyActiveUserSchema.statics.recordUserActivity = async function (userEmail, us
   };
 
   try {
-    // ─── Atomic upsert ────────────────────────────────────────────────────────
-    // This single operation:
-    //   1. Creates the document for `today` if it does not exist (upsert:true).
-    //   2. Adds the user to the `users` array ONLY if their email is not yet
-    //      present ($ne guard on 'users.email').
-    //   3. Increments totalUsers only when a user is actually pushed.
-    //
-    // Because upsert is a single atomic write, there is NO check-then-create
-    // race window — concurrent requests cannot both see "no document" and both
-    // call this.create(), which was the original source of duplicate documents.
-    // ──────────────────────────────────────────────────────────────────────────
+    // ─── Step 1: Ensure document for 'today' exists (Document-level Upsert) ─────
+    // We only upsert based on 'date' to guarantee we never create more than one 
+    // document per calendar day, even if the unique index hasn't built yet.
+    await this.findOneAndUpdate(
+      { date: today },
+      { $setOnInsert: { date: today, users: [], totalUsers: 0 } },
+      { upsert: true, new: true }
+    );
+
+    // ─── Step 2: Push the user ONLY if they are not already recorded ───────────
+    // This is atomic and works even if other users are being added simultaneously.
     const result = await this.findOneAndUpdate(
       {
         date: today,
         'users.email': { $ne: userEmail } // skip if user already recorded
       },
       {
-        $setOnInsert: { date: today },    // only set date when creating a new doc
         $push: { users: userPayload },
         $inc: { totalUsers: 1 }
       },
-      {
-        upsert: true,  // create the document if it doesn't exist
-        new: true
-      }
+      { new: true }
     );
 
-    // result is null when the filter matched nothing (user already in doc)
     if (result) {
       return { success: true, message: 'User activity recorded', isNew: true };
     }
@@ -189,12 +184,9 @@ dailyActiveUserSchema.statics.recordUserActivity = async function (userEmail, us
     return { success: true, message: 'User already recorded for today', isNew: false };
 
   } catch (error) {
-    // Edge-case: two truly simultaneous requests may both attempt the upsert
-    // insert path at the same nanosecond. MongoDB raises a duplicate-key error
-    // (code 11000) on the unique `date` index in that scenario.
-    // Retry with a plain update (no upsert needed — the doc now exists).
+    // Unique index catch-all (backup for simultaneous creations on very first hit of the day)
     if (error.code === 11000 && error.keyPattern?.date) {
-      const updateResult = await this.findOneAndUpdate(
+      const retryResult = await this.findOneAndUpdate(
         {
           date: today,
           'users.email': { $ne: userEmail }
@@ -206,7 +198,7 @@ dailyActiveUserSchema.statics.recordUserActivity = async function (userEmail, us
         { new: true }
       );
 
-      if (updateResult) {
+      if (retryResult) {
         return { success: true, message: 'User activity recorded', isNew: true };
       }
       return { success: true, message: 'User already recorded for today', isNew: false };
