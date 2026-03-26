@@ -57,7 +57,8 @@ function splitArtists(artistData) {
  */
 export async function getPlaylistData(playlistId) {
     try {
-        const externalApiUrl = `https://spotify-scraper-six.vercel.app/api/get-spotify-playlist?url=https://open.spotify.com/playlist/${playlistId}`;
+        const baseUrl = process.env.SPOTIFY_SCRAPER_API_URL;
+        const externalApiUrl = `${baseUrl}${playlistId}`;
         console.log(`[Spotify] Fetching playlist data: ${playlistId}`);
 
         const data = await spotifyRequest(externalApiUrl, {
