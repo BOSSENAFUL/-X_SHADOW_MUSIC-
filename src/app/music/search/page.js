@@ -262,6 +262,7 @@ function SearchPageContent() {
   const [loading, setLoading] = useState(false);
   const [lyricsLoading, setLyricsLoading] = useState(false);
   const [publicPlaylistsLoading, setPublicPlaylistsLoading] = useState(false);
+  const [loadedSearchQuery, setLoadedSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
 
   // State for category-specific results with pagination
@@ -579,7 +580,18 @@ function SearchPageContent() {
           }
         }
 
-        setSearchResults(transformedData);
+        setSearchResults(prev => {
+          if (!prev) return transformedData;
+          return {
+            ...transformedData,
+            songs: prev.songs?.results?.length > transformedData.songs.results.length ? prev.songs : transformedData.songs,
+            albums: prev.albums?.results?.length > transformedData.albums.results.length ? prev.albums : transformedData.albums,
+            artists: prev.artists?.results?.length > transformedData.artists.results.length ? prev.artists : transformedData.artists,
+            playlists: prev.playlists?.results?.length > transformedData.playlists.results.length ? prev.playlists : transformedData.playlists,
+          };
+        });
+        setLoading(false);
+        setLoadedSearchQuery(query);
       } else {
         console.error('Search failed:', data.message);
         // Don't clear results on error, keep previous results to prevent layout shift
@@ -907,7 +919,9 @@ function SearchPageContent() {
       searchResults[activeTab].results.length > 0;
 
     if (currentCategoryState?.page === 0 && !currentCategoryState?.loading) {
-      if (hasExistingResultsFromMainSearch) {
+      // Only promote if we have a substantial number of results. 
+      // The general search returns a tiny preview (3-5 items) which is NOT page 1.
+      if (hasExistingResultsFromMainSearch && searchResults[activeTab].results.length >= 15) {
         console.log(`[Search] Hydrating ${activeTab} with existing results from main search`);
 
         // For artists, make sure we preserve any injected song artists
@@ -927,8 +941,21 @@ function SearchPageContent() {
           }
         }));
       } else {
-        // Genuine empty state, fetch page 1
-        console.log(`[Search] No existing results for ${activeTab}, fetching page 1`);
+        // Genuine empty state, or we only have a 3-item preview which is useless for a full grid.
+        console.log(`[Search] No full existing results for ${activeTab}, fetching page 1`);
+        // If we have a tiny preview, we can temporarily show it while loading page 1
+        if (hasExistingResultsFromMainSearch) {
+          setCategoryData(prev => ({
+            ...prev,
+            [activeTab]: {
+              ...prev[activeTab],
+              results: searchResults[activeTab].results,
+              page: 0,
+              hasMore: true,
+              loading: true // Show loading
+            }
+          }));
+        }
         fetchCategoryResults(activeTab, 1);
       }
     }
@@ -1127,6 +1154,9 @@ function SearchPageContent() {
     }
     if (categoryData.albums?.results?.length > combined.albums.results.length) {
       combined.albums.results = categoryData.albums.results;
+    }
+    if (categoryData.playlists?.results?.length > combined.playlists.results.length) {
+      combined.playlists.results = categoryData.playlists.results;
     }
     if (categoryData.artists?.results?.length > 0) {
       // PRESERVE injected song artists (which have IDs/images fetched specially)

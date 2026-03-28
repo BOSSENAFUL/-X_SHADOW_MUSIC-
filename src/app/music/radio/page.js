@@ -98,10 +98,30 @@ export default function RadioPage() {
     const fetchInitialData = async () => {
       try {
         setLoading(true);
+
+        const cacheKey = "radio_data_cache";
+        const cacheTimeKey = "radio_data_cache_time";
+        const cachedStr = sessionStorage.getItem(cacheKey);
+        const cacheTimeStr = sessionStorage.getItem(cacheTimeKey);
+
+        // Use cache if it exists and is less than 6 hours old
+        if (cachedStr && cacheTimeStr) {
+          const cachedTime = parseInt(cacheTimeStr, 10);
+          if (Date.now() - cachedTime < 6 * 60 * 60 * 1000) {
+            const cachedData = JSON.parse(cachedStr);
+            setStations(cachedData.stations);
+            setFilteredStations(cachedData.stations);
+            setCountries(cachedData.countries);
+            setLanguages(cachedData.languages);
+            setTags(cachedData.tags);
+            setLoading(false);
+            return;
+          }
+        }
         
         // Fetch stations with geo info
         const stationsResponse = await fetch(
-          "https://fi1.api.radio-browser.info/json/stations/search?limit=1000&has_geo_info=true&hidebroken=true&order=clickcount&reverse=true"
+          "https://de1.api.radio-browser.info/json/stations/search?limit=1000&has_geo_info=true&hidebroken=true&order=clickcount&reverse=true"
         );
         const stationsData = await stationsResponse.json();
         
@@ -117,25 +137,40 @@ export default function RadioPage() {
 
         // Fetch countries
         const countriesResponse = await fetch(
-          "https://fi1.api.radio-browser.info/json/countries?hidebroken=true"
+          "https://de1.api.radio-browser.info/json/countries?hidebroken=true"
         );
         const countriesData = await countriesResponse.json();
-        setCountries(countriesData.slice(0, 50)); // Limit to top 50 countries
+        const topCountries = countriesData.slice(0, 50);
+        setCountries(topCountries); // Limit to top 50 countries
 
         // Fetch languages
         const languagesResponse = await fetch(
-          "https://fi1.api.radio-browser.info/json/languages?hidebroken=true"
+          "https://de1.api.radio-browser.info/json/languages?hidebroken=true"
         );
         const languagesData = await languagesResponse.json();
-        setLanguages(languagesData.slice(0, 30)); // Limit to top 30 languages
+        const topLanguages = languagesData.slice(0, 30);
+        setLanguages(topLanguages); // Limit to top 30 languages
 
         // Fetch tags
         const tagsResponse = await fetch(
-          "https://fi1.api.radio-browser.info/json/tags?hidebroken=true"
+          "https://de1.api.radio-browser.info/json/tags?hidebroken=true"
         );
         const tagsData = await tagsResponse.json();
-        setTags(tagsData.slice(0, 50)); // Limit to top 50 tags
+        const topTags = tagsData.slice(0, 50);
+        setTags(topTags); // Limit to top 50 tags
 
+        try {
+          // Save to cache to prevent redundant fetches
+          sessionStorage.setItem(cacheKey, JSON.stringify({
+            stations: validStations,
+            countries: topCountries,
+            languages: topLanguages,
+            tags: topTags
+          }));
+          sessionStorage.setItem(cacheTimeKey, Date.now().toString());
+        } catch (e) {
+          console.warn("Could not cache radio data (quota exceeded)");
+        }
       } catch (error) {
         console.error("Error fetching radio data:", error);
       } finally {
@@ -182,7 +217,7 @@ export default function RadioPage() {
     try {
       // Click counter for the station and get the proper stream URL
       const clickResponse = await fetch(
-        `https://fi1.api.radio-browser.info/json/url/${station.stationuuid}`,
+        `https://de1.api.radio-browser.info/json/url/${station.stationuuid}`,
         {
           headers: {
             'User-Agent': 'Jammify/1.0'

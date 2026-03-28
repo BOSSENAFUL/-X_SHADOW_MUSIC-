@@ -39,7 +39,7 @@ import { toast } from "sonner"
 // --- Memoized Components ---
 
 const PlaylistSkeleton = memo(() => (
-  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 min-[2400px]:grid-cols-11 gap-6">
+  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-x-3 gap-y-6 md:gap-x-4 md:gap-y-8">
     {[...Array(12)].map((_, i) => (
       <div key={i} className="space-y-3">
         <Skeleton className="aspect-square w-full rounded-md bg-zinc-800/50" />
@@ -710,7 +710,7 @@ export default function PlaylistsPage() {
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 min-[2400px]:grid-cols-11 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-x-3 gap-y-6 md:gap-x-4 md:gap-y-8">
               {filteredPlaylists.map((playlist) => (
                 <Link
                   key={playlist._id}
