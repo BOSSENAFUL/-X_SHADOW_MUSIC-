@@ -72,7 +72,7 @@ AmbientGradient.displayName = "AmbientGradient";
 
 export default function MusicPage() {
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const [newReleases, setNewReleases] = useState([]);
   const [trendingPlaylists, setTrendingPlaylists] = useState([]);
   const [topHitsPlaylists, setTopHitsPlaylists] = useState([]);
@@ -122,6 +122,8 @@ export default function MusicPage() {
 
   // Fetch recently played playlists whenever session is ready
   useEffect(() => {
+    if (sessionStatus === "loading") return;
+
     if (!session?.user?.id) {
       setRecentlyPlayedLoading(false);
       return;
@@ -211,7 +213,7 @@ export default function MusicPage() {
     };
     fetchRecentlyPlayed();
     return () => { isMounted = false; };
-  }, [session?.user?.id]);
+  }, [session?.user?.id, sessionStatus]);
 
   useEffect(() => {
     let isMounted = true;
@@ -784,7 +786,7 @@ export default function MusicPage() {
           </div>
 
           {/* Recently Played Section */}
-          {!recentlyPlayedLoading && recentlyPlayed.length > 0 && (
+          {(recentlyPlayedLoading || recentlyPlayed.length > 0) && (
             <PlaylistSection
               title="Recently Played"
               playlists={recentlyPlayed.slice(0, 20).map(p => ({
@@ -849,6 +851,7 @@ export default function MusicPage() {
           <PlaylistSection
             title="Top Hits Playlists"
             playlists={topHitsPlaylists}
+            loading={topHitsLoading}
             onShowAll={() => router.push("/music/discover/top-hits")}
             onPlaylistClick={(playlist) => handleCardClick(playlist, "playlist")}
             onPlayClick={handlePlaylistPlay}
