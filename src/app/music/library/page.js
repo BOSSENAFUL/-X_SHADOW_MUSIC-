@@ -53,12 +53,14 @@ const PlaylistCollage = memo(({ images }) => {
 PlaylistCollage.displayName = "PlaylistCollage";
 
 const LibrarySkeleton = memo(() => (
-  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 min-[2400px]:grid-cols-11 gap-6">
+  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 min-[2400px]:grid-cols-11 gap-x-3 gap-y-6 md:gap-x-4 md:gap-y-8">
     {Array.from({ length: 12 }).map((_, i) => (
-      <div key={i} className="p-3">
-        <Skeleton className="aspect-square w-full mb-3 rounded-md bg-zinc-800/50" />
-        <Skeleton className="h-4 w-3/4 mb-2 bg-zinc-800/50" />
-        <Skeleton className="h-3 w-1/2 bg-zinc-800/50" />
+      <div key={i} className="group relative rounded-md">
+        <Skeleton className="aspect-square w-full mb-2 rounded-md bg-zinc-800/50" />
+        <div className="min-w-0 space-y-1.5 mt-1">
+          <Skeleton className="h-4 w-full bg-zinc-800/50" />
+          <Skeleton className="h-3 w-2/3 bg-zinc-800/50" />
+        </div>
       </div>
     ))}
   </div>
