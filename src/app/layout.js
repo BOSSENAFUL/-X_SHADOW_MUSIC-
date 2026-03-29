@@ -11,6 +11,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import AppRating from "@/components/app-rating";
 import { RouteChangeHandler } from "@/components/analytics/RouteChangeHandler";
+import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -97,6 +98,7 @@ export default function RootLayout({ children }) {
               <AppRating />
               <RouteChangeHandler />
               {children}
+              <Toaster theme="dark" position="bottom-right" />
               <Analytics />
               <SpeedInsights />
               <MusicPlayerWrapper />
