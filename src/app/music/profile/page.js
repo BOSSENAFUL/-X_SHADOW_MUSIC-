@@ -155,7 +155,7 @@ export default function ProfilePage() {
       <div className="p-6 space-y-8">
         <div className="space-y-4">
           <Skeleton className="h-8 w-48" />
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-x-3 gap-y-6 md:gap-x-4 md:gap-y-8">
             {[...Array(5)].map((_, i) => (
               <div key={i} className="space-y-3">
                 <Skeleton className="aspect-square w-full rounded-md" />
@@ -264,7 +264,7 @@ export default function ProfilePage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="rounded-full border-zinc-700 bg-black/20 hover:bg-zinc-800 hover:text-white font-semibold tracking-wide px-6"
+                    className="rounded-full border-zinc-700 bg-black/20 hover:bg-zinc-800 hover:text-white font-semibold tracking-wide px-6 cursor-pointer"
                     onClick={() => signOut({ callbackUrl: "/login" })}
                   >
                     Sign out
@@ -280,7 +280,7 @@ export default function ProfilePage() {
               <section>
                 <h2 className="text-2xl font-bold mb-4">Created Playlists</h2>
                 {enrichedCreatedPlaylists.length > 0 ? (
-                  <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-x-3 gap-y-6 md:gap-x-4 md:gap-y-8">
                     {enrichedCreatedPlaylists.map((playlist) => (
                       <div
                         key={playlist._id || playlist.playlistId}
@@ -290,7 +290,7 @@ export default function ProfilePage() {
                         <div className="aspect-square w-full relative mb-4 shadow-lg rounded-md overflow-hidden bg-zinc-900">
                           <PlaylistImage playlist={playlist} />
                         </div>
-                        <h3 className="md:font-bold truncate text-white mb-1 group-hover:underline decoration-1 underline-offset-2 text-sm md:text-base">{playlist.name || playlist.playlistName}</h3>
+                        <h3 className="md:font-bold truncate text-white mb-1 decoration-1 text-sm md:text-base">{playlist.name || playlist.playlistName}</h3>
                         <p className="text-xs md:text-sm text-muted-foreground truncate">By {playlist.owner || session?.user?.name || 'You'}</p>
                       </div>
                     ))}
@@ -308,7 +308,7 @@ export default function ProfilePage() {
               {uniqueLikedPlaylists.length > 0 && (
                 <section>
                   <h2 className="text-2xl font-bold mb-4">Liked Playlists</h2>
-                  <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-x-3 gap-y-6 md:gap-x-4 md:gap-y-8">
                     {uniqueLikedPlaylists.map((playlist) => (
                       <div
                         key={playlist.playlistId}
@@ -318,7 +318,7 @@ export default function ProfilePage() {
                         <div className="aspect-square w-full relative mb-4 shadow-lg rounded-md overflow-hidden bg-zinc-900">
                           <PlaylistImage playlist={playlist} />
                         </div>
-                        <h3 className="md:font-bold truncate text-white mb-1 group-hover:underline decoration-1 underline-offset-2 text-sm md:text-base">{playlist.playlistName}</h3>
+                        <h3 className="md:font-bold truncate text-white mb-1 decoration-1 text-sm md:text-base">{playlist.playlistName}</h3>
                         <p className="text-xs md:text-sm text-muted-foreground truncate">By {playlist.owner || playlist.subtitle || 'Jammify'}</p>
                       </div>
                     ))}
