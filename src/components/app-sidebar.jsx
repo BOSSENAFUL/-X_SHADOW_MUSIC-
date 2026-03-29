@@ -12,6 +12,7 @@ import {
   User,
   Home,
   TrendingUp,
+  MessageSquare,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -51,6 +52,11 @@ const data = {
       title: "Search",
       url: "/music/search",
       icon: Search,
+    },
+    {
+      title: "Community",
+      url: "/music/chat",
+      icon: MessageSquare,
     },
     {
       title: "Your Library",
