@@ -40,12 +40,12 @@ import { toast } from "sonner"
 
 const PlaylistSkeleton = memo(() => (
   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-x-3 gap-y-6 md:gap-x-4 md:gap-y-8">
-    {[...Array(12)].map((_, i) => (
-      <div key={i} className="space-y-3">
-        <Skeleton className="aspect-square w-full rounded-md bg-zinc-800/50" />
-        <div className="space-y-1">
-          <Skeleton className="h-4 w-3/4 bg-zinc-800/50" />
-          <Skeleton className="h-3 w-1/2 bg-zinc-800/50" />
+    {Array.from({ length: 12 }).map((_, i) => (
+      <div key={i} className="group relative rounded-md">
+        <Skeleton className="aspect-square w-full mb-2 rounded-md bg-zinc-800/50" />
+        <div className="min-w-0 space-y-1.5 mt-1">
+          <Skeleton className="h-4 w-full bg-zinc-800/50" />
+          <Skeleton className="h-3 w-2/3 bg-zinc-800/50" />
         </div>
       </div>
     ))}
@@ -95,22 +95,20 @@ const PlaylistCard = memo(({ playlist }) => {
   }, [playlist.image, playlist.songs]);
 
   return (
-    <div
-      className="group space-y-3 transition-all"
-    >
-      <div className="aspect-square w-full relative overflow-hidden rounded-md shadow-sm transition-all duration-300 group-hover:shadow-xl group-hover:scale-[1.02]">
+    <>
+      <div className="aspect-square w-full mb-2 overflow-hidden shadow-lg relative rounded-md">
         {cover.type === 'single' ? (
           <img
             src={cover.src}
             alt={playlist.name}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
             loading="lazy"
           />
         ) : cover.type === 'collage' ? (
-          <div className="w-full h-full grid grid-cols-2 grid-rows-2">
+          <div className="grid grid-cols-2 grid-rows-2 w-full h-full group-hover:scale-105 transition-transform duration-300">
             {cover.images.map((imageSrc, index) => (
-              <div key={index} className="w-full h-full overflow-hidden border-[0.5px] border-black/10">
+              <div key={index} className="relative w-full h-full overflow-hidden border-[0.5px] border-black/10">
                 <img
                   src={imageSrc}
                   alt={`Song ${index + 1}`}
@@ -122,8 +120,10 @@ const PlaylistCard = memo(({ playlist }) => {
             ))}
           </div>
         ) : (
-          <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
-            <Music className="w-12 h-12 text-zinc-700" />
+          <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
+            <span className="text-2xl font-bold text-zinc-600">
+              {playlist.name?.charAt(0) || "?"}
+            </span>
           </div>
         )}
 
@@ -135,15 +135,15 @@ const PlaylistCard = memo(({ playlist }) => {
         </div>
       </div>
 
-      <div className="space-y-1">
-        <h3 className="font-semibold text-sm truncate pr-2 group-hover:text-primary transition-colors">
+      <div className="min-w-0 space-y-0.5">
+        <h3 className="font-bold text-white truncate text-[15px]">
           {playlist.name}
         </h3>
-        <div className="flex flex-col text-xs text-muted-foreground space-y-0.5">
-          <span>{playlist.songIds?.length || 0} songs</span>
-        </div>
+        <p className="text-sm text-zinc-400 truncate font-medium">
+          {playlist.songIds?.length || 0} songs
+        </p>
       </div>
-    </div>
+    </>
   );
 });
 PlaylistCard.displayName = "PlaylistCard";
@@ -682,7 +682,7 @@ export default function PlaylistsPage() {
             </div>
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-8 p-6 pb-32 md:pb-24">
+        <div className="flex-1 p-4 md:p-6 pb-24">
 
           {loading ? (
             <PlaylistSkeleton />
@@ -715,7 +715,7 @@ export default function PlaylistsPage() {
                 <Link
                   key={playlist._id}
                   href={`/music/playlists/${playlist._id}`}
-                  className="outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md"
+                  className="group relative rounded-md hover:bg-zinc-800/30 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   aria-label={`View playlist ${playlist.name}`}
                 >
                   <PlaylistCard playlist={playlist} />
