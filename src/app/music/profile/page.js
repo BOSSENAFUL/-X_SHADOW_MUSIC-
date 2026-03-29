@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { useLikedPlaylists } from "@/hooks/useLikedPlaylists";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useRouter } from "next/navigation";
-import { Music, Disc, LogOut, Edit2 } from "lucide-react";
+import { Music, Disc, LogOut, Edit2, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function ProfilePage() {
@@ -260,7 +260,16 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <div className="mt-2">
+                <div className="mt-2 flex gap-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full border-zinc-700 bg-black/20 hover:bg-zinc-800 hover:text-white font-semibold tracking-wide px-6 cursor-pointer gap-2"
+                    onClick={() => router.push("/music/chat")}
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Chat
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
