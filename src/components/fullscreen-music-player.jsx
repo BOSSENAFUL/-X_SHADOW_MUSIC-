@@ -69,6 +69,78 @@ function _getFsSmallImageUrl(song) {
   );
 }
 
+const parseSyncedLyrics = (syncedLyrics) => {
+  if (!syncedLyrics) return [];
+
+  const lines = syncedLyrics.split("\n");
+  const parsedLines = [];
+
+  for (const line of lines) {
+    // Match LRC format: [mm:ss.xx] or [mm:ss] followed by lyrics
+    const match = line.match(/\[(\d{2}):(\d{2})(?:\.(\d{2}))?\]\s*(.*)/);
+    if (match) {
+      const minutes = parseInt(match[1], 10);
+      const seconds = parseInt(match[2], 10);
+      const centiseconds = parseInt(match[3] || "0", 10);
+      const text = match[4].trim();
+
+      const timeInSeconds = minutes * 60 + seconds + centiseconds / 100;
+
+      if (text) {
+        parsedLines.push({
+          time: timeInSeconds,
+          text: text,
+        });
+      }
+    }
+  }
+
+  return parsedLines.sort((a, b) => a.time - b.time);
+};
+
+const getCurrentLyricIndex = (parsedLyrics, currentTime) => {
+  if (!parsedLyrics || parsedLyrics.length === 0) return -1;
+
+  for (let i = parsedLyrics.length - 1; i >= 0; i--) {
+    if (currentTime >= parsedLyrics[i].time) {
+      return i;
+    }
+  }
+  return -1;
+};
+
+const formatTime = (time) => {
+  if (!time || isNaN(time)) return "0:00";
+  const minutes = Math.floor(time / 60);
+  const seconds = Math.floor(time % 60);
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+};
+
+const decodeHtmlEntities = (text) => {
+  if (!text) return text;
+  const entities = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#039;': "'",
+    '&#x27;': "'",
+    '&#x2F;': '/',
+    '&#32;': ' ',
+    '&#160;': ' '
+  };
+  return text.replace(/&[#\w\d]+;/g, (entity) => entities[entity] || entity);
+};
+
+const getArtistNames = (song) => {
+    if (!song) return "Unknown Artist";
+    if (song.artists?.primary && Array.isArray(song.artists.primary)) {
+      return song.artists.primary.map((artist) => artist.name).join(", ");
+    }
+    if (song.primaryArtists) return song.primaryArtists;
+    return "Unknown Artist";
+};
+
 export function FullscreenMusicPlayer({
   currentSong,
   playlist = [],
@@ -99,11 +171,12 @@ export function FullscreenMusicPlayer({
     isShuffle,
     setIsShuffle,
     repeatMode,
-    setRepeatMode
+    setRepeatMode,
+    isFullscreenPlaylistOpen: showPlaylist,
+    setIsFullscreenPlaylistOpen: setShowPlaylist,
   } = useMusicPlayer();
   const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
   const router = useRouter();
-  const [showPlaylist, setShowPlaylist] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
   const [shuffledPlaylist, setShuffledPlaylist] = useState([]);
   const [lyrics, setLyrics] = useState(null);
@@ -232,7 +305,8 @@ export function FullscreenMusicPlayer({
 
     if (draggedIndex === null || draggedIndex === dropIndex) return;
 
-    const newPlaylist = [...localPlaylist];
+    const currentPlaylist = getCurrentPlaylist();
+    const newPlaylist = [...currentPlaylist];
     const draggedItem = newPlaylist[draggedIndex];
 
     // Remove dragged item
@@ -242,7 +316,11 @@ export function FullscreenMusicPlayer({
     const insertIndex = draggedIndex < dropIndex ? dropIndex - 1 : dropIndex;
     newPlaylist.splice(insertIndex, 0, draggedItem);
 
-    setLocalPlaylist(newPlaylist);
+    if (isShuffle && shuffledPlaylist.length > 0) {
+      setShuffledPlaylist(newPlaylist);
+    } else {
+      setLocalPlaylist(newPlaylist);
+    }
 
     // Update the parent component's playlist using the new prop
     if (onPlaylistReorder) {
@@ -365,7 +443,8 @@ export function FullscreenMusicPlayer({
           dragOverIndex !== draggedIndex
         ) {
           // Perform the reorder
-          const newPlaylist = [...localPlaylist];
+          const currentPlaylist = getCurrentPlaylist();
+          const newPlaylist = [...currentPlaylist];
           const draggedItem = newPlaylist[draggedIndex];
 
           // Remove dragged item
@@ -376,7 +455,11 @@ export function FullscreenMusicPlayer({
             draggedIndex < dragOverIndex ? dragOverIndex - 1 : dragOverIndex;
           newPlaylist.splice(insertIndex, 0, draggedItem);
 
-          setLocalPlaylist(newPlaylist);
+          if (isShuffle && shuffledPlaylist.length > 0) {
+            setShuffledPlaylist(newPlaylist);
+          } else {
+            setLocalPlaylist(newPlaylist);
+          }
 
           // Update the parent component's playlist using the new prop
           if (onPlaylistReorder) {
@@ -427,28 +510,6 @@ export function FullscreenMusicPlayer({
   const desktopLyricsContainerRef = useRef(null);
   const mobileLyricLineRefs = useRef([]);
   const desktopLyricLineRefs = useRef([]);
-
-  const formatTime = (time) => {
-    if (!time || isNaN(time)) return "0:00";
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-  };
-
-  const decodeHtmlEntities = (text) => {
-    if (!text) return text;
-    const textarea = document.createElement("textarea");
-    textarea.innerHTML = text;
-    return textarea.value;
-  };
-
-  const getArtistNames = (song) => {
-    if (song.artists?.primary && Array.isArray(song.artists.primary)) {
-      return song.artists.primary.map((artist) => artist.name).join(", ");
-    }
-    if (song.primaryArtists) return song.primaryArtists;
-    return "Unknown Artist";
-  };
 
   // Fetch lyrics from LRCLib API
   const fetchLyrics = async (song) => {
@@ -577,49 +638,6 @@ export function FullscreenMusicPlayer({
     } finally {
       setLyricsLoading(false);
     }
-  };
-
-  // Parse synced lyrics (LRC format)
-  const parseSyncedLyrics = (syncedLyrics) => {
-    if (!syncedLyrics) return [];
-
-    const lines = syncedLyrics.split("\n");
-    const parsedLines = [];
-
-    for (const line of lines) {
-      // Match LRC format: [mm:ss.xx] or [mm:ss] followed by lyrics
-      const match = line.match(/\[(\d{2}):(\d{2})(?:\.(\d{2}))?\]\s*(.*)/);
-      if (match) {
-        const minutes = parseInt(match[1], 10);
-        const seconds = parseInt(match[2], 10);
-        const centiseconds = parseInt(match[3] || "0", 10);
-        const text = match[4].trim();
-
-        const timeInSeconds = minutes * 60 + seconds + centiseconds / 100;
-
-        if (text) {
-          // Only add non-empty lyrics
-          parsedLines.push({
-            time: timeInSeconds,
-            text: text,
-          });
-        }
-      }
-    }
-
-    return parsedLines.sort((a, b) => a.time - b.time);
-  };
-
-  // Get current lyric line based on current time
-  const getCurrentLyricIndex = (parsedLyrics, currentTime) => {
-    if (!parsedLyrics || parsedLyrics.length === 0) return -1;
-
-    for (let i = parsedLyrics.length - 1; i >= 0; i--) {
-      if (currentTime >= parsedLyrics[i].time) {
-        return i;
-      }
-    }
-    return -1;
   };
 
   // Scroll to center the current lyric line (Spotify-like behavior) - Optimized
@@ -1092,14 +1110,24 @@ export function FullscreenMusicPlayer({
         : shuffleArray(playlist);
 
       setShuffledPlaylist(shuffled);
+      // Update context index to match the new position (always 0)
+      if (currentSong) {
+        onSongChange?.(currentSong, 0, shuffled);
+      }
     } else {
       setShuffledPlaylist([]);
+      // When shuffle is turned off, find where current song is in localPlaylist and update context
+      if (currentSong && localPlaylist.length > 0) {
+        const originalIndex = localPlaylist.findIndex(s => s.id === currentSong.id);
+        if (originalIndex !== -1) {
+          onSongChange?.(currentSong, originalIndex, localPlaylist);
+        }
+      }
     }
   }, [isShuffle, playlist, currentSong?.id]);
 
-  // Get current playlist (shuffled or normal)
   const getCurrentPlaylist = () => {
-    return isShuffle ? shuffledPlaylist : playlist;
+    return isShuffle && shuffledPlaylist.length > 0 ? shuffledPlaylist : localPlaylist;
   };
 
   // Enhanced next/previous functions with shuffle and repeat support
@@ -1975,9 +2003,9 @@ export function FullscreenMusicPlayer({
                   className="flex-1 overflow-y-auto scrollbar-hide"
                   style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
                 >
-                  {localPlaylist.map((song, index) => (
+                  {getCurrentPlaylist().map((song, index) => (
                     <div
-                      key={song.id}
+                      key={`${song.id}-${index}`}
                       data-song-index={index}
                       draggable
                       onDragStart={(e) => handleDragStart(e, index)}
@@ -1991,7 +2019,7 @@ export function FullscreenMusicPlayer({
                       onClick={(e) => {
                         // Only trigger song change if not dragging
                         if (!isDragging) {
-                          onSongChange?.(song, index, localPlaylist);
+                          onSongChange?.(song, index, getCurrentPlaylist());
                           setShowPlaylist(false); // Close queue on mobile after selection
                         }
                       }}
@@ -2082,9 +2110,9 @@ export function FullscreenMusicPlayer({
                 </div>
               </div>
               <div className="overflow-y-auto h-full pb-20 scrollbar-hide">
-                {localPlaylist.map((song, index) => (
+                {getCurrentPlaylist().map((song, index) => (
                   <div
-                    key={song.id}
+                    key={`${song.id}-${index}`}
                     data-song-index={index}
                     draggable
                     onDragStart={(e) => handleDragStart(e, index)}
@@ -2098,7 +2126,7 @@ export function FullscreenMusicPlayer({
                     onClick={(e) => {
                       // Only trigger song change if not dragging
                       if (!isDragging) {
-                        onSongChange?.(song, index, localPlaylist);
+                        onSongChange?.(song, index, getCurrentPlaylist());
                       }
                     }}
                     className={`flex items-center gap-3 p-3 hover:bg-white/5 cursor-move transition-all duration-200 select-none ${index === playerCurrentIndex ? "bg-white/10" : ""

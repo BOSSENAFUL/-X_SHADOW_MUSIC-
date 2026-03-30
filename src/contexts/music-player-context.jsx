@@ -12,6 +12,7 @@ export function MusicPlayerProvider({ children }) {
   const [isPlayerVisible, setIsPlayerVisible] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
+  const [isFullscreenPlaylistOpen, setIsFullscreenPlaylistOpen] = useState(false);
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState("off"); // 'off', 'all', 'one'
 
@@ -85,11 +86,13 @@ export function MusicPlayerProvider({ children }) {
         isShuffle,
         repeatMode,
         isFullscreenOpen,
+        isFullscreenPlaylistOpen,
         currentTime,
         duration,
         volume,
         audioRef,
         setIsFullscreenOpen,
+        setIsFullscreenPlaylistOpen,
         playSong,
         handleSongChange,
         clearPlayer,

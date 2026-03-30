@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1 } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1, ListMusic } from "lucide-react";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { FullscreenMusicPlayer } from "@/components/fullscreen-music-player";
 import { IoMdPlay } from "react-icons/io";
@@ -37,6 +37,8 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     currentIndex: playerCurrentIndex,
     setIsShuffle,
     setRepeatMode,
+    setIsFullscreenPlaylistOpen,
+    isFullscreenPlaylistOpen,
   } = useMusicPlayer();
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -1005,17 +1007,33 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                 </div>
 
                 {/* Volume */}
-                <div className="flex items-center gap-2 flex-1 justify-end">
+                <div className="flex items-center gap-3 flex-1 justify-end">
+                  <button
+                    className={`transition-colors p-1 ${isFullscreenOpen && isFullscreenPlaylistOpen ? 'text-green-500' : 'text-white/60 hover:text-white'}`}
+                    title="Queue"
+                    onClick={() => {
+                        if (isFullscreenOpen && isFullscreenPlaylistOpen) {
+                            setIsFullscreenOpen(false);
+                            setIsFullscreenPlaylistOpen(false);
+                        } else {
+                            setIsFullscreenOpen(true);
+                            setIsFullscreenPlaylistOpen(true);
+                        }
+                    }}
+                  >
+                    <ListMusic style={{ width: '20px', height: '20px' }} />
+                  </button>
+
                   {volume === 0 ? (
                     <VolumeX
                       style={{ width: '20px', height: '20px' }}
-                      className="cursor-pointer hover:text-white transition-colors"
+                      className="cursor-pointer hover:text-white transition-colors ml-1"
                       onClick={toggleMute}
                     />
                   ) : (
                     <Volume2
                       style={{ width: '20px', height: '20px' }}
-                      className="cursor-pointer hover:text-white transition-colors"
+                      className="cursor-pointer hover:text-white transition-colors ml-1"
                       onClick={toggleMute}
                     />
                   )}
