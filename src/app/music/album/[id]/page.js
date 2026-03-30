@@ -67,7 +67,7 @@ const SongActionMenu = memo(({
                       'Unknown Artist';
   const songImageUrl = song.image?.find(img => img.quality === '150x150')?.url || 
                        song.image?.[song.image.length - 1]?.url || 
-                       '/default-playlist-image.png';
+                       '/def playlist image.jpg';
 
   const ActionItems = ({ onItemClick }) => (
     <>
@@ -766,13 +766,15 @@ export default function AlbumPage() {
                         alt={album.name}
                         className="w-full h-full object-cover"
                         onError={(e) => {
-                          e.target.style.display = 'none';
+                          e.target.src = '/def playlist image.jpg';
                         }}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Disc className="w-16 h-16 opacity-50" />
-                      </div>
+                      <img 
+                        src="/def playlist image.jpg" 
+                        alt={album.name} 
+                        className="w-full h-full object-cover"
+                      />
                     )}
                   </div>
                   <div className="space-y-3">
@@ -824,13 +826,15 @@ export default function AlbumPage() {
                       alt={album.name}
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        e.target.style.display = 'none';
+                        e.target.src = '/def playlist image.jpg';
                       }}
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Disc className="w-20 h-20 opacity-50" />
-                    </div>
+                    <img 
+                      src="/def playlist image.jpg" 
+                      alt={album.name} 
+                      className="w-full h-full object-cover"
+                    />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -971,12 +975,12 @@ export default function AlbumPage() {
                               className="w-full h-full object-cover rounded"
                               loading="lazy"
                               onError={(e) => {
-                                e.target.src = '/default-playlist-image.png';
+                                e.target.src = '/def playlist image.jpg';
                               }}
                             />
                           ) : (
                             <img
-                              src="/default-playlist-image.png"
+                              src="/def playlist image.jpg"
                               alt={song.name}
                               className="w-full h-full object-cover rounded"
                             />
@@ -1066,12 +1070,12 @@ export default function AlbumPage() {
                                 className="w-full h-full object-cover rounded"
                                 loading="lazy"
                                 onError={(e) => {
-                                  e.target.src = '/default-playlist-image.png';
+                                  e.target.src = '/def playlist image.jpg';
                                 }}
                               />
                             ) : (
                               <img
-                                src="/default-playlist-image.png"
+                                src="/def playlist image.jpg"
                                 alt={song.name}
                                 className="w-full h-full object-cover rounded"
                               />

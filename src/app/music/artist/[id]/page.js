@@ -243,11 +243,18 @@ export default function ArtistPage() {
   const [artistLikeLoading, setArtistLikeLoading] = useState(false);
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState(null);
+  const [biography, setBiography] = useState([]);
+  const [fetchingBio, setFetchingBio] = useState(false);
   const [showHeaderTitle, setShowHeaderTitle] = useState(false);
   const [albums, setAlbums] = useState([]);
+  const [songs, setSongs] = useState([]);
+  const [songsPage, setSongsPage] = useState(0);
+  const [hasMoreSongs, setHasMoreSongs] = useState(true);
+  const [fetchingMoreSongs, setFetchingMoreSongs] = useState(false);
   const [albumPage, setAlbumPage] = useState(0);
   const [hasMoreAlbums, setHasMoreAlbums] = useState(true);
   const [fetchingMoreAlbums, setFetchingMoreAlbums] = useState(false);
+  const [showAllTopSongs, setShowAllTopSongs] = useState(false);
   const mobileTitleRef = useRef(null);
   const desktopTitleRef = useRef(null);
   const albumsObserverTarget = useRef(null);
@@ -288,12 +295,20 @@ export default function ArtistPage() {
           setDominantColor(extractedColor);
           setArtist(artistData.data);
 
+          if (artistData.data.bio) {
+            setBiography(artistData.data.bio);
+          }
+
+          if (artistData.data.topSongs) {
+            setSongs(artistData.data.topSongs);
+            // JioSaavn usually returns 10 top songs in the artist detail
+            setSongsPage(1); 
+            setHasMoreSongs(artistData.data.topSongs.length >= 10);
+          }
+
           if (artistData.data.topAlbums) {
             setAlbums(artistData.data.topAlbums);
-            // Initialize albumPage to 0 so we fetch page 0 of the dedicated API next
             setAlbumPage(0);
-            // We can check if we should even try to fetch more. 
-            // Usually, if total is not available here, we assume there's more if we got a full page of topAlbums.
             setHasMoreAlbums(artistData.data.topAlbums.length >= 10);
           } else {
             setHasMoreAlbums(false);
@@ -344,6 +359,44 @@ export default function ArtistPage() {
       observer.disconnect();
     };
   }, [loading, artist?.name]);
+
+  // Function to fetch more songs (Pagination)
+  const fetchMoreSongs = async () => {
+    if (fetchingMoreSongs || !hasMoreSongs || !artistId) return;
+
+    setFetchingMoreSongs(true);
+    try {
+      const nextPage = songsPage;
+      console.log(`Fetching more songs for artist ${artistId}, page ${nextPage}`);
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/artists/${artistId}/songs?page=${nextPage}`);
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        const newSongs = data.data.songs || data.data;
+
+        if (Array.isArray(newSongs) && newSongs.length > 0) {
+          setSongs(prev => {
+            const existingIds = new Set(prev.map(s => s.id));
+            const uniqueNew = newSongs.filter(s => s.id && !existingIds.has(s.id));
+            return [...prev, ...uniqueNew];
+          });
+          setSongsPage(nextPage + 1);
+          setHasMoreSongs(newSongs.length >= 10);
+          setShowAllTopSongs(true); // Ensure new songs are visible
+        } else {
+          setHasMoreSongs(false);
+        }
+      } else {
+        setHasMoreSongs(false);
+      }
+    } catch (error) {
+      console.error('Error fetching more songs:', error);
+      setHasMoreSongs(false);
+    } finally {
+      setFetchingMoreSongs(false);
+    }
+  };
 
   // Function to fetch more albums (Lazy Loading)
   const fetchMoreAlbums = useCallback(async () => {
@@ -429,20 +482,55 @@ export default function ArtistPage() {
     };
 
     checkArtistLiked();
-  }, [session, artistId]);
+  }, [session?.user?.id, artistId]);
+
+  // Handle missing or short bio with external enrichment
+  useEffect(() => {
+    const fetchExternalBio = async () => {
+      // If we already have a good bio, don't fetch more
+      // Good bio = at least one section with more than 100 characters
+      const isBioGood = biography.some(b => b.text && b.text.length > 100);
+      
+      if (!isBioGood && artist?.name && !fetchingBio) {
+        setFetchingBio(true);
+        try {
+          const response = await fetch(`/api/artist/bio?name=${encodeURIComponent(artist.name)}`);
+          const data = await response.json();
+          if (data.success && data.data && data.data.length > 0) {
+              setBiography(prev => {
+                  // If prev is totally empty, just take the new one
+                  if (prev.length === 0) return data.data;
+                  // If prev is small, append new ones but avoid duplicate titles
+                  const existingTitles = new Set(prev.map(b => b.title?.toLowerCase()));
+                  const uniqueNew = data.data.filter(b => b.title && !existingTitles.has(b.title.toLowerCase()));
+                  return [...prev, ...uniqueNew];
+              });
+          }
+        } catch (error) {
+          console.error('Failed to fetch external bio:', error);
+        } finally {
+          setFetchingBio(false);
+        }
+      }
+    };
+
+    if (artist?.name && !loading) {
+      fetchExternalBio();
+    }
+  }, [artist?.name, loading]);
 
   const handlePlayClick = (song, index) => {
-    playSong(song, artist.topSongs, artistId, index);
+    playSong(song, songs, artistId, index);
   };
 
   const handlePlayAll = () => {
-    if (artist?.topSongs && artist.topSongs.length > 0) {
+    if (songs && songs.length > 0) {
       const isPlaylistPlaying = currentPlaylistId === artistId;
 
       if (isPlaylistPlaying) {
         togglePlayPause();
       } else {
-        playSong(artist.topSongs[0], artist.topSongs, artistId, 0);
+        playSong(songs[0], songs, artistId, 0);
       }
     }
   };
@@ -541,7 +629,21 @@ export default function ArtistPage() {
   };
 
   const decodeHtmlEntities = useCallback((text) => {
-    if (!text || !text.includes('&')) return text;
+    if (!text) return text;
+    
+    // Handle Mojibake (UTF-8 interpreted as Latin-1/Windows-1252)
+    let cleanedText = text
+      .replace(/â€œ/g, '“')
+      .replace(/â€/g, '”')
+      .replace(/â€˜/g, '‘')
+      .replace(/â€™/g, '’')
+      .replace(/â€”/g, '—')
+      .replace(/â€“/g, '–')
+      .replace(/â€¦/g, '…')
+      .replace(/Â/g, ''); // Non-breaking space artifact
+
+    if (!cleanedText.includes('&')) return cleanedText;
+    
     const entities = {
       '&amp;': '&',
       '&lt;': '<',
@@ -550,8 +652,176 @@ export default function ArtistPage() {
       '&#39;': "'",
       '&apos;': "'"
     };
-    return text.replace(/&amp;|&lt;|&gt;|&quot;|&#39;|&apos;/g, m => entities[m]);
+    return cleanedText.replace(/&amp;|&lt;|&gt;|&quot;|&#39;|&apos;/g, m => entities[m]);
   }, []);
+
+  const downloadSingleSong = async (song, silent = false) => {
+    let toastId = null;
+    if (!silent) {
+      toastId = toast.loading(`Preparing "${decodeHtmlEntities(song.name)}"...`);
+    }
+
+    try {
+      // 1. Resolve Best Quality URL
+      let downloadUrl = null;
+      if (song.downloadUrl && Array.isArray(song.downloadUrl)) {
+        // Step 1: Find all MP3s
+        const mp3s = song.downloadUrl.filter(u => u.url.toLowerCase().includes('.mp3'));
+
+        // Step 2: Pick the best MP3 (prefer high quality)
+        const bestMp3 = mp3s.find(u => u.quality === '320kbps') ||
+          mp3s.find(u => u.quality === '160kbps') ||
+          mp3s[0];
+
+        // Step 3: Fallback to best overall if no MP3 found
+        const bestOverall = song.downloadUrl.find(u => u.quality === '320kbps') ||
+          song.downloadUrl[song.downloadUrl.length - 1];
+
+        downloadUrl = bestMp3?.url || bestOverall?.url;
+      }
+
+      if (!downloadUrl) {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs?ids=${song.id}`);
+        const data = await response.json();
+        if (data.success && data.data?.[0]?.downloadUrl) {
+          const freshUrls = data.data[0].downloadUrl;
+          const mp3s = freshUrls.filter(u => u.url.toLowerCase().includes('.mp3'));
+          const bestMp3 = mp3s.find(u => u.quality === '320kbps') || mp3s.find(u => u.quality === '160kbps') || mp3s[0];
+          const bestOverall = freshUrls.find(u => u.quality === '320kbps') || freshUrls[freshUrls.length - 1];
+          downloadUrl = bestMp3?.url || bestOverall?.url;
+        }
+      }
+
+      if (!downloadUrl) throw new Error('No download URL available');
+
+      // 2. Resolve Best Image
+      const imageUrl = song.image?.find(img => img.quality === '500x500')?.url ||
+        song.image?.find(img => img.quality === '150x150')?.url ||
+        song.image?.[song.image.length - 1]?.url;
+
+      const title = decodeHtmlEntities(song.name);
+      const songArtist = song.artists?.primary?.map(a => a.name).join(', ') || 'Unknown Artist';
+      const album = song.album?.name ? decodeHtmlEntities(song.album.name) : 'Unknown Album';
+      const year = song.year || (song.releaseDate ? new Date(song.releaseDate).getFullYear() : '');
+
+      if (!silent) toast.loading(`Injecting metadata for "${title}"...`, { id: toastId });
+
+      // 3. Call Backend API
+      const response = await fetch('/api/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          songUrl: downloadUrl,
+          imageUrl,
+          title,
+          artist: songArtist,
+          album,
+          year
+        }),
+      });
+
+      if (!response.ok) throw new Error('Backend failed to process song');
+
+      const isTagged = response.headers.get('X-Tagged') === 'true';
+      const isConverted = response.headers.get('X-Converted') === 'true';
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${title} - ${songArtist}.mp3`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      if (isTagged) {
+        if (!silent) toast.success(`Downloaded "${title}" with album art! ${isConverted ? '(High-Quality MP3)' : ''}`, { id: toastId });
+      } else {
+        if (!silent) toast.error(`Download successful, but metadata injection failed for "${title}".`, { id: toastId });
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      if (!silent) {
+        toast.error(`Failed to download: ${error.message}`, { id: toastId });
+      }
+      throw error;
+    }
+  };
+
+  const handleDownloadSongs = async () => {
+    const songsToDownload = songs || [];
+    if (songsToDownload.length === 0) {
+      toast.info('No songs to download!');
+      return;
+    }
+
+    // Show initial toast
+    const progressToast = document.createElement('div');
+    progressToast.className = 'fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
+    progressToast.innerHTML = `
+      <div class="flex items-center gap-2">
+        <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+        <div class="flex flex-col">
+          <span class="font-bold text-sm">Downloading Songs...</span>
+          <span class="text-xs opacity-90" id="download-progress-text">Preparing 0 / ${songsToDownload.length}</span>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(progressToast);
+
+    let downloadedCount = 0;
+    let failedCount = 0;
+    const CONCURRENCY_LIMIT = 4;
+    const queue = [...songsToDownload];
+
+    const downloadWorker = async () => {
+      while (queue.length > 0) {
+        const song = queue.shift();
+        if (!song) break;
+
+        try {
+          await downloadSingleSong(song, true);
+          downloadedCount++;
+        } catch (error) {
+          console.error(`Failed to download ${song.name}:`, error);
+          failedCount++;
+        }
+
+        const progressText = document.getElementById('download-progress-text');
+        if (progressText) {
+          progressText.textContent = `Progress: ${downloadedCount + failedCount} / ${songsToDownload.length} (${failedCount} failed)`;
+        }
+      }
+    };
+
+    // Spin up workers
+    await Promise.all(Array(Math.min(CONCURRENCY_LIMIT, queue.length)).fill(null).map(downloadWorker));
+
+    // Finish
+    if (document.body.contains(progressToast)) {
+      document.body.removeChild(progressToast);
+    }
+
+    const completionToast = document.createElement('div');
+    completionToast.className = `fixed bottom-4 right-4 ${failedCount > 0 ? 'bg-orange-600' : 'bg-green-600'} text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300`;
+    completionToast.innerHTML = `
+      <div class="flex flex-col">
+        <span class="font-bold text-sm">Download Finished</span>
+        <span class="text-xs opacity-90">${downloadedCount} songs saved. ${failedCount > 0 ? `${failedCount} failed.` : ''}</span>
+      </div>
+    `;
+    document.body.appendChild(completionToast);
+
+    setTimeout(() => {
+      completionToast.style.opacity = '0';
+      setTimeout(() => {
+        if (document.body.contains(completionToast)) {
+          document.body.removeChild(completionToast);
+        }
+      }, 300);
+    }, 5000);
+  };
 
   const toggleArtistLike = async () => {
     if (!session?.user?.id) {
@@ -598,103 +868,7 @@ export default function ArtistPage() {
 
   const handleDownload = async (e, song) => {
     e.stopPropagation();
-
-    try {
-      console.log('Attempting to download song:', song.name);
-
-      // First, try to get download links from the song object
-      let downloadUrl = null;
-
-      // Check if song already has download URLs
-      if (song.downloadUrl && Array.isArray(song.downloadUrl)) {
-        // Look for 320kbps quality first, then fallback to highest available
-        const highQuality = song.downloadUrl.find(url => url.quality === '320kbps') ||
-          song.downloadUrl.find(url => url.quality === '160kbps') ||
-          song.downloadUrl[song.downloadUrl.length - 1];
-        downloadUrl = highQuality?.url;
-      }
-
-      // If no download URL found, fetch from API
-      if (!downloadUrl) {
-        console.log('No download URL found in song object, fetching from API...');
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs?ids=${song.id}`);
-        const data = await response.json();
-
-        if (data.success && data.data && data.data[0]?.downloadUrl) {
-          const songData = data.data[0];
-          // Look for 320kbps quality first, then fallback to highest available
-          const highQuality = songData.downloadUrl.find(url => url.quality === '320kbps') ||
-            songData.downloadUrl.find(url => url.quality === '160kbps') ||
-            songData.downloadUrl[songData.downloadUrl.length - 1];
-          downloadUrl = highQuality?.url;
-          console.log('Found download URL from API:', downloadUrl);
-        }
-      }
-
-      if (downloadUrl) {
-        // Fetch the file through your website and trigger direct download
-        console.log('Fetching file for download...');
-
-        const filename = `${decodeHtmlEntities(song.name)} - ${artist.name}.mp3`;
-
-        try {
-          // Fetch the file as a blob
-          const response = await fetch(downloadUrl, {
-            method: 'GET',
-            headers: {
-              'Accept': 'audio/mpeg, audio/mp4, */*'
-            }
-          });
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          // Get the file as a blob
-          const blob = await response.blob();
-
-          // Create a blob URL
-          const blobUrl = window.URL.createObjectURL(blob);
-
-          // Create a temporary anchor element for download
-          const link = document.createElement('a');
-          link.href = blobUrl;
-          link.download = filename;
-          link.style.display = 'none';
-
-          // Add to DOM, click, and remove
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-
-          // Clean up the blob URL after a short delay
-          setTimeout(() => {
-            window.URL.revokeObjectURL(blobUrl);
-          }, 1000);
-
-          console.log('Download completed for:', song.name);
-        } catch (fetchError) {
-          console.error('Error fetching file for download:', fetchError);
-
-          // Fallback: try direct link method if blob fetch fails
-          console.log('Falling back to direct link method...');
-          const link = document.createElement('a');
-          link.href = downloadUrl;
-          link.download = filename;
-          link.target = '_blank';
-          link.rel = 'noopener noreferrer';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        }
-      } else {
-        console.error('No download URL available for this song');
-        alert('Download not available for this song');
-      }
-    } catch (error) {
-      console.error('Error downloading song:', error);
-      alert('Failed to download song. Please try again.');
-    }
+    await downloadSingleSong(song);
   };
 
   if (loading) {
@@ -952,19 +1126,26 @@ export default function ArtistPage() {
                 >
                   <Heart className={`w-5 h-5 md:w-6 md:h-6 ${isArtistLiked ? 'fill-current' : ''}`} />
                 </Button>
+                <Button 
+                  variant="ghost" 
+                  size="lg" 
+                  className="rounded-full w-10 h-10 md:w-12 md:h-12"
+                  onClick={handleDownloadSongs}
+                >
+                  <Download className="w-5 h-5 md:w-6 md:h-6" />
+                </Button>
                 <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
                   <MoreVertical className="w-5 h-5 md:w-6 md:h-6" />
                 </Button>
               </div>
             </div>
 
-            <div className="pl-2 pr-1 md:px-6 pb-32 md:pb-24 space-y-6 md:space-y-8">
-              {/* Popular Songs */}
-              {artist.topSongs && artist.topSongs.length > 0 && (
+            <div className="pl-2 pr-1 md:px-6 pb-32 md:pb-24 space-y-6 md:space-y-8">              {/* Popular Songs */}
+              {songs && songs.length > 0 && (
                 <div>
                   <h2 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">Popular</h2>
                   <div className="space-y-0">
-                    {artist.topSongs.slice(0, 10).map((song, index) => {
+                    {songs.slice(0, showAllTopSongs ? undefined : 10).map((song, index) => {
                       const isCurrentSong = currentSong?.id === song.id;
                       return (
                         <div
@@ -1059,6 +1240,36 @@ export default function ArtistPage() {
                       );
                     })}
                   </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {songs.length > 10 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-foreground font-bold"
+                        onClick={() => setShowAllTopSongs(!showAllTopSongs)}
+                      >
+                        {showAllTopSongs ? "Show less" : "See more"}
+                      </Button>
+                    )}
+                    {hasMoreSongs && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-foreground font-bold flex items-center gap-2"
+                        onClick={fetchMoreSongs}
+                        disabled={fetchingMoreSongs}
+                      >
+                        {fetchingMoreSongs ? (
+                          <>
+                            <div className="w-3 h-3 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin"></div>
+                            Loading...
+                          </>
+                        ) : (
+                          "Load more content"
+                        )}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -1066,7 +1277,7 @@ export default function ArtistPage() {
               {albums.length > 0 && (
                 <div>
                   <h2 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">Albums</h2>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-3 md:gap-6">
                     {albums.map((album) => (
                       <Link
                         key={album.id}
@@ -1080,13 +1291,15 @@ export default function ArtistPage() {
                               alt={album.name}
                               className="w-full h-full object-cover"
                               onError={(e) => {
-                                e.target.style.display = 'none';
+                                e.target.src = '/def playlist image.jpg';
                               }}
                             />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-black">
-                              <IoMdPlay className="w-8 h-8 md:w-12 md:h-12 opacity-50" />
-                            </div>
+                            <img
+                              src="/def playlist image.jpg"
+                              alt={album.name}
+                              className="w-full h-full object-cover"
+                            />
                           )}
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
                           <Button
@@ -1122,17 +1335,22 @@ export default function ArtistPage() {
               )}
 
               {/* About */}
-              {artist.bio && artist.bio.length > 0 && (
+              {biography && biography.length > 0 && (
                 <div>
-                  <h2 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">About</h2>
+                  <div className="flex items-center gap-2 mb-3 md:mb-4">
+                    <h2 className="text-xl md:text-2xl font-bold">About</h2>
+                    {fetchingBio && (
+                       <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin"></div>
+                    )}
+                  </div>
                   <div className="space-y-3 md:space-y-4">
-                    {artist.bio.slice(0, 3).map((bioSection, index) => (
+                    {biography.slice(0, 5).map((bioSection, index) => (
                       <div key={index}>
                         {bioSection.title && (
-                          <h3 className="text-base md:text-lg font-semibold mb-2">{bioSection.title}</h3>
+                          <h3 className="text-base md:text-lg font-semibold mb-2">{decodeHtmlEntities(bioSection.title)}</h3>
                         )}
-                        <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
-                          {bioSection.text}
+                        <p className="text-sm md:text-base text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                          {decodeHtmlEntities(bioSection.text)}
                         </p>
                       </div>
                     ))}
