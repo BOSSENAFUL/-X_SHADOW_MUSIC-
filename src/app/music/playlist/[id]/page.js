@@ -49,29 +49,29 @@ import { memo } from "react";
 import { Share, Search, Check, List, LayoutList } from "lucide-react";
 
 // --- Helper Components ---
-const SongActionMenu = memo(({ 
-  song, 
-  onAddToPlaylist, 
-  onGoToArtist, 
+const SongActionMenu = memo(({
+  song,
+  onAddToPlaylist,
+  onGoToArtist,
   onGoToAlbum,
-  onDownload, 
+  onDownload,
   toggleLike,
   isLiked,
-  decodeHtmlEntities 
+  decodeHtmlEntities
 }) => {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
 
-  const artistNames = song.artists?.primary?.map(a => a.name).join(', ') || 
-                      song.artists?.map(a => a.name).join(', ') || 
-                      'Unknown Artist';
-  const songImageUrl = song.image?.find(img => img.quality === '150x150')?.url || 
-                       song.image?.[song.image.length - 1]?.url || 
-                       '/default-playlist-image.png';
+  const artistNames = song.artists?.primary?.map(a => a.name).join(', ') ||
+    song.artists?.map(a => a.name).join(', ') ||
+    'Unknown Artist';
+  const songImageUrl = song.image?.find(img => img.quality === '150x150')?.url ||
+    song.image?.[song.image.length - 1]?.url ||
+    '/default-playlist-image.png';
 
   const ActionItems = ({ onItemClick }) => (
     <>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -81,7 +81,7 @@ const SongActionMenu = memo(({
         <Plus className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Add to playlist</span>
       </div>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -100,7 +100,7 @@ const SongActionMenu = memo(({
         <Share className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Share</span>
       </div>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -111,7 +111,7 @@ const SongActionMenu = memo(({
         <span className="font-medium">Go to artist</span>
       </div>
       {onGoToAlbum && (
-        <div 
+        <div
           className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
           onClick={(e) => {
             onItemClick();
@@ -122,7 +122,7 @@ const SongActionMenu = memo(({
           <span className="font-medium">Go to album</span>
         </div>
       )}
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -133,7 +133,7 @@ const SongActionMenu = memo(({
         <span className="font-medium">Download</span>
       </div>
       <div className="h-px bg-white/5 my-1" />
-      <div 
+      <div
         className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${isLiked(song.id) ? 'text-red-500' : ''}`}
         onClick={(e) => {
           onItemClick();
@@ -165,9 +165,9 @@ const SongActionMenu = memo(({
             <DrawerHeader className="p-0">
               <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
                 <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0">
-                  <img 
-                    src={songImageUrl} 
-                    alt={song.name} 
+                  <img
+                    src={songImageUrl}
+                    alt={song.name}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -203,7 +203,7 @@ const SongActionMenu = memo(({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => onAddToPlaylist(e, song)}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
@@ -211,7 +211,7 @@ const SongActionMenu = memo(({
           Add to playlist
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-white/5" />
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => onGoToArtist(e, song)}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
@@ -219,7 +219,7 @@ const SongActionMenu = memo(({
           Go to artist
         </DropdownMenuItem>
         {onGoToAlbum && (
-          <DropdownMenuItem 
+          <DropdownMenuItem
             onClick={(e) => onGoToAlbum(e, song)}
             className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
           >
@@ -228,7 +228,7 @@ const SongActionMenu = memo(({
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator className="bg-white/5" />
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => onDownload(e, song)}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
@@ -271,7 +271,7 @@ const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }
 
   const currentSortLabel = sortOptions.find(o => o.id === sortBy)?.label || 'Sort by';
 
-  const Content = ({ closeOnSelect = () => {} }) => (
+  const Content = ({ closeOnSelect = () => { } }) => (
     <div className="flex flex-col gap-1 p-2">
       <div className="px-3 py-2 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Sort by</div>
       {sortOptions.map(option => (
@@ -352,26 +352,26 @@ SortAndViewMenu.displayName = "SortAndViewMenu";
 SongActionMenu.displayName = "SongActionMenu";
 
 // --- Playlist Action Menu ---
-const PlaylistActionMenu = memo(({ 
-  playlist, 
+const PlaylistActionMenu = memo(({
+  playlist,
   songs,
-  isLiked, 
-  toggleLike, 
-  onDownload, 
+  isLiked,
+  toggleLike,
+  onDownload,
   onShare,
   isMobile,
-  decodeHtmlEntities 
+  decodeHtmlEntities
 }) => {
   const [open, setOpen] = useState(false);
-  
-  const playlistImageUrl = playlist.image?.[2]?.url || 
-                           playlist.image?.[1]?.url || 
-                           playlist.image?.[0]?.url || 
-                           '/default-playlist-image.png';
+
+  const playlistImageUrl = playlist.image?.[2]?.url ||
+    playlist.image?.[1]?.url ||
+    playlist.image?.[0]?.url ||
+    '/default-playlist-image.png';
 
   const ActionItems = ({ onItemClick }) => (
     <>
-      <div 
+      <div
         className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${isLiked ? 'text-red-500' : ''}`}
         onClick={() => {
           onItemClick();
@@ -381,8 +381,8 @@ const PlaylistActionMenu = memo(({
         <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
         <span className="font-medium">{isLiked ? 'Remove from library' : 'Save to library'}</span>
       </div>
-      
-      <div 
+
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={() => {
           onItemClick();
@@ -393,7 +393,7 @@ const PlaylistActionMenu = memo(({
         <span className="font-medium">Download playlist</span>
       </div>
 
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={() => {
           onItemClick();
@@ -450,7 +450,7 @@ const PlaylistActionMenu = memo(({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={toggleLike}
           className={`hover:bg-white/10 focus:bg-white/10 cursor-pointer ${isLiked ? 'text-red-500' : ''}`}
         >
@@ -667,8 +667,8 @@ function PlaylistPageContent() {
 
     if (!searchQuery.trim()) return base;
     const query = searchQuery.toLowerCase().trim();
-    return base.filter(song => 
-      song.name?.toLowerCase().includes(query) || 
+    return base.filter(song =>
+      song.name?.toLowerCase().includes(query) ||
       song.artistName.toLowerCase().includes(query) ||
       song.albumName.toLowerCase().includes(query)
     );
@@ -742,12 +742,12 @@ function PlaylistPageContent() {
       } else {
         let startSong = songs[0];
         let startIndex = 0;
-        
+
         if (isShuffle) {
           startIndex = Math.floor(Math.random() * songs.length);
           startSong = songs[startIndex];
         }
-        
+
         playSong(startSong, songs, playlistId, startIndex);
         setCurrentlyPlaying({ song: startSong, index: startIndex });
         trackRecentlyPlayed();
@@ -1325,15 +1325,15 @@ function PlaylistPageContent() {
                     <IoMdPlay style={{ width: '24px', height: '24px', marginLeft: '4px' }} />
                   )}
                 </Button>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   onClick={() => setIsShuffle(!isShuffle)}
                   className={`rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center transition-colors ${isShuffle ? 'text-green-500 hover:text-green-400 hover:bg-green-500/10' : 'text-muted-foreground hover:text-foreground'}`}
                 >
                   <Shuffle style={{ width: '24px', height: '24px' }} />
                 </Button>
-                
-                <PlaylistActionMenu 
+
+                <PlaylistActionMenu
                   playlist={playlist}
                   songs={songs}
                   isLiked={isPlaylistLiked(playlistId)}
@@ -1367,7 +1367,7 @@ function PlaylistPageContent() {
                 <div className="flex items-center ml-auto gap-1 md:gap-3">
                   {/* Search Bar */}
                   <div ref={searchContainerRef}>
-                    <div 
+                    <div
                       className={`flex items-center transition-all duration-300 ease-in-out ${isSearchVisible ? 'w-40 md:w-56 h-9 px-2.5 rounded-md border border-white/10 bg-white/5 justify-start' : 'w-9 h-9 justify-center rounded-full bg-white/5 hover:bg-white/10 cursor-pointer border-none'}`}
                       onClick={() => !isSearchVisible && setIsSearchVisible(true)}
                     >
@@ -1392,12 +1392,12 @@ function PlaylistPageContent() {
 
                   {/* Sort and View Options */}
                   {!isSearchVisible && (
-                    <SortAndViewMenu 
-                      sortBy={sortBy} 
-                      setSortBy={setSortBy} 
-                      viewAs={viewAs} 
-                      setViewAs={setViewAs} 
-                      isMobile={window.innerWidth < 768} 
+                    <SortAndViewMenu
+                      sortBy={sortBy}
+                      setSortBy={setSortBy}
+                      viewAs={viewAs}
+                      setViewAs={setViewAs}
+                      isMobile={window.innerWidth < 768}
                     />
                   )}
                 </div>
@@ -1428,28 +1428,27 @@ function PlaylistPageContent() {
                     <div key={song.id || index} >
                       {/* Mobile Layout */}
                       <div
-                        className={`md:hidden flex items-center rounded hover:bg-muted/50 group cursor-pointer ${viewAs === 'compact' ? 'gap-3 pl-0 pr-0 py-1 h-[48px]' : 'gap-3 pl-0 pr-0 py-2 h-[64px]'}`}
+                        className={`md:hidden flex items-center rounded hover:bg-muted/50 group cursor-pointer ${viewAs === 'compact' ? 'gap-2 pl-0 pr-0 py-1 h-[48px]' : 'gap-2 pl-0 pr-0 py-2 h-[64px]'}`}
                         onClick={() => handlePlayClick(song, index)}
                       >
-                        <div className="w-6 text-right pr-1 shrink-0">
+                        <div className="grid place-items-center shrink-0 w-8 h-full">
                           {isCurrentSong && isPlaying ? (
-                            <div className="flex items-center justify-center">
-                              <div className="flex items-end justify-center gap-0.5 h-3">
-                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
-                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
-                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
-                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
-                              </div>
+                            <div className="col-start-1 row-start-1 flex items-end justify-center gap-0.5 h-3 w-4">
+                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
+                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
+                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
+                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
                             </div>
                           ) : isCurrentSong ? (
-                            <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
+                            <div className="col-start-1 row-start-1 flex items-center justify-center">
+                              <IoMdPlay className="w-4 h-4 text-green-500" />
+                            </div>
                           ) : (
-                            <>
-                              <span className="text-muted-foreground group-hover:hidden text-sm">
+                            <div className="col-start-1 row-start-1 flex items-center justify-center">
+                              <span className="text-muted-foreground text-sm">
                                 {index + 1}
                               </span>
-                              <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
-                            </>
+                            </div>
                           )}
                         </div>
 
@@ -1479,38 +1478,38 @@ function PlaylistPageContent() {
                           <div className="min-w-0 flex-1">
                             <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''
                               }`}>
-                            {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
-                          </p>
-                          <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
-                            }`}>
-                            {song.artists?.primary?.length > 0 ? (
-                              song.artists.primary.map((artist, artistIndex) => (
-                                <span key={artist.id || artistIndex}>
-                                  <span className="md:hidden">
-                                    {artist.name}
+                              {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
+                            </p>
+                            <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
+                              }`}>
+                              {song.artists?.primary?.length > 0 ? (
+                                song.artists.primary.map((artist, artistIndex) => (
+                                  <span key={artist.id || artistIndex}>
+                                    <span className="md:hidden">
+                                      {artist.name}
+                                    </span>
+                                    <button
+                                      className={`hidden md:inline hover:underline transition-colors ${isCurrentSong ? 'hover:text-green-300' : 'hover:text-foreground'
+                                        }`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        router.push(`/music/artist/${artist.id}`);
+                                      }}
+                                    >
+                                      {artist.name}
+                                    </button>
+                                    {artistIndex < song.artists.primary.length - 1 && ', '}
                                   </span>
-                                  <button
-                                    className={`hidden md:inline hover:underline transition-colors ${isCurrentSong ? 'hover:text-green-300' : 'hover:text-foreground'
-                                      }`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      router.push(`/music/artist/${artist.id}`);
-                                    }}
-                                  >
-                                    {artist.name}
-                                  </button>
-                                  {artistIndex < song.artists.primary.length - 1 && ', '}
-                                </span>
-                              ))
-                            ) : (
-                              'Unknown Artist'
-                            )}
-                          </p>
+                                ))
+                              ) : (
+                                'Unknown Artist'
+                              )}
+                            </p>
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-                          <SongActionMenu 
+                        <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                          <SongActionMenu
                             song={song}
                             onAddToPlaylist={handleAddToPlaylist}
                             onGoToArtist={handleGoToArtist}
@@ -1529,24 +1528,22 @@ function PlaylistPageContent() {
                         onClick={() => handlePlayClick(song, index)}
                         style={{ height: viewAs === 'compact' ? 48 : 64 }}
                       >
-                        <div className="text-right pr-2 shrink-0">
+                        <div className="flex items-center justify-center shrink-0 w-10">
                           {isCurrentSong && isPlaying ? (
-                            <div className="flex items-center justify-center">
-                              <div className="flex items-end justify-center gap-0.5 h-3">
-                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
-                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
-                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
-                                <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
-                              </div>
+                            <div className="flex items-end justify-center gap-0.5 h-3 w-4">
+                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
+                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
+                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
+                              <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
                             </div>
                           ) : isCurrentSong ? (
-                            <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
+                            <IoMdPlay className="w-4 h-4 text-green-500" />
                           ) : (
                             <>
-                              <span className="text-muted-foreground group-hover:hidden">
+                              <span className="text-muted-foreground group-hover:hidden text-sm">
                                 {index + 1}
                               </span>
-                              <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
+                              <IoMdPlay className="w-4 h-4 hidden group-hover:block" />
                             </>
                           )}
                         </div>
@@ -1643,7 +1640,7 @@ function PlaylistPageContent() {
                           <div className="min-w-[40px] text-right text-sm text-muted-foreground font-mono hidden md:block">
                             {formatDuration(song.duration)}
                           </div>
-                          <SongActionMenu 
+                          <SongActionMenu
                             song={song}
                             onAddToPlaylist={handleAddToPlaylist}
                             onGoToArtist={handleGoToArtist}

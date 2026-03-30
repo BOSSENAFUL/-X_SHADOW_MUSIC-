@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1 } from "lucide-react";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { FullscreenMusicPlayer } from "@/components/fullscreen-music-player";
 import { IoMdPlay } from "react-icons/io";
@@ -35,6 +35,8 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     isFullscreenOpen,
     setIsFullscreenOpen,
     currentIndex: playerCurrentIndex,
+    setIsShuffle,
+    setRepeatMode,
   } = useMusicPlayer();
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -105,6 +107,13 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
     const nextIndex = currentIndex < playlist.length - 1 ? currentIndex + 1 : 0;
     onSongChange?.(playlist[nextIndex], nextIndex);
+  };
+
+  const toggleRepeat = () => {
+    const modes = ["off", "all", "one"];
+    const currentIndex = modes.indexOf(repeatMode);
+    const nextIndex = (currentIndex + 1) % modes.length;
+    setRepeatMode(modes[nextIndex]);
   };
 
   const handleSeek = (value) => {
@@ -912,25 +921,37 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
                 {/* Controls */}
                 <div className="flex flex-col items-center gap-2 flex-1 max-w-md">
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-3 md:gap-4 justify-center">
+                    {/* Shuffle Button */}
+                    <button
+                      onClick={() => setIsShuffle(!isShuffle)}
+                      className={`relative flex flex-col items-center justify-center p-0 bg-transparent hover:bg-transparent border-none outline-none shadow-none transition-colors group ${isShuffle ? "text-green-500" : "text-white/60 hover:text-white"
+                        }`}
+                    >
+                      <Shuffle style={{ width: '18px', height: '18px' }} />
+                      {isShuffle && (
+                        <div className="absolute -bottom-2 w-1 h-1 bg-green-500 rounded-full" />
+                      )}
+                    </button>
+
                     <Button
                       size="sm"
                       onClick={handlePrevious}
                       disabled={playlist.length === 0}
-                      className="hover:bg-transparent bg-transparent hover:scale-105 group hover:cursor-pointer"
+                      className="hover:bg-transparent bg-transparent hover:scale-110 active:scale-95 group transition-all p-0 h-auto w-auto"
                     >
-                      <BiSkipPrevious style={{ width: '34px', height: '34px' }} className="text-white/65 group-hover:text-white" />
+                      <BiSkipPrevious style={{ width: '32px', height: '32px' }} className="text-white/65 group-hover:text-white" />
                     </Button>
 
                     <Button
                       size="sm"
                       onClick={togglePlayPause}
-                      className="rounded-full w-8 h-8 bg-white hover:bg-white hover:scale-105 transition-transform hover:cursor-pointer"
+                      className="rounded-full w-8 h-8 bg-white hover:bg-white hover:scale-110 transition-transform active:scale-95 hover:cursor-pointer shrink-0"
                     >
                       {isPlaying ? (
-                        <HiPause className="text-black" style={{ width: '20px', height: '20px' }} />
+                        <HiPause className="text-black" style={{ width: '18px', height: '18px' }} />
                       ) : (
-                        <IoMdPlay style={{ width: '18px', height: '18px', marginLeft: '4px', }} className="text-black" />
+                        <IoMdPlay style={{ width: '16px', height: '16px', marginLeft: '2px', }} className="text-black" />
                       )}
                     </Button>
 
@@ -938,10 +959,26 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                       size="sm"
                       onClick={handleNext}
                       disabled={playlist.length === 0}
-                      className="hover:bg-transparent bg-transparent hover:scale-105 group hover:cursor-pointer"
+                      className="hover:bg-transparent bg-transparent hover:scale-110 active:scale-95 group transition-all p-0 h-auto w-auto"
                     >
-                      <BiSkipNext style={{ width: '34px', height: '34px' }} className="text-white/65 group-hover:text-white" />
+                      <BiSkipNext style={{ width: '32px', height: '32px' }} className="text-white/65 group-hover:text-white" />
                     </Button>
+
+                    {/* Repeat Button */}
+                    <button
+                      onClick={toggleRepeat}
+                      className={`relative flex flex-col items-center justify-center p-0 bg-transparent hover:bg-transparent border-none outline-none shadow-none transition-colors group ${repeatMode !== "off" ? "text-green-500" : "text-white/60 hover:text-white"
+                        }`}
+                    >
+                      {repeatMode === "one" ? (
+                        <Repeat1 style={{ width: '18px', height: '18px' }} />
+                      ) : (
+                        <Repeat style={{ width: '18px', height: '18px' }} />
+                      )}
+                      {repeatMode !== "off" && (
+                        <div className="absolute -bottom-2 w-1 h-1 bg-green-500 rounded-full" />
+                      )}
+                    </button>
                   </div>
 
                   {/* Progress Bar */}

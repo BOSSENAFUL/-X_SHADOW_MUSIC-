@@ -94,31 +94,31 @@ import { IoMdPlay } from "react-icons/io";
 const globalColorCache = typeof window !== 'undefined' ? new Map() : null;
 
 // --- Helper Components ---
-const SongActionMenu = memo(({ 
-  song, 
-  onGoToArtist, 
+const SongActionMenu = memo(({
+  song,
+  onGoToArtist,
   onGoToAlbum,
-  onDownload, 
+  onDownload,
   onShare,
   onRemove,
   toggleLike,
   isLiked,
   isOwner,
-  decodeHtmlEntities 
+  decodeHtmlEntities
 }) => {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
 
-  const artistNames = song.artists?.primary?.map(a => a.name).join(', ') || 
-                      (Array.isArray(song.artists) ? song.artists.map(a => a.name).join(', ') : null) || 
-                      'Unknown Artist';
-  const songImageUrl = song.image?.find(img => img.quality === '150x150')?.url || 
-                       song.image?.[song.image.length - 1]?.url || 
-                       '/default-playlist-image.png';
+  const artistNames = song.artists?.primary?.map(a => a.name).join(', ') ||
+    (Array.isArray(song.artists) ? song.artists.map(a => a.name).join(', ') : null) ||
+    'Unknown Artist';
+  const songImageUrl = song.image?.find(img => img.quality === '150x150')?.url ||
+    song.image?.[song.image.length - 1]?.url ||
+    '/default-playlist-image.png';
 
   const ActionItems = ({ onItemClick }) => (
     <>
-      <div 
+      <div
         className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${isLiked(song.id) ? 'text-red-500' : ''}`}
         onClick={(e) => {
           onItemClick();
@@ -131,7 +131,7 @@ const SongActionMenu = memo(({
       </div>
 
       {isOwner && onRemove && (
-        <div 
+        <div
           className="flex items-center gap-4 p-3 hover:bg-red-500/10 text-red-500 cursor-pointer transition-colors px-3 font-medium"
           onClick={(e) => {
             onItemClick();
@@ -143,7 +143,7 @@ const SongActionMenu = memo(({
         </div>
       )}
 
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -154,7 +154,7 @@ const SongActionMenu = memo(({
         <span className="font-medium">Share</span>
       </div>
 
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -166,7 +166,7 @@ const SongActionMenu = memo(({
       </div>
 
       {onGoToAlbum && (
-        <div 
+        <div
           className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
           onClick={(e) => {
             onItemClick();
@@ -178,7 +178,7 @@ const SongActionMenu = memo(({
         </div>
       )}
 
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -209,9 +209,9 @@ const SongActionMenu = memo(({
             <DrawerHeader className="p-0 text-left">
               <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
                 <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0">
-                  <img 
-                    src={songImageUrl} 
-                    alt={song.name} 
+                  <img
+                    src={songImageUrl}
+                    alt={song.name}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -247,7 +247,7 @@ const SongActionMenu = memo(({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => {
             e.stopPropagation();
             toggleLike(song);
@@ -257,11 +257,11 @@ const SongActionMenu = memo(({
           <Heart className={`w-4 h-4 mr-2 ${isLiked(song.id) ? 'fill-current' : ''}`} />
           {isLiked(song.id) ? 'Unlike' : 'Like'}
         </DropdownMenuItem>
-        
+
         {isOwner && onRemove && (
           <>
             <DropdownMenuSeparator className="bg-white/5" />
-            <DropdownMenuItem 
+            <DropdownMenuItem
               onClick={(e) => {
                 e.stopPropagation();
                 onRemove(song.id);
@@ -275,7 +275,7 @@ const SongActionMenu = memo(({
         )}
 
         <DropdownMenuSeparator className="bg-white/5" />
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => {
             e.stopPropagation();
             onShare(song);
@@ -286,7 +286,7 @@ const SongActionMenu = memo(({
           Share
         </DropdownMenuItem>
 
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => {
             e.stopPropagation();
             onGoToArtist(e, song);
@@ -297,7 +297,7 @@ const SongActionMenu = memo(({
           Go to artist
         </DropdownMenuItem>
 
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => {
             e.stopPropagation();
             onGoToAlbum(e, song);
@@ -309,7 +309,7 @@ const SongActionMenu = memo(({
         </DropdownMenuItem>
 
         <DropdownMenuSeparator className="bg-white/5" />
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => {
             e.stopPropagation();
             onDownload(song);
@@ -327,12 +327,12 @@ const SongActionMenu = memo(({
 SongActionMenu.displayName = "SongActionMenu";
 
 // --- Playlist Action Menu ---
-const PlaylistActionMenu = memo(({ 
-  playlist, 
-  isOwner, 
-  onEdit, 
-  onTogglePrivacy, 
-  onShare, 
+const PlaylistActionMenu = memo(({
+  playlist,
+  isOwner,
+  onEdit,
+  onTogglePrivacy,
+  onShare,
   onDelete,
   onDownload,
   canDownload,
@@ -351,7 +351,7 @@ const PlaylistActionMenu = memo(({
   const ActionItems = ({ onItemClick }) => (
     <>
       {!isOwner && playlist.isPublic && (
-        <div 
+        <div
           className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${isLiked ? 'text-red-500' : ''} ${likingInProgress ? 'opacity-50 pointer-events-none' : ''}`}
           onClick={() => {
             onItemClick();
@@ -364,7 +364,7 @@ const PlaylistActionMenu = memo(({
       )}
       {isOwner && (
         <>
-          <div 
+          <div
             className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
             onClick={() => {
               onItemClick();
@@ -374,7 +374,7 @@ const PlaylistActionMenu = memo(({
             <Edit className="w-5 h-5 text-muted-foreground" />
             <span className="font-medium">Edit playlist</span>
           </div>
-          <div 
+          <div
             className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
             onClick={() => {
               onItemClick();
@@ -396,7 +396,7 @@ const PlaylistActionMenu = memo(({
         </>
       )}
 
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={() => {
           onItemClick();
@@ -407,7 +407,7 @@ const PlaylistActionMenu = memo(({
         <span className="font-medium">Share playlist</span>
       </div>
 
-      <div 
+      <div
         className={`flex items-center gap-4 p-3 hover:bg-white/5 transition-colors ${!canDownload ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
         onClick={() => {
           if (canDownload) {
@@ -423,7 +423,7 @@ const PlaylistActionMenu = memo(({
       {isOwner && (
         <>
           <div className="h-px bg-white/5 my-1" />
-          <div 
+          <div
             className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors text-red-500"
             onClick={() => {
               onItemClick();
@@ -490,8 +490,8 @@ const PlaylistActionMenu = memo(({
       <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
         {!isOwner && playlist.isPublic && (
           <>
-            <DropdownMenuItem 
-              onClick={onToggleLike} 
+            <DropdownMenuItem
+              onClick={onToggleLike}
               disabled={likingInProgress}
               className={`${isLiked ? 'text-red-500' : ''} hover:bg-white/10 focus:bg-white/10 cursor-pointer`}
             >
@@ -527,8 +527,8 @@ const PlaylistActionMenu = memo(({
           <Share className="w-4 h-4 mr-2" />
           Share playlist
         </DropdownMenuItem>
-        <DropdownMenuItem 
-          onClick={onDownload} 
+        <DropdownMenuItem
+          onClick={onDownload}
           disabled={!canDownload}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer disabled:opacity-50"
         >
@@ -538,7 +538,7 @@ const PlaylistActionMenu = memo(({
         {isOwner && (
           <>
             <DropdownMenuSeparator className="bg-white/5" />
-            <DropdownMenuItem 
+            <DropdownMenuItem
               onClick={onDelete}
               className="text-red-500 hover:bg-red-500/10 focus:bg-red-500/10 cursor-pointer font-medium"
             >
@@ -572,7 +572,7 @@ const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }
 
   const currentSortLabel = sortOptions.find(o => o.id === sortBy)?.label || 'Sort by';
 
-  const Content = ({ closeOnSelect = () => {} }) => (
+  const Content = ({ closeOnSelect = () => { } }) => (
     <div className="flex flex-col gap-1 p-2">
       <div className="px-3 py-2 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Sort by</div>
       {sortOptions.map(option => (
@@ -671,24 +671,25 @@ const SongRow = React.memo(function SongRow({
     <div>
       {/* Mobile */}
       <div
-        className={`md:hidden flex items-center rounded hover:bg-muted/50 group cursor-pointer ${viewAs === 'compact' ? 'gap-3 pl-0 pr-0 py-1 h-[48px]' : 'gap-3 pl-0 pr-0 py-2 h-[64px]'}`}
+        className={`md:hidden flex items-center rounded hover:bg-muted/50 group cursor-pointer ${viewAs === 'compact' ? 'gap-2 pl-0 pr-0 py-1 h-[48px]' : 'gap-2 pl-0 pr-0 py-2 h-[64px]'}`}
         onClick={() => handlePlayClick(song, index)}
       >
-        <div className="w-6 text-right pr-1 shrink-0">
+        <div className="grid place-items-center shrink-0 w-8 h-full">
           {isCurrentSong && isPlaying ? (
-            <div className="flex items-end justify-center gap-0.5 h-3">
+            <div className="col-start-1 row-start-1 flex items-end justify-center gap-0.5 h-3 w-4">
               <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0s' }} />
               <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.2s' }} />
               <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.4s' }} />
               <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.1s' }} />
             </div>
           ) : isCurrentSong ? (
-            <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
+            <div className="col-start-1 row-start-1 flex items-center justify-center">
+              <IoMdPlay className="w-4 h-4 text-green-500" />
+            </div>
           ) : (
-            <>
-              <span className="text-muted-foreground group-hover:hidden text-sm">{index + 1}</span>
-              <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
-            </>
+            <div className="col-start-1 row-start-1 flex items-center justify-center">
+              <span className="text-muted-foreground text-sm">{index + 1}</span>
+            </div>
           )}
         </div>
         <div className="flex-1 min-w-0 flex items-center gap-2.5">
@@ -709,13 +710,13 @@ const SongRow = React.memo(function SongRow({
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-          <SongActionMenu 
+          <SongActionMenu
             song={song}
             onGoToArtist={(e, s) => {
-               if (s.artists?.primary?.length > 0) router.push(`/music/artist/${s.artists.primary[0].id}`);
+              if (s.artists?.primary?.length > 0) router.push(`/music/artist/${s.artists.primary[0].id}`);
             }}
             onGoToAlbum={(e, s) => {
-               if (s.album?.id) router.push(`/music/album/${s.album.id}`);
+              if (s.album?.id) router.push(`/music/album/${s.album.id}`);
             }}
             onDownload={handleDownloadSong}
             onShare={handleShareSong}
@@ -734,20 +735,20 @@ const SongRow = React.memo(function SongRow({
         onClick={() => handlePlayClick(song, index)}
         style={{ height: viewAs === 'compact' ? ITEM_HEIGHTS.compact : ITEM_HEIGHTS.list }}
       >
-        <div className="text-right pr-2 shrink-0">
+        <div className="flex items-center justify-center shrink-0 w-10">
           {isCurrentSong && isPlaying ? (
-            <div className="flex items-end justify-center gap-0.5 h-3">
+            <div className="flex items-end justify-center gap-0.5 h-3 w-4">
               <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0s' }} />
               <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.2s' }} />
               <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.4s' }} />
               <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.1s' }} />
             </div>
           ) : isCurrentSong ? (
-            <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
+            <IoMdPlay className="w-4 h-4 text-green-500" />
           ) : (
             <>
-              <span className="text-muted-foreground group-hover:hidden">{index + 1}</span>
-              <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
+              <span className="text-muted-foreground group-hover:hidden text-sm">{index + 1}</span>
+              <IoMdPlay className="w-4 h-4 hidden group-hover:block" />
             </>
           )}
         </div>
@@ -798,13 +799,13 @@ const SongRow = React.memo(function SongRow({
             {formatDuration(song.duration)}
           </div>
           <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-            <SongActionMenu 
+            <SongActionMenu
               song={song}
               onGoToArtist={(e, s) => {
-                 if (s.artists?.primary?.length > 0) router.push(`/music/artist/${s.artists.primary[0].id}`);
+                if (s.artists?.primary?.length > 0) router.push(`/music/artist/${s.artists.primary[0].id}`);
               }}
               onGoToAlbum={(e, s) => {
-                 if (s.album?.id) router.push(`/music/album/${s.album.id}`);
+                if (s.album?.id) router.push(`/music/album/${s.album.id}`);
               }}
               onDownload={handleDownloadSong}
               onShare={handleShareSong}
@@ -821,10 +822,10 @@ const SongRow = React.memo(function SongRow({
   );
 });
 
-function VirtualSongList({ 
+function VirtualSongList({
   songs, currentSong, activePlaylistId, playlistId, currentIndex, isPlaying, isOwner,
   isSongLiked, handlePlayClick, handleToggleSongLike, handleRemoveFromPlaylist,
-  handleDownloadSong, handleShareSong, decodeHtmlEntities, formatDuration, router, viewAs 
+  handleDownloadSong, handleShareSong, decodeHtmlEntities, formatDuration, router, viewAs
 }) {
   const containerRef = useRef(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -1098,7 +1099,7 @@ export default function PlaylistDetailPage({ params }) {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
         const chunkSize = 50;
         const chunks = [];
-        
+
         for (let i = 0; i < songIds.length; i += chunkSize) {
           chunks.push(songIds.slice(i, i + chunkSize));
         }
@@ -1108,8 +1109,8 @@ export default function PlaylistDetailPage({ params }) {
             try {
               const response = await fetch(`${apiUrl}/api/songs?ids=${chunk.join(',')}`);
               if (!response.ok) {
-                 console.error(`Failed to fetch chunk: ${response.status}`);
-                 return [];
+                console.error(`Failed to fetch chunk: ${response.status}`);
+                return [];
               }
               const data = await response.json();
               return data.success && data.data ? data.data : [];
@@ -1125,9 +1126,9 @@ export default function PlaylistDetailPage({ params }) {
         if (flattenedSongs.length > 0) {
           const musicMap = {};
           flattenedSongs.forEach(song => {
-             if (song && song.id) {
-               musicMap[song.id] = song;
-             }
+            if (song && song.id) {
+              musicMap[song.id] = song;
+            }
           });
           const sortedSongs = songIds.map(id => musicMap[id]).filter(Boolean);
           setSongs(sortedSongs);
@@ -1306,8 +1307,8 @@ export default function PlaylistDetailPage({ params }) {
   const filteredBaseSongs = useMemo(() => {
     if (!searchQuery.trim()) return baseMappedSongs;
     const query = searchQuery.toLowerCase().trim();
-    return baseMappedSongs.filter(song => 
-      song.name?.toLowerCase().includes(query) || 
+    return baseMappedSongs.filter(song =>
+      song.name?.toLowerCase().includes(query) ||
       song.artists?.primary?.some(artist => artist.name?.toLowerCase().includes(query)) ||
       song.album?.name?.toLowerCase().includes(query)
     );
@@ -1379,15 +1380,15 @@ export default function PlaylistDetailPage({ params }) {
   const handlePlayAll = useCallback(() => {
     if (sortedSongs.length === 0) return;
     if (activePlaylistId === playlistId) { togglePlayPause(); return; }
-    
+
     let startSong = mappedFilteredPlaylistData[0];
     let startIndex = 0;
-    
+
     if (isShuffle) {
       startIndex = Math.floor(Math.random() * mappedFilteredPlaylistData.length);
       startSong = mappedFilteredPlaylistData[startIndex];
     }
-    
+
     playSong(startSong, mappedFilteredPlaylistData, playlistId, startIndex);
     setCurrentlyPlaying({ song: sortedSongs[startIndex], index: startIndex });
     trackRecentlyPlayed();
@@ -1528,7 +1529,7 @@ export default function PlaylistDetailPage({ params }) {
           sessionStorage.removeItem(`created_playlists_${session.user.id}`);
         }
         toast.success('Playlist deleted');
-        
+
         // Also remove from recently played
         fetch(`/api/recently-played-playlists?playlistId=${playlistId}`, {
           method: 'DELETE',
@@ -1754,10 +1755,10 @@ export default function PlaylistDetailPage({ params }) {
   // Handle click outside to close search (if empty)
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (isSearchVisible && 
-          searchContainerRef.current && 
-          !searchContainerRef.current.contains(event.target) && 
-          !searchQuery.trim()) {
+      if (isSearchVisible &&
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(event.target) &&
+        !searchQuery.trim()) {
         setIsSearchVisible(false);
       }
     };
@@ -2375,15 +2376,15 @@ export default function PlaylistDetailPage({ params }) {
 
                 {/* Moved Heart button to PlaylistActionMenu */}
 
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   onClick={() => setIsShuffle(!isShuffle)}
                   className={`rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center transition-colors ${isShuffle ? 'text-green-500 hover:text-green-400 hover:bg-green-500/10' : 'text-muted-foreground hover:text-foreground'}`}
                 >
                   <Shuffle style={{ width: '24px', height: '24px' }} />
                 </Button>
 
-                <PlaylistActionMenu 
+                <PlaylistActionMenu
                   playlist={playlist}
                   isOwner={isOwner}
                   onEdit={handleEditPlaylist}
@@ -2409,7 +2410,7 @@ export default function PlaylistDetailPage({ params }) {
                 <div className="flex items-center ml-auto gap-1 md:gap-3">
                   {/* Search Bar - Far Right side */}
                   <div ref={searchContainerRef}>
-                    <div 
+                    <div
                       className={`flex items-center transition-all duration-300 ease-in-out ${isSearchVisible ? 'w-40 md:w-56 h-9 px-2.5 rounded-md border border-white/10 bg-white/5 justify-start' : 'w-9 h-9 justify-center rounded-full bg-white/5 hover:bg-white/10 cursor-pointer border-none'}`}
                       onClick={() => !isSearchVisible && setIsSearchVisible(true)}
                     >
@@ -2434,12 +2435,12 @@ export default function PlaylistDetailPage({ params }) {
 
                   {/* Sort and View Options */}
                   {!isSearchVisible && (
-                    <SortAndViewMenu 
-                      sortBy={sortBy} 
-                      setSortBy={setSortBy} 
-                      viewAs={viewAs} 
-                      setViewAs={setViewAs} 
-                      isMobile={isMobile} 
+                    <SortAndViewMenu
+                      sortBy={sortBy}
+                      setSortBy={setSortBy}
+                      viewAs={viewAs}
+                      setViewAs={setViewAs}
+                      isMobile={isMobile}
                     />
                   )}
                 </div>
