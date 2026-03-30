@@ -30,6 +30,8 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     isPlaying,
     setIsPlaying,
     isRadioPlaying,
+    isShuffle,
+    repeatMode,
     isFullscreenOpen,
     setIsFullscreenOpen,
     currentIndex: playerCurrentIndex,
@@ -75,12 +77,32 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
   const handlePrevious = () => {
     if (playlist.length === 0) return;
+    
+    if (isShuffle) {
+      const randomIndex = Math.floor(Math.random() * playlist.length);
+      onSongChange?.(playlist[randomIndex], randomIndex);
+      return;
+    }
+
     const prevIndex = currentIndex > 0 ? currentIndex - 1 : playlist.length - 1;
     onSongChange?.(playlist[prevIndex], prevIndex);
   };
 
   const handleNext = () => {
     if (playlist.length === 0) return;
+
+    if (repeatMode === 'one') {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(() => {});
+      return;
+    }
+
+    if (isShuffle) {
+      const randomIndex = Math.floor(Math.random() * playlist.length);
+      onSongChange?.(playlist[randomIndex], randomIndex);
+      return;
+    }
+
     const nextIndex = currentIndex < playlist.length - 1 ? currentIndex + 1 : 0;
     onSongChange?.(playlist[nextIndex], nextIndex);
   };

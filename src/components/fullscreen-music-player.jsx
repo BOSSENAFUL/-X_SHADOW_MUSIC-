@@ -92,11 +92,17 @@ export function FullscreenMusicPlayer({
 }) {
   const isMobile = useIsMobile();
   const { data: session } = useSession();
-  const { setIsPlaying, setIsFullscreenOpen, currentIndex: playerCurrentIndex } = useMusicPlayer();
+  const { 
+    setIsPlaying, 
+    setIsFullscreenOpen, 
+    currentIndex: playerCurrentIndex,
+    isShuffle,
+    setIsShuffle,
+    repeatMode,
+    setRepeatMode
+  } = useMusicPlayer();
   const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
   const router = useRouter();
-  const [isShuffled, setIsShuffled] = useState(false);
-  const [repeatMode, setRepeatMode] = useState("off"); // 'off', 'all', 'one'
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
   const [shuffledPlaylist, setShuffledPlaylist] = useState([]);
@@ -1075,7 +1081,7 @@ export function FullscreenMusicPlayer({
 
   // Create shuffled playlist when shuffle is enabled
   useEffect(() => {
-    if (isShuffled && playlist.length > 0) {
+    if (isShuffle && playlist.length > 0) {
       // Create shuffled playlist but keep current song at the beginning
       const otherSongs = playlist.filter((song) => song.id !== currentSong?.id);
       const shuffledOthers = shuffleArray(otherSongs);
@@ -1089,17 +1095,17 @@ export function FullscreenMusicPlayer({
     } else {
       setShuffledPlaylist([]);
     }
-  }, [isShuffled, playlist, currentSong?.id]);
+  }, [isShuffle, playlist, currentSong?.id]);
 
   // Get current playlist (shuffled or normal)
   const getCurrentPlaylist = () => {
-    return isShuffled ? shuffledPlaylist : playlist;
+    return isShuffle ? shuffledPlaylist : playlist;
   };
 
   // Enhanced next/previous functions with shuffle and repeat support
   const handleNext = () => {
     // Use localPlaylist (reordered) if shuffle is off, otherwise use shuffled playlist
-    const currentPlaylist = isShuffled ? shuffledPlaylist : localPlaylist;
+    const currentPlaylist = isShuffle ? shuffledPlaylist : localPlaylist;
     if (currentPlaylist.length === 0) return;
 
     const currentIndex = currentPlaylist.findIndex(
@@ -1131,7 +1137,7 @@ export function FullscreenMusicPlayer({
 
   const handlePrevious = () => {
     // Use localPlaylist (reordered) if shuffle is off, otherwise use shuffled playlist
-    const currentPlaylist = isShuffled ? shuffledPlaylist : localPlaylist;
+    const currentPlaylist = isShuffle ? shuffledPlaylist : localPlaylist;
     if (currentPlaylist.length === 0) return;
 
     const currentIndex = currentPlaylist.findIndex(
@@ -1168,7 +1174,7 @@ export function FullscreenMusicPlayer({
     const handleSongEnd = () => {
       console.log("Song ended, playing next...");
       // Use localPlaylist (reordered) if shuffle is off, otherwise use shuffled playlist
-      const currentPlaylist = isShuffled ? shuffledPlaylist : localPlaylist;
+      const currentPlaylist = isShuffle ? shuffledPlaylist : localPlaylist;
       if (currentPlaylist.length === 0) return;
 
       const currentIndex = currentPlaylist.findIndex(
@@ -1205,7 +1211,7 @@ export function FullscreenMusicPlayer({
   }, [
     currentSong?.id,
     repeatMode,
-    isShuffled,
+    isShuffle,
     shuffledPlaylist,
     localPlaylist, // Add localPlaylist to dependencies
     onSongChange,
@@ -1666,8 +1672,8 @@ export function FullscreenMusicPlayer({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setIsShuffled(!isShuffled)}
-                    className={`p-2 ${isShuffled ? "text-green-400" : "text-white/60"
+                    onClick={() => setIsShuffle(!isShuffle)}
+                    className={`p-2 ${isShuffle ? "text-green-400" : "text-white/60"
                       }`}
                   >
                     <RxShuffle style={{ width: '24px', height: '24px' }} />
@@ -1842,8 +1848,8 @@ export function FullscreenMusicPlayer({
                     <Button
 
                       size="sm"
-                      onClick={() => setIsShuffled(!isShuffled)}
-                      className={`bg-transparent hover:bg-transparent hover:cursor-pointer ${isShuffled ? "text-green-400" : "text-white/65"
+                      onClick={() => setIsShuffle(!isShuffle)}
+                      className={`bg-transparent hover:bg-transparent hover:cursor-pointer ${isShuffle ? "text-green-400" : "text-white/65"
                         }`}
                     >
                       <RxShuffle style={{ width: '24px', height: '24px' }} />

@@ -12,6 +12,8 @@ export function MusicPlayerProvider({ children }) {
   const [isPlayerVisible, setIsPlayerVisible] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
+  const [isShuffle, setIsShuffle] = useState(false);
+  const [repeatMode, setRepeatMode] = useState("off"); // 'off', 'all', 'one'
 
   // Add audio timing states
   const [currentTime, setCurrentTime] = useState(0);
@@ -80,6 +82,8 @@ export function MusicPlayerProvider({ children }) {
         isPlayerVisible,
         isPlaying,
         isRadioPlaying,
+        isShuffle,
+        repeatMode,
         isFullscreenOpen,
         currentTime,
         duration,
@@ -92,6 +96,8 @@ export function MusicPlayerProvider({ children }) {
         togglePlayPause,
         setIsPlaying,
         updateCurrentTime,
+        setIsShuffle,
+        setRepeatMode,
         updateDuration,
         updateVolume,
         seekTo,

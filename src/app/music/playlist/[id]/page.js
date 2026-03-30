@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense, useMemo } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -46,7 +46,7 @@ import {
   DrawerPortal,
 } from "@/components/ui/drawer";
 import { memo } from "react";
-import { Share } from "lucide-react";
+import { Share, Search, Check, List, LayoutList } from "lucide-react";
 
 // --- Helper Components ---
 const SongActionMenu = memo(({ 
@@ -253,6 +253,226 @@ const SongActionMenu = memo(({
 
 SongActionMenu.displayName = "SongActionMenu";
 
+// --- Sort and View Menu ---
+const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }) => {
+  const sortOptions = [
+    { id: 'custom', label: 'Custom order' },
+    { id: 'title', label: 'Title' },
+    { id: 'artist', label: 'Artist' },
+    { id: 'album', label: 'Album' },
+    { id: 'added', label: 'Recently added' },
+    { id: 'duration', label: 'Duration' },
+  ];
+
+  const viewOptions = [
+    { id: 'compact', label: 'Compact', icon: LayoutList },
+    { id: 'list', label: 'List', icon: List },
+  ];
+
+  const currentSortLabel = sortOptions.find(o => o.id === sortBy)?.label || 'Sort by';
+
+  const Content = ({ closeOnSelect = () => {} }) => (
+    <div className="flex flex-col gap-1 p-2">
+      <div className="px-3 py-2 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Sort by</div>
+      {sortOptions.map(option => (
+        <button
+          key={option.id}
+          className={`flex items-center justify-between px-3 py-2.5 rounded-sm hover:bg-white/10 transition-colors text-sm ${sortBy === option.id ? 'text-[#1ed760] font-medium' : 'text-white/90'}`}
+          onClick={() => {
+            setSortBy(option.id);
+            closeOnSelect();
+          }}
+        >
+          {option.label}
+          {sortBy === option.id && <Check className="w-4 h-4" />}
+        </button>
+      ))}
+      <div className="h-px bg-white/5 my-2" />
+      <div className="px-3 py-2 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">View as</div>
+      {viewOptions.map(option => (
+        <button
+          key={option.id}
+          className={`flex items-center justify-between px-3 py-2.5 rounded-sm hover:bg-white/10 transition-colors text-sm ${viewAs === option.id ? 'text-[#1ed760] font-medium' : 'text-white/90'}`}
+          onClick={() => {
+            setViewAs(option.id);
+            closeOnSelect();
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <option.icon className="w-4 h-4" />
+            {option.label}
+          </div>
+          {viewAs === option.id && <Check className="w-4 h-4" />}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (isMobile) {
+    const [open, setOpen] = useState(false);
+    return (
+      <Drawer open={open} onOpenChange={setOpen}>
+        <DrawerTrigger asChild>
+          <button className="flex items-center gap-2 text-sm font-medium text-white/80 hover:text-white transition-colors py-2 px-1">
+            <span className={sortBy !== 'custom' ? 'text-[#1ed760]' : ''}>{currentSortLabel}</span>
+            <List className="w-4 h-4" />
+          </button>
+        </DrawerTrigger>
+        <DrawerPortal>
+          <DrawerContent className="bg-[#1a1a1a] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
+            <DrawerHeader className="sr-only">
+              <DrawerTitle>Sort and View Options</DrawerTitle>
+              <DrawerDescription>Select sorting order and view mode for the current playlist</DrawerDescription>
+            </DrawerHeader>
+            <Content closeOnSelect={() => setOpen(false)} />
+            <div className="h-6" />
+          </DrawerContent>
+        </DrawerPortal>
+      </Drawer>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="flex items-center gap-2 text-sm font-medium text-white/80 hover:text-white transition-colors py-2 px-2 hover:bg-white/5 rounded-md">
+          <span className={sortBy !== 'custom' ? 'text-[#1ed760]' : ''}>{currentSortLabel}</span>
+          <List className="w-4 h-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64 bg-[#282828] border-none text-white p-0 shadow-xl ring-1 ring-black/20">
+        <Content />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+});
+
+SortAndViewMenu.displayName = "SortAndViewMenu";
+
+SongActionMenu.displayName = "SongActionMenu";
+
+// --- Playlist Action Menu ---
+const PlaylistActionMenu = memo(({ 
+  playlist, 
+  songs,
+  isLiked, 
+  toggleLike, 
+  onDownload, 
+  onShare,
+  isMobile,
+  decodeHtmlEntities 
+}) => {
+  const [open, setOpen] = useState(false);
+  
+  const playlistImageUrl = playlist.image?.[2]?.url || 
+                           playlist.image?.[1]?.url || 
+                           playlist.image?.[0]?.url || 
+                           '/default-playlist-image.png';
+
+  const ActionItems = ({ onItemClick }) => (
+    <>
+      <div 
+        className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${isLiked ? 'text-red-500' : ''}`}
+        onClick={() => {
+          onItemClick();
+          toggleLike();
+        }}
+      >
+        <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
+        <span className="font-medium">{isLiked ? 'Remove from library' : 'Save to library'}</span>
+      </div>
+      
+      <div 
+        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        onClick={() => {
+          onItemClick();
+          onDownload();
+        }}
+      >
+        <Download className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Download playlist</span>
+      </div>
+
+      <div 
+        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        onClick={() => {
+          onItemClick();
+          onShare();
+        }}
+      >
+        <Share className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Share playlist</span>
+      </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={setOpen}>
+        <DrawerTrigger asChild>
+          <Button variant="ghost" className="rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center">
+            <MoreVertical style={{ width: '24px', height: '24px' }} />
+          </Button>
+        </DrawerTrigger>
+        <div onClick={(e) => e.stopPropagation()}>
+          <DrawerContent className="bg-[#121212] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
+            <DrawerHeader className="p-0 text-left">
+              <DrawerTitle className="sr-only">Playlist Options</DrawerTitle>
+              <DrawerDescription className="sr-only">Actions for {playlist.name}</DrawerDescription>
+              <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
+                <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0 bg-neutral-800">
+                  <img src={playlistImageUrl} alt={playlist.name} className="w-full h-full object-cover" />
+                </div>
+                <div className="flex-1 min-w-0 flex flex-col justify-center text-left">
+                  <div className="text-base font-bold truncate text-white text-left">
+                    {decodeHtmlEntities(playlist.name)}
+                  </div>
+                  <div className="text-sm text-muted-foreground truncate mt-0.5 text-left">
+                    Playlist • {playlist.subtitle || 'JioSaavn'}
+                  </div>
+                </div>
+              </div>
+            </DrawerHeader>
+            <div className="px-2 py-4 pb-8 space-y-1">
+              <ActionItems onItemClick={() => setOpen(false)} />
+            </div>
+          </DrawerContent>
+        </div>
+      </Drawer>
+    );
+  }
+
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center">
+          <MoreVertical style={{ width: '24px', height: '24px' }} />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
+        <DropdownMenuItem 
+          onClick={toggleLike}
+          className={`hover:bg-white/10 focus:bg-white/10 cursor-pointer ${isLiked ? 'text-red-500' : ''}`}
+        >
+          <Heart className={`w-4 h-4 mr-2 ${isLiked ? 'fill-current' : ''}`} />
+          {isLiked ? 'Remove from library' : 'Save to library'}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onDownload} className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
+          <Download className="w-4 h-4 mr-2" />
+          Download playlist
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuItem onClick={onShare} className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
+          <Share className="w-4 h-4 mr-2" />
+          Share playlist
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+});
+
+PlaylistActionMenu.displayName = "PlaylistActionMenu";
+
 function PlaylistPageContent() {
   const router = useRouter();
   const params = useParams();
@@ -272,6 +492,32 @@ function PlaylistPageContent() {
   const mobileTitleRef = useRef(null);
   const desktopTitleRef = useRef(null);
 
+  // Search and Sort State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [sortBy, setSortBy] = useState('custom');
+  const [viewAs, setViewAs] = useState('list');
+  const searchInputRef = useRef(null);
+  const searchContainerRef = useRef(null);
+
+  // Auto-focus search input when it becomes visible
+  useEffect(() => {
+    if (isSearchVisible && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [isSearchVisible]);
+
+  // Click outside to hide search
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target)) {
+        if (!searchQuery) setIsSearchVisible(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [searchQuery]);
+
   // Initialize liked songs hook with actual user ID from session
   const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
 
@@ -282,7 +528,7 @@ function PlaylistPageContent() {
   } = useLikedPlaylists(session?.user?.id);
 
   // Initialize music player
-  const { playSong, currentSong, isPlaying, togglePlayPause, currentPlaylistId } = useMusicPlayer();
+  const { playSong, currentSong, isPlaying, togglePlayPause, currentPlaylistId, isShuffle, setIsShuffle } = useMusicPlayer();
 
   useEffect(() => {
     const fetchPlaylistDetails = async () => {
@@ -409,7 +655,55 @@ function PlaylistPageContent() {
     };
   }, [loading, songs.length]);
 
-  // ── Recently Played Tracking ────────────────────────────────────────
+  // Filter and Sort Logic
+  const filteredBaseSongs = useMemo(() => {
+    // Pre-map songs for easier sorting
+    const base = songs.map(s => ({
+      ...s,
+      artistName: s.artists?.primary?.[0]?.name || s.artists?.[0]?.name || '',
+      albumName: s.album?.name || '',
+      addedAt: s.releaseDate || s.year || s.id
+    }));
+
+    if (!searchQuery.trim()) return base;
+    const query = searchQuery.toLowerCase().trim();
+    return base.filter(song => 
+      song.name?.toLowerCase().includes(query) || 
+      song.artistName.toLowerCase().includes(query) ||
+      song.albumName.toLowerCase().includes(query)
+    );
+  }, [songs, searchQuery]);
+
+  const sortedSongs = useMemo(() => {
+    let result = [...filteredBaseSongs];
+    if (sortBy === 'custom') return result;
+
+    result.sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case "title":
+          comparison = (a.name || '').localeCompare(b.name || '');
+          break;
+        case "artist":
+          comparison = a.artistName.localeCompare(b.artistName);
+          break;
+        case "album":
+          comparison = a.albumName.localeCompare(b.albumName);
+          break;
+        case "added":
+          comparison = b.addedAt > a.addedAt ? 1 : -1;
+          break;
+        case "duration":
+          comparison = (b.duration || 0) - (a.duration || 0);
+          break;
+        default:
+          break;
+      }
+      return comparison;
+    });
+    return result;
+  }, [filteredBaseSongs, sortBy]);
+
   const trackRecentlyPlayed = () => {
     if (!session?.user?.id || !playlist) return;
     const imageUrl =
@@ -446,8 +740,16 @@ function PlaylistPageContent() {
       if (isPlaylistPlaying) {
         togglePlayPause();
       } else {
-        playSong(songs[0], songs, playlistId);
-        setCurrentlyPlaying({ song: songs[0], index: 0 });
+        let startSong = songs[0];
+        let startIndex = 0;
+        
+        if (isShuffle) {
+          startIndex = Math.floor(Math.random() * songs.length);
+          startSong = songs[startIndex];
+        }
+        
+        playSong(startSong, songs, playlistId, startIndex);
+        setCurrentlyPlaying({ song: startSong, index: startIndex });
         trackRecentlyPlayed();
       }
       console.log('Playlist action:', isPlaylistPlaying ? 'toggling play/pause' : 'starting from beginning');
@@ -821,7 +1123,7 @@ function PlaylistPageContent() {
         >
           {/* Optimized Mobile Background Layer */}
           <div
-            className="absolute inset-0 -z-10 transition-opacity duration-150 ease-linear pointer-events-none md:hidden"
+            className="absolute inset-0 -z-10 transition-opacity duration-150 ease-in-out pointer-events-none md:hidden"
             style={{
               backgroundColor: dominantColor ? `color-mix(in srgb, ${dominantColor}, black 60%)` : '#1D1046',
               opacity: 'var(--scroll-progress, 0)'
@@ -1004,9 +1306,8 @@ function PlaylistPageContent() {
               </div>
             </div>
 
-            {/* Controls */}
             <div className="p-4 pt-2 md:p-8 md:pt-4">
-              <div className="flex items-center gap-3 md:gap-4">
+              <div className="flex items-center gap-0.5 md:gap-1">
                 <Button
                   size="lg"
                   className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-all duration-500"
@@ -1024,37 +1325,82 @@ function PlaylistPageContent() {
                     <IoMdPlay style={{ width: '24px', height: '24px', marginLeft: '4px' }} />
                   )}
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="lg"
-                  className={`rounded-full w-10 h-10 md:w-12 md:h-12 transition-all duration-200 ${isPlaylistLiked(playlistId) ? 'text-red-500 hover:text-red-600 hover:scale-110' : 'text-white hover:text-red-500 hover:scale-110'}`}
-                  onClick={async () => {
-                    const result = await togglePlaylistLike({
+                <Button 
+                  variant="ghost" 
+                  onClick={() => setIsShuffle(!isShuffle)}
+                  className={`rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center transition-colors ${isShuffle ? 'text-green-500 hover:text-green-400 hover:bg-green-500/10' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  <Shuffle style={{ width: '24px', height: '24px' }} />
+                </Button>
+                
+                <PlaylistActionMenu 
+                  playlist={playlist}
+                  songs={songs}
+                  isLiked={isPlaylistLiked(playlistId)}
+                  toggleLike={async () => {
+                    await togglePlaylistLike({
                       id: playlistId,
                       name: playlist.name,
                       description: playlist.subtitle || playlist.header_desc || '',
                       image: playlist.image,
                       songCount: playlist.songCount || songs.length
                     });
-                    console.log(result.message);
                   }}
-                >
-                  <Heart className={`w-5 h-5 md:w-6 md:h-6 transition-all duration-200 ${isPlaylistLiked(playlistId) ? 'fill-current' : ''}`} />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="lg"
-                  className="rounded-full w-10 h-10 md:w-12 md:h-12 text-white hover:text-green-500 hover:scale-110"
-                  onClick={handleDownloadAll}
-                >
-                  <Download className="w-5 h-5 md:w-6 md:h-6" />
-                </Button>
-                <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
-                  <Shuffle className="w-5 h-5 md:w-6 md:h-6" />
-                </Button>
-                <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
-                  <MoreVertical className="w-5 h-5 md:w-6 md:h-6" />
-                </Button>
+                  onDownload={handleDownloadAll}
+                  onShare={() => {
+                    if (navigator.share) {
+                      navigator.share({
+                        title: playlist.name,
+                        text: `Check out this playlist "${playlist.name}" on Jamify`,
+                        url: window.location.href
+                      });
+                    } else {
+                      navigator.clipboard.writeText(window.location.href);
+                      toast.success('Link copied to clipboard');
+                    }
+                  }}
+                  isMobile={window.innerWidth < 768}
+                  decodeHtmlEntities={decodeHtmlEntities}
+                />
+
+                {/* Search and Sort Options Container */}
+                <div className="flex items-center ml-auto gap-1 md:gap-3">
+                  {/* Search Bar */}
+                  <div ref={searchContainerRef}>
+                    <div 
+                      className={`flex items-center transition-all duration-300 ease-in-out ${isSearchVisible ? 'w-40 md:w-56 h-9 px-2.5 rounded-md border border-white/10 bg-white/5 justify-start' : 'w-9 h-9 justify-center rounded-full bg-white/5 hover:bg-white/10 cursor-pointer border-none'}`}
+                      onClick={() => !isSearchVisible && setIsSearchVisible(true)}
+                    >
+                      <Search className={`w-4 h-4 text-muted-foreground shrink-0 transition-colors ${isSearchVisible ? 'text-white/70' : ''}`} />
+                      <input
+                        ref={searchInputRef}
+                        type="text"
+                        placeholder="Search in playlist"
+                        className={`bg-transparent border-none outline-none text-white text-xs md:text-sm placeholder:text-white/40 transition-all duration-300 ${isSearchVisible ? 'w-full ml-2 opacity-100 visible' : 'w-0 ml-0 opacity-0 invisible'}`}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            setSearchQuery("");
+                            setIsSearchVisible(false);
+                          }
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Sort and View Options */}
+                  {!isSearchVisible && (
+                    <SortAndViewMenu 
+                      sortBy={sortBy} 
+                      setSortBy={setSortBy} 
+                      viewAs={viewAs} 
+                      setViewAs={setViewAs} 
+                      isMobile={window.innerWidth < 768} 
+                    />
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1062,8 +1408,8 @@ function PlaylistPageContent() {
             <div className="pl-2 pr-1 md:px-6 pb-32 md:pb-24">
 
               {/* Desktop Table Header */}
-              <div className="hidden md:grid grid-cols-[auto_1fr_1fr_120px_100px] gap-4 items-center text-sm text-muted-foreground border-b pb-2 mb-4">
-                <div className="w-8 text-center">#</div>
+              <div className="hidden md:grid grid-cols-[40px_1fr_1fr_120px_100px] gap-4 items-center text-sm text-muted-foreground border-b pb-2 mb-4">
+                <div className="text-right pr-2">#</div>
                 <div>Title</div>
                 <div>Album</div>
                 <div>Release Date</div>
@@ -1076,17 +1422,16 @@ function PlaylistPageContent() {
               </div>
 
               <div className="space-y-0">
-                {songs.map((song, index) => {
+                {sortedSongs.map((song, index) => {
                   const isCurrentSong = currentSong?.id === song.id;
                   return (
                     <div key={song.id || index} >
                       {/* Mobile Layout */}
                       <div
-                        className={`md:hidden flex items-center gap-2 pl-1 pr-0 py-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
-                          }`}
+                        className={`md:hidden flex items-center rounded hover:bg-muted/50 group cursor-pointer ${viewAs === 'compact' ? 'gap-3 pl-0 pr-0 py-1 h-[48px]' : 'gap-3 pl-0 pr-0 py-2 h-[64px]'}`}
                         onClick={() => handlePlayClick(song, index)}
                       >
-                        <div className="w-6 text-center shrink-0">
+                        <div className="w-6 text-right pr-1 shrink-0">
                           {isCurrentSong && isPlaying ? (
                             <div className="flex items-center justify-center">
                               <div className="flex items-end justify-center gap-0.5 h-3">
@@ -1108,31 +1453,32 @@ function PlaylistPageContent() {
                           )}
                         </div>
 
-                        <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
-                          {song.image?.length > 0 ? (
-                            <img
-                              src={song.image.find(img => img.quality === '500x500')?.url ||
-                                song.image.find(img => img.quality === '150x150')?.url ||
-                                song.image[song.image.length - 1]?.url}
-                              alt={song.name}
-                              className="w-full h-full object-cover rounded"
-                              loading="lazy"
-                              onError={(e) => {
-                                e.target.src = '/default-playlist-image.png';
-                              }}
-                            />
-                          ) : (
-                            <img
-                              src="/default-playlist-image.png"
-                              alt={song.name}
-                              className="w-full h-full object-cover rounded"
-                            />
-                          )}
-                        </div>
+                        <div className="flex-1 min-w-0 flex items-center gap-2.5">
+                          <div className={`${viewAs === 'compact' ? 'w-10 h-10' : 'w-12 h-12'} rounded bg-muted shrink-0 overflow-hidden`}>
+                            {song.image?.length > 0 ? (
+                              <img
+                                src={song.image.find(img => img.quality === '500x500')?.url ||
+                                  song.image.find(img => img.quality === '150x150')?.url ||
+                                  song.image[song.image.length - 1]?.url}
+                                alt={song.name}
+                                className="w-full h-full object-cover rounded"
+                                loading="lazy"
+                                onError={(e) => {
+                                  e.target.src = '/default-playlist-image.png';
+                                }}
+                              />
+                            ) : (
+                              <img
+                                src="/default-playlist-image.png"
+                                alt={song.name}
+                                className="w-full h-full object-cover rounded"
+                              />
+                            )}
+                          </div>
 
-                        <div className="min-w-0 flex-1">
-                          <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''
-                            }`}>
+                          <div className="min-w-0 flex-1">
+                            <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''
+                              }`}>
                             {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
                           </p>
                           <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
@@ -1161,8 +1507,9 @@ function PlaylistPageContent() {
                             )}
                           </p>
                         </div>
+                      </div>
 
-                        <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                           <SongActionMenu 
                             song={song}
                             onAddToPlaylist={handleAddToPlaylist}
@@ -1178,11 +1525,11 @@ function PlaylistPageContent() {
 
                       {/* Desktop Layout */}
                       <div
-                        className={`hidden md:grid grid-cols-[auto_1fr_1fr_120px_100px] gap-4 items-center p-1.5 py-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
-                          }`}
+                        className={`hidden md:grid grid-cols-[40px_1fr_1fr_120px_100px] gap-4 items-center p-1.5 rounded hover:bg-muted/50 group cursor-pointer ${viewAs === 'compact' ? 'py-1' : 'py-2'}`}
                         onClick={() => handlePlayClick(song, index)}
+                        style={{ height: viewAs === 'compact' ? 48 : 64 }}
                       >
-                        <div className="w-8 text-center">
+                        <div className="text-right pr-2 shrink-0">
                           {isCurrentSong && isPlaying ? (
                             <div className="flex items-center justify-center">
                               <div className="flex items-end justify-center gap-0.5 h-3">
@@ -1204,8 +1551,8 @@ function PlaylistPageContent() {
                           )}
                         </div>
 
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className={`${viewAs === 'compact' ? 'w-8 h-8' : 'w-12 h-12'} rounded bg-muted shrink-0 overflow-hidden`}>
                             {song.image?.length > 0 ? (
                               <img
                                 src={song.image.find(img => img.quality === '500x500')?.url ||
@@ -1227,8 +1574,7 @@ function PlaylistPageContent() {
                             )}
                           </div>
                           <div className="min-w-0">
-                            <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''
-                              }`}>
+                            <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''} ${viewAs === 'compact' ? 'text-sm' : ''}`}>
                               {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
                             </p>
                             <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
@@ -1262,7 +1608,6 @@ function PlaylistPageContent() {
                               className="hover:underline hover:text-foreground transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // Use the album ID directly from the album object
                                 if (song.album.id) {
                                   router.push(`/music/album/${song.album.id}`);
                                 }

@@ -79,7 +79,10 @@ import {
   Minus,
   User,
   Disc,
-  Search
+  Search,
+  Check,
+  LayoutList,
+  List
 } from "lucide-react";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
@@ -331,17 +334,34 @@ const PlaylistActionMenu = memo(({
   onTogglePrivacy, 
   onShare, 
   onDelete,
+  onDownload,
+  canDownload,
   open,
   setOpen,
   isMobile,
   getPlaylistCover,
-  decodeHtmlEntities
+  decodeHtmlEntities,
+  onToggleLike,
+  isLiked,
+  likingInProgress
 }) => {
   const cover = getPlaylistCover();
   const playlistImageUrl = cover.type === 'single' ? cover.src : (cover.type === 'collage' ? cover.images[0] : '/default-playlist-image.png');
 
   const ActionItems = ({ onItemClick }) => (
     <>
+      {!isOwner && playlist.isPublic && (
+        <div 
+          className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${isLiked ? 'text-red-500' : ''} ${likingInProgress ? 'opacity-50 pointer-events-none' : ''}`}
+          onClick={() => {
+            onItemClick();
+            onToggleLike();
+          }}
+        >
+          <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
+          <span className="font-medium">{isLiked ? 'Remove from library' : 'Add to library'}</span>
+        </div>
+      )}
       {isOwner && (
         <>
           <div 
@@ -387,6 +407,19 @@ const PlaylistActionMenu = memo(({
         <span className="font-medium">Share playlist</span>
       </div>
 
+      <div 
+        className={`flex items-center gap-4 p-3 hover:bg-white/5 transition-colors ${!canDownload ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+        onClick={() => {
+          if (canDownload) {
+            onItemClick();
+            onDownload();
+          }
+        }}
+      >
+        <Download className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Download playlist</span>
+      </div>
+
       {isOwner && (
         <>
           <div className="h-px bg-white/5 my-1" />
@@ -409,8 +442,8 @@ const PlaylistActionMenu = memo(({
     return (
       <Drawer open={open} onOpenChange={setOpen}>
         <DrawerTrigger asChild>
-          <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
-            <MoreVertical className="w-5 h-5 md:w-6 md:h-6" />
+          <Button variant="ghost" className="rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center">
+            <MoreVertical style={{ width: '24px', height: '24px' }} />
           </Button>
         </DrawerTrigger>
         <div onClick={(e) => e.stopPropagation()}>
@@ -450,11 +483,24 @@ const PlaylistActionMenu = memo(({
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
-          <MoreVertical className="w-5 h-5 md:w-6 md:h-6" />
+        <Button variant="ghost" className="rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center">
+          <MoreVertical style={{ width: '24px', height: '24px' }} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
+        {!isOwner && playlist.isPublic && (
+          <>
+            <DropdownMenuItem 
+              onClick={onToggleLike} 
+              disabled={likingInProgress}
+              className={`${isLiked ? 'text-red-500' : ''} hover:bg-white/10 focus:bg-white/10 cursor-pointer`}
+            >
+              <Heart className={`w-4 h-4 mr-2 ${isLiked ? 'fill-current' : ''}`} />
+              {isLiked ? 'Remove from library' : 'Add to library'}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-white/5" />
+          </>
+        )}
         {isOwner && (
           <>
             <DropdownMenuItem onClick={onEdit} className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
@@ -481,6 +527,14 @@ const PlaylistActionMenu = memo(({
           <Share className="w-4 h-4 mr-2" />
           Share playlist
         </DropdownMenuItem>
+        <DropdownMenuItem 
+          onClick={onDownload} 
+          disabled={!canDownload}
+          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer disabled:opacity-50"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Download playlist
+        </DropdownMenuItem>
         {isOwner && (
           <>
             <DropdownMenuSeparator className="bg-white/5" />
@@ -500,15 +554,114 @@ const PlaylistActionMenu = memo(({
 
 PlaylistActionMenu.displayName = "PlaylistActionMenu";
 
+// --- Sort and View Menu ---
+const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }) => {
+  const sortOptions = [
+    { id: 'custom', label: 'Custom order' },
+    { id: 'title', label: 'Title' },
+    { id: 'artist', label: 'Artist' },
+    { id: 'album', label: 'Album' },
+    { id: 'added', label: 'Recently added' },
+    { id: 'duration', label: 'Duration' },
+  ];
+
+  const viewOptions = [
+    { id: 'compact', label: 'Compact', icon: LayoutList },
+    { id: 'list', label: 'List', icon: List },
+  ];
+
+  const currentSortLabel = sortOptions.find(o => o.id === sortBy)?.label || 'Sort by';
+
+  const Content = ({ closeOnSelect = () => {} }) => (
+    <div className="flex flex-col gap-1 p-2">
+      <div className="px-3 py-2 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Sort by</div>
+      {sortOptions.map(option => (
+        <button
+          key={option.id}
+          className={`flex items-center justify-between px-3 py-2.5 rounded-sm hover:bg-white/10 transition-colors text-sm ${sortBy === option.id ? 'text-[#1ed760] font-medium' : 'text-white/90'}`}
+          onClick={() => {
+            setSortBy(option.id);
+            closeOnSelect();
+          }}
+        >
+          {option.label}
+          {sortBy === option.id && <Check className="w-4 h-4" />}
+        </button>
+      ))}
+      <div className="h-px bg-white/5 my-2" />
+      <div className="px-3 py-2 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">View as</div>
+      {viewOptions.map(option => (
+        <button
+          key={option.id}
+          className={`flex items-center justify-between px-3 py-2.5 rounded-sm hover:bg-white/10 transition-colors text-sm ${viewAs === option.id ? 'text-[#1ed760] font-medium' : 'text-white/90'}`}
+          onClick={() => {
+            setViewAs(option.id);
+            closeOnSelect();
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <option.icon className="w-4 h-4" />
+            {option.label}
+          </div>
+          {viewAs === option.id && <Check className="w-4 h-4" />}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (isMobile) {
+    const [open, setOpen] = useState(false);
+    return (
+      <Drawer open={open} onOpenChange={setOpen}>
+        <DrawerTrigger asChild>
+          <button className="flex items-center gap-2 text-sm font-medium text-white/80 hover:text-white transition-colors py-2 px-1">
+            <span className={sortBy !== 'custom' ? 'text-[#1ed760]' : ''}>{currentSortLabel}</span>
+            <List className="w-4 h-4" />
+          </button>
+        </DrawerTrigger>
+        <DrawerPortal>
+          <DrawerContent className="bg-[#1a1a1a] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
+            <DrawerHeader className="sr-only">
+              <DrawerTitle>Sort and View Options</DrawerTitle>
+              <DrawerDescription>Select sorting order and view mode for the current playlist</DrawerDescription>
+            </DrawerHeader>
+            <Content closeOnSelect={() => setOpen(false)} />
+            <div className="h-6" />
+          </DrawerContent>
+        </DrawerPortal>
+      </Drawer>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="flex items-center gap-2 text-sm font-medium text-white/80 hover:text-white transition-colors py-2 px-2 hover:bg-white/5 rounded-md">
+          <span className={sortBy !== 'custom' ? 'text-[#1ed760]' : ''}>{currentSortLabel}</span>
+          <List className="w-4 h-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64 bg-[#282828] border-none text-white p-0 shadow-xl ring-1 ring-black/20">
+        <Content />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+});
+
+SortAndViewMenu.displayName = "SortAndViewMenu";
+
 // ─── Virtual Song List ──────────────────────────────────────────────────────
-const ITEM_HEIGHT = 64; // px per row (mobile ≈ desktop row height)
+const ITEM_HEIGHTS = {
+  list: 64,
+  compact: 48
+};
 const OVERSCAN = 5;     // extra rows above/below viewport
 
 const SongRow = React.memo(function SongRow({
   song, index, isCurrentSong, isPlaying, isOwner,
   isSongLiked, handlePlayClick, handleToggleSongLike,
   handleRemoveFromPlaylist, handleDownloadSong, handleShareSong,
-  decodeHtmlEntities, formatDuration, router, playlistId
+  decodeHtmlEntities, formatDuration, router, playlistId, viewAs
 }) {
   const imageUrl = song.image?.find(img => img.quality === '500x500')?.url ||
     song.image?.find(img => img.quality === '150x150')?.url ||
@@ -518,10 +671,10 @@ const SongRow = React.memo(function SongRow({
     <div>
       {/* Mobile */}
       <div
-        className="md:hidden flex items-center gap-2 pl-1 pr-0 py-2 rounded hover:bg-muted/50 group cursor-pointer"
+        className={`md:hidden flex items-center rounded hover:bg-muted/50 group cursor-pointer ${viewAs === 'compact' ? 'gap-3 pl-0 pr-0 py-1 h-[48px]' : 'gap-3 pl-0 pr-0 py-2 h-[64px]'}`}
         onClick={() => handlePlayClick(song, index)}
       >
-        <div className="w-6 text-center shrink-0">
+        <div className="w-6 text-right pr-1 shrink-0">
           {isCurrentSong && isPlaying ? (
             <div className="flex items-end justify-center gap-0.5 h-3">
               <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0s' }} />
@@ -538,20 +691,22 @@ const SongRow = React.memo(function SongRow({
             </>
           )}
         </div>
-        <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
-          <img src={imageUrl || '/default-playlist-image.png'} alt={song.name}
-            className="w-full h-full object-cover rounded" loading="lazy"
-            onError={(e) => { e.target.src = '/default-playlist-image.png'; }} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''}`}>
-            {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
-          </p>
-          <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'}`}>
-            {song.artists?.primary?.length > 0
-              ? song.artists.primary.map((a, ai) => <span key={a.id || ai}>{a.name}{ai < song.artists.primary.length - 1 && ', '}</span>)
-              : 'Unknown Artist'}
-          </p>
+        <div className="flex-1 min-w-0 flex items-center gap-2.5">
+          <div className={`${viewAs === 'compact' ? 'w-10 h-10' : 'w-12 h-12'} rounded bg-muted shrink-0 overflow-hidden`}>
+            <img src={imageUrl || '/default-playlist-image.png'} alt={song.name}
+              className="w-full h-full object-cover rounded" loading="lazy"
+              onError={(e) => { e.target.src = '/default-playlist-image.png'; }} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''} ${viewAs === 'compact' ? 'text-sm' : ''}`}>
+              {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
+            </p>
+            <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'}`}>
+              {song.artists?.primary?.length > 0
+                ? song.artists.primary.map((a, ai) => <span key={a.id || ai}>{a.name}{ai < song.artists.primary.length - 1 && ', '}</span>)
+                : 'Unknown Artist'}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
           <SongActionMenu 
@@ -575,10 +730,11 @@ const SongRow = React.memo(function SongRow({
 
       {/* Desktop */}
       <div
-        className="hidden md:grid grid-cols-[auto_1fr_1fr_120px_100px] gap-4 items-center p-1.5 py-2 rounded hover:bg-muted/50 group cursor-pointer"
+        className={`hidden md:grid grid-cols-[40px_1fr_1fr_120px_100px] gap-4 items-center p-1.5 rounded hover:bg-muted/50 group cursor-pointer ${viewAs === 'compact' ? 'py-1' : 'py-2'}`}
         onClick={() => handlePlayClick(song, index)}
+        style={{ height: viewAs === 'compact' ? ITEM_HEIGHTS.compact : ITEM_HEIGHTS.list }}
       >
-        <div className="w-8 text-center">
+        <div className="text-right pr-2 shrink-0">
           {isCurrentSong && isPlaying ? (
             <div className="flex items-end justify-center gap-0.5 h-3">
               <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0s' }} />
@@ -595,14 +751,14 @@ const SongRow = React.memo(function SongRow({
             </>
           )}
         </div>
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className={`${viewAs === 'compact' ? 'w-8 h-8' : 'w-12 h-12'} rounded bg-muted shrink-0 overflow-hidden`}>
             <img src={imageUrl || '/default-playlist-image.png'} alt={song.name}
               className="w-full h-full object-cover rounded" loading="lazy"
               onError={(e) => { e.target.src = '/default-playlist-image.png'; }} />
           </div>
           <div className="min-w-0">
-            <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''}`}>
+            <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''} ${viewAs === 'compact' ? 'text-sm' : ''}`}>
               {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
             </p>
             <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'}`}>
@@ -668,12 +824,13 @@ const SongRow = React.memo(function SongRow({
 function VirtualSongList({ 
   songs, currentSong, activePlaylistId, playlistId, currentIndex, isPlaying, isOwner,
   isSongLiked, handlePlayClick, handleToggleSongLike, handleRemoveFromPlaylist,
-  handleDownloadSong, handleShareSong, decodeHtmlEntities, formatDuration, router 
+  handleDownloadSong, handleShareSong, decodeHtmlEntities, formatDuration, router, viewAs 
 }) {
   const containerRef = useRef(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [containerHeight, setContainerHeight] = useState(800);
   const [listOffsetTop, setListOffsetTop] = useState(0);
+  const itemHeight = viewAs === 'compact' ? ITEM_HEIGHTS.compact : ITEM_HEIGHTS.list;
 
   useEffect(() => {
     const scrollEl = document.getElementById('user-playlist-scroll-container');
@@ -711,12 +868,12 @@ function VirtualSongList({
   }, [songs.length]);
 
   const relativeScroll = Math.max(0, scrollTop - listOffsetTop);
-  const startIndex = Math.max(0, Math.floor(relativeScroll / ITEM_HEIGHT) - OVERSCAN);
-  const visibleCount = Math.ceil(containerHeight / ITEM_HEIGHT) + OVERSCAN * 2;
+  const startIndex = Math.max(0, Math.floor(relativeScroll / itemHeight) - OVERSCAN);
+  const visibleCount = Math.ceil(containerHeight / itemHeight) + OVERSCAN * 2;
   const endIndex = Math.min(songs.length - 1, startIndex + visibleCount);
 
-  const totalHeight = songs.length * ITEM_HEIGHT;
-  const paddingTop = startIndex * ITEM_HEIGHT;
+  const totalHeight = songs.length * itemHeight;
+  const paddingTop = startIndex * itemHeight;
 
   return (
     <div ref={containerRef} style={{ height: totalHeight, position: 'relative' }}>
@@ -744,6 +901,7 @@ function VirtualSongList({
               formatDuration={formatDuration}
               router={router}
               playlistId={playlistId}
+              viewAs={viewAs}
             />
           );
         })}
@@ -775,6 +933,8 @@ export default function PlaylistDetailPage({ params }) {
   const [showHeaderTitle, setShowHeaderTitle] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("custom");
+  const [viewAs, setViewAs] = useState("list");
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const searchInputRef = useRef(null);
   const searchContainerRef = useRef(null);
@@ -783,7 +943,7 @@ export default function PlaylistDetailPage({ params }) {
   const isMobile = useIsMobile();
 
   // Initialize music player
-  const { playSong, currentSong, currentIndex, isPlaying, togglePlayPause, currentPlaylistId: activePlaylistId } = useMusicPlayer();
+  const { playSong, currentSong, currentIndex, isPlaying, togglePlayPause, currentPlaylistId: activePlaylistId, isShuffle, setIsShuffle } = useMusicPlayer();
 
   // Initialize liked songs hook
   const { toggleLike: toggleSongLike, isLiked: isSongLiked } = useLikedSongs(session?.user?.id);
@@ -1135,19 +1295,60 @@ export default function PlaylistDetailPage({ params }) {
     }).catch(() => { });
   };
 
+  // Pre-mapped base songs
+  const baseMappedSongs = useMemo(() => songs.map(s => ({
+    ...s,
+    artistName: s.artists?.primary?.[0]?.name || '',
+    albumName: s.album?.name || '',
+  })), [songs]);
+
   // Filter songs based on search query
-  const filteredSongs = useMemo(() => {
-    if (!searchQuery.trim()) return songs;
+  const filteredBaseSongs = useMemo(() => {
+    if (!searchQuery.trim()) return baseMappedSongs;
     const query = searchQuery.toLowerCase().trim();
-    return songs.filter(song => 
+    return baseMappedSongs.filter(song => 
       song.name?.toLowerCase().includes(query) || 
       song.artists?.primary?.some(artist => artist.name?.toLowerCase().includes(query)) ||
       song.album?.name?.toLowerCase().includes(query)
     );
-  }, [songs, searchQuery]);
+  }, [baseMappedSongs, searchQuery]);
+
+  // Apply sorting
+  const sortedSongs = useMemo(() => {
+    let result = [...filteredBaseSongs];
+    if (sortBy === 'custom') return result;
+
+    result.sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case "title":
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case "artist":
+          comparison = (a.artistName || '').localeCompare(b.artistName || '');
+          break;
+        case "album":
+          comparison = (a.albumName || '').localeCompare(b.albumName || '');
+          break;
+        case "added":
+          // Falling back to ID as proximity for added time if missing
+          const timeA = a.addedAt || a.id;
+          const timeB = b.addedAt || b.id;
+          comparison = timeB > timeA ? 1 : -1;
+          break;
+        case "duration":
+          comparison = b.duration - a.duration;
+          break;
+        default:
+          break;
+      }
+      return comparison;
+    });
+    return result;
+  }, [filteredBaseSongs, sortBy]);
 
   // Pre-map filtered playlist data
-  const mappedFilteredPlaylistData = useMemo(() => filteredSongs.map(s => ({
+  const mappedFilteredPlaylistData = useMemo(() => sortedSongs.map(s => ({
     id: s.id,
     name: s.name,
     artists: { primary: s.artists?.primary || [] },
@@ -1158,7 +1359,7 @@ export default function PlaylistDetailPage({ params }) {
     language: s.language,
     playCount: s.playCount,
     downloadUrl: s.downloadUrl
-  })), [filteredSongs]);
+  })), [sortedSongs]);
 
   const handlePlayClick = useCallback((song, index) => {
     if (currentSong?.id === song.id) return;
@@ -1176,12 +1377,21 @@ export default function PlaylistDetailPage({ params }) {
   }, [currentSong?.id, mappedFilteredPlaylistData, playlistId, playSong, trackRecentlyPlayed]);
 
   const handlePlayAll = useCallback(() => {
-    if (filteredSongs.length === 0) return;
+    if (sortedSongs.length === 0) return;
     if (activePlaylistId === playlistId) { togglePlayPause(); return; }
-    playSong(mappedFilteredPlaylistData[0], mappedFilteredPlaylistData, playlistId, 0);
-    setCurrentlyPlaying({ song: filteredSongs[0], index: 0 });
+    
+    let startSong = mappedFilteredPlaylistData[0];
+    let startIndex = 0;
+    
+    if (isShuffle) {
+      startIndex = Math.floor(Math.random() * mappedFilteredPlaylistData.length);
+      startSong = mappedFilteredPlaylistData[startIndex];
+    }
+    
+    playSong(startSong, mappedFilteredPlaylistData, playlistId, startIndex);
+    setCurrentlyPlaying({ song: sortedSongs[startIndex], index: startIndex });
     trackRecentlyPlayed();
-  }, [filteredSongs, activePlaylistId, playlistId, togglePlayPause, mappedFilteredPlaylistData, playSong, trackRecentlyPlayed]);
+  }, [sortedSongs, activePlaylistId, playlistId, togglePlayPause, mappedFilteredPlaylistData, playSong, trackRecentlyPlayed, isShuffle]);
 
   const handleGoBack = () => {
     router.back();
@@ -2142,9 +2352,8 @@ export default function PlaylistDetailPage({ params }) {
               </div>
             </div>
 
-            {/* Controls */}
             <div className="p-4 pt-2 md:p-8 md:pt-4">
-              <div className="flex items-center gap-3 md:gap-4">
+              <div className="flex items-center gap-0.5 md:gap-1">
                 <Button
                   size="lg"
                   className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-all duration-500"
@@ -2164,35 +2373,14 @@ export default function PlaylistDetailPage({ params }) {
                   )}
                 </Button>
 
-                {/* Heart Button - Only show for non-owners and public playlists */}
-                {!isOwner && playlist.isPublic && (
-                  <Button
-                    variant="ghost"
-                    size="lg"
-                    className={`rounded-full w-10 h-10 md:w-12 md:h-12 transition-all duration-200 ${isLiked
-                      ? 'text-red-500 hover:text-red-600 hover:scale-110'
-                      : 'text-white hover:text-red-500 hover:scale-110'
-                      }`}
-                    onClick={handleToggleLike}
-                    disabled={likingInProgress}
-                  >
-                    <Heart
-                      className={`w-5 h-5 md:w-6 md:h-6 transition-all duration-200 ${isLiked ? 'fill-current' : ''
-                        }`}
-                    />
-                  </Button>
-                )}
-                <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
-                  <Shuffle className="w-5 h-5 md:w-6 md:h-6" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="lg"
-                  className="rounded-full w-10 h-10 md:w-12 md:h-12"
-                  onClick={handleDownloadPlaylist}
-                  disabled={songs.length === 0}
+                {/* Moved Heart button to PlaylistActionMenu */}
+
+                <Button 
+                  variant="ghost" 
+                  onClick={() => setIsShuffle(!isShuffle)}
+                  className={`rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center transition-colors ${isShuffle ? 'text-green-500 hover:text-green-400 hover:bg-green-500/10' : 'text-muted-foreground hover:text-foreground'}`}
                 >
-                  <Download className="w-5 h-5 md:w-6 md:h-6" />
+                  <Shuffle style={{ width: '24px', height: '24px' }} />
                 </Button>
 
                 <PlaylistActionMenu 
@@ -2201,6 +2389,8 @@ export default function PlaylistDetailPage({ params }) {
                   onEdit={handleEditPlaylist}
                   onTogglePrivacy={handleTogglePrivacy}
                   onShare={handleSharePlaylist}
+                  onDownload={handleDownloadPlaylist}
+                  canDownload={songs.length > 0}
                   onDelete={() => {
                     setDropdownOpen(false);
                     setDeleteDialogOpen(true);
@@ -2210,31 +2400,48 @@ export default function PlaylistDetailPage({ params }) {
                   isMobile={isMobile}
                   getPlaylistCover={getPlaylistCover}
                   decodeHtmlEntities={decodeHtmlEntities}
+                  onToggleLike={handleToggleLike}
+                  isLiked={isLiked}
+                  likingInProgress={likingInProgress}
                 />
 
-                {/* Search Bar - Far Right side */}
-                <div className="flex items-center ml-auto" ref={searchContainerRef}>
-                  <div 
-                    className={`flex items-center transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${isSearchVisible ? 'w-40 md:w-56 h-9 px-2.5 rounded-md border border-white/10 bg-white/5 justify-start' : 'w-9 h-9 justify-center rounded-full bg-white/5 hover:bg-white/10 cursor-pointer border-none'}`}
-                    onClick={() => !isSearchVisible && setIsSearchVisible(true)}
-                  >
-                    <Search className={`w-4 h-4 text-muted-foreground shrink-0 transition-colors ${isSearchVisible ? 'text-white/70' : ''}`} />
-                    <input
-                      ref={searchInputRef}
-                      type="text"
-                      placeholder="Search in playlist"
-                      className={`bg-transparent border-none outline-none text-white text-xs md:text-sm placeholder:text-white/40 transition-all duration-300 ${isSearchVisible ? 'w-full ml-2 opacity-100 visible' : 'w-0 ml-0 opacity-0 invisible'}`}
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Escape') {
-                          setSearchQuery("");
-                          setIsSearchVisible(false);
-                        }
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                    />
+                {/* Search and Sort Options Container */}
+                <div className="flex items-center ml-auto gap-1 md:gap-3">
+                  {/* Search Bar - Far Right side */}
+                  <div ref={searchContainerRef}>
+                    <div 
+                      className={`flex items-center transition-all duration-300 ease-in-out ${isSearchVisible ? 'w-40 md:w-56 h-9 px-2.5 rounded-md border border-white/10 bg-white/5 justify-start' : 'w-9 h-9 justify-center rounded-full bg-white/5 hover:bg-white/10 cursor-pointer border-none'}`}
+                      onClick={() => !isSearchVisible && setIsSearchVisible(true)}
+                    >
+                      <Search className={`w-4 h-4 text-muted-foreground shrink-0 transition-colors ${isSearchVisible ? 'text-white/70' : ''}`} />
+                      <input
+                        ref={searchInputRef}
+                        type="text"
+                        placeholder="Search in playlist"
+                        className={`bg-transparent border-none outline-none text-white text-xs md:text-sm placeholder:text-white/40 transition-all duration-300 ${isSearchVisible ? 'w-full ml-2 opacity-100 visible' : 'w-0 ml-0 opacity-0 invisible'}`}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            setSearchQuery("");
+                            setIsSearchVisible(false);
+                          }
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
                   </div>
+
+                  {/* Sort and View Options */}
+                  {!isSearchVisible && (
+                    <SortAndViewMenu 
+                      sortBy={sortBy} 
+                      setSortBy={setSortBy} 
+                      viewAs={viewAs} 
+                      setViewAs={setViewAs} 
+                      isMobile={isMobile} 
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -2244,8 +2451,8 @@ export default function PlaylistDetailPage({ params }) {
               {songs.length > 0 ? (
                 <>
                   {/* Desktop Table Header */}
-                  <div className="hidden md:grid grid-cols-[auto_1fr_1fr_120px_100px] gap-4 items-center text-sm text-muted-foreground border-b pb-2 mb-4">
-                    <div className="w-8 text-center">#</div>
+                  <div className="hidden md:grid grid-cols-[40px_1fr_1fr_120px_100px] gap-4 items-center text-sm text-muted-foreground border-b pb-2 mb-4">
+                    <div className="text-right pr-2">#</div>
                     <div>Title</div>
                     <div>Album</div>
                     <div>Date added</div>
@@ -2258,7 +2465,7 @@ export default function PlaylistDetailPage({ params }) {
                   </div>
 
                   <VirtualSongList
-                    songs={filteredSongs}
+                    songs={sortedSongs}
                     currentSong={currentSong}
                     activePlaylistId={activePlaylistId}
                     playlistId={playlistId}
@@ -2273,6 +2480,7 @@ export default function PlaylistDetailPage({ params }) {
                     decodeHtmlEntities={decodeHtmlEntities}
                     formatDuration={formatDuration}
                     router={router}
+                    viewAs={viewAs}
                   />
                 </>
               ) : (
