@@ -78,7 +78,8 @@ import {
   Heart,
   Minus,
   User,
-  Disc
+  Disc,
+  Search
 } from "lucide-react";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
@@ -773,6 +774,10 @@ export default function PlaylistDetailPage({ params }) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [showHeaderTitle, setShowHeaderTitle] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const searchInputRef = useRef(null);
+  const searchContainerRef = useRef(null);
   const mobileTitleRef = useRef(null);
   const desktopTitleRef = useRef(null);
   const isMobile = useIsMobile();
@@ -1130,8 +1135,19 @@ export default function PlaylistDetailPage({ params }) {
     }).catch(() => { });
   };
 
-  // Pre-map songs ONCE — avoids O(n) re-map on every interaction
-  const mappedPlaylistData = useMemo(() => songs.map(s => ({
+  // Filter songs based on search query
+  const filteredSongs = useMemo(() => {
+    if (!searchQuery.trim()) return songs;
+    const query = searchQuery.toLowerCase().trim();
+    return songs.filter(song => 
+      song.name?.toLowerCase().includes(query) || 
+      song.artists?.primary?.some(artist => artist.name?.toLowerCase().includes(query)) ||
+      song.album?.name?.toLowerCase().includes(query)
+    );
+  }, [songs, searchQuery]);
+
+  // Pre-map filtered playlist data
+  const mappedFilteredPlaylistData = useMemo(() => filteredSongs.map(s => ({
     id: s.id,
     name: s.name,
     artists: { primary: s.artists?.primary || [] },
@@ -1142,7 +1158,7 @@ export default function PlaylistDetailPage({ params }) {
     language: s.language,
     playCount: s.playCount,
     downloadUrl: s.downloadUrl
-  })), [songs]);
+  })), [filteredSongs]);
 
   const handlePlayClick = useCallback((song, index) => {
     if (currentSong?.id === song.id) return;
@@ -1154,18 +1170,18 @@ export default function PlaylistDetailPage({ params }) {
       releaseDate: song.releaseDate, language: song.language,
       playCount: song.playCount, downloadUrl: song.downloadUrl
     };
-    playSong(songData, mappedPlaylistData, playlistId, index);
+    playSong(songData, mappedFilteredPlaylistData, playlistId, index);
     setCurrentlyPlaying({ song, index });
     trackRecentlyPlayed();
-  }, [currentSong?.id, mappedPlaylistData, playlistId, playSong, trackRecentlyPlayed]);
+  }, [currentSong?.id, mappedFilteredPlaylistData, playlistId, playSong, trackRecentlyPlayed]);
 
   const handlePlayAll = useCallback(() => {
-    if (songs.length === 0) return;
+    if (filteredSongs.length === 0) return;
     if (activePlaylistId === playlistId) { togglePlayPause(); return; }
-    playSong(mappedPlaylistData[0], mappedPlaylistData, playlistId, 0);
-    setCurrentlyPlaying({ song: songs[0], index: 0 });
+    playSong(mappedFilteredPlaylistData[0], mappedFilteredPlaylistData, playlistId, 0);
+    setCurrentlyPlaying({ song: filteredSongs[0], index: 0 });
     trackRecentlyPlayed();
-  }, [songs, activePlaylistId, playlistId, togglePlayPause, mappedPlaylistData, playSong, trackRecentlyPlayed]);
+  }, [filteredSongs, activePlaylistId, playlistId, togglePlayPause, mappedFilteredPlaylistData, playSong, trackRecentlyPlayed]);
 
   const handleGoBack = () => {
     router.back();
@@ -1517,6 +1533,28 @@ export default function PlaylistDetailPage({ params }) {
       observer.disconnect();
     };
   }, [loading, playlist?.name]);
+
+  // Effect to focus search input when it becomes visible
+  useEffect(() => {
+    if (isSearchVisible && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [isSearchVisible]);
+
+  // Handle click outside to close search (if empty)
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isSearchVisible && 
+          searchContainerRef.current && 
+          !searchContainerRef.current.contains(event.target) && 
+          !searchQuery.trim()) {
+        setIsSearchVisible(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isSearchVisible, searchQuery]);
 
   const handleShareSong = async (song) => {
     // Share the current playlist URL instead of the individual song
@@ -2156,6 +2194,7 @@ export default function PlaylistDetailPage({ params }) {
                 >
                   <Download className="w-5 h-5 md:w-6 md:h-6" />
                 </Button>
+
                 <PlaylistActionMenu 
                   playlist={playlist}
                   isOwner={isOwner}
@@ -2172,6 +2211,31 @@ export default function PlaylistDetailPage({ params }) {
                   getPlaylistCover={getPlaylistCover}
                   decodeHtmlEntities={decodeHtmlEntities}
                 />
+
+                {/* Search Bar - Far Right side */}
+                <div className="flex items-center ml-auto" ref={searchContainerRef}>
+                  <div 
+                    className={`flex items-center transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${isSearchVisible ? 'w-40 md:w-56 h-9 px-2.5 rounded-md border border-white/10 bg-white/5 justify-start' : 'w-9 h-9 justify-center rounded-full bg-white/5 hover:bg-white/10 cursor-pointer border-none'}`}
+                    onClick={() => !isSearchVisible && setIsSearchVisible(true)}
+                  >
+                    <Search className={`w-4 h-4 text-muted-foreground shrink-0 transition-colors ${isSearchVisible ? 'text-white/70' : ''}`} />
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      placeholder="Search in playlist"
+                      className={`bg-transparent border-none outline-none text-white text-xs md:text-sm placeholder:text-white/40 transition-all duration-300 ${isSearchVisible ? 'w-full ml-2 opacity-100 visible' : 'w-0 ml-0 opacity-0 invisible'}`}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                          setSearchQuery("");
+                          setIsSearchVisible(false);
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -2194,7 +2258,7 @@ export default function PlaylistDetailPage({ params }) {
                   </div>
 
                   <VirtualSongList
-                    songs={songs}
+                    songs={filteredSongs}
                     currentSong={currentSong}
                     activePlaylistId={activePlaylistId}
                     playlistId={playlistId}
@@ -2214,10 +2278,21 @@ export default function PlaylistDetailPage({ params }) {
               ) : (
                 <div className="text-center py-12">
                   <ListMusic className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-xl font-semibold mb-2">Your playlist is empty</h3>
-                  <p className="text-muted-foreground mb-4">Add songs to start building your playlist</p>
-                  <Button onClick={() => router.push('/music')}>
-                    Find music to add
+                  <h3 className="text-xl font-semibold mb-2">
+                    {searchQuery ? "No results found" : "Your playlist is empty"}
+                  </h3>
+                  <p className="text-muted-foreground mb-4">
+                    {searchQuery ? `We couldn't find any songs matching "${searchQuery}"` : "Add songs to start building your playlist"}
+                  </p>
+                  <Button onClick={() => {
+                    if (searchQuery) {
+                      setSearchQuery("");
+                      setIsSearchVisible(false);
+                    } else {
+                      router.push('/music');
+                    }
+                  }}>
+                    {searchQuery ? "Clear search" : "Find music to add"}
                   </Button>
                 </div>
               )}

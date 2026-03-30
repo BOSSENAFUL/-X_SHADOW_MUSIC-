@@ -133,15 +133,18 @@
     letter-spacing: var(--tracking-normal);
   }
 
-  /* Disable text selection and zoom for mobile for a native app feel */
+  /* Disable text selection and zoom globally for a native app feel */
+  * {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   @media (max-width: 768px) {
     * {
-      -webkit-user-select: none;
-      -moz-user-select: none;
-      -ms-user-select: none;
-      user-select: none;
-      -webkit-touch-callout: none;
-      -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
       -webkit-text-size-adjust: 100%;
     }
