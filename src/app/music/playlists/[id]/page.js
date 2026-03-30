@@ -614,9 +614,9 @@ const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }
     return (
       <Drawer open={open} onOpenChange={setOpen}>
         <DrawerTrigger asChild>
-          <button className="flex items-center gap-2 text-sm font-medium text-white/80 hover:text-white transition-colors py-2 px-1">
-            <span className={sortBy !== 'custom' ? 'text-[#1ed760]' : ''}>{currentSortLabel}</span>
-            <List className="w-4 h-4" />
+          <button className="flex items-center gap-1.5 text-xs font-medium text-white/80 hover:text-white transition-colors py-1.5 px-3 bg-white/5 rounded-full border border-white/10 shrink-0">
+            <span className={sortBy !== 'custom' ? 'text-[#1ed760]' : ''}>Sort</span>
+            <List className="w-3.5 h-3.5 opacity-80" />
           </button>
         </DrawerTrigger>
         <DrawerPortal>
@@ -942,6 +942,11 @@ export default function PlaylistDetailPage({ params }) {
   const mobileTitleRef = useRef(null);
   const desktopTitleRef = useRef(null);
   const isMobile = useIsMobile();
+
+  // Drag and drop states for playlist reordering
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Initialize music player
   const { playSong, currentSong, currentIndex, isPlaying, togglePlayPause, currentPlaylistId: activePlaylistId, isShuffle, setIsShuffle } = useMusicPlayer();
@@ -1397,6 +1402,97 @@ export default function PlaylistDetailPage({ params }) {
   const handleGoBack = () => {
     router.back();
   };
+
+  // ─── Drag and Drop Handlers ───────────────────────────────────────────────
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    setIsDragging(true);
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      // Need this for Firefox
+      e.dataTransfer.setData("text/html", e.target);
+    }
+  };
+
+  const handleDragEnter = (e, index) => {
+    e.preventDefault();
+    setDragOverIndex(index);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "move";
+    }
+
+    // Auto-scroll logic
+    const scrollContainer = document.getElementById('user-playlist-scroll-container');
+    if (scrollContainer) {
+      const scrollThreshold = 100; // pixels from edge to trigger scroll
+      const scrollSpeed = 15; // pixels to adjust per calculation
+      
+      const rect = scrollContainer.getBoundingClientRect();
+      const clientY = e.clientY;
+
+      // Check proximity to top edge
+      if (clientY - rect.top < scrollThreshold) {
+        scrollContainer.scrollTop -= scrollSpeed;
+      } 
+      // Check proximity to bottom edge
+      else if (rect.bottom - clientY < scrollThreshold) {
+        scrollContainer.scrollTop += scrollSpeed;
+      }
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e, dropIndex) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      handleDragEnd();
+      return;
+    }
+
+    const newSongs = [...songs];
+    const draggedItem = newSongs[draggedIndex];
+    newSongs.splice(draggedIndex, 1);
+    
+    // Adjust insert index
+    const insertIndex = draggedIndex < dropIndex ? dropIndex - 1 : dropIndex;
+    newSongs.splice(insertIndex, 0, draggedItem);
+    
+    setSongs(newSongs); // Optimistic UI update
+    handleDragEnd();
+
+    try {
+      const response = await fetch(`/api/playlists/${playlistId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          songIds: newSongs.map((s) => s.id)
+        }),
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        if (session?.user?.id) {
+          sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
+        }
+        sessionStorage.removeItem(`jammify_playlist_${playlistId}`);
+      } else {
+        toast.error('Failed to update playlist order');
+      }
+    } catch (error) {
+      console.error('Error updating playlist order:', error);
+      toast.error('Something went wrong. Please try again.');
+    }
+  };
+
 
   const handleTogglePrivacy = async () => {
     // Optimistically update the UI immediately
@@ -2465,24 +2561,71 @@ export default function PlaylistDetailPage({ params }) {
                     </div>
                   </div>
 
-                  <VirtualSongList
-                    songs={sortedSongs}
-                    currentSong={currentSong}
-                    activePlaylistId={activePlaylistId}
-                    playlistId={playlistId}
-                    currentIndex={currentIndex}
-                    isPlaying={isPlaying}
-                    isOwner={isOwner}
-                    isSongLiked={isSongLiked}
-                    handlePlayClick={handlePlayClick}
-                    handleToggleSongLike={handleToggleSongLike}
-                    handleRemoveFromPlaylist={handleRemoveFromPlaylist}
-                    handleDownloadSong={handleDownloadSong}
-                    decodeHtmlEntities={decodeHtmlEntities}
-                    formatDuration={formatDuration}
-                    router={router}
-                    viewAs={viewAs}
-                  />
+                  {isOwner && sortBy === "custom" && !searchQuery ? (
+                    <div className="flex flex-col">
+                      {sortedSongs.map((song, index) => {
+                        const isCurrentSong =
+                          currentSong?.id === song.id &&
+                          activePlaylistId === playlistId &&
+                          currentIndex === index;
+                        return (
+                          <div
+                            key={`${song.id}-${index}`}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, index)}
+                            onDragEnd={handleDragEnd}
+                            onDragOver={handleDragOver}
+                            onDragEnter={(e) => handleDragEnter(e, index)}
+                            onDrop={(e) => handleDrop(e, index)}
+                            className={`cursor-grab transition-all duration-200 select-none ${
+                              dragOverIndex === index && draggedIndex !== index
+                                ? "border-t-2 border-green-400"
+                                : ""
+                            } ${draggedIndex === index ? "opacity-50 scale-[0.99]" : ""}`}
+                          >
+                            <SongRow
+                              song={song}
+                              index={index}
+                              isCurrentSong={isCurrentSong}
+                              isPlaying={isPlaying}
+                              isOwner={isOwner}
+                              isSongLiked={isSongLiked}
+                              handlePlayClick={handlePlayClick}
+                              handleToggleSongLike={handleToggleSongLike}
+                              handleRemoveFromPlaylist={handleRemoveFromPlaylist}
+                              handleDownloadSong={handleDownloadSong}
+                              handleShareSong={handleShareSong}
+                              decodeHtmlEntities={decodeHtmlEntities}
+                              formatDuration={formatDuration}
+                              router={router}
+                              playlistId={playlistId}
+                              viewAs={viewAs}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <VirtualSongList
+                      songs={sortedSongs}
+                      currentSong={currentSong}
+                      activePlaylistId={activePlaylistId}
+                      playlistId={playlistId}
+                      currentIndex={currentIndex}
+                      isPlaying={isPlaying}
+                      isOwner={isOwner}
+                      isSongLiked={isSongLiked}
+                      handlePlayClick={handlePlayClick}
+                      handleToggleSongLike={handleToggleSongLike}
+                      handleRemoveFromPlaylist={handleRemoveFromPlaylist}
+                      handleDownloadSong={handleDownloadSong}
+                      handleShareSong={handleShareSong}
+                      decodeHtmlEntities={decodeHtmlEntities}
+                      formatDuration={formatDuration}
+                      router={router}
+                      viewAs={viewAs}
+                    />
+                  )}
                 </>
               ) : (
                 <div className="text-center py-12">
