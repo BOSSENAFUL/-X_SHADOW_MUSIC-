@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -28,6 +28,27 @@ export default function NewReleasesPage() {
   const [currentlyPlaying, setCurrentlyPlaying] = useState(null);
   const scrollContainerRef = useRef(null);
 
+  // Read country from localStorage cache (set by the home page)
+  const isInternational = useMemo(() => {
+    try {
+      const cached = localStorage.getItem('user_country_cache');
+      if (cached) {
+        const { country } = JSON.parse(cached);
+        return country !== 'IN';
+      }
+    } catch {}
+    return false; // default to India
+  }, []);
+
+  const queries = isInternational
+    ? ["English New Releases", "New English Songs"]
+    : ["New Release", "New Releases"];
+
+  const pageTitle = isInternational ? "New English Releases" : "New Releases";
+  const pageDesc  = isInternational
+    ? "Discover the latest English music releases and trending playlists"
+    : "Discover the latest music releases and trending playlists";
+
   // Save results to sessionStorage
   useEffect(() => {
     if (newReleases.length > 0) {
@@ -53,7 +74,7 @@ export default function NewReleasesPage() {
         setLoading(true);
 
         // Fetch from multiple queries to ensure maximum coverage
-        const queries = ["New Release", "New Releases"];
+        const queryList = queries;
         let allPlaylists = [];
 
         const fetchForQuery = async (query) => {
@@ -82,7 +103,7 @@ export default function NewReleasesPage() {
           }
         };
 
-        await Promise.all(queries.map(q => fetchForQuery(q)));
+        await Promise.all(queryList.map(q => fetchForQuery(q)));
 
         // Unique results by ID
         const uniquePlaylists = allPlaylists.filter((playlist, index, self) =>
@@ -165,9 +186,9 @@ export default function NewReleasesPage() {
           <div className="space-y-6">
             <div className="flex items-start justify-between gap-x-4">
               <div className="min-w-0 flex-1">
-                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight truncate">New Releases</h1>
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight truncate">{pageTitle}</h1>
                 <p className="text-muted-foreground text-xs sm:text-sm md:text-base line-clamp-2">
-                  Discover the latest music releases and trending playlists
+                  {pageDesc}
                 </p>
               </div>
               {!loading && newReleases.length > 0 && (

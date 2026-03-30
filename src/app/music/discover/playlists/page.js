@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import { PlaylistCard } from "@/components/music/playlist-card";
@@ -26,6 +26,24 @@ export default function PlaylistsPage() {
   const [playlists, setPlaylists] = useState([]);
   const [loading, setLoading] = useState(true);
   const scrollContainerRef = useRef(null);
+
+  // Read country from localStorage cache (set by the home page)
+  const isInternational = useMemo(() => {
+    try {
+      const cached = localStorage.getItem('user_country_cache');
+      if (cached) {
+        const { country } = JSON.parse(cached);
+        return country !== 'IN';
+      }
+    } catch {}
+    return false;
+  }, []);
+
+  const query = isInternational ? 'english%20hits%20top' : 'trending';
+  const pageTitle = isInternational ? "English Hits" : "Trending Playlists";
+  const pageDesc  = isInternational
+    ? "Discover the hottest English hits and trending international playlists"
+    : "Discover the most popular and trending playlists right now";
 
   // Save results to sessionStorage
   useEffect(() => {
@@ -64,7 +82,7 @@ export default function PlaylistsPage() {
         }
 
         // Fetch first page to get total count
-        const initialResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/playlists?query=trending&page=0&limit=1`);
+        const initialResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/playlists?query=${query}&page=0&limit=1`);
         const initialData = await initialResponse.json();
 
         if (initialData.success && initialData.data.total) {
@@ -77,7 +95,7 @@ export default function PlaylistsPage() {
 
           for (let page = 0; page < totalPages; page++) {
             promises.push(
-              fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/playlists?query=trending&page=${page}&limit=${limit}`)
+              fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/playlists?query=${query}&page=${page}&limit=${limit}`)
                 .then(res => res.json())
             );
           }
@@ -166,9 +184,9 @@ export default function PlaylistsPage() {
           <div className="space-y-6">
             <div className="flex items-start justify-between gap-x-4">
               <div className="min-w-0 flex-1">
-                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight truncate">Trending Playlists</h1>
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight truncate">{pageTitle}</h1>
                 <p className="text-muted-foreground text-xs sm:text-sm md:text-base line-clamp-2">
-                  Discover the most popular and trending playlists right now
+                  {pageDesc}
                 </p>
               </div>
               {!loading && playlists.length > 0 && (

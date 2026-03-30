@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -30,6 +30,24 @@ export default function TopHitsPage() {
     const [hasMore, setHasMore] = useState(true);
     const [currentIndex, setCurrentIndex] = useState(0);
     const scrollContainerRef = useRef(null);
+
+    // Read country from localStorage cache (set by the home page)
+    const isInternational = useMemo(() => {
+      try {
+        const cached = localStorage.getItem('user_country_cache');
+        if (cached) {
+          const { country } = JSON.parse(cached);
+          return country !== 'IN';
+        }
+      } catch {}
+      return false;
+    }, []);
+
+    const query = isInternational ? 'pop%20hits%20english' : 'top%20hits';
+    const pageTitle = isInternational ? "Pop Hits" : "Top Hits Playlists";
+    const pageDesc  = isInternational
+      ? "The biggest English pop hits and chart-toppers from around the world"
+      : "Discover the most popular hits and classic playlists of all time";
 
     const ITEMS_PER_BATCH = 24; // Load 24 items at a time
 
@@ -111,7 +129,7 @@ export default function TopHitsPage() {
                 }
 
                 // Fresh fetch if no saved data
-                const initialResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/playlists?query=top%20hits&page=0&limit=1`);
+                const initialResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/playlists?query=${query}&page=0&limit=1`);
                 const initialData = await initialResponse.json();
 
                 if (initialData.success && initialData.data.total) {
@@ -125,7 +143,7 @@ export default function TopHitsPage() {
                     const promises = [];
                     for (let page = 0; page < totalPages; page++) {
                         promises.push(
-                            fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/playlists?query=top%20hits&page=${page}&limit=${limit}`)
+                            fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/playlists?query=${query}&page=${page}&limit=${limit}`)
                                 .then(response => response.json())
                         );
                     }
@@ -225,9 +243,9 @@ export default function TopHitsPage() {
           <div className="space-y-6">
             <div className="flex items-start justify-between gap-x-4">
               <div className="min-w-0 flex-1">
-                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight truncate">Top Hits Playlists</h1>
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight truncate">{pageTitle}</h1>
                 <p className="text-muted-foreground text-xs sm:text-sm md:text-base line-clamp-2">
-                  Discover the most popular hits and classic playlists of all time
+                  {pageDesc}
                 </p>
               </div>
               {!loading && topHits.length > 0 && (
