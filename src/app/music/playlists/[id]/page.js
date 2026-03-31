@@ -89,6 +89,7 @@ import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { toast } from "sonner";
 import { HiPause } from "react-icons/hi2";
 import { IoMdPlay } from "react-icons/io";
+import { ShareStoryPreview } from "@/components/share-story-preview";
 
 // --- In-Memory Global Color Cache ---
 const globalColorCache = typeof window !== 'undefined' ? new Map() : null;
@@ -947,6 +948,7 @@ export default function PlaylistDetailPage({ params }) {
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [sharePreviewOpen, setSharePreviewOpen] = useState(false);
 
   // Initialize music player
   const { playSong, currentSong, currentIndex, isPlaying, togglePlayPause, currentPlaylistId: activePlaylistId, isShuffle, setIsShuffle } = useMusicPlayer();
@@ -1537,27 +1539,7 @@ export default function PlaylistDetailPage({ params }) {
 
   const handleSharePlaylist = async () => {
     if (playlist.isPublic) {
-      // Use NEXT_PUBLIC_APP_URL from environment variable
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-      const shareUrl = `${baseUrl}/music/playlists/${playlistId}`;
-
-      try {
-        // Try to use the Web Share API first (mobile devices)
-        if (navigator.share) {
-          await navigator.share({
-            title: playlist.name,
-            text: `Check out this playlist: ${playlist.name}`,
-            url: shareUrl,
-          });
-        } else {
-          // Fallback to clipboard
-          await navigator.clipboard.writeText(shareUrl);
-          toast.success('Link copied to clipboard!');
-        }
-      } catch (error) {
-        console.error('Error sharing playlist:', error);
-        toast.error('Failed to share playlist');
-      }
+      setSharePreviewOpen(true);
     } else {
       toast.info('Make playlist public first to share it!');
     }
@@ -2721,6 +2703,17 @@ export default function PlaylistDetailPage({ params }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Share Image Preview Modal */}
+      <ShareStoryPreview 
+         key={playlist?.id || playlistId}
+         isOpen={sharePreviewOpen}
+         onClose={setSharePreviewOpen}
+         playlist={playlist}
+         getPlaylistCover={getPlaylistCover}
+         dominantColors={dominantColors}
+         shareUrl={typeof window !== 'undefined' ? `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/music/playlists/${playlistId}` : ''}
+      />
     </SidebarProvider>
   );
 }

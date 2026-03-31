@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense, useMemo } from "react";
+import { useState, useEffect, useRef, Suspense, useMemo, useCallback } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Play, ArrowLeft, Heart, MoreVertical, Clock, Shuffle, Plus, User, Disc, Download, Loader2 } from "lucide-react";
+import { ShareStoryPreview } from "@/components/share-story-preview";
 import { toast } from "sonner";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useLikedPlaylists } from "@/hooks/useLikedPlaylists";
@@ -499,8 +500,24 @@ function PlaylistPageContent() {
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [sortBy, setSortBy] = useState('custom');
   const [viewAs, setViewAs] = useState('list');
+  const [sharePreviewOpen, setSharePreviewOpen] = useState(false);
   const searchInputRef = useRef(null);
   const searchContainerRef = useRef(null);
+
+  // Build cover object for ShareStoryPreview (mirrors playlists/[id] pattern)
+  const getPlaylistCover = useCallback(() => {
+    if (!playlist) return { type: 'default', src: '/default-playlist-image.png' };
+    if (Array.isArray(playlist.image) && playlist.image.length > 0) {
+      const url =
+        playlist.image[playlist.image.length - 1]?.url ||
+        playlist.image[playlist.image.length - 1]?.link ||
+        playlist.image[0]?.url;
+      if (url) return { type: 'single', src: url };
+    } else if (typeof playlist.image === 'string' && playlist.image) {
+      return { type: 'single', src: playlist.image };
+    }
+    return { type: 'default', src: '/default-playlist-image.png' };
+  }, [playlist]);
 
   // Auto-focus search input when it becomes visible
   useEffect(() => {
@@ -1340,18 +1357,7 @@ function PlaylistPageContent() {
                     });
                   }}
                   onDownload={handleDownloadAll}
-                  onShare={() => {
-                    if (navigator.share) {
-                      navigator.share({
-                        title: playlist.name,
-                        text: `Check out this playlist "${playlist.name}" on Jamify`,
-                        url: window.location.href
-                      });
-                    } else {
-                      navigator.clipboard.writeText(window.location.href);
-                      toast.success('Link copied to clipboard');
-                    }
-                  }}
+                  onShare={() => setSharePreviewOpen(true)}
                   isMobile={isMobile}
                   decodeHtmlEntities={decodeHtmlEntities}
                 />
@@ -1665,6 +1671,23 @@ function PlaylistPageContent() {
         open={addToPlaylistDialogOpen}
         onOpenChange={setAddToPlaylistDialogOpen}
         song={selectedSong}
+      />
+
+      {/* Share Story Preview Modal */}
+      <ShareStoryPreview
+        key={playlist?.id || playlistId}
+        isOpen={sharePreviewOpen}
+        onClose={setSharePreviewOpen}
+        playlist={{
+          name: playlist?.name,
+          ownerName: 'JioSaavn',
+          image: playlist?.image,
+        }}
+        getPlaylistCover={getPlaylistCover}
+        dominantColors={dominantColor}
+        shareUrl={typeof window !== 'undefined'
+          ? `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/music/playlist/${playlistId}`
+          : ''}
       />
     </SidebarProvider>
   );
