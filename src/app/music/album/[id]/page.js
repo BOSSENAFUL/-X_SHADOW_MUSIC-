@@ -28,7 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Play, ArrowLeft, Heart, MoreVertical, Clock, Shuffle, Calendar, Disc, Plus, User, Share, Download, Pause } from "lucide-react";
+import { Play, ArrowLeft, Heart, MoreVertical, Clock, Shuffle, Calendar, Disc, Plus, User, Share, Download } from "lucide-react";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useLikedAlbums } from "@/hooks/useLikedAlbums";
 import { useMusicPlayer } from "@/contexts/music-player-context";
@@ -43,7 +43,6 @@ import {
   DrawerHeader,
   DrawerTitle,
   DrawerDescription,
-  DrawerPortal,
 } from "@/components/ui/drawer";
 import { toast } from "sonner";
 import { memo } from "react";
@@ -232,6 +231,141 @@ const SongActionMenu = memo(({
 
 SongActionMenu.displayName = "SongActionMenu";
 
+const AlbumActionMenu = memo(({
+  album,
+  isAlbumLiked,
+  toggleAlbumLike,
+  onDownloadAlbum
+}) => {
+  const isMobile = useIsMobile();
+  const [open, setOpen] = useState(false);
+
+  const albumImageUrl = album?.image?.[2]?.url || album?.image?.[1]?.url || album?.image?.[0]?.url || '';
+
+  const handleShare = (e) => {
+    e.stopPropagation();
+    if (navigator.share) {
+      navigator.share({
+        title: album.name,
+        text: `Check out ${album.name} on Jammify`,
+        url: window.location.href
+      });
+    } else {
+      navigator.clipboard.writeText(window.location.href);
+      toast.success('Link copied to clipboard');
+    }
+    setOpen(false);
+  };
+
+  const ActionItems = ({ onItemClick }) => (
+    <>
+      <div 
+        className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${isAlbumLiked ? 'text-red-500' : ''}`}
+        onClick={() => {
+          onItemClick();
+          toggleAlbumLike();
+        }}
+      >
+        <Heart className={`w-5 h-5 ${isAlbumLiked ? 'fill-current' : ''}`} />
+        <span className="font-medium">{isAlbumLiked ? 'Unlike Album' : 'Like Album'}</span>
+      </div>
+      <div 
+        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        onClick={() => {
+          onItemClick();
+          onDownloadAlbum();
+        }}
+      >
+        <Download className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Download Album</span>
+      </div>
+      <div className="h-px bg-white/5 my-1" />
+      <div 
+        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        onClick={handleShare}
+      >
+        <Share className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Share Album</span>
+      </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={setOpen}>
+        <DrawerTrigger asChild>
+          <button className="rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center transition-colors bg-transparent border-none outline-none cursor-pointer text-muted-foreground hover:text-foreground">
+            <MoreVertical style={{ width: '24px', height: '24px' }} />
+          </button>
+        </DrawerTrigger>
+        <div onClick={(e) => e.stopPropagation()}>
+          <DrawerContent className="bg-[#121212] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
+            <DrawerHeader className="p-0">
+              <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
+                <div className="w-14 h-14 rounded-lg shadow-lg overflow-hidden shrink-0 bg-muted">
+                  {albumImageUrl ? (
+                    <img src={albumImageUrl} alt={album.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Disc className="w-6 h-6 opacity-50" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0 flex flex-col justify-center text-left">
+                  <DrawerTitle className="text-base font-bold truncate text-white text-left">
+                    {album?.name}
+                  </DrawerTitle>
+                  <DrawerDescription className="text-sm text-muted-foreground truncate mt-0.5 text-left">
+                    Album
+                  </DrawerDescription>
+                </div>
+              </div>
+            </DrawerHeader>
+            <div className="px-2 py-4 pb-8 space-y-1">
+              <ActionItems onItemClick={() => setOpen(false)} />
+            </div>
+          </DrawerContent>
+        </div>
+      </Drawer>
+    );
+  }
+
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <button className="rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center transition-colors bg-transparent border-none outline-none cursor-pointer text-muted-foreground hover:text-foreground">
+          <MoreVertical style={{ width: '24px', height: '24px' }} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
+        <DropdownMenuItem 
+          onClick={() => { setOpen(false); toggleAlbumLike(); }}
+          className={`hover:bg-white/10 focus:bg-white/10 cursor-pointer ${isAlbumLiked ? 'text-red-500' : ''}`}
+        >
+          <Heart className={`w-4 h-4 mr-2 ${isAlbumLiked ? 'fill-current' : ''}`} />
+          {isAlbumLiked ? 'Unlike Album' : 'Like Album'}
+        </DropdownMenuItem>
+        <DropdownMenuItem 
+          onClick={() => { setOpen(false); onDownloadAlbum(); }}
+          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Download Album
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuItem 
+          onClick={handleShare}
+          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+        >
+          <Share className="w-4 h-4 mr-2" />
+          Share Album
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+});
+AlbumActionMenu.displayName = "AlbumActionMenu";
+
 export default function AlbumPage() {
   const router = useRouter();
   const params = useParams();
@@ -254,7 +388,7 @@ export default function AlbumPage() {
   const { toggleLike: toggleAlbumLike, isLiked: isAlbumLiked } = useLikedAlbums(session?.user?.id);
 
   // Initialize music player
-  const { playSong, currentSong, currentIndex, isPlaying, togglePlayPause, currentPlaylistId } = useMusicPlayer();
+  const { playSong, currentSong, currentIndex, isPlaying, togglePlayPause, currentPlaylistId, isShuffle, setIsShuffle } = useMusicPlayer();
 
   useEffect(() => {
     let isMounted = true;
@@ -344,10 +478,18 @@ export default function AlbumPage() {
       if (isPlaylistPlaying) {
         togglePlayPause();
       } else {
-        playSong(album.songs[0], album.songs, albumId, 0);
+        let startSong = album.songs[0];
+        let startIndex = 0;
+
+        if (isShuffle) {
+          startIndex = Math.floor(Math.random() * album.songs.length);
+          startSong = album.songs[startIndex];
+        }
+
+        playSong(startSong, album.songs, albumId, startIndex);
       }
     }
-  }, [album?.songs, currentPlaylistId, albumId, togglePlayPause, playSong]);
+  }, [album?.songs, currentPlaylistId, albumId, togglePlayPause, playSong, isShuffle]);
 
   const handleGoBack = useCallback(() => {
     router.back();
@@ -435,7 +577,7 @@ export default function AlbumPage() {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }, []);
 
-  const getTotalDuration = () => {
+  const getTotalDuration = useCallback(() => {
     if (!album?.songs) return "0 min";
     const totalSeconds = album.songs.reduce((total, song) => total + (song.duration || 0), 0);
     const hours = Math.floor(totalSeconds / 3600);
@@ -445,7 +587,7 @@ export default function AlbumPage() {
       return `${hours} hr ${minutes} min`;
     }
     return `${minutes} min`;
-  };
+  }, [album?.songs]);
 
   const decodeHtmlEntities = useCallback((text) => {
     if (!text || !text.includes('&')) return text;
@@ -460,7 +602,7 @@ export default function AlbumPage() {
     return text.replace(/&amp;|&lt;|&gt;|&quot;|&#39;|&apos;/g, m => entities[m]);
   }, []);
 
-  const truncateTitle = (title, maxLength = 50) => {
+  const truncateTitle = useCallback((title, maxLength = 50) => {
     if (!title || title.length <= maxLength) return title;
 
     // Common patterns to remove for better truncation
@@ -489,7 +631,7 @@ export default function AlbumPage() {
     }
 
     return shortened;
-  };
+  }, []);
 
   const handleAddToPlaylist = (e, song) => {
     e.stopPropagation();
@@ -504,120 +646,165 @@ export default function AlbumPage() {
     }
   };
 
-  const handleShare = (e, song) => {
-    e.stopPropagation();
-    if (navigator.share) {
-      navigator.share({
-        title: song.name,
-        text: `Check out "${song.name}" by ${song.artists?.primary?.[0]?.name || 'Unknown Artist'}`,
-        url: window.location.href
-      });
-    } else {
-      // Fallback: copy to clipboard
-      navigator.clipboard.writeText(window.location.href);
-      console.log('Link copied to clipboard');
+
+  const downloadSingleSong = async (song, silent = false) => {
+    let toastId = null;
+    if (!silent) {
+      toastId = toast.loading(`Preparing "${decodeHtmlEntities(song.name)}"...`);
     }
+
+    try {
+      // 1. Resolve Best Quality URL
+      let downloadUrl = null;
+      if (song.downloadUrl && Array.isArray(song.downloadUrl)) {
+        const mp3s = song.downloadUrl.filter(u => u.url.toLowerCase().includes('.mp3'));
+        const bestMp3 = mp3s.find(u => u.quality === '320kbps') || mp3s.find(u => u.quality === '160kbps') || mp3s[0];
+        const bestOverall = song.downloadUrl.find(u => u.quality === '320kbps') || song.downloadUrl[song.downloadUrl.length - 1];
+        downloadUrl = bestMp3?.url || bestOverall?.url;
+      }
+
+      if (!downloadUrl) {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs?ids=${song.id}`);
+        const data = await response.json();
+        if (data.success && data.data?.[0]?.downloadUrl) {
+          const freshUrls = data.data[0].downloadUrl;
+          const mp3s = freshUrls.filter(u => u.url.toLowerCase().includes('.mp3'));
+          const bestMp3 = mp3s.find(u => u.quality === '320kbps') || mp3s.find(u => u.quality === '160kbps') || mp3s[0];
+          const bestOverall = freshUrls.find(u => u.quality === '320kbps') || freshUrls[freshUrls.length - 1];
+          downloadUrl = bestMp3?.url || bestOverall?.url;
+        }
+      }
+
+      if (!downloadUrl) throw new Error('No download URL available');
+
+      // 2. Resolve Best Image
+      const imageUrl = song.image?.find(img => img.quality === '500x500')?.url ||
+        song.image?.find(img => img.quality === '150x150')?.url ||
+        song.image?.[song.image.length - 1]?.url;
+
+      const title = decodeHtmlEntities(song.name);
+      const songArtist = song.artists?.primary?.map(a => a.name).join(', ') || 'Unknown Artist';
+      const albumName = song.album?.name ? decodeHtmlEntities(song.album.name) : 'Unknown Album';
+      const year = song.year || (song.releaseDate ? new Date(song.releaseDate).getFullYear() : '');
+
+      if (!silent) toast.loading(`Injecting metadata for "${title}"...`, { id: toastId });
+
+      // 3. Call Backend API
+      const response = await fetch('/api/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          songUrl: downloadUrl,
+          imageUrl,
+          title,
+          artist: songArtist,
+          album: albumName,
+          year
+        }),
+      });
+
+      if (!response.ok) throw new Error('Backend failed to process song');
+
+      const isTagged = response.headers.get('X-Tagged') === 'true';
+      const isConverted = response.headers.get('X-Converted') === 'true';
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${title} - ${songArtist}.mp3`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      if (isTagged) {
+        if (!silent) toast.success(`Downloaded "${title}" with album art! ${isConverted ? '(High-Quality MP3)' : ''}`, { id: toastId });
+      } else {
+        if (!silent) toast.error(`Download successful, but metadata injection failed for "${title}".`, { id: toastId });
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      if (!silent) {
+        toast.error(`Failed to download: ${error.message}`, { id: toastId });
+      }
+      throw error;
+    }
+  };
+
+  const handleDownloadSongs = async () => {
+    const songsToDownload = album?.songs || [];
+    if (songsToDownload.length === 0) {
+      toast.info('No songs to download!');
+      return;
+    }
+
+    const progressToast = document.createElement('div');
+    progressToast.className = 'fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
+    progressToast.innerHTML = `
+      <div class="flex items-center gap-2">
+        <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+        <div class="flex flex-col">
+          <span class="font-bold text-sm">Downloading Album...</span>
+          <span class="text-xs opacity-90" id="download-progress-text">Preparing 0 / ${songsToDownload.length}</span>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(progressToast);
+
+    let downloadedCount = 0;
+    let failedCount = 0;
+    const CONCURRENCY_LIMIT = 4;
+    const queue = [...songsToDownload];
+
+    const downloadWorker = async () => {
+      while (queue.length > 0) {
+        const song = queue.shift();
+        if (!song) break;
+
+        try {
+          await downloadSingleSong(song, true);
+          downloadedCount++;
+        } catch (error) {
+          failedCount++;
+        }
+
+        const progressText = document.getElementById('download-progress-text');
+        if (progressText) {
+          progressText.textContent = `Progress: ${downloadedCount + failedCount} / ${songsToDownload.length} (${failedCount} failed)`;
+        }
+      }
+    };
+
+    await Promise.all(Array(Math.min(CONCURRENCY_LIMIT, queue.length)).fill(null).map(downloadWorker));
+
+    if (document.body.contains(progressToast)) {
+      document.body.removeChild(progressToast);
+    }
+
+    const completionToast = document.createElement('div');
+    completionToast.className = `fixed bottom-4 right-4 ${failedCount > 0 ? 'bg-orange-600' : 'bg-green-600'} text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300`;
+    completionToast.innerHTML = `
+      <div class="flex flex-col">
+        <span class="font-bold text-sm">Download Finished</span>
+        <span class="text-xs opacity-90">${downloadedCount} songs saved. ${failedCount > 0 ? `${failedCount} failed.` : ''}</span>
+      </div>
+    `;
+    document.body.appendChild(completionToast);
+
+    setTimeout(() => {
+      completionToast.style.opacity = '0';
+      setTimeout(() => {
+        if (document.body.contains(completionToast)) {
+          document.body.removeChild(completionToast);
+        }
+      }, 300);
+    }, 5000);
   };
 
   const handleDownload = async (e, song) => {
     e.stopPropagation();
-
-    try {
-      console.log('Attempting to download song:', song.name);
-
-      // First, try to get download links from the song object
-      let downloadUrl = null;
-
-      // Check if song already has download URLs
-      if (song.downloadUrl && Array.isArray(song.downloadUrl)) {
-        // Look for 320kbps quality first, then fallback to highest available
-        const highQuality = song.downloadUrl.find(url => url.quality === '320kbps') ||
-          song.downloadUrl.find(url => url.quality === '160kbps') ||
-          song.downloadUrl[song.downloadUrl.length - 1];
-        downloadUrl = highQuality?.url;
-      }
-
-      // If no download URL found, fetch from API
-      if (!downloadUrl) {
-        console.log('No download URL found in song object, fetching from API...');
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs?ids=${song.id}`);
-        const data = await response.json();
-
-        if (data.success && data.data && data.data[0]?.downloadUrl) {
-          const songData = data.data[0];
-          // Look for 320kbps quality first, then fallback to highest available
-          const highQuality = songData.downloadUrl.find(url => url.quality === '320kbps') ||
-            songData.downloadUrl.find(url => url.quality === '160kbps') ||
-            songData.downloadUrl[songData.downloadUrl.length - 1];
-          downloadUrl = highQuality?.url;
-          console.log('Found download URL from API:', downloadUrl);
-        }
-      }
-
-      if (downloadUrl) {
-        // Fetch the file through your website and trigger direct download
-        console.log('Fetching file for download...');
-
-        const filename = `${decodeHtmlEntities(song.name)} - ${song.artists?.primary?.[0]?.name || 'Unknown Artist'}.mp3`;
-
-        try {
-          // Fetch the file as a blob
-          const response = await fetch(downloadUrl, {
-            method: 'GET',
-            headers: {
-              'Accept': 'audio/mpeg, audio/mp4, */*'
-            }
-          });
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          // Get the file as a blob
-          const blob = await response.blob();
-
-          // Create a blob URL
-          const blobUrl = window.URL.createObjectURL(blob);
-
-          // Create a temporary anchor element for download
-          const link = document.createElement('a');
-          link.href = blobUrl;
-          link.download = filename;
-          link.style.display = 'none';
-
-          // Add to DOM, click, and remove
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-
-          // Clean up the blob URL after a short delay
-          setTimeout(() => {
-            window.URL.revokeObjectURL(blobUrl);
-          }, 1000);
-
-          console.log('Download completed for:', song.name);
-        } catch (fetchError) {
-          console.error('Error fetching file for download:', fetchError);
-
-          // Fallback: try direct link method if blob fetch fails
-          console.log('Falling back to direct link method...');
-          const link = document.createElement('a');
-          link.href = downloadUrl;
-          link.download = filename;
-          link.target = '_blank';
-          link.rel = 'noopener noreferrer';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        }
-      } else {
-        console.error('No download URL available for this song');
-        alert('Download not available for this song');
-      }
-    } catch (error) {
-      console.error('Error downloading song:', error);
-      alert('Failed to download song. Please try again.');
-    }
+    await downloadSingleSong(song);
   };
 
   if (loading) {
@@ -877,12 +1064,11 @@ export default function AlbumPage() {
               </div>
             </div>
 
-            {/* Controls */}
             <div className="p-4 pt-2 md:p-8 md:pt-4">
-              <div className="flex items-center gap-3 md:gap-4">
+              <div className="flex items-center gap-0.5 md:gap-1">
                 <Button
                   size="lg"
-                  className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-transform"
+                  className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-all duration-500 cursor-pointer"
                   style={{
                     backgroundColor: dominantColor,
                     boxShadow: `0 8px 32px ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.3)')}`
@@ -895,25 +1081,20 @@ export default function AlbumPage() {
                     <IoMdPlay style={{ width: '24px', height: '24px', marginLeft: '4px' }} />
                   )}
                 </Button>
-                <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
-                  <Shuffle className="w-5 h-5 md:w-6 md:h-6" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="lg"
-                  className={`rounded-full w-10 h-10 md:w-12 md:h-12 ${isAlbumLiked(albumId) ? 'text-red-500' : ''}`}
-                  onClick={() => {
-                    // Optimistic update - toggle immediately for better UX
-                    toggleAlbumLike(album).catch(error => {
-                      console.error('Error toggling album like:', error);
-                    });
-                  }}
+                
+                <button
+                  onClick={() => setIsShuffle(!isShuffle)}
+                  className={`rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center transition-colors bg-transparent border-none outline-none cursor-pointer ${isShuffle ? 'text-green-500 hover:text-green-400' : 'text-muted-foreground hover:text-foreground'}`}
                 >
-                  <Heart className={`w-5 h-5 md:w-6 md:h-6 ${isAlbumLiked(albumId) ? 'fill-current' : ''}`} />
-                </Button>
-                <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
-                  <MoreVertical className="w-5 h-5 md:w-6 md:h-6" />
-                </Button>
+                  <Shuffle style={{ width: '24px', height: '24px' }} />
+                </button>
+                
+                <AlbumActionMenu
+                  album={album}
+                  isAlbumLiked={isAlbumLiked(albumId)}
+                  toggleAlbumLike={() => toggleAlbumLike(album).catch(console.error)}
+                  onDownloadAlbum={handleDownloadSongs}
+                />
               </div>
             </div>
 
@@ -934,8 +1115,7 @@ export default function AlbumPage() {
               <div className="space-y-0">
                 {album.songs?.map((song, index) => {
                   const isCurrentSong = currentSong?.id === song.id &&
-                    currentPlaylistId === albumId &&
-                    currentIndex === index;
+                    currentPlaylistId === albumId;
                   return (
                     <div key={song.id || index}>
                       {/* Mobile Layout */}

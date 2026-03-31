@@ -28,7 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Play, Pause, ArrowLeft, Heart, MoreVertical, Clock, Shuffle, Download, Plus, User, Disc, Share, X } from "lucide-react";
+import { Play, ArrowLeft, Heart, MoreVertical, Clock, Shuffle, Download, Plus, User, Disc, Share, X } from "lucide-react";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { AddToPlaylistDialog } from "@/components/playlists/AddToPlaylistDialog";
@@ -43,8 +43,6 @@ import {
   DrawerHeader,
   DrawerTitle,
   DrawerDescription,
-  DrawerPortal,
-  DrawerOverlay,
 } from "@/components/ui/drawer";
 
 // --- Helper Components ---
@@ -284,7 +282,7 @@ export default function FavoritesPage() {
   }, [loading, likedSongs.length]);
 
   // Initialize music player
-  const { playSong, currentSong, currentIndex, isPlaying, togglePlayPause, currentPlaylistId } = useMusicPlayer();
+  const { playSong, currentSong, currentIndex, isPlaying, togglePlayPause, currentPlaylistId, isShuffle, setIsShuffle } = useMusicPlayer();
 
   // Pre-calculate playlist data for the player to avoid mapping on every click
   const playlistData = useMemo(() => {
@@ -324,31 +322,24 @@ export default function FavoritesPage() {
   }, [currentSong?.id, playlistData, playSong]);
 
   const handlePlayAll = useCallback(() => {
-    if (likedSongs.length > 0) {
+    if (playlistData.length > 0) {
       const isPlaylistPlaying = currentPlaylistId === 'favorites';
 
       if (isPlaylistPlaying) {
         togglePlayPause();
-        return;
+      } else {
+        let startSong = playlistData[0];
+        let startIndex = 0;
+
+        if (isShuffle) {
+          startIndex = Math.floor(Math.random() * playlistData.length);
+          startSong = playlistData[startIndex];
+        }
+
+        playSong(startSong, playlistData, 'favorites', startIndex);
       }
-
-      // Convert first song to standard format
-      const firstSong = {
-        id: likedSongs[0].songId,
-        name: likedSongs[0].songName,
-        artists: { primary: likedSongs[0].artists },
-        album: likedSongs[0].album,
-        duration: likedSongs[0].duration,
-        image: likedSongs[0].image,
-        releaseDate: likedSongs[0].releaseDate,
-        language: likedSongs[0].language,
-        playCount: likedSongs[0].playCount,
-        downloadUrl: likedSongs[0].downloadUrl
-      };
-
-      playSong(firstSong, playlistData, 'favorites', 0);
     }
-  }, [likedSongs, currentPlaylistId, togglePlayPause, playSong, playlistData]);
+  }, [playlistData, currentPlaylistId, togglePlayPause, playSong, isShuffle]);
 
   const handleGoBack = useCallback(() => {
     router.back();
@@ -404,20 +395,6 @@ export default function FavoritesPage() {
     }
   }, [router]);
 
-  const handleShare = useCallback((e, song) => {
-    e.stopPropagation();
-    if (navigator.share) {
-      navigator.share({
-        title: song.songName,
-        text: `Check out "${song.songName}" by ${song.artists?.[0]?.name || 'Unknown Artist'}`,
-        url: window.location.href
-      });
-    } else {
-      // Fallback: copy to clipboard
-      navigator.clipboard.writeText(window.location.href);
-      console.log('Link copied to clipboard');
-    }
-  }, []);
 
   const handleDownloadAllLikedSongs = async () => {
     if (likedSongs.length === 0) {
@@ -569,7 +546,7 @@ export default function FavoritesPage() {
       const album = song.album?.name ? decodeHtmlEntities(song.album.name) : 'Unknown Album';
       const year = song.releaseDate ? new Date(song.releaseDate).getFullYear() : '';
 
-      toast.loading(`Injecting metadata for "${title}"...`, { id: toastId });
+      if (!silent) toast.loading(`Injecting metadata for "${title}"...`, { id: toastId });
 
       // 3. Call Backend API
       const response = await fetch('/api/download', {
@@ -615,7 +592,8 @@ export default function FavoritesPage() {
   const handleDownload = useCallback(async (e, song) => {
     e.stopPropagation();
     await downloadSingleLikedSong(song);
-  }, []); // downloadSingleLikedSong is defined inside component, but doesn't change after mounting usually. Actually it depends on toast, but toast is static.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleUnlike = useCallback(async (e, likedSong) => {
     e.stopPropagation();
@@ -760,11 +738,14 @@ export default function FavoritesPage() {
           </div>
 
           {/* Controls */}
-          <div className="p-4 md:p-6" style={{ background: "linear-gradient(to bottom, rgba(69, 10, 245, 0.2) 0%, transparent 100%)" }}>
-            <div className="flex items-center gap-3 md:gap-4">
+          <div className="p-4 pt-2 md:p-8 md:pt-4" style={{ background: "linear-gradient(to bottom, rgba(69, 10, 245, 0.2) 0%, transparent 100%)" }}>
+            <div className="flex items-center gap-0.5 md:gap-1">
               <Button
                 size="lg"
-                className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-transform bg-green-500 hover:bg-green-600"
+                className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-all duration-500 cursor-pointer bg-green-500 hover:bg-green-400"
+                style={{
+                  boxShadow: '0 8px 32px rgba(34, 197, 94, 0.3)'
+                }}
                 onClick={handlePlayAll}
                 disabled={likedSongs.length === 0}
               >
@@ -774,19 +755,19 @@ export default function FavoritesPage() {
                   <IoMdPlay style={{ width: '24px', height: '24px', marginLeft: '4px' }} />
                 )}
               </Button>
-              <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
-                <Shuffle className="w-5 h-5 md:w-6 md:h-6" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="lg"
-                className="rounded-full w-10 h-10 md:w-12 md:h-12"
+              <button
+                onClick={() => setIsShuffle(!isShuffle)}
+                className={`rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center transition-colors bg-transparent border-none outline-none cursor-pointer ${isShuffle ? 'text-green-500 hover:text-green-400' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                <Shuffle style={{ width: '24px', height: '24px' }} />
+              </button>
+              <button
                 onClick={handleDownloadAllLikedSongs}
                 disabled={likedSongs.length === 0}
+                className="rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center transition-colors bg-transparent border-none outline-none cursor-pointer text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Download className="w-5 h-5 md:w-6 md:h-6" />
-              </Button>
-
+                <Download style={{ width: '24px', height: '24px' }} />
+              </button>
             </div>
           </div>
 
@@ -829,8 +810,7 @@ export default function FavoritesPage() {
                 <div className="space-y-0">
                   {likedSongs.map((likedSong, index) => {
                     const isCurrentSong = currentSong?.id === likedSong.songId &&
-                      currentPlaylistId === 'favorites' &&
-                      currentIndex === index;
+                      currentPlaylistId === 'favorites';
                     return (
                       <div key={likedSong.songId || index} >
                         {/* Mobile Layout */}

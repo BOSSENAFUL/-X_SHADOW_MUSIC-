@@ -442,9 +442,9 @@ const PlaylistActionMenu = memo(({
     return (
       <Drawer open={open} onOpenChange={setOpen}>
         <DrawerTrigger asChild>
-          <Button variant="ghost" className="rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center">
+          <button className="rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center text-muted-foreground hover:text-foreground bg-transparent border-none outline-none transition-colors cursor-pointer">
             <MoreVertical style={{ width: '24px', height: '24px' }} />
-          </Button>
+          </button>
         </DrawerTrigger>
         <div onClick={(e) => e.stopPropagation()}>
           <DrawerContent className="bg-[#121212] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
@@ -483,9 +483,9 @@ const PlaylistActionMenu = memo(({
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center">
+        <button className="rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center text-muted-foreground hover:text-foreground bg-transparent border-none outline-none transition-colors cursor-pointer">
           <MoreVertical style={{ width: '24px', height: '24px' }} />
-        </Button>
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
         {!isOwner && playlist.isPublic && (
@@ -609,10 +609,12 @@ const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }
     </div>
   );
 
+  // useState must be at top level — never inside if-blocks (Rules of Hooks)
+  const [sortDrawerOpen, setSortDrawerOpen] = useState(false);
+
   if (isMobile) {
-    const [open, setOpen] = useState(false);
     return (
-      <Drawer open={open} onOpenChange={setOpen}>
+      <Drawer open={sortDrawerOpen} onOpenChange={setSortDrawerOpen}>
         <DrawerTrigger asChild>
           <button className="flex items-center gap-1.5 text-xs font-medium text-white/80 hover:text-white transition-colors py-1.5 px-3 bg-white/5 rounded-full border border-white/10 shrink-0">
             <span className={sortBy !== 'custom' ? 'text-[#1ed760]' : ''}>Sort</span>
@@ -625,7 +627,7 @@ const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }
               <DrawerTitle>Sort and View Options</DrawerTitle>
               <DrawerDescription>Select sorting order and view mode for the current playlist</DrawerDescription>
             </DrawerHeader>
-            <Content closeOnSelect={() => setOpen(false)} />
+            <Content closeOnSelect={() => setSortDrawerOpen(false)} />
             <div className="h-6" />
           </DrawerContent>
         </DrawerPortal>
@@ -636,7 +638,7 @@ const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex items-center gap-2 text-sm font-medium text-white/80 hover:text-white transition-colors py-2 px-2 hover:bg-white/5 rounded-md">
+        <button className="flex items-center justify-center gap-2 text-sm font-medium text-white/80 hover:text-white transition-colors h-9 px-3 hover:bg-white/5 rounded-md">
           <span className={sortBy !== 'custom' ? 'text-[#1ed760]' : ''}>{currentSortLabel}</span>
           <List className="w-4 h-4" />
         </button>
@@ -785,7 +787,7 @@ const SongRow = React.memo(function SongRow({
           ) : 'Unknown Album'}
         </div>
         <div className="text-sm text-muted-foreground">
-          {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+          {song.releaseDate ? new Date(song.releaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Unknown date'}
         </div>
         <div className="flex items-center justify-end gap-1">
           <Button
@@ -882,8 +884,7 @@ function VirtualSongList({
         {songs.slice(startIndex, endIndex + 1).map((song, i) => {
           const index = startIndex + i;
           const isCurrentSong = currentSong?.id === song.id &&
-            activePlaylistId === playlistId &&
-            currentIndex === index;
+            activePlaylistId === playlistId;
           return (
             <SongRow
               key={`${song.id}-${index}`}
@@ -918,7 +919,6 @@ export default function PlaylistDetailPage({ params }) {
   const [playlist, setPlaylist] = useState(null);
   const [songs, setSongs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [currentlyPlaying, setCurrentlyPlaying] = useState(null);
   const [playlistId, setPlaylistId] = useState(null);
   const [dominantColors, setDominantColors] = useState(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -959,9 +959,13 @@ export default function PlaylistDetailPage({ params }) {
   const decodeHtmlEntities = useCallback((text) => {
     if (!text) return text;
     if (htmlEntityCache.current.has(text)) return htmlEntityCache.current.get(text);
-    const textarea = document.createElement('textarea');
-    textarea.innerHTML = text;
-    const result = textarea.value;
+    const entities = {
+      '&amp;': '&', '&lt;': '<', '&gt;': '>',
+      '&quot;': '"', '&#39;': "'", '&apos;': "'"
+    };
+    const result = text.includes('&')
+      ? text.replace(/&amp;|&lt;|&gt;|&quot;|&#39;|&apos;/g, m => entities[m])
+      : text;
     htmlEntityCache.current.set(text, result);
     return result;
   }, []);
@@ -1378,7 +1382,6 @@ export default function PlaylistDetailPage({ params }) {
       playCount: song.playCount, downloadUrl: song.downloadUrl
     };
     playSong(songData, mappedFilteredPlaylistData, playlistId, index);
-    setCurrentlyPlaying({ song, index });
     trackRecentlyPlayed();
   }, [currentSong?.id, mappedFilteredPlaylistData, playlistId, playSong, trackRecentlyPlayed]);
 
@@ -1395,7 +1398,6 @@ export default function PlaylistDetailPage({ params }) {
     }
 
     playSong(startSong, mappedFilteredPlaylistData, playlistId, startIndex);
-    setCurrentlyPlaying({ song: sortedSongs[startIndex], index: startIndex });
     trackRecentlyPlayed();
   }, [sortedSongs, activePlaylistId, playlistId, togglePlayPause, mappedFilteredPlaylistData, playSong, trackRecentlyPlayed, isShuffle]);
 
@@ -1645,18 +1647,7 @@ export default function PlaylistDetailPage({ params }) {
 
   const handleRemoveFromPlaylist = async (songId) => {
     if (!isOwner) {
-      // Show toast that only owner can remove songs
-      const toast = document.createElement('div');
-      toast.className = 'fixed bottom-4 right-4 bg-orange-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-      toast.textContent = 'Only the playlist owner can remove songs!';
-      document.body.appendChild(toast);
-
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => {
-          document.body.removeChild(toast);
-        }, 300);
-      }, 3000);
+      toast.error('Only the playlist owner can remove songs!');
       return;
     }
 
@@ -2453,7 +2444,7 @@ export default function PlaylistDetailPage({ params }) {
               <div className="flex items-center gap-0.5 md:gap-1">
                 <Button
                   size="lg"
-                  className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-all duration-500"
+                  className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-all duration-500 cursor-pointer"
                   style={{
                     backgroundColor: dominantColors || '#ffffff',
                     boxShadow: dominantColors
@@ -2472,13 +2463,12 @@ export default function PlaylistDetailPage({ params }) {
 
                 {/* Moved Heart button to PlaylistActionMenu */}
 
-                <Button
-                  variant="ghost"
+                <button
                   onClick={() => setIsShuffle(!isShuffle)}
-                  className={`rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center transition-colors ${isShuffle ? 'text-green-500 hover:text-green-400 hover:bg-green-500/10' : 'text-muted-foreground hover:text-foreground'}`}
+                  className={`rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center transition-colors bg-transparent border-none outline-none cursor-pointer ${isShuffle ? 'text-green-500 hover:text-green-400' : 'text-muted-foreground hover:text-foreground'}`}
                 >
                   <Shuffle style={{ width: '24px', height: '24px' }} />
-                </Button>
+                </button>
 
                 <PlaylistActionMenu
                   playlist={playlist}
@@ -2530,7 +2520,7 @@ export default function PlaylistDetailPage({ params }) {
                   </div>
 
                   {/* Sort and View Options */}
-                  {!isSearchVisible && (
+                  {(!isSearchVisible || !isMobile) && (
                     <SortAndViewMenu
                       sortBy={sortBy}
                       setSortBy={setSortBy}
@@ -2566,8 +2556,7 @@ export default function PlaylistDetailPage({ params }) {
                       {sortedSongs.map((song, index) => {
                         const isCurrentSong =
                           currentSong?.id === song.id &&
-                          activePlaylistId === playlistId &&
-                          currentIndex === index;
+                          activePlaylistId === playlistId;
                         return (
                           <div
                             key={`${song.id}-${index}`}

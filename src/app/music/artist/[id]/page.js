@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Play, ArrowLeft, Heart, MoreVertical, Shuffle, Users, Calendar, Plus, Disc, Share, Download, Pause } from "lucide-react";
+import { Play, ArrowLeft, Heart, MoreVertical, Shuffle, Users, Calendar, Plus, Disc, Share, Download } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,7 +42,6 @@ import {
   DrawerHeader,
   DrawerTitle,
   DrawerDescription,
-  DrawerPortal,
 } from "@/components/ui/drawer";
 import { toast } from "sonner";
 import { memo } from "react";
@@ -230,6 +229,146 @@ const SongActionMenu = memo(({
 
 SongActionMenu.displayName = "SongActionMenu";
 
+const ArtistActionMenu = memo(({
+  artist,
+  isArtistLiked,
+  toggleArtistLike,
+  onDownloadSongs,
+  artistLikeLoading,
+  decodeHtmlEntities
+}) => {
+  const isMobile = useIsMobile();
+  const [open, setOpen] = useState(false);
+
+  const artistImageUrl = artist?.image?.[2]?.url || artist?.image?.[1]?.url || artist?.image?.[0]?.url || '';
+
+  const handleShare = (e) => {
+    e.stopPropagation();
+    if (navigator.share) {
+      navigator.share({
+        title: artist.name,
+        text: `Check out ${artist.name} on Jammify`,
+        url: window.location.href
+      });
+    } else {
+      navigator.clipboard.writeText(window.location.href);
+      toast.success('Link copied to clipboard');
+    }
+    setOpen(false);
+  };
+
+  const ActionItems = ({ onItemClick }) => (
+    <>
+      <div 
+        className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${isArtistLiked ? 'text-red-500' : ''}`}
+        onClick={(e) => {
+          if (!artistLikeLoading) {
+            onItemClick();
+            toggleArtistLike();
+          }
+        }}
+      >
+        <Heart className={`w-5 h-5 ${isArtistLiked ? 'fill-current' : ''}`} />
+        <span className="font-medium">{isArtistLiked ? 'Unlike Artist' : 'Like Artist'}</span>
+      </div>
+      <div 
+        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        onClick={(e) => {
+          onItemClick();
+          onDownloadSongs();
+        }}
+      >
+        <Download className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Download Songs</span>
+      </div>
+      <div className="h-px bg-white/5 my-1" />
+      <div 
+        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        onClick={handleShare}
+      >
+        <Share className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Share Artist</span>
+      </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={setOpen}>
+        <DrawerTrigger asChild>
+          <button className="rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center transition-colors bg-transparent border-none outline-none cursor-pointer text-muted-foreground hover:text-foreground">
+            <MoreVertical style={{ width: '24px', height: '24px' }} />
+          </button>
+        </DrawerTrigger>
+        <div onClick={(e) => e.stopPropagation()}>
+          <DrawerContent className="bg-[#121212] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
+            <DrawerHeader className="p-0">
+              <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
+                <div className="w-14 h-14 rounded-full shadow-lg overflow-hidden shrink-0 bg-muted">
+                  {artistImageUrl ? (
+                    <img src={artistImageUrl} alt={artist.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Users className="w-6 h-6 opacity-50" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0 flex flex-col justify-center text-left">
+                  <DrawerTitle className="text-base font-bold truncate text-white text-left">
+                    {artist?.name}
+                  </DrawerTitle>
+                  <DrawerDescription className="text-sm text-muted-foreground truncate mt-0.5 text-left">
+                    Artist
+                  </DrawerDescription>
+                </div>
+              </div>
+            </DrawerHeader>
+            <div className="px-2 py-4 pb-8 space-y-1">
+              <ActionItems onItemClick={() => setOpen(false)} />
+            </div>
+          </DrawerContent>
+        </div>
+      </Drawer>
+    );
+  }
+
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <button className="rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center transition-colors bg-transparent border-none outline-none cursor-pointer text-muted-foreground hover:text-foreground">
+          <MoreVertical style={{ width: '24px', height: '24px' }} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
+        <DropdownMenuItem 
+          onClick={(e) => { setOpen(false); toggleArtistLike(); }}
+          className={`hover:bg-white/10 focus:bg-white/10 cursor-pointer ${isArtistLiked ? 'text-red-500' : ''}`}
+          disabled={artistLikeLoading}
+        >
+          <Heart className={`w-4 h-4 mr-2 ${isArtistLiked ? 'fill-current' : ''}`} />
+          {isArtistLiked ? 'Unlike Artist' : 'Like Artist'}
+        </DropdownMenuItem>
+        <DropdownMenuItem 
+          onClick={(e) => { setOpen(false); onDownloadSongs(); }}
+          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Download Songs
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuItem 
+          onClick={handleShare}
+          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+        >
+          <Share className="w-4 h-4 mr-2" />
+          Share Artist
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+});
+ArtistActionMenu.displayName = "ArtistActionMenu";
+
 export default function ArtistPage() {
   const router = useRouter();
   const params = useParams();
@@ -263,7 +402,14 @@ export default function ArtistPage() {
   const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
 
   // Initialize music player
-  const { playSong, currentSong, isPlaying, togglePlayPause, currentPlaylistId } = useMusicPlayer();
+  const { playSong, currentSong, isPlaying, togglePlayPause, currentPlaylistId, isShuffle, setIsShuffle, setPlaylist } = useMusicPlayer();
+
+  // Sync new paginated songs into the player if we are currently listening to this artist
+  useEffect(() => {
+    if (currentPlaylistId === artistId && songs.length > 0) {
+      setPlaylist(songs);
+    }
+  }, [songs, currentPlaylistId, artistId, setPlaylist]);
 
   useEffect(() => {
     let isMounted = true;
@@ -300,10 +446,27 @@ export default function ArtistPage() {
           }
 
           if (artistData.data.topSongs) {
-            setSongs(artistData.data.topSongs);
+            let initialSongs = artistData.data.topSongs;
+            try {
+              const songIds = initialSongs.map(s => s.id).filter(Boolean).join(',');
+              if (songIds) {
+                const songsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs?ids=${songIds}`);
+                const songsData = await songsResponse.json();
+                if (songsData.success && songsData.data) {
+                  const playCountMap = {};
+                  songsData.data.forEach(s => { 
+                    if (s.playCount != null) playCountMap[s.id] = s.playCount; 
+                  });
+                  initialSongs = initialSongs.map(s => ({ ...s, playCount: playCountMap[s.id] ?? s.playCount }));
+                }
+              }
+            } catch (err) {
+              console.error('Error fetching initial playcounts:', err);
+            }
+            setSongs(initialSongs);
             // JioSaavn usually returns 10 top songs in the artist detail
             setSongsPage(1); 
-            setHasMoreSongs(artistData.data.topSongs.length >= 10);
+            setHasMoreSongs(initialSongs.length >= 10);
           }
 
           if (artistData.data.topAlbums) {
@@ -373,16 +536,35 @@ export default function ArtistPage() {
       const data = await response.json();
 
       if (data.success && data.data) {
-        const newSongs = data.data.songs || data.data;
+        let newSongs = data.data.songs || data.data;
 
         if (Array.isArray(newSongs) && newSongs.length > 0) {
+          try {
+            const songIds = newSongs.map(s => s.id).filter(Boolean).join(',');
+            if (songIds) {
+              const songsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs?ids=${songIds}`);
+              const songsData = await songsResponse.json();
+              if (songsData.success && songsData.data) {
+                const playCountMap = {};
+                songsData.data.forEach(s => { 
+                  if (s.playCount != null) playCountMap[s.id] = s.playCount; 
+                });
+                newSongs = newSongs.map(s => ({ ...s, playCount: playCountMap[s.id] ?? s.playCount }));
+              }
+            }
+          } catch (err) {
+            console.error('Error fetching more playcounts:', err);
+          }
+
+          let uniqueNew = [];
           setSongs(prev => {
             const existingIds = new Set(prev.map(s => s.id));
-            const uniqueNew = newSongs.filter(s => s.id && !existingIds.has(s.id));
+            uniqueNew = newSongs.filter(s => s.id && !existingIds.has(s.id));
             return [...prev, ...uniqueNew];
           });
           setSongsPage(nextPage + 1);
-          setHasMoreSongs(newSongs.length >= 10);
+          // Stop if no new unique songs were added OR batch was smaller than a full page
+          setHasMoreSongs(uniqueNew.length > 0 && newSongs.length >= 10);
           setShowAllTopSongs(true); // Ensure new songs are visible
         } else {
           setHasMoreSongs(false);
@@ -517,7 +699,7 @@ export default function ArtistPage() {
     if (artist?.name && !loading) {
       fetchExternalBio();
     }
-  }, [artist?.name, loading]);
+  }, [artist?.name, loading, fetchingBio]);
 
   const handlePlayClick = (song, index) => {
     playSong(song, songs, artistId, index);
@@ -530,7 +712,15 @@ export default function ArtistPage() {
       if (isPlaylistPlaying) {
         togglePlayPause();
       } else {
-        playSong(songs[0], songs, artistId, 0);
+        let startSong = songs[0];
+        let startIndex = 0;
+
+        if (isShuffle) {
+          startIndex = Math.floor(Math.random() * songs.length);
+          startSong = songs[startIndex];
+        }
+
+        playSong(startSong, songs, artistId, startIndex);
       }
     }
   };
@@ -1098,10 +1288,10 @@ export default function ArtistPage() {
 
             {/* Controls */}
             <div className="p-4 pt-2 md:p-8 md:pt-4">
-              <div className="flex items-center gap-3 md:gap-4">
+              <div className="flex items-center gap-0.5 md:gap-1">
                 <Button
                   size="lg"
-                  className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-transform"
+                  className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-all duration-500 cursor-pointer"
                   style={{
                     backgroundColor: dominantColor,
                     boxShadow: `0 8px 32px ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.3)')}`
@@ -1114,29 +1304,22 @@ export default function ArtistPage() {
                     <IoMdPlay style={{ width: '24px', height: '24px', marginLeft: '4px' }} />
                   )}
                 </Button>
-                <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
-                  <Shuffle className="w-5 h-5 md:w-6 md:h-6" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="lg"
-                  className={`rounded-full w-10 h-10 md:w-12 md:h-12 ${isArtistLiked ? 'text-red-500' : ''}`}
-                  onClick={toggleArtistLike}
-                  disabled={artistLikeLoading || !session?.user?.id}
+                
+                <button
+                  onClick={() => setIsShuffle(!isShuffle)}
+                  className={`rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center transition-colors bg-transparent border-none outline-none cursor-pointer ${isShuffle ? 'text-green-500 hover:text-green-400' : 'text-muted-foreground hover:text-foreground'}`}
                 >
-                  <Heart className={`w-5 h-5 md:w-6 md:h-6 ${isArtistLiked ? 'fill-current' : ''}`} />
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="lg" 
-                  className="rounded-full w-10 h-10 md:w-12 md:h-12"
-                  onClick={handleDownloadSongs}
-                >
-                  <Download className="w-5 h-5 md:w-6 md:h-6" />
-                </Button>
-                <Button variant="ghost" size="lg" className="rounded-full w-10 h-10 md:w-12 md:h-12">
-                  <MoreVertical className="w-5 h-5 md:w-6 md:h-6" />
-                </Button>
+                  <Shuffle style={{ width: '24px', height: '24px' }} />
+                </button>
+                
+                <ArtistActionMenu
+                  artist={artist}
+                  isArtistLiked={isArtistLiked}
+                  toggleArtistLike={toggleArtistLike}
+                  onDownloadSongs={handleDownloadSongs}
+                  artistLikeLoading={artistLikeLoading}
+                  decodeHtmlEntities={decodeHtmlEntities}
+                />
               </div>
             </div>
 
@@ -1207,6 +1390,10 @@ export default function ArtistPage() {
                               }`}>
                               {song.album?.name || 'Unknown Album'}
                             </p>
+                          </div>
+
+                          <div className="w-24 lg:w-32 text-right text-sm text-muted-foreground hidden md:block pr-4">
+                            {song.playCount ? Number(song.playCount).toLocaleString() : ''}
                           </div>
 
                           <Button

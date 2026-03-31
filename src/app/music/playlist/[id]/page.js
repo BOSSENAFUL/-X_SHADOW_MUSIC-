@@ -27,7 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Play, Pause, ArrowLeft, Heart, MoreVertical, Clock, Shuffle, Plus, User, Disc, Download, Loader2 } from "lucide-react";
+import { Play, ArrowLeft, Heart, MoreVertical, Clock, Shuffle, Plus, User, Disc, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useLikedPlaylists } from "@/hooks/useLikedPlaylists";
@@ -308,8 +308,10 @@ const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }
     </div>
   );
 
+  // useState must be at top level - never inside if-blocks (Rules of Hooks)
+  const [open, setOpen] = useState(false);
+
   if (isMobile) {
-    const [open, setOpen] = useState(false);
     return (
       <Drawer open={open} onOpenChange={setOpen}>
         <DrawerTrigger asChild>
@@ -335,7 +337,7 @@ const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex items-center gap-2 text-sm font-medium text-white/80 hover:text-white transition-colors py-2 px-2 hover:bg-white/5 rounded-md">
+        <button className="flex items-center justify-center gap-2 text-sm font-medium text-white/80 hover:text-white transition-colors h-9 px-3 hover:bg-white/5 rounded-md">
           <span className={sortBy !== 'custom' ? 'text-[#1ed760]' : ''}>{currentSortLabel}</span>
           <List className="w-4 h-4" />
         </button>
@@ -410,9 +412,9 @@ const PlaylistActionMenu = memo(({
     return (
       <Drawer open={open} onOpenChange={setOpen}>
         <DrawerTrigger asChild>
-          <Button variant="ghost" className="rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center">
+          <button className="rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center text-muted-foreground hover:text-foreground bg-transparent border-none outline-none transition-colors cursor-pointer">
             <MoreVertical style={{ width: '24px', height: '24px' }} />
-          </Button>
+          </button>
         </DrawerTrigger>
         <div onClick={(e) => e.stopPropagation()}>
           <DrawerContent className="bg-[#121212] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
@@ -445,9 +447,9 @@ const PlaylistActionMenu = memo(({
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center">
+        <button className="rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center text-muted-foreground hover:text-foreground bg-transparent border-none outline-none transition-colors cursor-pointer">
           <MoreVertical style={{ width: '24px', height: '24px' }} />
-        </Button>
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
         <DropdownMenuItem
@@ -484,8 +486,8 @@ function PlaylistPageContent() {
   const [playlist, setPlaylist] = useState(null);
   const [songs, setSongs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [currentlyPlaying, setCurrentlyPlaying] = useState(null);
   const [dominantColor, setDominantColor] = useState(null);
+  const isMobile = useIsMobile();
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState(null);
   const [showHeaderTitle, setShowHeaderTitle] = useState(false);
@@ -728,9 +730,7 @@ function PlaylistPageContent() {
 
   const handlePlayClick = (song, index) => {
     playSong(song, songs, playlistId);
-    setCurrentlyPlaying({ song, index });
     trackRecentlyPlayed();
-    console.log(`Playing song:`, song);
   };
 
   const handlePlayAll = () => {
@@ -749,7 +749,6 @@ function PlaylistPageContent() {
         }
 
         playSong(startSong, songs, playlistId, startIndex);
-        setCurrentlyPlaying({ song: startSong, index: startIndex });
         trackRecentlyPlayed();
       }
       console.log('Playlist action:', isPlaylistPlaying ? 'toggling play/pause' : 'starting from beginning');
@@ -834,9 +833,16 @@ function PlaylistPageContent() {
 
   const decodeHtmlEntities = (text) => {
     if (!text) return text;
-    const textarea = document.createElement('textarea');
-    textarea.innerHTML = text;
-    return textarea.value;
+    const entities = {
+      '&amp;': '&',
+      '&lt;': '<',
+      '&gt;': '>',
+      '&quot;': '"',
+      '&#39;': "'",
+      '&apos;': "'"
+    };
+    if (!text.includes('&')) return text;
+    return text.replace(/&amp;|&lt;|&gt;|&quot;|&#39;|&apos;/g, m => entities[m]);
   };
 
   const handleAddToPlaylist = (e, song) => {
@@ -859,20 +865,6 @@ function PlaylistPageContent() {
     }
   };
 
-  const handleShare = (e, song) => {
-    e.stopPropagation();
-    if (navigator.share) {
-      navigator.share({
-        title: song.name,
-        text: `Check out "${song.name}" by ${song.artists?.primary?.[0]?.name || 'Unknown Artist'}`,
-        url: window.location.href
-      });
-    } else {
-      // Fallback: copy to clipboard
-      navigator.clipboard.writeText(window.location.href);
-      console.log('Link copied to clipboard');
-    }
-  };
 
   const downloadSingleSong = async (song, silent = false) => {
     let toastId = null;
@@ -1015,7 +1007,9 @@ function PlaylistPageContent() {
     await Promise.all(Array(Math.min(CONCURRENCY_LIMIT, queue.length)).fill(null).map(downloadWorker));
 
     // Finish
-    document.body.removeChild(progressToast);
+    if (document.body.contains(progressToast)) {
+      document.body.removeChild(progressToast);
+    }
 
     const completionToast = document.createElement('div');
     completionToast.className = `fixed bottom-4 right-4 ${failedCount > 0 ? 'bg-orange-600' : 'bg-green-600'} text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300`;
@@ -1310,7 +1304,7 @@ function PlaylistPageContent() {
               <div className="flex items-center gap-0.5 md:gap-1">
                 <Button
                   size="lg"
-                  className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-all duration-500"
+                  className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-all duration-500 cursor-pointer"
                   style={{
                     backgroundColor: dominantColor || '#ffffff',
                     boxShadow: dominantColor
@@ -1325,13 +1319,12 @@ function PlaylistPageContent() {
                     <IoMdPlay style={{ width: '24px', height: '24px', marginLeft: '4px' }} />
                   )}
                 </Button>
-                <Button
-                  variant="ghost"
+                <button
                   onClick={() => setIsShuffle(!isShuffle)}
-                  className={`rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center transition-colors ${isShuffle ? 'text-green-500 hover:text-green-400 hover:bg-green-500/10' : 'text-muted-foreground hover:text-foreground'}`}
+                  className={`rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center transition-colors bg-transparent border-none outline-none cursor-pointer ${isShuffle ? 'text-green-500 hover:text-green-400' : 'text-muted-foreground hover:text-foreground'}`}
                 >
                   <Shuffle style={{ width: '24px', height: '24px' }} />
-                </Button>
+                </button>
 
                 <PlaylistActionMenu
                   playlist={playlist}
@@ -1359,7 +1352,7 @@ function PlaylistPageContent() {
                       toast.success('Link copied to clipboard');
                     }
                   }}
-                  isMobile={window.innerWidth < 768}
+                  isMobile={isMobile}
                   decodeHtmlEntities={decodeHtmlEntities}
                 />
 
@@ -1390,14 +1383,14 @@ function PlaylistPageContent() {
                     </div>
                   </div>
 
-                  {/* Sort and View Options */}
-                  {!isSearchVisible && (
+                  {/* Sort and View Options - always visible on PC, hidden on mobile when search is open */}
+                  {(!isSearchVisible || !isMobile) && (
                     <SortAndViewMenu
                       sortBy={sortBy}
                       setSortBy={setSortBy}
                       viewAs={viewAs}
                       setViewAs={setViewAs}
-                      isMobile={window.innerWidth < 768}
+                      isMobile={isMobile}
                     />
                   )}
                 </div>

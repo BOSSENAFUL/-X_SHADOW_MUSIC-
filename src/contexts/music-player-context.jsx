@@ -105,6 +105,7 @@ export function MusicPlayerProvider({ children }) {
         updateVolume,
         seekTo,
         setAudioRef,
+        setPlaylist,
       }}
     >
       {children}

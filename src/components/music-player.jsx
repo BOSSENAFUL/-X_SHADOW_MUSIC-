@@ -927,7 +927,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                     {/* Shuffle Button */}
                     <button
                       onClick={() => setIsShuffle(!isShuffle)}
-                      className={`relative flex flex-col items-center justify-center p-0 bg-transparent hover:bg-transparent border-none outline-none shadow-none transition-colors group ${isShuffle ? "text-green-500" : "text-white/60 hover:text-white"
+                      className={`relative flex flex-col items-center justify-center p-0 bg-transparent hover:bg-transparent border-none outline-none shadow-none transition-colors group cursor-pointer ${isShuffle ? "text-green-500" : "text-white/60 hover:text-white"
                         }`}
                     >
                       <Shuffle style={{ width: '18px', height: '18px' }} />
@@ -940,7 +940,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                       size="sm"
                       onClick={handlePrevious}
                       disabled={playlist.length === 0}
-                      className="hover:bg-transparent bg-transparent hover:scale-110 active:scale-95 group transition-all p-0 h-auto w-auto"
+                      className="hover:bg-transparent bg-transparent hover:scale-110 active:scale-95 group transition-all p-0 h-auto w-auto cursor-pointer"
                     >
                       <BiSkipPrevious style={{ width: '32px', height: '32px' }} className="text-white/65 group-hover:text-white" />
                     </Button>
@@ -961,7 +961,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                       size="sm"
                       onClick={handleNext}
                       disabled={playlist.length === 0}
-                      className="hover:bg-transparent bg-transparent hover:scale-110 active:scale-95 group transition-all p-0 h-auto w-auto"
+                      className="hover:bg-transparent bg-transparent hover:scale-110 active:scale-95 group transition-all p-0 h-auto w-auto cursor-pointer"
                     >
                       <BiSkipNext style={{ width: '32px', height: '32px' }} className="text-white/65 group-hover:text-white" />
                     </Button>
@@ -969,7 +969,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                     {/* Repeat Button */}
                     <button
                       onClick={toggleRepeat}
-                      className={`relative flex flex-col items-center justify-center p-0 bg-transparent hover:bg-transparent border-none outline-none shadow-none transition-colors group ${repeatMode !== "off" ? "text-green-500" : "text-white/60 hover:text-white"
+                      className={`relative flex flex-col items-center justify-center p-0 bg-transparent hover:bg-transparent border-none outline-none shadow-none transition-colors group cursor-pointer ${repeatMode !== "off" ? "text-green-500" : "text-white/60 hover:text-white"
                         }`}
                     >
                       {repeatMode === "one" ? (
@@ -1009,7 +1009,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                 {/* Volume */}
                 <div className="flex items-center gap-3 flex-1 justify-end">
                   <button
-                    className={`transition-colors p-1 ${isFullscreenOpen && isFullscreenPlaylistOpen ? 'text-green-500' : 'text-white/60 hover:text-white'}`}
+                    className={`transition-colors p-1 cursor-pointer ${isFullscreenOpen && isFullscreenPlaylistOpen ? 'text-green-500' : 'text-white/60 hover:text-white'}`}
                     title="Queue"
                     onClick={() => {
                         if (isFullscreenOpen && isFullscreenPlaylistOpen) {
