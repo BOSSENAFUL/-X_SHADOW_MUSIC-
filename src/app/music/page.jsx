@@ -29,7 +29,6 @@ import { IoMdPlay } from "react-icons/io";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 
 const PlaylistCollage = memo(({ images }) => {
   if (!images || images.length === 0) return null;
@@ -103,30 +102,6 @@ export default function MusicPage() {
 
   const { playSong } = useMusicPlayer();
 
-  // Once-a-day Welcome Toast for Community Feature
-  useEffect(() => {
-    if (sessionStatus !== "authenticated") return;
-
-    // Check if user has seen the toast today
-    const lastSeenDate = localStorage.getItem("lastSeenCommunityToastDate");
-    const today = new Date().toDateString();
-
-    if (lastSeenDate !== today) {
-      const timer = setTimeout(() => {
-        toast("Have an idea for Jammify? 💡", {
-          description: "Drop into the Community Hub to discuss features, report bugs, and build the future of the app.",
-          action: {
-            label: "Open Hub",
-            onClick: () => router.push("/music/chat")
-          },
-          duration: 10000,
-        });
-        localStorage.setItem("lastSeenCommunityToastDate", today);
-      }, 2000); // 2-second delay lets UI load fully before springing the toast
-
-      return () => clearTimeout(timer);
-    }
-  }, [sessionStatus, router]);
 
   useEffect(() => {
     let isMounted = true;
