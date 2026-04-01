@@ -494,6 +494,7 @@ function PlaylistPageContent() {
   const [showHeaderTitle, setShowHeaderTitle] = useState(false);
   const mobileTitleRef = useRef(null);
   const desktopTitleRef = useRef(null);
+  const lastTrackedRef = useRef(0);
 
   // Search and Sort State
   const [searchQuery, setSearchQuery] = useState("");
@@ -725,6 +726,13 @@ function PlaylistPageContent() {
 
   const trackRecentlyPlayed = () => {
     if (!session?.user?.id || !playlist) return;
+
+    // Throttle: don't track the same playlist more than once every 5 minutes
+    const now = Date.now();
+    if (now - lastTrackedRef.current < 300000) {
+      return;
+    }
+
     const imageUrl =
       playlist.image?.[2]?.url ||
       playlist.image?.[1]?.url ||
@@ -737,6 +745,10 @@ function PlaylistPageContent() {
       source: 'jiosaavn',
       owner: playlist.subtitle || playlist.owner || 'JioSaavn',
     };
+
+    // Update ref before fetch
+    lastTrackedRef.current = now;
+
     // Fire-and-forget – don't block UI
     fetch('/api/recently-played-playlists', {
       method: 'POST',

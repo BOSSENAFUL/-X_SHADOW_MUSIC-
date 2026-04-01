@@ -948,6 +948,7 @@ export default function PlaylistDetailPage({ params }) {
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const lastTrackedRef = useRef(0);
   const [sharePreviewOpen, setSharePreviewOpen] = useState(false);
 
   // Initialize music player
@@ -1284,6 +1285,13 @@ export default function PlaylistDetailPage({ params }) {
   // ── Recently Played Tracking ────────────────────────────────────────
   const trackRecentlyPlayed = () => {
     if (!session?.user?.id || !playlist) return;
+
+    // Throttle: don't track the same playlist more than once every 5 minutes
+    const now = Date.now();
+    if (now - lastTrackedRef.current < 300000) {
+      return;
+    }
+
     const cover = getPlaylistCover();
     let imageArr = [];
     if (cover.type === 'single' && cover.src) {
@@ -1299,12 +1307,19 @@ export default function PlaylistDetailPage({ params }) {
       source: 'user',
       owner: session.user.name || session.user.email || 'You',
     };
+
+    // Update ref before fetch to prevent race conditions from rapid clicks
+    lastTrackedRef.current = now;
+
     // Fire-and-forget – don't block UI
     fetch('/api/recently-played-playlists', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playlistData }),
-    }).catch(() => { });
+    }).catch(() => {
+      // Reset ref on failure so we can try again sooner? 
+      // Actually, let's keep it simple. If it fails, we wait 5 mins.
+    });
   };
 
   // Pre-mapped base songs
@@ -1434,14 +1449,14 @@ export default function PlaylistDetailPage({ params }) {
     if (scrollContainer) {
       const scrollThreshold = 100; // pixels from edge to trigger scroll
       const scrollSpeed = 15; // pixels to adjust per calculation
-      
+
       const rect = scrollContainer.getBoundingClientRect();
       const clientY = e.clientY;
 
       // Check proximity to top edge
       if (clientY - rect.top < scrollThreshold) {
         scrollContainer.scrollTop -= scrollSpeed;
-      } 
+      }
       // Check proximity to bottom edge
       else if (rect.bottom - clientY < scrollThreshold) {
         scrollContainer.scrollTop += scrollSpeed;
@@ -1465,11 +1480,11 @@ export default function PlaylistDetailPage({ params }) {
     const newSongs = [...songs];
     const draggedItem = newSongs[draggedIndex];
     newSongs.splice(draggedIndex, 1);
-    
+
     // Adjust insert index
     const insertIndex = draggedIndex < dropIndex ? dropIndex - 1 : dropIndex;
     newSongs.splice(insertIndex, 0, draggedItem);
-    
+
     setSongs(newSongs); // Optimistic UI update
     handleDragEnd();
 
@@ -2548,11 +2563,10 @@ export default function PlaylistDetailPage({ params }) {
                             onDragOver={handleDragOver}
                             onDragEnter={(e) => handleDragEnter(e, index)}
                             onDrop={(e) => handleDrop(e, index)}
-                            className={`cursor-grab transition-all duration-200 select-none ${
-                              dragOverIndex === index && draggedIndex !== index
+                            className={`cursor-grab transition-all duration-200 select-none ${dragOverIndex === index && draggedIndex !== index
                                 ? "border-t-2 border-green-400"
                                 : ""
-                            } ${draggedIndex === index ? "opacity-50 scale-[0.99]" : ""}`}
+                              } ${draggedIndex === index ? "opacity-50 scale-[0.99]" : ""}`}
                           >
                             <SongRow
                               song={song}
@@ -2705,14 +2719,14 @@ export default function PlaylistDetailPage({ params }) {
       </AlertDialog>
 
       {/* Share Image Preview Modal */}
-      <ShareStoryPreview 
-         key={playlist?.id || playlistId}
-         isOpen={sharePreviewOpen}
-         onClose={setSharePreviewOpen}
-         playlist={playlist}
-         getPlaylistCover={getPlaylistCover}
-         dominantColors={dominantColors}
-         shareUrl={typeof window !== 'undefined' ? `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/music/playlists/${playlistId}` : ''}
+      <ShareStoryPreview
+        key={playlist?.id || playlistId}
+        isOpen={sharePreviewOpen}
+        onClose={setSharePreviewOpen}
+        playlist={playlist}
+        getPlaylistCover={getPlaylistCover}
+        dominantColors={dominantColors}
+        shareUrl={typeof window !== 'undefined' ? `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/music/playlists/${playlistId}` : ''}
       />
     </SidebarProvider>
   );
