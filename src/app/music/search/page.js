@@ -309,6 +309,43 @@ function SearchPageContent() {
     playlists: 0
   });
 
+  // --- Utility Functions ---
+  const decodeHtmlEntities = (text) => {
+    if (!text) return text;
+    if (typeof window === 'undefined') return text;
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = text;
+    return textarea.value;
+  };
+
+  const formatDuration = (duration) => {
+    if (!duration) return "0:00";
+    const minutes = Math.floor(duration / 60);
+    const seconds = duration % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const getArtistNames = (item) => {
+    let result = 'Unknown Artist';
+
+    // Handle detailed song API response (artists.primary array) - prioritize this
+    if (item.artists?.primary && Array.isArray(item.artists.primary) && item.artists.primary.length > 0) {
+      result = item.artists.primary.map(artist => artist.name || artist).join(', ');
+    }
+    // Handle search API response (primaryArtists string)
+    else if (item.primaryArtists && typeof item.primaryArtists === 'string') {
+      result = item.primaryArtists;
+    }
+    else if (item.artist && typeof item.artist === 'string') {
+      result = item.artist;
+    }
+    else if (item.singers && typeof item.singers === 'string') {
+      result = item.singers;
+    }
+
+    return decodeHtmlEntities(result);
+  };
+
   // Save current tab's scroll position before switching tabs
   const saveCurrentTabScroll = useCallback(() => {
     if (scrollContainerRef.current) {
@@ -532,15 +569,8 @@ function SearchPageContent() {
 
         // Enhance artists section by adding song artists if they're not already included
         if (transformedData.songs?.results?.length > 0) {
-          const existingArtistNames = new Set(
-            transformedData.artists.results.map(artist =>
-              artist.title?.toLowerCase() || artist.name?.toLowerCase()
-            )
-          );
-
-          // Get unique artists from top songs with proper IDs by fetching detailed song info
-          // Process top 3 songs to extract their artists in parallel
-          const artistPromises = transformedData.songs.results.slice(0, 3).map(async (song) => {
+          // Get unique artists from top 10 songs with proper IDs by fetching detailed song info
+          const artistPromises = transformedData.songs.results.slice(0, 10).map(async (song) => {
             try {
               // Fetch detailed song info to get proper artist data with IDs
               const songResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs/${song.id}`);
@@ -1146,7 +1176,6 @@ function SearchPageContent() {
     };
 
     // 2. Hydrate with high-quality specific category fetches
-    // These specific fetches (limit 40) are almost always better than the generic search (limit 20)
     if (categoryData.songs?.results?.length > 0) {
       if (categoryData.songs.results.length > combined.songs.results.length || combined.songs.results.length === 0) {
         combined.songs.results = categoryData.songs.results;
@@ -1158,36 +1187,13 @@ function SearchPageContent() {
     if (categoryData.playlists?.results?.length > combined.playlists.results.length) {
       combined.playlists.results = categoryData.playlists.results;
     }
-    if (categoryData.artists?.results?.length > 0) {
-      // PRESERVE injected song artists (which have IDs/images fetched specially)
-      // when overwriting with full category results (which are often more but missing the song's specific artist)
-      const songArtists = combined.artists.results.filter(a => a.isSongArtist);
 
-      if (categoryData.artists.results.length > combined.artists.results.length) {
-        const existingNames = new Set(categoryData.artists.results.map(a =>
-          (a.title || a.name || "").toLowerCase()
-        ));
-
-        const uniqueSongArtists = songArtists.filter(a =>
-          !existingNames.has((a.title || a.name || "").toLowerCase())
-        );
-
-        combined.artists.results = [...uniqueSongArtists, ...categoryData.artists.results];
-      } else if (songArtists.length > 0) {
-        // Even if we don't swap, make sure song artists are at the front if they aren't already
-        const existingNames = new Set(combined.artists.results.map(a =>
-          a.isSongArtist ? "" : (a.title || a.name || "").toLowerCase()
-        ));
-
-        const uniqueSongArtists = songArtists.filter(a =>
-          !existingNames.has((a.title || a.name || "").toLowerCase())
-        );
-
-        // Deduplicate and prepend
-        const baseResults = combined.artists.results.filter(a => !a.isSongArtist);
-        combined.artists.results = [...uniqueSongArtists, ...baseResults];
-      }
-    }
+    // Comprehensive Artist Pooling and Ranking
+    const allArtists = [
+      ...(searchResults.artists?.results || []),
+      ...(categoryData.artists?.results || []),
+      ...(combined.artists.results.filter(a => a.isSongArtist) || [])
+    ];
 
     // 3. Merge Lyrics Matches
     let topLyricsMatch = null;
@@ -1213,14 +1219,17 @@ function SearchPageContent() {
     // 4. Robust Ranking & Sorting
     const getRelevanceScore = (item) => {
       if (!item) return -1000;
-      const title = (item.title || item.name || "").toLowerCase().trim();
+      
+      // Decode entities for comparison - helps with exact matches
+      const rawTitle = (item.title || item.name || "");
+      const title = decodeHtmlEntities(rawTitle).toLowerCase().trim();
       const lyricsScore = item.lyricsScore || 0;
 
       // Tier 1: Exact matches (always absolute top)
-      if (title === searchTerm) return 2000;
+      if (title === searchTerm) return 3000;
 
       // Tier 2: Starts with the term
-      if (title.startsWith(searchTerm)) return 1500;
+      if (title.startsWith(searchTerm)) return 2000;
 
       // Tier 3: Very high quality lyrics matches (> 500 score)
       if (item.isLyricsMatch && lyricsScore > 500) return 1000 + lyricsScore;
@@ -1229,13 +1238,34 @@ function SearchPageContent() {
       if (title.includes(" " + searchTerm) || title.includes(searchTerm + " ")) return 800;
 
       // Tier 5: Direct matches from song search generally have a base relevance
-      if (!item.isLyricsMatch) return 400;
+      if (!item.isLyricsMatch) {
+         // Small boost for artists extracted from top songs as they are highly relevant
+         if (item.type === 'artist' && item.isSongArtist) return 600;
+         return 400;
+      }
 
       // Tier 6: Regular lyrics matches
       return lyricsScore;
     };
 
-    // Deduplicate
+    // Deduplicate and sort artists pool
+    const artistSeen = new Set();
+    const uniqueArtists = allArtists.filter(a => {
+      if (!a) return false;
+      const name = decodeHtmlEntities(a.title || a.name || "").toLowerCase().trim();
+      const id = a.id;
+      const key = id ? `id-${id}` : `name-${name}`;
+      
+      if (!name || artistSeen.has(key)) return false;
+      artistSeen.add(key);
+      return true;
+    });
+
+    // Sort all artists by relevance
+    uniqueArtists.sort((a, b) => b._index === undefined ? getRelevanceScore(b) - getRelevanceScore(a) : 0);
+    combined.artists.results = uniqueArtists;
+
+    // Deduplicate and sort songs
     const seen = new Set();
     const uniqueSongs = combined.songs.results.filter(s => {
       if (!s.id || seen.has(s.id)) return false;
@@ -1249,8 +1279,8 @@ function SearchPageContent() {
     // when more songs load.
 
     // Identify which songs belong to the initial "Top Results" set vs "Infinite Scroll" set
-    // A song is a "Hero" if it was in the first 40 results OR it's a special high-priority lyrics match
-    const threshold = 40;
+    // A song is a "Hero" if it was in the first 60 results OR it's a special high-priority lyrics match
+    const threshold = 60;
     const heroSongs = uniqueSongs.slice(0, threshold);
     const deepSongs = uniqueSongs.slice(threshold);
 
@@ -1393,41 +1423,6 @@ function SearchPageContent() {
       sessionStorage.setItem('searchPageState', JSON.stringify(searchState));
     }
     router.push(`/music/playlist/${playlistId}`);
-  };
-
-  const formatDuration = (duration) => {
-    if (!duration) return "0:00";
-    const minutes = Math.floor(duration / 60);
-    const seconds = duration % 60;
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
-
-  const decodeHtmlEntities = (text) => {
-    if (!text) return text;
-    const textarea = document.createElement('textarea');
-    textarea.innerHTML = text;
-    return textarea.value;
-  };
-
-  const getArtistNames = (item) => {
-    let result = 'Unknown Artist';
-
-    // Handle detailed song API response (artists.primary array) - prioritize this
-    if (item.artists?.primary && Array.isArray(item.artists.primary) && item.artists.primary.length > 0) {
-      result = item.artists.primary.map(artist => artist.name || artist).join(', ');
-    }
-    // Handle search API response (primaryArtists string)
-    else if (item.primaryArtists && typeof item.primaryArtists === 'string') {
-      result = item.primaryArtists;
-    }
-    else if (item.artist && typeof item.artist === 'string') {
-      result = item.artist;
-    }
-    else if (item.singers && typeof item.singers === 'string') {
-      result = item.singers;
-    }
-
-    return decodeHtmlEntities(result);
   };
 
   const handleAddToPlaylist = (e, song) => {
