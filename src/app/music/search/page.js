@@ -595,14 +595,7 @@ function SearchPageContent() {
           });
 
           const artistResults = await Promise.all(artistPromises);
-          const songArtists = [];
-
-          artistResults.flat().forEach(artist => {
-            if (artist.title && !existingArtistNames.has(artist.title.toLowerCase())) {
-              songArtists.push(artist);
-              existingArtistNames.add(artist.title.toLowerCase());
-            }
-          });
+          const songArtists = artistResults.flat().filter(artist => artist && artist.title);
 
           // Add song artists to the beginning of artists array
           if (songArtists.length > 0) {
