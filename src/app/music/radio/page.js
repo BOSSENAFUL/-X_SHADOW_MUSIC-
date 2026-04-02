@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   Breadcrumb,
@@ -57,6 +57,14 @@ import { useMusicPlayer } from "@/contexts/music-player-context";
 import dynamic from "next/dynamic";
 
 // Dynamically import the map component to avoid SSR issues
+// Function to decode HTML entities
+const decodeHtmlEntities = (text) => {
+  if (typeof document === 'undefined') return text;
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = text;
+  return textarea.value;
+};
+
 const RadioMap = dynamic(() => import("@/components/radio-map"), {
   ssr: false,
   loading: () => (
@@ -71,12 +79,11 @@ const RadioMap = dynamic(() => import("@/components/radio-map"), {
 
 export default function RadioPage() {
   const [stations, setStations] = useState([]);
-  const [filteredStations, setFilteredStations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCountry, setSelectedCountry] = useState("");
-  const [selectedLanguage, setSelectedLanguage] = useState("");
-  const [selectedTag, setSelectedTag] = useState("");
+  const [selectedCountry, setSelectedCountry] = useState("all");
+  const [selectedLanguage, setSelectedLanguage] = useState("all");
+  const [selectedTag, setSelectedTag] = useState("all");
   const [countries, setCountries] = useState([]);
   const [languages, setLanguages] = useState([]);
   const [tags, setTags] = useState([]);
@@ -85,13 +92,6 @@ export default function RadioPage() {
 
   const { playSong, currentSong, isPlayerVisible, isPlaying } = useMusicPlayer();
 
-  // Function to decode HTML entities
-  const decodeHtmlEntities = (text) => {
-    if (!text) return text;
-    const textarea = document.createElement('textarea');
-    textarea.innerHTML = text;
-    return textarea.value;
-  };
 
   // Fetch initial data
   useEffect(() => {
@@ -99,8 +99,8 @@ export default function RadioPage() {
       try {
         setLoading(true);
 
-        const cacheKey = "radio_data_cache";
-        const cacheTimeKey = "radio_data_cache_time";
+        const cacheKey = "radio_data_cache_v2";
+        const cacheTimeKey = "radio_data_cache_time_v2";
         const cachedStr = sessionStorage.getItem(cacheKey);
         const cacheTimeStr = sessionStorage.getItem(cacheTimeKey);
 
@@ -110,7 +110,6 @@ export default function RadioPage() {
           if (Date.now() - cachedTime < 6 * 60 * 60 * 1000) {
             const cachedData = JSON.parse(cachedStr);
             setStations(cachedData.stations);
-            setFilteredStations(cachedData.stations);
             setCountries(cachedData.countries);
             setLanguages(cachedData.languages);
             setTags(cachedData.tags);
@@ -119,9 +118,9 @@ export default function RadioPage() {
           }
         }
         
-        // Fetch stations with geo info
+        // Fetch stations with geo info - increased limit for better global coverage
         const stationsResponse = await fetch(
-          "https://de1.api.radio-browser.info/json/stations/search?limit=1000&has_geo_info=true&hidebroken=true&order=clickcount&reverse=true"
+          "https://de1.api.radio-browser.info/json/stations/search?limit=2500&has_geo_info=true&hidebroken=true&order=clickcount&reverse=true"
         );
         const stationsData = await stationsResponse.json();
         
@@ -133,37 +132,44 @@ export default function RadioPage() {
         );
         
         setStations(validStations);
-        setFilteredStations(validStations);
 
         // Fetch countries
         const countriesResponse = await fetch(
           "https://de1.api.radio-browser.info/json/countries?hidebroken=true"
         );
         const countriesData = await countriesResponse.json();
-        const topCountries = countriesData.slice(0, 50);
-        setCountries(topCountries); // Limit to top 50 countries
+        const sortedCountries = countriesData.sort((a, b) => a.name.localeCompare(b.name));
+        setCountries(sortedCountries); // Show all countries, sorted alphabetically
 
-        // Fetch languages
+        // Fetch languages - ordered by popularity
         const languagesResponse = await fetch(
-          "https://de1.api.radio-browser.info/json/languages?hidebroken=true"
+          "https://de1.api.radio-browser.info/json/languages?hidebroken=true&order=stationcount&reverse=true"
         );
         const languagesData = await languagesResponse.json();
-        const topLanguages = languagesData.slice(0, 30);
-        setLanguages(topLanguages); // Limit to top 30 languages
+        
+        // Filter for clean language names and sort by popularity
+        const topLanguages = languagesData
+          .filter(lang => /^[a-zA-Z\s-]+$/.test(lang.name)) // Only alphabetic names
+          .slice(0, 80);
+        setLanguages(topLanguages); 
 
-        // Fetch tags
+        // Fetch tags - ordered by popularity
         const tagsResponse = await fetch(
-          "https://de1.api.radio-browser.info/json/tags?hidebroken=true"
+          "https://de1.api.radio-browser.info/json/tags?hidebroken=true&order=stationcount&reverse=true"
         );
         const tagsData = await tagsResponse.json();
-        const topTags = tagsData.slice(0, 50);
-        setTags(topTags); // Limit to top 50 tags
+        
+        // Filter for clean genre names
+        const topTags = tagsData
+          .filter(tag => /^[a-zA-Z\s-]+$/.test(tag.name) && tag.name.length > 2)
+          .slice(0, 80);
+        setTags(topTags); 
 
         try {
-          // Save to cache to prevent redundant fetches
+          // Save to cache
           sessionStorage.setItem(cacheKey, JSON.stringify({
             stations: validStations,
-            countries: topCountries,
+            countries: sortedCountries,
             languages: topLanguages,
             tags: topTags
           }));
@@ -181,39 +187,96 @@ export default function RadioPage() {
     fetchInitialData();
   }, []);
 
-  // Filter stations based on search criteria
+  // On-demand fetching when filters change to ensure we have data for the selection
   useEffect(() => {
+    if (selectedCountry === "all" && selectedLanguage === "all" && selectedTag === "all") return;
+
+    const fetchFilteredData = async () => {
+      try {
+        let url = "https://de1.api.radio-browser.info/json/stations/search?limit=500&has_geo_info=true&hidebroken=true&order=clickcount&reverse=true";
+        
+        if (selectedCountry !== "all") {
+          // Send both name and try to remove "The" prefix for API search
+          const cleanCountry = selectedCountry.toLowerCase().startsWith("the ") ? selectedCountry.slice(4) : selectedCountry;
+          url += `&country=${encodeURIComponent(cleanCountry)}`;
+        }
+        
+        if (selectedLanguage !== "all") url += `&language=${encodeURIComponent(selectedLanguage)}`;
+        if (selectedTag !== "all") url += `&tag=${encodeURIComponent(selectedTag)}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        const validNewStations = data.filter(
+          station => station.geo_lat && station.geo_long && 
+          station.geo_lat !== 0 && station.geo_long !== 0 &&
+          station.lastcheckok === 1
+        );
+
+        if (validNewStations.length > 0) {
+          setStations(prev => {
+            const existingIds = new Set(prev.map(s => s.stationuuid));
+            const uniqueNewStations = validNewStations.filter(s => !existingIds.has(s.stationuuid));
+            if (uniqueNewStations.length === 0) return prev;
+            return [...prev, ...uniqueNewStations];
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching filtered data:", error);
+      }
+    };
+
+    const timeoutId = setTimeout(fetchFilteredData, 300); // Debounce to prevent rapid API calls
+    return () => clearTimeout(timeoutId);
+  }, [selectedCountry, selectedLanguage, selectedTag]);
+
+  // Filter stations based on search criteria
+  const filteredStations = useMemo(() => {
     let filtered = stations;
 
     if (searchTerm) {
+      const term = searchTerm.toLowerCase().trim();
       filtered = filtered.filter(station =>
-        station.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        station.tags.toLowerCase().includes(searchTerm.toLowerCase())
+        (station.name && station.name.toLowerCase().includes(term)) ||
+        (station.tags && station.tags.toLowerCase().includes(term)) ||
+        (station.country && station.country.toLowerCase().includes(term))
       );
     }
 
     if (selectedCountry && selectedCountry !== "all") {
-      filtered = filtered.filter(station =>
-        station.countrycode === selectedCountry
-      );
+      const search = selectedCountry.toLowerCase().trim();
+      // Heuristic: remove "the " prefix for better matching
+      const cleanSearch = search.startsWith("the ") ? search.slice(4) : search;
+      
+      filtered = filtered.filter(station => {
+        const country = (station.country || "").toLowerCase();
+        const code = (station.countrycode || "").toLowerCase();
+        return country === search || 
+               country === cleanSearch || 
+               code === search || 
+               country.includes(cleanSearch) || 
+               cleanSearch.includes(country);
+      });
     }
 
     if (selectedLanguage && selectedLanguage !== "all") {
+      const search = selectedLanguage.toLowerCase().trim();
       filtered = filtered.filter(station =>
-        station.language.toLowerCase().includes(selectedLanguage.toLowerCase())
+        station.language && station.language.toLowerCase().includes(search)
       );
     }
 
     if (selectedTag && selectedTag !== "all") {
+      const search = selectedTag.toLowerCase().trim();
       filtered = filtered.filter(station =>
-        station.tags.toLowerCase().includes(selectedTag.toLowerCase())
+        station.tags && station.tags.toLowerCase().includes(search)
       );
     }
 
-    setFilteredStations(filtered);
+    return filtered;
   }, [searchTerm, selectedCountry, selectedLanguage, selectedTag, stations]);
 
-  const handleStationPlay = async (station) => {
+  const handleStationPlay = useCallback(async (station) => {
     try {
       // Click counter for the station and get the proper stream URL
       const clickResponse = await fetch(
@@ -229,25 +292,31 @@ export default function RadioPage() {
       // Use the URL from the click response or fallback to station URL
       const streamUrl = clickData.url || station.url_resolved || station.url;
       
-      // Convert radio station to music player format
-      const radioSong = {
-        id: station.stationuuid,
-        name: decodeHtmlEntities(station.name),
-        artists: { primary: [{ name: station.country || "Radio Station" }] },
-        album: { name: station.tags || "Live Radio" },
-        duration: 0, // Live stream
-        image: station.favicon ? [{ url: station.favicon, quality: "150x150" }] : [],
+      // Helper to map station to player format
+      const mapStationToSong = (s, resolvedUrl = null) => ({
+        id: s.stationuuid,
+        name: decodeHtmlEntities(s.name),
+        artists: { primary: [{ name: s.country || "Radio Station" }] },
+        album: { name: s.tags || "Live Radio" },
+        duration: 0,
+        image: s.favicon ? [{ url: s.favicon, quality: "150x150" }] : [],
         downloadUrl: [
-          { url: streamUrl, quality: "320kbps" },
-          { url: streamUrl, quality: "stream" },
-          { url: streamUrl, quality: "160kbps" },
-          { url: streamUrl, quality: "128kbps" },
-          { url: streamUrl, quality: "96kbps" }
+          { url: resolvedUrl || s.url_resolved || s.url, quality: "320kbps" },
+          { url: resolvedUrl || s.url_resolved || s.url, quality: "stream" }
         ],
         isRadio: true,
-      };
+      });
 
-      playSong(radioSong, [radioSong]);
+      const radioSong = mapStationToSong(station, streamUrl);
+      
+      // Map all filtered stations to create a playable queue
+      // Including all ensures the next/previous buttons are always active
+      const queue = filteredStations.map(s => 
+        s.stationuuid === station.stationuuid ? radioSong : mapStationToSong(s)
+      );
+
+      // Pass a unique context ID for the radio session
+      playSong(radioSong, queue, "radio-global");
       setCurrentStation(station);
       
       console.log("Playing radio station:", station.name, "URL:", streamUrl);
@@ -267,7 +336,7 @@ export default function RadioPage() {
         }, 300);
       }, 3000);
     }
-  };
+  }, [playSong, filteredStations]);
 
   const clearFilters = () => {
     setSearchTerm("");
@@ -401,7 +470,7 @@ export default function RadioPage() {
                       <SelectItem value="all">All countries</SelectItem>
                       {countries.map((country) => (
                         <SelectItem key={country.name} value={country.name}>
-                          {country.name} ({country.stationcount})
+                          {country.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -418,7 +487,7 @@ export default function RadioPage() {
                       <SelectItem value="all">All languages</SelectItem>
                       {languages.map((language) => (
                         <SelectItem key={language.name} value={language.name}>
-                          {language.name} ({language.stationcount})
+                          {language.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -435,7 +504,7 @@ export default function RadioPage() {
                       <SelectItem value="all">All genres</SelectItem>
                       {tags.map((tag) => (
                         <SelectItem key={tag.name} value={tag.name}>
-                          {tag.name} ({tag.stationcount})
+                          {tag.name}
                         </SelectItem>
                       ))}
                     </SelectContent>

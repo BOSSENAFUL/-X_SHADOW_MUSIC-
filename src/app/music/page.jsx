@@ -21,7 +21,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Heart, Search, MessageSquare } from "lucide-react";
+import { Heart, Search, MessageSquare, Radio } from "lucide-react";
 
 import { PlaylistSection } from "@/components/music/playlist-section";
 import { PWAInstallBanner } from "@/components/music/pwa-install-banner";
@@ -346,11 +346,11 @@ export default function MusicPage() {
           englishTop: englishTop.success ? englishTop.data.results : [],
           community: communityRes.success ? communityRes.data : [],
           // Genre — only populated for international
-          party:  partyRes?.success  ? partyRes.data.results  : [],
+          party: partyRes?.success ? partyRes.data.results : [],
           hipHop: hipHopRes?.success ? hipHopRes.data.results : [],
-          dance:  danceRes?.success  ? danceRes.data.results  : [],
-          rock:   rockRes?.success   ? rockRes.data.results   : [],
-          metal:  metalRes?.success  ? metalRes.data.results  : [],
+          dance: danceRes?.success ? danceRes.data.results : [],
+          rock: rockRes?.success ? rockRes.data.results : [],
+          metal: metalRes?.success ? metalRes.data.results : [],
         };
 
         setNewReleases(homeData.newReleases);
@@ -751,6 +751,17 @@ export default function MusicPage() {
                   </span>
                 </Button>
               </div>
+
+              {/* Mobile Radio Button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => router.push("/music/radio")}
+                className="h-9 w-9 rounded-full bg-muted/30 hover:bg-muted/50 border border-muted-foreground/20 hover:border-muted-foreground/30 flex items-center justify-center shrink-0 md:hidden relative"
+                title="Radio Stations"
+              >
+                <Radio className="w-4 h-4 text-muted-foreground" />
+              </Button>
 
               {/* Mobile Community Button */}
               <Button

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,8 @@ const createCustomIcon = (isActive = false) => {
     popupAnchor: [0, -32],
   });
 };
+
+const EMPTY_ARRAY = [];
 
 // Component to handle theme-based tile layer switching
 function ThemeHandler() {
@@ -113,36 +115,61 @@ function MapBounds() {
 function StationMarkers({ stations, onStationClick, currentStation }) {
   const map = useMap();
   const [visibleStations, setVisibleStations] = useState([]);
+  const lastUpdateRef = useRef(0);
+  const stationsRef = useRef(stations);
+
+  // Pre-create icons to avoid overhead
+  const defaultIcon = useMemo(() => createCustomIcon(false), []);
+  const activeIcon = useMemo(() => createCustomIcon(true), []);
 
   useEffect(() => {
-    const updateVisibleStations = () => {
-      const bounds = map.getBounds();
-      const zoom = map.getZoom();
-      
-      // Limit number of stations based on zoom level
-      let maxStations = zoom > 10 ? 200 : zoom > 6 ? 100 : 50;
-      
-      const filtered = stations
-        .filter(station => {
-          const lat = parseFloat(station.geo_lat);
-          const lng = parseFloat(station.geo_long);
-          return bounds.contains([lat, lng]);
-        })
-        .slice(0, maxStations);
-      
-      setVisibleStations(filtered);
-    };
+    stationsRef.current = stations;
+  }, [stations]);
 
+  const updateVisibleStations = useCallback(() => {
+    if (!map) return;
+    
+    // Throttle updates to prevent loop and performance issues
+    const now = Date.now();
+    if (now - lastUpdateRef.current < 50) return;
+    lastUpdateRef.current = now;
+
+    const bounds = map.getBounds();
+    const zoom = map.getZoom();
+    
+    // Limit number of stations based on zoom level
+    let maxStations = zoom > 10 ? 300 : zoom > 6 ? 150 : 80;
+    
+    const currentStations = stationsRef.current || [];
+    const filtered = currentStations
+      .filter(station => {
+        const lat = parseFloat(station.geo_lat);
+        const lng = parseFloat(station.geo_long);
+        return !isNaN(lat) && !isNaN(lng) && bounds.contains([lat, lng]);
+      })
+      .slice(0, maxStations);
+    
+    // Only update if the count or IDs have changed (basic check)
+    setVisibleStations(prev => {
+      if (prev.length !== filtered.length) return filtered;
+      const isIdentical = prev.every((s, i) => s.stationuuid === filtered[i].stationuuid);
+      return isIdentical ? prev : filtered;
+    });
+  }, [map]);
+
+  useEffect(() => {
+    if (!map) return;
+
+    // Initial update
     updateVisibleStations();
     
-    map.on('moveend', updateVisibleStations);
-    map.on('zoomend', updateVisibleStations);
+    // Events
+    map.on('moveend zoomend resize', updateVisibleStations);
 
     return () => {
-      map.off('moveend', updateVisibleStations);
-      map.off('zoomend', updateVisibleStations);
+      map.off('moveend zoomend resize', updateVisibleStations);
     };
-  }, [map, stations]);
+  }, [map, updateVisibleStations, stations]);
 
   return (
     <>
@@ -153,14 +180,14 @@ function StationMarkers({ stations, onStationClick, currentStation }) {
 
         if (isNaN(lat) || isNaN(lng)) return null;
 
-        const customIcon = createCustomIcon(isActive);
-        if (!customIcon) return null;
+        const icon = isActive ? activeIcon : defaultIcon;
+        if (!icon) return null;
 
         return (
           <Marker
             key={station.stationuuid}
             position={[lat, lng]}
-            icon={customIcon}
+            icon={icon}
           >
             <Popup className="radio-popup" maxWidth={320}>
               <Card className="w-full">
@@ -171,14 +198,14 @@ function StationMarkers({ stations, onStationClick, currentStation }) {
                         {station.name}
                       </h3>
                       <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <MapPin className="w-4 h-4 flex-shrink-0" />
+                        <MapPin className="w-4 h-4 shrink-0" />
                         <span className="truncate">
                           {station.country}{station.state && `, ${station.state}`}
                         </span>
                       </div>
                     </div>
                     {station.favicon && (
-                      <div className="w-12 h-12 rounded-lg border bg-muted overflow-hidden flex-shrink-0">
+                      <div className="w-12 h-12 rounded-lg border bg-muted overflow-hidden shrink-0">
                         <img
                           src={station.favicon}
                           alt={station.name}
@@ -288,7 +315,7 @@ export default function MapComponent({ stations, onStationClick, currentStation 
         <ThemeHandler />
         <MapBounds />
         <StationMarkers 
-          stations={stations || []} 
+          stations={stations || EMPTY_ARRAY} 
           onStationClick={onStationClick}
           currentStation={currentStation}
         />
