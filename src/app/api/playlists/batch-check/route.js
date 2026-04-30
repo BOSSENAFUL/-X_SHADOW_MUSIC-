@@ -70,6 +70,7 @@ export async function POST(request) {
               description: playlist.description,
               songCount: playlist.songIds?.length || 0,
               songIds: playlist.songIds || [], // Added to support batched enrichment
+              image: playlist.image, // Include image in enrichment
               isPublic: playlist.isPublic,
               isOwner: playlist.userId.toString() === userId
             } : null

@@ -82,6 +82,7 @@ export default function LibraryPage() {
 
   const [createdPlaylists, setCreatedPlaylists] = useState([])
   const [loadingCreated, setLoadingCreated] = useState(true)
+  const scrollTimeoutRef = useRef(null)
 
   // Memoized cache for session to avoid refetching on "back" navigation
   useEffect(() => {
@@ -94,12 +95,22 @@ export default function LibraryPage() {
 
     const fetchCreatedPlaylists = async () => {
       // Check if we have data in session storage to avoid refetching on back navigation
-      const cacheKey = `created_playlists_${userId}`
-      const scrollKey = `library_scroll_${userId}`
+      const CACHE_VERSION = 'v3' // bump this to invalidate stale cache
+      const cacheKey = `created_playlists_${userId}_${CACHE_VERSION}`
       const cached = sessionStorage.getItem(cacheKey)
 
+      // Also clear any old versioned cache keys
+      Object.keys(sessionStorage).forEach(k => {
+        if (k.startsWith(`created_playlists_${userId}`) && k !== cacheKey) {
+          sessionStorage.removeItem(k)
+        }
+      })
+
       if (cached) {
-        setCreatedPlaylists(JSON.parse(cached))
+        const parsed = JSON.parse(cached)
+        // Validate cache integrity — filter out any null/undefined entries from old bug
+        const valid = parsed.filter(Boolean)
+        setCreatedPlaylists(valid)
         setLoadingCreated(false)
         return
       }
@@ -136,10 +147,13 @@ export default function LibraryPage() {
           }
 
           const playlistsWithCovers = data.data.map((playlist) => {
-            // Priority 1: Explicitly stored image (e.g. from Spotify import)
+            const sc = playlist.songIds?.length || 0
+            
+            // Priority 1: Explicitly stored image
             if (playlist.image) {
               return {
                 ...playlist,
+                songCount: sc,
                 isCollage: false
               }
             }
@@ -160,11 +174,19 @@ export default function LibraryPage() {
               if (validImages.length > 0) {
                 return {
                   ...playlist,
+                  songCount: sc,
                   collageImages: validImages,
                   isCollage: validImages.length >= 4,
-                  image: validImages.length < 4 ? validImages[0] : null
+                  image: validImages[0] // Set primary image fallback to first song
                 }
               }
+            }
+
+            // Priority 3: No image available
+            return {
+              ...playlist,
+              songCount: sc,
+              isCollage: false
             }
           })
 
@@ -172,10 +194,17 @@ export default function LibraryPage() {
             setCreatedPlaylists(playlistsWithCovers)
 
             // OPTIMIZATION: Store slim version of data to save session quota
-            const litePlaylists = playlistsWithCovers.map(p => ({
-              ...p,
-              songs: p.songs?.map(s => ({ id: s.id, image: s.image }))
-            }))
+            const litePlaylists = playlistsWithCovers.map(p => {
+              const { songIds, ...rest } = p;
+              return {
+                ...rest,
+                // Keep only necessary data for grid view
+                songCount: p.songCount, 
+                isCollage: p.isCollage,
+                collageImages: p.collageImages,
+                image: p.image
+              };
+            })
 
             try {
               sessionStorage.setItem(cacheKey, JSON.stringify(litePlaylists))
@@ -224,10 +253,12 @@ export default function LibraryPage() {
     // 2. Playlists (Created & Liked)
     if (activeTab === "All" || activeTab === "Playlists") {
       createdPlaylists.forEach((playlist) => {
+        if (!playlist) return // skip undefined entries
+        const count = playlist.songCount ?? playlist.songIds?.length ?? 0
         items.push({
           id: playlist._id || playlist.playlistId,
           title: playlist.name || playlist.playlistName || "Unknown Playlist",
-          subtitle: `${playlist.songIds?.length || 0} songs`,
+          subtitle: `${count} ${count === 1 ? 'song' : 'songs'}`,
           image: playlist.image,
           collageImages: playlist.collageImages,
           isCollage: playlist.isCollage,
@@ -237,12 +268,14 @@ export default function LibraryPage() {
       })
 
       likedPlaylists?.forEach((playlist) => {
-        if (createdPlaylists.some(cp => cp._id === playlist.playlistId)) return
+        if (createdPlaylists.some(cp => cp?._id === playlist.playlistId)) return
         const playlistUrl = playlist.isUserPlaylist ? `/music/playlists/${playlist.playlistId}` : `/music/playlist/${playlist.playlistId}`
+        // User playlists use enriched songCount; JioSaavn playlists use stored songCount
+        const count = playlist.songCount ?? playlist.songIds?.length ?? 0
         items.push({
           id: playlist.playlistId,
           title: playlist.playlistName || playlist.name || playlist.title || "Unknown Playlist",
-          subtitle: `${playlist.songIds?.length || 0} songs`,
+          subtitle: `${count} ${count === 1 ? 'song' : 'songs'}`,
           image: playlist.image,
           collageImages: playlist.collageImages,
           isCollage: playlist.isCollage,
@@ -310,6 +343,13 @@ export default function LibraryPage() {
     } else if (!isAnyLoading && filteredItems.length === 0) {
       setScrollRestored(true)
     }
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current)
+      }
+    }
   }, [isAnyLoading, filteredItems.length, scrollRestored, userId])
 
   const toggleTab = useCallback((tab) => {
@@ -332,9 +372,16 @@ export default function LibraryPage() {
       <SidebarInset
         className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col"
         onScroll={(e) => {
-          if (userId && !isAnyLoading && scrollRestored) {
-            const scrollKey = `library_scroll_${userId}`
-            sessionStorage.setItem(scrollKey, e.currentTarget.scrollTop.toString())
+          if (userId && !isAnyLoading && scrollRestored && e.currentTarget) {
+            const scrollPosition = e.currentTarget.scrollTop
+            // Throttle scroll position saving to improve performance
+            if (scrollTimeoutRef.current) {
+              clearTimeout(scrollTimeoutRef.current)
+            }
+            scrollTimeoutRef.current = setTimeout(() => {
+              const scrollKey = `library_scroll_${userId}`
+              sessionStorage.setItem(scrollKey, scrollPosition.toString())
+            }, 150)
           }
         }}
         ref={scrollContainerRef}
@@ -408,14 +455,14 @@ export default function LibraryPage() {
                       item.type === "artist" ? "rounded-full" : "rounded-md"
                     )}>
                       {item.isLikedSongs ? (
-                        <div className="w-full h-full bg-linear-to-br from-indigo-700 to-indigo-300 flex items-center justify-center">
+                        <div className="w-full h-full bg-gradient-to-br from-indigo-700 to-indigo-300 flex items-center justify-center">
                           <Heart className="w-1/3 h-1/3 text-white fill-current" />
                         </div>
-                      ) : item.isCollage ? (
+                      ) : (item.isCollage && item.collageImages?.length >= 4) ? (
                         <PlaylistCollage images={item.collageImages} />
-                      ) : getImageSrc(item.image) ? (
+                      ) : (getImageSrc(item.image) || (item.collageImages && item.collageImages[0])) ? (
                         <img
-                          src={getImageSrc(item.image)}
+                          src={getImageSrc(item.image) || item.collageImages[0]}
                           alt={item.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           loading="lazy"
