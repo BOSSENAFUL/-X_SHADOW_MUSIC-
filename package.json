@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "create-indexes": "node scripts/create-search-indexes.js  # Run once after setup or DB migration"
   },
   "dependencies": {
     "@auth/mongodb-adapter": "^3.11.1",

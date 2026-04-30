@@ -1,7 +1,37 @@
 import { NextResponse } from 'next/server';
 import { compareTwoStrings } from 'string-similarity';
 import { distance as levenshteinDistance } from 'fastest-levenshtein';
-import natural from 'natural';
+
+// Simple in-memory cache with TTL
+const lyricsCache = new Map();
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const MAX_CACHE_SIZE = 200;
+
+function getCacheKey(query) {
+  return `lyrics:${query.toLowerCase().trim()}`;
+}
+
+function getFromCache(key) {
+  const cached = lyricsCache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+  if (cached) {
+    lyricsCache.delete(key);
+  }
+  return null;
+}
+
+function setCache(key, data) {
+  if (lyricsCache.size >= MAX_CACHE_SIZE) {
+    const firstKey = lyricsCache.keys().next().value;
+    lyricsCache.delete(firstKey);
+  }
+  lyricsCache.set(key, {
+    data,
+    timestamp: Date.now()
+  });
+}
 
 export async function GET(request) {
   try {
@@ -15,20 +45,46 @@ export async function GET(request) {
       }, { status: 400 });
     }
 
-    // Generate spell-corrected search queries
-    const searchQueries = generateSpellCorrectedQueries(query);
+    // Trim and validate
+    const trimmedQuery = query.trim();
+    if (trimmedQuery.length < 3) {
+      return NextResponse.json({
+        success: true,
+        data: []
+      });
+    }
 
-    // Search Genius API with multiple spell-corrected variations
+    // Check cache first
+    const cacheKey = getCacheKey(trimmedQuery);
+    const cachedResult = getFromCache(cacheKey);
+    if (cachedResult) {
+      return NextResponse.json({
+        success: true,
+        data: cachedResult,
+        cached: true
+      });
+    }
+
+    // OPTIMIZATION 1: Reduce spell-corrected queries from 8 to 3
+    const searchQueries = generateSpellCorrectedQueries(trimmedQuery).slice(0, 3);
+
+    // OPTIMIZATION 2: Search Genius with timeout and limit results
     const geniusPromises = searchQueries.map(async (searchQuery) => {
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1000); // Reduced to 1s timeout
+
         const response = await fetch(
-          `https://api.genius.com/search?q=${encodeURIComponent(searchQuery)}`,
+          `https://api.genius.com/search?q=${encodeURIComponent(searchQuery)}&per_page=3`, // Reduced to 3 results
           {
             headers: {
               'Authorization': `Bearer ${process.env.GENIUS_CLIENT_ACCESS_TOKEN}`,
             },
+            signal: controller.signal
           }
         );
+
+        clearTimeout(timeoutId);
 
         if (response.ok) {
           const data = await response.json();
@@ -42,11 +98,11 @@ export async function GET(request) {
 
     const geniusResults = await Promise.allSettled(geniusPromises);
 
-    // Combine and prioritize results from all search queries
+    // Combine and prioritize results
     const allHits = [];
     const seenIds = new Set();
 
-    // First, add results from original query (highest priority)
+    // First, add results from original query
     for (const result of geniusResults) {
       if (result.status === 'fulfilled' && result.value?.data?.response?.hits && result.value.isOriginal) {
         for (const hit of result.value.data.response.hits) {
@@ -71,26 +127,24 @@ export async function GET(request) {
     }
 
     if (!allHits.length) {
+      setCache(cacheKey, []);
       return NextResponse.json({
         success: true,
         data: []
       });
     }
 
-    // Process Genius results and search JioSaavn for each song
-    const lyricsResults = [];
-
-    // Sort hits by priority (original query results first) and limit to top 10
+    // OPTIMIZATION 3: Limit to top 3 hits instead of 5 (further reduction)
     allHits.sort((a, b) => a.priority - b.priority);
-    const topHits = allHits.slice(0, 10);
+    const topHits = allHits.slice(0, 3);
 
-    // Process all Genius hits in parallel for maximum speed
+    // OPTIMIZATION 4: Process in parallel with aggressive timeout
     const jiosaavnPromises = topHits.map(async (hit, i) => {
       const song = hit.result;
       let title = song.title;
       let artist = song.primary_artist?.name || song.artist_names;
 
-      // Special handling for romanized songs where the actual artist is in the title
+      // Special handling for romanized songs
       if (artist === 'Genius Romanizations' && title.includes(' - ')) {
         const titleParts = title.split(' - ');
         if (titleParts.length >= 2) {
@@ -99,38 +153,22 @@ export async function GET(request) {
         }
       }
 
-      // Enhanced search variations with fuzzy matching support
+      // OPTIMIZATION 5: Reduce search variations from 5 to 2
       const cleanTitle = title.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').trim();
-      const firstArtistName = artist.split(' ')[0];
-
-      // Generate multiple search variations including fuzzy-friendly ones
-      const baseVariations = [
-        `${cleanTitle} ${artist}`, // Most likely match
-        cleanTitle, // Title only (often works for popular songs)
-        `${artist} ${cleanTitle}`, // Artist first (backup)
-        `${firstArtistName} ${cleanTitle}`, // First name + title
-        cleanTitle.split(' ').slice(0, 3).join(' '), // First 3 words of title
+      const searchVariations = [
+        `${cleanTitle} ${artist}`,
+        cleanTitle
       ];
-
-      // Add fuzzy variations for the original query if it looks like lyrics
-      if (query && query.length > 10) {
-        const queryVariations = createFuzzySearchVariations(query);
-        baseVariations.push(...queryVariations.slice(0, 2)); // Add top 2 query variations
-      }
-
-      const searchVariations = [...new Set(baseVariations)]
-        .filter(variation => variation.trim().length > 2)
-        .slice(0, 5); // Limit to 5 variations for performance
 
       let bestJiosaavnMatch = null;
       let bestMatchScore = 0;
       let bestSearchQuery = '';
 
-      // Ultra-optimized parallel search with aggressive timeout
+      // OPTIMIZATION 6: Ultra-aggressive timeout (800ms instead of 1s)
       const searchPromises = searchVariations.map(async (searchQuery) => {
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 2000); // More aggressive timeout
+          const timeoutId = setTimeout(() => controller.abort(), 800); // 800ms timeout
 
           const jiosaavnResponse = await fetch(
             `${process.env.NEXT_PUBLIC_API_URL}/api/search?query=${encodeURIComponent(searchQuery)}`,
@@ -138,7 +176,6 @@ export async function GET(request) {
               signal: controller.signal,
               headers: {
                 'Accept': 'application/json',
-                'Cache-Control': 'max-age=300' // 5 minute cache hint
               }
             }
           );
@@ -156,33 +193,28 @@ export async function GET(request) {
 
       const results = await Promise.allSettled(searchPromises);
 
-      // Early exit optimization - stop when we find a high-quality match
+      // OPTIMIZATION 7: Check only top 1 result for speed
       for (const result of results) {
         if (result.status === 'fulfilled' && result.value) {
           const { searchQuery, data } = result.value;
           if (data?.success && data.data.songs?.results?.length > 0) {
-            // Check only top 2 results for speed
-            for (const jiosaavnSong of data.data.songs.results.slice(0, 2)) {
-              const matchScore = calculateMatchScore(title, artist, jiosaavnSong, query);
-              if (matchScore > bestMatchScore) {
-                bestJiosaavnMatch = jiosaavnSong;
-                bestMatchScore = matchScore;
-                bestSearchQuery = searchQuery;
+            const jiosaavnSong = data.data.songs.results[0]; // Only check first result
+            const matchScore = calculateMatchScore(title, artist, jiosaavnSong);
+            if (matchScore > bestMatchScore) {
+              bestJiosaavnMatch = jiosaavnSong;
+              bestMatchScore = matchScore;
+              bestSearchQuery = searchQuery;
 
-                // Early exit for very high scores
-                if (matchScore > 120) break;
-              }
+              // Early exit for very high scores
+              if (matchScore > 100) break;
             }
-            // Early exit if we found a very good match
-            if (bestMatchScore > 120) break;
           }
         }
       }
 
       // Calculate Genius ranking bonus
-      const geniusRankBonus = Math.max(0, 200 - (i * 20));
-      const topResultBonus = i < 3 ? (50 - (i * 15)) : 0;
-      const finalScore = bestMatchScore + geniusRankBonus + topResultBonus;
+      const geniusRankBonus = Math.max(0, 100 - (i * 20));
+      const finalScore = bestMatchScore + geniusRankBonus;
 
       return {
         genius: {
@@ -202,17 +234,18 @@ export async function GET(request) {
       };
     });
 
-    // Wait for all parallel processing to complete
+    // Wait for all parallel processing
     const allResults = await Promise.allSettled(jiosaavnPromises);
 
-    // Filter successful results and add to lyricsResults
+    // Filter successful results
+    const lyricsResults = [];
     for (const result of allResults) {
       if (result.status === 'fulfilled' && result.value) {
         lyricsResults.push(result.value);
       }
     }
 
-    // Enhanced sorting with early termination
+    // Sort by final score
     lyricsResults.sort((a, b) => {
       if (a.jiosaavn && !b.jiosaavn) return -1;
       if (!a.jiosaavn && b.jiosaavn) return 1;
@@ -220,12 +253,17 @@ export async function GET(request) {
       return a.geniusRank - b.geniusRank;
     });
 
+    // Cache the result
+    setCache(cacheKey, lyricsResults);
+
     return NextResponse.json({
       success: true,
-      data: lyricsResults
+      data: lyricsResults,
+      cached: false
     });
 
   } catch (error) {
+    console.error('Lyrics search error:', error);
     return NextResponse.json({
       success: false,
       error: 'Failed to search lyrics'
@@ -233,102 +271,26 @@ export async function GET(request) {
   }
 }
 
-// Spell correction and query generation utilities
+// OPTIMIZATION 8: Simplified spell correction (removed heavy natural.js processing)
 function generateSpellCorrectedQueries(query) {
   const queries = [query]; // Always include original query first
 
-  // Common misspelling patterns and corrections
+  // Common misspelling patterns (reduced set)
   const spellCorrections = {
-    // Common typos
-    'straing': 'staring',
-    'staring': 'staring', // Keep correct spelling
-    'imagin': 'imagine',
-    'imagining': 'imagine',
-    'imagin': 'imagine',
-    'recieve': 'receive',
-    'seperate': 'separate',
-    'definately': 'definitely',
-    'occured': 'occurred',
-    'begining': 'beginning',
-    'untill': 'until',
-    'thier': 'their',
-    'freind': 'friend',
-    'wierd': 'weird',
-    'beleive': 'believe',
-    'acheive': 'achieve',
-    'neccessary': 'necessary',
-    'embarass': 'embarrass',
-    'accomodate': 'accommodate',
-    'recomend': 'recommend',
-    'existance': 'existence',
-    'independant': 'independent',
-    'maintainance': 'maintenance',
-    'occassion': 'occasion',
-    'proffesional': 'professional',
-    'reccomend': 'recommend',
-    'succesful': 'successful',
-    'tommorrow': 'tomorrow',
-    'unfortunatly': 'unfortunately',
-    'usefull': 'useful',
-    'wonderfull': 'wonderful',
-
-    // Music-specific corrections and contractions
     'dont': "don't",
     'doesnt': "doesn't",
     'cant': "can't",
     'wont': "won't",
     'isnt': "isn't",
     'wasnt': "wasn't",
-    'werent': "weren't",
-    'arent': "aren't",
-    'hasnt': "hasn't",
-    'havent': "haven't",
-    'hadnt': "hadn't",
-    'shouldnt': "shouldn't",
-    'couldnt': "couldn't",
-    'wouldnt': "wouldn't",
-    'mustnt': "mustn't",
-    'neednt': "needn't",
     'youre': "you're",
     'theyre': "they're",
-    'were': "we're",
     'its': "it's",
-    'lets': "let's",
-    'thats': "that's",
-    'whats': "what's",
-    'heres': "here's",
-    'theres': "there's",
-    'wheres': "where's",
-    'whos': "who's",
-    'hows': "how's",
-    'whens': "when's",
-    'whys': "why's",
-
-    // Common informal contractions and word corrections
     'kinda': 'kind of',
     'gonna': 'going to',
     'wanna': 'want to',
     'gotta': 'got to',
-    'sorta': 'sort of',
-    'outta': 'out of',
-    'lotta': 'lot of',
     'alot': 'a lot',
-    'alright': 'all right',
-    'anyways': 'anyway',
-    'everytime': 'every time',
-    'eachother': 'each other',
-    'incase': 'in case',
-    'aswell': 'as well',
-    'atleast': 'at least',
-    'probly': 'probably',
-
-    // Common pattern fixes for your specific case
-    'kind a': 'kind of',
-    'sort a': 'sort of',
-    'lot a': 'lot of',
-    'out a': 'out of',
-    'type a': 'type of',
-    'piece a': 'piece of'
   };
 
   // Apply direct spell corrections
@@ -336,87 +298,18 @@ function generateSpellCorrectedQueries(query) {
   for (const [wrong, correct] of Object.entries(spellCorrections)) {
     if (correctedQuery.includes(wrong)) {
       const newQuery = correctedQuery.replace(new RegExp(wrong, 'g'), correct);
-      if (newQuery !== correctedQuery) {
+      if (newQuery !== correctedQuery && !queries.includes(newQuery)) {
         queries.push(newQuery);
       }
     }
   }
 
-  // Advanced spell correction using edit distance for individual words
-  const words = query.toLowerCase().split(' ');
-  const correctedWords = words.map(word => {
-    // Skip very short words
-    if (word.length <= 2) return word;
-
-    // Check if word needs correction using common English words
-    const commonWords = [
-      'staring', 'looking', 'watching', 'seeing', 'gazing',
-      'imagine', 'thinking', 'dreaming', 'believing', 'hoping',
-      'bottom', 'top', 'middle', 'center', 'edge',
-      'glass', 'cup', 'bottle', 'window', 'mirror',
-      'love', 'heart', 'soul', 'mind', 'life',
-      'never', 'always', 'sometimes', 'maybe', 'perhaps',
-      'beautiful', 'wonderful', 'amazing', 'incredible', 'perfect',
-      'remember', 'forget', 'recall', 'remind', 'memory',
-      'together', 'forever', 'alone', 'apart', 'close',
-      'feeling', 'emotion', 'passion', 'desire', 'longing'
-    ];
-
-    let bestMatch = word;
-    let bestDistance = Infinity;
-
-    for (const commonWord of commonWords) {
-      const distance = levenshteinDistance(word, commonWord);
-      // Only suggest if the distance is reasonable (1-2 characters different)
-      if (distance > 0 && distance <= 2 && distance < bestDistance) {
-        // Additional check: words should have similar length
-        if (Math.abs(word.length - commonWord.length) <= 1) {
-          bestDistance = distance;
-          bestMatch = commonWord;
-        }
-      }
-    }
-
-    return bestMatch;
-  });
-
-  // Add spell-corrected version if different
-  const spellCorrectedQuery = correctedWords.join(' ');
-  if (spellCorrectedQuery !== query.toLowerCase() && !queries.includes(spellCorrectedQuery)) {
-    queries.push(spellCorrectedQuery);
-  }
-
-  // Generate phonetic variations using Metaphone
-  try {
-    const metaphone = natural.Metaphone;
-    const phoneticWords = words.map(word => {
-      if (word.length > 3) {
-        // Generate phonetically similar words
-        const phoneticCode = metaphone.process(word);
-        // This is a simplified approach - in a real system you'd have a phonetic dictionary
-        return word;
-      }
-      return word;
-    });
-
-    const phoneticQuery = phoneticWords.join(' ');
-    if (phoneticQuery !== query.toLowerCase() && !queries.includes(phoneticQuery)) {
-      queries.push(phoneticQuery);
-    }
-  } catch (error) {
-    // Fallback if natural processing fails
-  }
-
   // Add partial queries for long lyrics searches
   if (query.length > 15) {
-    const queryWords = words.filter(w => w.length > 2);
-    if (queryWords.length > 3) {
-      // First half of words
-      queries.push(queryWords.slice(0, Math.ceil(queryWords.length / 2)).join(' '));
-      // Last half of words
-      queries.push(queryWords.slice(-Math.ceil(queryWords.length / 2)).join(' '));
+    const words = query.split(' ').filter(w => w.length > 2);
+    if (words.length > 3) {
       // Key words (longer words that are likely important)
-      const keyWords = queryWords.filter(w => w.length > 4).slice(0, 3);
+      const keyWords = words.filter(w => w.length > 4).slice(0, 3);
       if (keyWords.length > 0) {
         queries.push(keyWords.join(' '));
       }
@@ -426,10 +319,10 @@ function generateSpellCorrectedQueries(query) {
   // Remove duplicates and filter out very short queries
   return [...new Set(queries)]
     .filter(q => q && q.trim().length > 2)
-    .slice(0, 8); // Limit to 8 queries for performance
+    .slice(0, 3); // Limit to 3 queries for performance
 }
 
-// Advanced fuzzy matching utilities
+// OPTIMIZATION 9: Simplified matching algorithm
 function normalizeString(str) {
   return str.toLowerCase()
     .replace(/[^\w\s]/g, ' ')
@@ -441,63 +334,10 @@ function cleanTitle(str) {
   return str.replace(/\(.*?\)/g, '')
     .replace(/\[.*?\]/g, '')
     .replace(/\bfeat\.?\b|\bft\.?\b|\bfeaturing\b/gi, '')
-    .replace(/\bremix\b|\bversion\b|\bremastered\b/gi, '')
     .trim();
 }
 
-function getFuzzyScore(str1, str2, threshold = 0.6) {
-  // Use multiple similarity algorithms for robust matching
-  const similarity = compareTwoStrings(str1, str2);
-  const levenshtein = 1 - (levenshteinDistance(str1, str2) / Math.max(str1.length, str2.length));
-
-  // Weighted average of different similarity measures
-  const combinedScore = (similarity * 0.7) + (levenshtein * 0.3);
-
-  return combinedScore >= threshold ? combinedScore : 0;
-}
-
-function fuzzyWordMatch(words1, words2, threshold = 0.7) {
-  let matchCount = 0;
-  let totalScore = 0;
-
-  for (const word1 of words1) {
-    let bestMatch = 0;
-    for (const word2 of words2) {
-      const score = getFuzzyScore(word1, word2, 0.5);
-      if (score > bestMatch) {
-        bestMatch = score;
-      }
-    }
-    if (bestMatch >= threshold) {
-      matchCount++;
-      totalScore += bestMatch;
-    }
-  }
-
-  return {
-    matchCount,
-    averageScore: matchCount > 0 ? totalScore / matchCount : 0,
-    ratio: words1.length > 0 ? matchCount / words1.length : 0
-  };
-}
-
-function createFuzzySearchVariations(query) {
-  const normalized = normalizeString(query);
-  const words = normalized.split(' ').filter(w => w.length > 1);
-
-  const variations = [
-    normalized,
-    words.join(' '),
-    words.reverse().join(' '), // Reverse word order
-    words.slice(0, Math.ceil(words.length / 2)).join(' '), // First half of words
-    words.slice(-Math.ceil(words.length / 2)).join(' ') // Last half of words
-  ];
-
-  return [...new Set(variations)].filter(v => v.length > 2);
-}
-
-// Helper function to calculate match score between Genius and JioSaavn results with fuzzy matching
-function calculateMatchScore(geniusTitle, geniusArtist, jiosaavnSong, originalQuery) {
+function calculateMatchScore(geniusTitle, geniusArtist, jiosaavnSong) {
   if (!jiosaavnSong) return 0;
 
   const jiosaavnTitle = jiosaavnSong.title || jiosaavnSong.name || '';
@@ -510,143 +350,39 @@ function calculateMatchScore(geniusTitle, geniusArtist, jiosaavnSong, originalQu
   const normalizedGeniusArtist = normalizeString(geniusArtist);
   const normalizedJiosaavnArtist = normalizeString(jiosaavnArtist);
 
-  // 1. EXACT TITLE MATCHING (Highest Priority)
+  // 1. EXACT TITLE MATCHING
   if (normalizedGeniusTitle === normalizedJiosaavnTitle) {
     score += 80;
   } else {
     // 2. FUZZY TITLE MATCHING
-    const titleSimilarity = getFuzzyScore(normalizedGeniusTitle, normalizedJiosaavnTitle, 0.4);
-    if (titleSimilarity > 0) {
-      score += Math.floor(titleSimilarity * 70); // Up to 70 points for fuzzy title match
+    const titleSimilarity = compareTwoStrings(normalizedGeniusTitle, normalizedJiosaavnTitle);
+    if (titleSimilarity > 0.4) {
+      score += Math.floor(titleSimilarity * 70);
     }
 
-    // 3. WORD-LEVEL FUZZY MATCHING
-    const geniusWords = normalizedGeniusTitle.split(' ').filter(w => w.length > 2);
-    const jiosaavnWords = normalizedJiosaavnTitle.split(' ').filter(w => w.length > 2);
-
-    if (geniusWords.length > 0 && jiosaavnWords.length > 0) {
-      const wordMatch = fuzzyWordMatch(geniusWords, jiosaavnWords, 0.6);
-      score += Math.floor(wordMatch.ratio * wordMatch.averageScore * 50); // Up to 50 points
-    }
-
-    // 4. SUBSTRING AND PARTIAL MATCHING
+    // 3. SUBSTRING MATCHING
     if (normalizedJiosaavnTitle.includes(normalizedGeniusTitle) ||
       normalizedGeniusTitle.includes(normalizedJiosaavnTitle)) {
       score += 30;
     }
   }
 
-  // 5. EXACT ARTIST MATCHING
+  // 4. EXACT ARTIST MATCHING
   if (normalizedGeniusArtist === normalizedJiosaavnArtist) {
     score += 50;
   } else {
-    // 6. FUZZY ARTIST MATCHING
-    const artistSimilarity = getFuzzyScore(normalizedGeniusArtist, normalizedJiosaavnArtist, 0.5);
-    if (artistSimilarity > 0) {
-      score += Math.floor(artistSimilarity * 40); // Up to 40 points for fuzzy artist match
+    // 5. FUZZY ARTIST MATCHING
+    const artistSimilarity = compareTwoStrings(normalizedGeniusArtist, normalizedJiosaavnArtist);
+    if (artistSimilarity > 0.5) {
+      score += Math.floor(artistSimilarity * 40);
     }
 
-    // 7. ARTIST WORD-LEVEL MATCHING
-    const geniusArtistWords = normalizedGeniusArtist.split(' ').filter(w => w.length > 1);
-    const jiosaavnArtistWords = normalizedJiosaavnArtist.split(' ').filter(w => w.length > 1);
-
-    if (geniusArtistWords.length > 0 && jiosaavnArtistWords.length > 0) {
-      const artistWordMatch = fuzzyWordMatch(geniusArtistWords, jiosaavnArtistWords, 0.7);
-      score += Math.floor(artistWordMatch.ratio * artistWordMatch.averageScore * 30); // Up to 30 points
-    }
-
-    // 8. ARTIST SUBSTRING MATCHING
+    // 6. ARTIST SUBSTRING MATCHING
     if (normalizedJiosaavnArtist.includes(normalizedGeniusArtist) ||
       normalizedGeniusArtist.includes(normalizedJiosaavnArtist)) {
       score += 20;
     }
   }
 
-  // 9. ORIGINAL QUERY FUZZY MATCHING (for lyrics searches)
-  if (originalQuery) {
-    const normalizedQuery = normalizeString(originalQuery);
-    const queryVariations = createFuzzySearchVariations(normalizedQuery);
-
-    let bestQueryMatch = 0;
-    for (const variation of queryVariations) {
-      // Check against title
-      const titleQuerySimilarity = getFuzzyScore(variation, normalizedJiosaavnTitle, 0.4);
-      if (titleQuerySimilarity > bestQueryMatch) {
-        bestQueryMatch = titleQuerySimilarity;
-      }
-
-      // Check against artist
-      const artistQuerySimilarity = getFuzzyScore(variation, normalizedJiosaavnArtist, 0.4);
-      if (artistQuerySimilarity > bestQueryMatch) {
-        bestQueryMatch = artistQuerySimilarity;
-      }
-
-      // Check for partial matches in combined string
-      const combined = `${normalizedJiosaavnTitle} ${normalizedJiosaavnArtist}`;
-      if (combined.includes(variation) || variation.includes(normalizedJiosaavnTitle.split(' ')[0])) {
-        bestQueryMatch = Math.max(bestQueryMatch, 0.8);
-      }
-    }
-
-    if (bestQueryMatch > 0) {
-      score += Math.floor(bestQueryMatch * 35); // Up to 35 bonus points for query relevance
-    }
-  }
-
-  // 10. PHONETIC AND COMMON MISSPELLING PATTERNS
-  const phoneticPatterns = [
-    { from: 'ph', to: 'f' },
-    { from: 'ck', to: 'k' },
-    { from: 'qu', to: 'kw' },
-    { from: 'x', to: 'ks' },
-    { from: 'z', to: 's' }
-  ];
-
-  let phoneticTitle1 = normalizedGeniusTitle;
-  let phoneticTitle2 = normalizedJiosaavnTitle;
-  let phoneticArtist1 = normalizedGeniusArtist;
-  let phoneticArtist2 = normalizedJiosaavnArtist;
-
-  phoneticPatterns.forEach(pattern => {
-    phoneticTitle1 = phoneticTitle1.replace(new RegExp(pattern.from, 'g'), pattern.to);
-    phoneticTitle2 = phoneticTitle2.replace(new RegExp(pattern.from, 'g'), pattern.to);
-    phoneticArtist1 = phoneticArtist1.replace(new RegExp(pattern.from, 'g'), pattern.to);
-    phoneticArtist2 = phoneticArtist2.replace(new RegExp(pattern.from, 'g'), pattern.to);
-  });
-
-  const phoneticTitleSimilarity = getFuzzyScore(phoneticTitle1, phoneticTitle2, 0.6);
-  const phoneticArtistSimilarity = getFuzzyScore(phoneticArtist1, phoneticArtist2, 0.6);
-
-  if (phoneticTitleSimilarity > 0) {
-    score += Math.floor(phoneticTitleSimilarity * 25);
-  }
-  if (phoneticArtistSimilarity > 0) {
-    score += Math.floor(phoneticArtistSimilarity * 15);
-  }
-
-  // 11. DYNAMIC LYRICS PATTERN MATCHING (instead of hardcoded special cases)
-  if (originalQuery && originalQuery.length > 10) {
-    // This looks like a lyrics search
-    const queryWords = normalizeString(originalQuery).split(' ').filter(w => w.length > 2);
-    const titleWords = normalizedJiosaavnTitle.split(' ').filter(w => w.length > 2);
-    const artistWords = normalizedJiosaavnArtist.split(' ').filter(w => w.length > 2);
-
-    // Check if query words appear in title or artist (potential lyrics match)
-    let lyricsMatchCount = 0;
-    for (const qWord of queryWords) {
-      for (const tWord of [...titleWords, ...artistWords]) {
-        if (getFuzzyScore(qWord, tWord, 0.7) > 0) {
-          lyricsMatchCount++;
-          break;
-        }
-      }
-    }
-
-    if (lyricsMatchCount > 0) {
-      const lyricsMatchRatio = lyricsMatchCount / queryWords.length;
-      score += Math.floor(lyricsMatchRatio * 60); // Up to 60 bonus for potential lyrics match
-    }
-  }
-
-  return Math.min(score, 300); // Cap the score to prevent inflation
+  return Math.min(score, 200); // Cap the score
 }

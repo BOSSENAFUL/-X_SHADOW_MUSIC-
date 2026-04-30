@@ -1152,7 +1152,8 @@ function SearchPageContent() {
   // Combine and rank search results from all sources (Direct, Lyrics, Category-specific)
   const combinedSearchResults = React.useMemo(() => {
     // Return null while fundamental loading is happening or if we have no base results
-    if (loading || lyricsLoading || !searchResults || (!searchResults.topQuery && !searchResults.songs?.results?.length)) {
+    // Keep showing loading until we have actual data to display
+    if (loading || lyricsLoading || publicPlaylistsLoading || !searchResults || (!searchResults.topQuery && !searchResults.songs?.results?.length)) {
       return null;
     }
 
@@ -1679,7 +1680,10 @@ function SearchPageContent() {
           {/* Search Input */}
           <div className="p-4 sm:p-6 pb-4">
             <div className="relative w-full max-w-2xl mx-auto">
-              <Search className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 transition-colors ${loading ? 'text-primary animate-pulse' : 'text-muted-foreground'
+              <Search className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 transition-colors ${
+                (loading || lyricsLoading || publicPlaylistsLoading || (searchQuery.trim() && !combinedSearchResults)) 
+                  ? 'text-primary animate-pulse' 
+                  : 'text-muted-foreground'
                 }`} />
               <Input
                 ref={searchInputRef}
@@ -1688,7 +1692,7 @@ function SearchPageContent() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-12 pr-4 bg-muted/50 border-0 h-12 sm:h-14 text-base sm:text-lg rounded-full focus:bg-muted/70 transition-colors"
               />
-              {loading && (
+              {(loading || lyricsLoading || publicPlaylistsLoading || (searchQuery.trim() && !combinedSearchResults)) && (
                 <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
                   <div className="animate-spin rounded-full h-5 w-5 border-2 border-primary border-t-transparent"></div>
                 </div>
@@ -1830,7 +1834,7 @@ function SearchPageContent() {
                             const isCurrentSong = currentSong?.id === song.id;
                             return (
                               <div
-                                key={`all-tab-${song.isLyricsMatch ? 'lyrics' : 'regular'}-${song.id || `fallback-${index}`}-${index}`}
+                                key={`all-tab-song-${index}-${song.id || 'no-id'}-${song.isLyricsMatch ? 'lyrics' : 'regular'}`}
                                 className={`flex items-center gap-2 pl-1 pr-0 py-1.5 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150`}
                                 onClick={() => handlePlayClick(song, combinedSearchResults.songs.results)}
                               >
@@ -1927,7 +1931,7 @@ function SearchPageContent() {
                       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 gap-3 sm:gap-4">
                         {combinedSearchResults.artists.results.slice(0, 8).map((artist, index) => (
                           <div
-                            key={artist.id || index}
+                            key={`all-tab-artist-${index}-${artist.id || 'no-id'}`}
                             className="text-center group cursor-pointer hover:scale-105 transition-transform duration-200"
                             onClick={() => handleArtistClick(artist.id, artist.title || artist.name)}
                           >
@@ -1982,7 +1986,7 @@ function SearchPageContent() {
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 gap-3 sm:gap-4">
                         {combinedSearchResults.albums.results.slice(0, 8).map((album, index) => (
                           <div
-                            key={album.id || index}
+                            key={`all-tab-album-${index}-${album.id || 'no-id'}`}
                             className="group cursor-pointer hover:scale-105 transition-transform duration-200"
                             onClick={() => handleAlbumClick(album.id)}
                           >
@@ -2028,7 +2032,7 @@ function SearchPageContent() {
                           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 gap-3 sm:gap-4">
                             {publicPlaylists.map((playlist, index) => (
                               <div
-                                key={`public-${playlist.id || index}`}
+                                key={`all-tab-public-playlist-${index}-${playlist.id || 'no-id'}`}
                                 className="group cursor-pointer hover:scale-105 transition-transform duration-200"
                                 onClick={() => router.push(`/music/playlists/${playlist.id}`)}
                               >
@@ -2057,7 +2061,7 @@ function SearchPageContent() {
                           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 gap-3 sm:gap-4">
                             {combinedSearchResults.playlists.results.map((playlist, index) => (
                               <div
-                                key={`jiosaavn-${playlist.id || index}`}
+                                key={`all-tab-jiosaavn-playlist-${index}-${playlist.id || 'no-id'}`}
                                 className="group cursor-pointer hover:scale-105 transition-transform duration-200"
                                 onClick={() => handlePlaylistClick(playlist.id)}
                               >
@@ -2115,7 +2119,7 @@ function SearchPageContent() {
 
                         const isCurrentSong = currentSong?.id === song.id;
                         return (
-                          <div key={`songs-tab-${song.isLyricsMatch ? 'lyrics' : 'regular'}-${song.id || `fallback-${index}`}-${index}`}>
+                          <div key={`songs-tab-song-${index}-${song.id || 'no-id'}-${song.isLyricsMatch ? 'lyrics' : 'regular'}`}>
                             {/* Mobile Layout */}
                             <div
                               className={`md:hidden flex items-center gap-2 pl-1 pr-0 py-1.5 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150`}
@@ -2328,7 +2332,7 @@ function SearchPageContent() {
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 gap-4 sm:gap-6">
                       {combinedSearchResults.albums.results.map((album, index) => (
                         <div
-                          key={album.id || index}
+                          key={`albums-tab-album-${index}-${album.id || 'no-id'}`}
                           className="group cursor-pointer hover:scale-105 transition-transform duration-200"
                           onClick={() => handleAlbumClick(album.id)}
                         >
@@ -2386,7 +2390,7 @@ function SearchPageContent() {
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 gap-4 sm:gap-6">
                       {combinedSearchResults.artists.results.map((artist, index) => (
                         <div
-                          key={artist.id || index}
+                          key={`artists-tab-artist-${index}-${artist.id || 'no-id'}`}
                           className="text-center group cursor-pointer hover:scale-105 transition-transform duration-200"
                           onClick={() => handleArtistClick(artist.id, artist.title || artist.name)}
                         >
@@ -2473,7 +2477,7 @@ function SearchPageContent() {
                           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1800px]:grid-cols-9 min-[2100px]:grid-cols-10 gap-4 sm:gap-6">
                             {publicPlaylists.map((playlist, index) => (
                               <div
-                                key={`public-${playlist.id || index}`}
+                                key={`playlists-tab-public-playlist-${index}-${playlist.id || 'no-id'}`}
                                 className="group cursor-pointer hover:scale-105 transition-transform duration-200"
                                 onClick={() => router.push(`/music/playlists/${playlist.id}`)}
                               >

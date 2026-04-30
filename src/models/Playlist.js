@@ -37,6 +37,15 @@ const playlistSchema = new mongoose.Schema({
 // Compound index for efficient queries
 playlistSchema.index({ userId: 1, createdAt: -1 });
 
+// Text index for efficient search on name and description
+playlistSchema.index({ name: 'text', description: 'text' });
+
+// Compound index for public playlist queries with sorting
+playlistSchema.index({ isPublic: 1, createdAt: -1 });
+
+// Compound index for public playlist search optimization
+playlistSchema.index({ isPublic: 1, name: 1 });
+
 // Static method to create playlist with automatic naming
 playlistSchema.statics.createPlaylist = async function(userId) {
   try {
