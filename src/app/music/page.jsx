@@ -736,18 +736,16 @@ export default function MusicPage() {
 
             {/* Right Actions */}
             <div className="flex items-center gap-2">
-              <div className="relative">
+              {/* Search Bar - Hidden on mobile */}
+              <div className="relative hidden sm:block">
                 <Button
                   variant="ghost"
                   onClick={() => router.push("/music/search")}
-                  className="flex items-center justify-start gap-3 bg-muted/30 hover:bg-muted/50 border border-muted-foreground/20 hover:border-muted-foreground/30 transition-all duration-200 rounded-full h-9 w-32 sm:w-40 md:w-48 lg:w-56 xl:w-64 px-4"
+                  className="flex items-center justify-start gap-3 bg-muted/30 hover:bg-muted/50 border border-muted-foreground/20 hover:border-muted-foreground/30 transition-all duration-200 rounded-full h-9 w-40 md:w-48 lg:w-56 xl:w-64 px-4"
                 >
                   <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <span className="hidden sm:block text-sm text-muted-foreground text-left truncate">
+                  <span className="text-sm text-muted-foreground text-left truncate">
                     Search music...
-                  </span>
-                  <span className="sm:hidden text-xs text-muted-foreground">
-                    Search
                   </span>
                 </Button>
               </div>
