@@ -699,7 +699,7 @@ export default function ArtistPage() {
     if (artist?.name && !loading) {
       fetchExternalBio();
     }
-  }, [artist?.name, loading, fetchingBio]);
+  }, [artist?.name, loading, fetchingBio, biography]);
 
   const handlePlayClick = (song, index) => {
     playSong(song, songs, artistId, index);
