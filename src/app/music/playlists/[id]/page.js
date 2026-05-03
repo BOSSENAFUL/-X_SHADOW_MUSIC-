@@ -1241,7 +1241,11 @@ export default function PlaylistDetailPage({ params }) {
     const targetSongs = customSongs || songs;
 
     if (targetPlaylist?.image) {
-      return { type: 'single', src: targetPlaylist.image };
+      // Proxy YouTube Music images through our API
+      const imageUrl = targetPlaylist.image.includes('yt3.googleusercontent.com') 
+        ? `/api/proxy/image?url=${encodeURIComponent(targetPlaylist.image)}`
+        : targetPlaylist.image;
+      return { type: 'single', src: imageUrl };
     }
 
     if (!targetSongs || targetSongs.length === 0) {
