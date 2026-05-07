@@ -2,35 +2,41 @@ import { NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
 export async function middleware(req) {
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-  const { pathname } = req.nextUrl;
+  try {
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    const { pathname } = req.nextUrl;
 
-  // Public routes (auth pages) - accessible when NOT logged in
-  const publicRoutes = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/verify-email"];
+    // Public routes (auth pages) - accessible when NOT logged in
+    const publicRoutes = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/verify-email"];
 
-  // Private routes - require authentication
-  const privateRoutes = ["/music", "/profile", "/settings"];
+    // Private routes - require authentication
+    const privateRoutes = ["/music", "/profile", "/settings"];
 
-  // Also protect dynamic routes that start with these paths
-  const ismusicRoute = pathname.startsWith("/music/");
-  const isProfileRoute = pathname.startsWith("/profile/");
-  const isSettingsRoute = pathname.startsWith("/settings/");
+    // Also protect dynamic routes that start with these paths
+    const ismusicRoute = pathname.startsWith("/music/");
+    const isProfileRoute = pathname.startsWith("/profile/");
+    const isSettingsRoute = pathname.startsWith("/settings/");
 
-  // User is NOT logged in
-  if (!token) {
-    if (privateRoutes.includes(pathname) || ismusicRoute || isProfileRoute || isSettingsRoute) {
-      return NextResponse.redirect(new URL("/login", req.url));
+    // User is NOT logged in
+    if (!token) {
+      if (privateRoutes.includes(pathname) || ismusicRoute || isProfileRoute || isSettingsRoute) {
+        return NextResponse.redirect(new URL("/login", req.url));
+      }
     }
-  }
 
-  // User IS logged in
-  if (token) {
-    if (publicRoutes.includes(pathname)) {
-      return NextResponse.redirect(new URL("/music", req.url));
+    // User IS logged in
+    if (token) {
+      if (publicRoutes.includes(pathname)) {
+        return NextResponse.redirect(new URL("/music", req.url));
+      }
     }
-  }
 
-  return NextResponse.next();
+    return NextResponse.next();
+  } catch (error) {
+    console.error('Middleware error:', error);
+    // On error, redirect to login for safety
+    return NextResponse.redirect(new URL("/login", req.url));
+  }
 }
 
 export const config = {
