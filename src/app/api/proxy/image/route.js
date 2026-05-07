@@ -25,8 +25,10 @@ export async function GET(request) {
         return new Response(buffer, {
             headers: {
                 'Content-Type': contentType || 'image/jpeg',
-                'Cache-Control': 'public, max-age=86400',
+                // Cache for 7 days on CDN, 30 days in browser
+                'Cache-Control': 'public, max-age=2592000, s-maxage=604800, stale-while-revalidate=86400',
                 'Access-Control-Allow-Origin': '*',
+                'CDN-Cache-Control': 'max-age=604800',
             },
         });
     } catch (error) {

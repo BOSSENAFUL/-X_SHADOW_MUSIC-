@@ -44,28 +44,29 @@ import {
   DrawerTitle,
   DrawerDescription,
 } from "@/components/ui/drawer";
+import { downloadWithMetadata } from "@/lib/clientDownload";
 
 // --- Helper Components ---
-const SongActionMenu = memo(({ 
-  song, 
-  onAddToPlaylist, 
-  onGoToArtist, 
-  onGoToAlbum, 
-  onDownload, 
+const SongActionMenu = memo(({
+  song,
+  onAddToPlaylist,
+  onGoToArtist,
+  onGoToAlbum,
+  onDownload,
   onUnlike,
-  decodeHtmlEntities 
+  decodeHtmlEntities
 }) => {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
 
   const artistNames = song.artists?.map(a => a.name).join(', ') || 'Unknown Artist';
-  const songImageUrl = song.image?.find(img => img.quality === '150x150')?.url || 
-                       song.image?.[song.image.length - 1]?.url || 
-                       '/default-playlist-image.png';
+  const songImageUrl = song.image?.find(img => img.quality === '150x150')?.url ||
+    song.image?.[song.image.length - 1]?.url ||
+    '/default-playlist-image.png';
 
   const ActionItems = ({ onItemClick }) => (
     <>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -75,7 +76,7 @@ const SongActionMenu = memo(({
         <Plus className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Add to playlist</span>
       </div>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -94,7 +95,7 @@ const SongActionMenu = memo(({
         <Share className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Share</span>
       </div>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -104,7 +105,7 @@ const SongActionMenu = memo(({
         <User className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Go to artist</span>
       </div>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -114,7 +115,7 @@ const SongActionMenu = memo(({
         <Disc className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Go to album</span>
       </div>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -125,7 +126,7 @@ const SongActionMenu = memo(({
         <span className="font-medium">Download</span>
       </div>
       <div className="h-px bg-white/5 my-1" />
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors text-red-500"
         onClick={(e) => {
           onItemClick();
@@ -156,9 +157,9 @@ const SongActionMenu = memo(({
             <DrawerHeader className="p-0">
               <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
                 <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0">
-                  <img 
-                    src={songImageUrl} 
-                    alt={song.songName} 
+                  <img
+                    src={songImageUrl}
+                    alt={song.songName}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -194,7 +195,7 @@ const SongActionMenu = memo(({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => onAddToPlaylist(e, song)}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
@@ -202,14 +203,14 @@ const SongActionMenu = memo(({
           Add to playlist
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-white/5" />
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => onGoToArtist(e, song)}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
           <User className="w-4 h-4 mr-2" />
           Go to artist
         </DropdownMenuItem>
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => onGoToAlbum(e, song)}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
@@ -217,7 +218,7 @@ const SongActionMenu = memo(({
           Go to album
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-white/5" />
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => onDownload(e, song)}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
@@ -438,8 +439,8 @@ export default function FavoritesPage() {
       `;
     };
 
-    // 🚀 PARALLEL BATCH DOWNLOADER (4 at a time)
-    const CONCURRENCY_LIMIT = 4;
+    // 🚀 PARALLEL BATCH DOWNLOADER (10 at a time - client-side is instant!)
+    const CONCURRENCY_LIMIT = 10;
     const queue = [...likedSongs];
 
     const downloadWorker = async () => {
@@ -546,41 +547,19 @@ export default function FavoritesPage() {
       const album = song.album?.name ? decodeHtmlEntities(song.album.name) : 'Unknown Album';
       const year = song.releaseDate ? new Date(song.releaseDate).getFullYear() : '';
 
-      if (!silent) toast.loading(`Injecting metadata for "${title}"...`, { id: toastId });
+      if (!silent) toast.loading(`Downloading "${title}"...`, { id: toastId });
 
-      // 3. Call Backend API
-      const response = await fetch('/api/download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          songUrl: downloadUrl,
-          imageUrl,
-          title,
-          artist,
-          album,
-          year
-        }),
+      // 3. Use 100% client-side download (ZERO server cost!)
+      const result = await downloadWithMetadata({
+        songUrl: downloadUrl,
+        title,
+        artist
       });
 
-      if (!response.ok) throw new Error('Backend failed to process song');
-
-      const isTagged = response.headers.get('X-Tagged') === 'true';
-      const isConverted = response.headers.get('X-Converted') === 'true';
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${title} - ${artist}.mp3`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      if (isTagged) {
-        if (!silent) toast.success(`Downloaded "${title}" with album art! ${isConverted ? '(High-Quality MP3)' : ''}`, { id: toastId });
+      if (result.success) {
+        if (!silent) toast.success(`Downloaded "${title}"!`, { id: toastId });
       } else {
-        if (!silent) toast.error(`Download successful, but metadata injection failed for "${title}".`, { id: toastId });
+        throw new Error(result.error || 'Download failed');
       }
     } catch (error) {
       console.error('Download error:', error);
@@ -592,7 +571,7 @@ export default function FavoritesPage() {
   const handleDownload = useCallback(async (e, song) => {
     e.stopPropagation();
     await downloadSingleLikedSong(song);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleUnlike = useCallback(async (e, likedSong) => {
@@ -896,7 +875,7 @@ export default function FavoritesPage() {
                           </div>
 
                           <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                            <SongActionMenu 
+                            <SongActionMenu
                               song={likedSong}
                               onAddToPlaylist={handleAddToPlaylist}
                               onGoToArtist={handleGoToArtist}
@@ -1020,7 +999,7 @@ export default function FavoritesPage() {
                             <div className="min-w-[40px] text-right text-sm text-muted-foreground font-mono hidden md:block">
                               {formatDuration(likedSong.duration)}
                             </div>
-                            <SongActionMenu 
+                            <SongActionMenu
                               song={likedSong}
                               onAddToPlaylist={handleAddToPlaylist}
                               onGoToArtist={handleGoToArtist}

@@ -46,31 +46,32 @@ import {
 } from "@/components/ui/drawer";
 import { toast } from "sonner";
 import { memo } from "react";
+import { downloadWithMetadata } from "@/lib/clientDownload";
 
 
 // --- Helper Components ---
-const SongActionMenu = memo(({ 
-  song, 
-  onAddToPlaylist, 
-  onGoToArtist, 
-  onDownload, 
+const SongActionMenu = memo(({
+  song,
+  onAddToPlaylist,
+  onGoToArtist,
+  onDownload,
   toggleLike,
   isLiked,
-  decodeHtmlEntities 
+  decodeHtmlEntities
 }) => {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
 
-  const artistNames = song.artists?.primary?.map(a => a.name).join(', ') || 
-                      song.artists?.map(a => a.name).join(', ') || 
-                      'Unknown Artist';
-  const songImageUrl = song.image?.find(img => img.quality === '150x150')?.url || 
-                       song.image?.[song.image.length - 1]?.url || 
-                       '/def playlist image.jpg';
+  const artistNames = song.artists?.primary?.map(a => a.name).join(', ') ||
+    song.artists?.map(a => a.name).join(', ') ||
+    'Unknown Artist';
+  const songImageUrl = song.image?.find(img => img.quality === '150x150')?.url ||
+    song.image?.[song.image.length - 1]?.url ||
+    '/def playlist image.jpg';
 
   const ActionItems = ({ onItemClick }) => (
     <>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -80,7 +81,7 @@ const SongActionMenu = memo(({
         <Plus className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Add to playlist</span>
       </div>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -99,7 +100,7 @@ const SongActionMenu = memo(({
         <Share className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Share</span>
       </div>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -109,7 +110,7 @@ const SongActionMenu = memo(({
         <User className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Go to artist</span>
       </div>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -120,7 +121,7 @@ const SongActionMenu = memo(({
         <span className="font-medium">Download</span>
       </div>
       <div className="h-px bg-white/5 my-1" />
-      <div 
+      <div
         className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${isLiked(song.id) ? 'text-red-500' : ''}`}
         onClick={(e) => {
           onItemClick();
@@ -152,9 +153,9 @@ const SongActionMenu = memo(({
             <DrawerHeader className="p-0">
               <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
                 <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0">
-                  <img 
-                    src={songImageUrl} 
-                    alt={song.name} 
+                  <img
+                    src={songImageUrl}
+                    alt={song.name}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -190,7 +191,7 @@ const SongActionMenu = memo(({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => onAddToPlaylist(e, song)}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
@@ -198,7 +199,7 @@ const SongActionMenu = memo(({
           Add to playlist
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-white/5" />
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => onGoToArtist(e, song)}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
@@ -206,7 +207,7 @@ const SongActionMenu = memo(({
           Go to artist
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-white/5" />
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => onDownload(e, song)}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
@@ -259,7 +260,7 @@ const AlbumActionMenu = memo(({
 
   const ActionItems = ({ onItemClick }) => (
     <>
-      <div 
+      <div
         className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${isAlbumLiked ? 'text-red-500' : ''}`}
         onClick={() => {
           onItemClick();
@@ -269,7 +270,7 @@ const AlbumActionMenu = memo(({
         <Heart className={`w-5 h-5 ${isAlbumLiked ? 'fill-current' : ''}`} />
         <span className="font-medium">{isAlbumLiked ? 'Unlike Album' : 'Like Album'}</span>
       </div>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={() => {
           onItemClick();
@@ -280,7 +281,7 @@ const AlbumActionMenu = memo(({
         <span className="font-medium">Download Album</span>
       </div>
       <div className="h-px bg-white/5 my-1" />
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={handleShare}
       >
@@ -338,14 +339,14 @@ const AlbumActionMenu = memo(({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={() => { setOpen(false); toggleAlbumLike(); }}
           className={`hover:bg-white/10 focus:bg-white/10 cursor-pointer ${isAlbumLiked ? 'text-red-500' : ''}`}
         >
           <Heart className={`w-4 h-4 mr-2 ${isAlbumLiked ? 'fill-current' : ''}`} />
           {isAlbumLiked ? 'Unlike Album' : 'Like Album'}
         </DropdownMenuItem>
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={() => { setOpen(false); onDownloadAlbum(); }}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
@@ -353,7 +354,7 @@ const AlbumActionMenu = memo(({
           Download Album
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-white/5" />
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={handleShare}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
@@ -687,41 +688,19 @@ export default function AlbumPage() {
       const albumName = song.album?.name ? decodeHtmlEntities(song.album.name) : 'Unknown Album';
       const year = song.year || (song.releaseDate ? new Date(song.releaseDate).getFullYear() : '');
 
-      if (!silent) toast.loading(`Injecting metadata for "${title}"...`, { id: toastId });
+      if (!silent) toast.loading(`Downloading "${title}"...`, { id: toastId });
 
-      // 3. Call Backend API
-      const response = await fetch('/api/download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          songUrl: downloadUrl,
-          imageUrl,
-          title,
-          artist: songArtist,
-          album: albumName,
-          year
-        }),
+      // 3. Use 100% client-side download (ZERO server cost!)
+      const result = await downloadWithMetadata({
+        songUrl: downloadUrl,
+        title,
+        artist: songArtist
       });
 
-      if (!response.ok) throw new Error('Backend failed to process song');
-
-      const isTagged = response.headers.get('X-Tagged') === 'true';
-      const isConverted = response.headers.get('X-Converted') === 'true';
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${title} - ${songArtist}.mp3`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      if (isTagged) {
-        if (!silent) toast.success(`Downloaded "${title}" with album art! ${isConverted ? '(High-Quality MP3)' : ''}`, { id: toastId });
+      if (result.success) {
+        if (!silent) toast.success(`Downloaded "${title}"!`, { id: toastId });
       } else {
-        if (!silent) toast.error(`Download successful, but metadata injection failed for "${title}".`, { id: toastId });
+        throw new Error(result.error || 'Download failed');
       }
     } catch (error) {
       console.error('Download error:', error);
@@ -957,9 +936,9 @@ export default function AlbumPage() {
                         }}
                       />
                     ) : (
-                      <img 
-                        src="/def playlist image.jpg" 
-                        alt={album.name} 
+                      <img
+                        src="/def playlist image.jpg"
+                        alt={album.name}
                         className="w-full h-full object-cover"
                       />
                     )}
@@ -1017,9 +996,9 @@ export default function AlbumPage() {
                       }}
                     />
                   ) : (
-                    <img 
-                      src="/def playlist image.jpg" 
-                      alt={album.name} 
+                    <img
+                      src="/def playlist image.jpg"
+                      alt={album.name}
                       className="w-full h-full object-cover"
                     />
                   )}
@@ -1081,14 +1060,14 @@ export default function AlbumPage() {
                     <IoMdPlay style={{ width: '24px', height: '24px', marginLeft: '4px' }} />
                   )}
                 </Button>
-                
+
                 <button
                   onClick={() => setIsShuffle(!isShuffle)}
                   className={`rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center transition-colors bg-transparent border-none outline-none cursor-pointer ${isShuffle ? 'text-green-500 hover:text-green-400' : 'text-muted-foreground hover:text-foreground'}`}
                 >
                   <Shuffle style={{ width: '24px', height: '24px' }} />
                 </button>
-                
+
                 <AlbumActionMenu
                   album={album}
                   isAlbumLiked={isAlbumLiked(albumId)}
@@ -1200,7 +1179,7 @@ export default function AlbumPage() {
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-                          <SongActionMenu 
+                          <SongActionMenu
                             song={song}
                             onAddToPlaylist={handleAddToPlaylist}
                             onGoToArtist={handleGoToArtist}
@@ -1264,7 +1243,7 @@ export default function AlbumPage() {
                           <div className="min-w-0">
                             <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''
                               }`}>
-                               {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
+                              {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
                             </p>
                             <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
                               }`}>
@@ -1306,7 +1285,7 @@ export default function AlbumPage() {
                           <div className="w-12 text-center text-sm text-muted-foreground hidden md:block">
                             {formatDuration(song.duration)}
                           </div>
-                          <SongActionMenu 
+                          <SongActionMenu
                             song={song}
                             onAddToPlaylist={handleAddToPlaylist}
                             onGoToArtist={handleGoToArtist}

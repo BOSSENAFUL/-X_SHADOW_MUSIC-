@@ -45,30 +45,31 @@ import {
 } from "@/components/ui/drawer";
 import { toast } from "sonner";
 import { memo } from "react";
+import { downloadWithMetadata } from "@/lib/clientDownload";
 
 // --- Helper Components ---
-const SongActionMenu = memo(({ 
-  song, 
-  onAddToPlaylist, 
-  onGoToAlbum, 
-  onDownload, 
+const SongActionMenu = memo(({
+  song,
+  onAddToPlaylist,
+  onGoToAlbum,
+  onDownload,
   toggleLike,
   isLiked,
-  decodeHtmlEntities 
+  decodeHtmlEntities
 }) => {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
 
-  const artistNames = song.artists?.primary?.map(a => a.name).join(', ') || 
-                      song.artists?.map(a => a.name).join(', ') || 
-                      'Unknown Artist';
-  const songImageUrl = song.image?.find(img => img.quality === '150x150')?.url || 
-                       song.image?.[song.image.length - 1]?.url || 
-                       '/default-playlist-image.png';
+  const artistNames = song.artists?.primary?.map(a => a.name).join(', ') ||
+    song.artists?.map(a => a.name).join(', ') ||
+    'Unknown Artist';
+  const songImageUrl = song.image?.find(img => img.quality === '150x150')?.url ||
+    song.image?.[song.image.length - 1]?.url ||
+    '/default-playlist-image.png';
 
   const ActionItems = ({ onItemClick }) => (
     <>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -78,7 +79,7 @@ const SongActionMenu = memo(({
         <Plus className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Add to playlist</span>
       </div>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -97,7 +98,7 @@ const SongActionMenu = memo(({
         <Share className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Share</span>
       </div>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -107,7 +108,7 @@ const SongActionMenu = memo(({
         <Disc className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Go to album</span>
       </div>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -118,7 +119,7 @@ const SongActionMenu = memo(({
         <span className="font-medium">Download</span>
       </div>
       <div className="h-px bg-white/5 my-1" />
-      <div 
+      <div
         className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${isLiked(song.id) ? 'text-red-500' : ''}`}
         onClick={(e) => {
           onItemClick();
@@ -150,9 +151,9 @@ const SongActionMenu = memo(({
             <DrawerHeader className="p-0">
               <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
                 <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0">
-                  <img 
-                    src={songImageUrl} 
-                    alt={song.name} 
+                  <img
+                    src={songImageUrl}
+                    alt={song.name}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -188,7 +189,7 @@ const SongActionMenu = memo(({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => onAddToPlaylist(e, song)}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
@@ -196,7 +197,7 @@ const SongActionMenu = memo(({
           Add to playlist
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-white/5" />
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => onGoToAlbum(e, song)}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
@@ -204,7 +205,7 @@ const SongActionMenu = memo(({
           Go to album
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-white/5" />
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => onDownload(e, song)}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
@@ -259,7 +260,7 @@ const ArtistActionMenu = memo(({
 
   const ActionItems = ({ onItemClick }) => (
     <>
-      <div 
+      <div
         className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${isArtistLiked ? 'text-red-500' : ''}`}
         onClick={(e) => {
           if (!artistLikeLoading) {
@@ -271,7 +272,7 @@ const ArtistActionMenu = memo(({
         <Heart className={`w-5 h-5 ${isArtistLiked ? 'fill-current' : ''}`} />
         <span className="font-medium">{isArtistLiked ? 'Unlike Artist' : 'Like Artist'}</span>
       </div>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -282,7 +283,7 @@ const ArtistActionMenu = memo(({
         <span className="font-medium">Download Songs</span>
       </div>
       <div className="h-px bg-white/5 my-1" />
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={handleShare}
       >
@@ -340,7 +341,7 @@ const ArtistActionMenu = memo(({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => { setOpen(false); toggleArtistLike(); }}
           className={`hover:bg-white/10 focus:bg-white/10 cursor-pointer ${isArtistLiked ? 'text-red-500' : ''}`}
           disabled={artistLikeLoading}
@@ -348,7 +349,7 @@ const ArtistActionMenu = memo(({
           <Heart className={`w-4 h-4 mr-2 ${isArtistLiked ? 'fill-current' : ''}`} />
           {isArtistLiked ? 'Unlike Artist' : 'Like Artist'}
         </DropdownMenuItem>
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => { setOpen(false); onDownloadSongs(); }}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
@@ -356,7 +357,7 @@ const ArtistActionMenu = memo(({
           Download Songs
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-white/5" />
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={handleShare}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
@@ -454,8 +455,8 @@ export default function ArtistPage() {
                 const songsData = await songsResponse.json();
                 if (songsData.success && songsData.data) {
                   const playCountMap = {};
-                  songsData.data.forEach(s => { 
-                    if (s.playCount != null) playCountMap[s.id] = s.playCount; 
+                  songsData.data.forEach(s => {
+                    if (s.playCount != null) playCountMap[s.id] = s.playCount;
                   });
                   initialSongs = initialSongs.map(s => ({ ...s, playCount: playCountMap[s.id] ?? s.playCount }));
                 }
@@ -465,7 +466,7 @@ export default function ArtistPage() {
             }
             setSongs(initialSongs);
             // JioSaavn usually returns 10 top songs in the artist detail
-            setSongsPage(1); 
+            setSongsPage(1);
             setHasMoreSongs(initialSongs.length >= 10);
           }
 
@@ -546,8 +547,8 @@ export default function ArtistPage() {
               const songsData = await songsResponse.json();
               if (songsData.success && songsData.data) {
                 const playCountMap = {};
-                songsData.data.forEach(s => { 
-                  if (s.playCount != null) playCountMap[s.id] = s.playCount; 
+                songsData.data.forEach(s => {
+                  if (s.playCount != null) playCountMap[s.id] = s.playCount;
                 });
                 newSongs = newSongs.map(s => ({ ...s, playCount: playCountMap[s.id] ?? s.playCount }));
               }
@@ -672,21 +673,21 @@ export default function ArtistPage() {
       // If we already have a good bio, don't fetch more
       // Good bio = at least one section with more than 100 characters
       const isBioGood = biography.some(b => b.text && b.text.length > 100);
-      
+
       if (!isBioGood && artist?.name && !fetchingBio) {
         setFetchingBio(true);
         try {
           const response = await fetch(`/api/artist/bio?name=${encodeURIComponent(artist.name)}`);
           const data = await response.json();
           if (data.success && data.data && data.data.length > 0) {
-              setBiography(prev => {
-                  // If prev is totally empty, just take the new one
-                  if (prev.length === 0) return data.data;
-                  // If prev is small, append new ones but avoid duplicate titles
-                  const existingTitles = new Set(prev.map(b => b.title?.toLowerCase()));
-                  const uniqueNew = data.data.filter(b => b.title && !existingTitles.has(b.title.toLowerCase()));
-                  return [...prev, ...uniqueNew];
-              });
+            setBiography(prev => {
+              // If prev is totally empty, just take the new one
+              if (prev.length === 0) return data.data;
+              // If prev is small, append new ones but avoid duplicate titles
+              const existingTitles = new Set(prev.map(b => b.title?.toLowerCase()));
+              const uniqueNew = data.data.filter(b => b.title && !existingTitles.has(b.title.toLowerCase()));
+              return [...prev, ...uniqueNew];
+            });
           }
         } catch (error) {
           console.error('Failed to fetch external bio:', error);
@@ -699,7 +700,8 @@ export default function ArtistPage() {
     if (artist?.name && !loading) {
       fetchExternalBio();
     }
-  }, [artist?.name, loading, fetchingBio, biography]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [artist?.name, loading]); // Removed 'biography' and 'fetchingBio' from dependencies to prevent loop
 
   const handlePlayClick = (song, index) => {
     playSong(song, songs, artistId, index);
@@ -820,7 +822,7 @@ export default function ArtistPage() {
 
   const decodeHtmlEntities = useCallback((text) => {
     if (!text) return text;
-    
+
     // Handle Mojibake (UTF-8 interpreted as Latin-1/Windows-1252)
     let cleanedText = text
       .replace(/â€œ/g, '“')
@@ -833,7 +835,7 @@ export default function ArtistPage() {
       .replace(/Â/g, ''); // Non-breaking space artifact
 
     if (!cleanedText.includes('&')) return cleanedText;
-    
+
     const entities = {
       '&amp;': '&',
       '&lt;': '<',
@@ -894,41 +896,19 @@ export default function ArtistPage() {
       const album = song.album?.name ? decodeHtmlEntities(song.album.name) : 'Unknown Album';
       const year = song.year || (song.releaseDate ? new Date(song.releaseDate).getFullYear() : '');
 
-      if (!silent) toast.loading(`Injecting metadata for "${title}"...`, { id: toastId });
+      if (!silent) toast.loading(`Downloading "${title}"...`, { id: toastId });
 
-      // 3. Call Backend API
-      const response = await fetch('/api/download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          songUrl: downloadUrl,
-          imageUrl,
-          title,
-          artist: songArtist,
-          album,
-          year
-        }),
+      // 3. Use 100% client-side download (ZERO server cost!)
+      const result = await downloadWithMetadata({
+        songUrl: downloadUrl,
+        title,
+        artist: songArtist
       });
 
-      if (!response.ok) throw new Error('Backend failed to process song');
-
-      const isTagged = response.headers.get('X-Tagged') === 'true';
-      const isConverted = response.headers.get('X-Converted') === 'true';
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${title} - ${songArtist}.mp3`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      if (isTagged) {
-        if (!silent) toast.success(`Downloaded "${title}" with album art! ${isConverted ? '(High-Quality MP3)' : ''}`, { id: toastId });
+      if (result.success) {
+        if (!silent) toast.success(`Downloaded "${title}"!`, { id: toastId });
       } else {
-        if (!silent) toast.error(`Download successful, but metadata injection failed for "${title}".`, { id: toastId });
+        throw new Error(result.error || 'Download failed');
       }
     } catch (error) {
       console.error('Download error:', error);
@@ -1304,14 +1284,14 @@ export default function ArtistPage() {
                     <IoMdPlay style={{ width: '24px', height: '24px', marginLeft: '4px' }} />
                   )}
                 </Button>
-                
+
                 <button
                   onClick={() => setIsShuffle(!isShuffle)}
                   className={`rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center transition-colors bg-transparent border-none outline-none cursor-pointer ${isShuffle ? 'text-green-500 hover:text-green-400' : 'text-muted-foreground hover:text-foreground'}`}
                 >
                   <Shuffle style={{ width: '24px', height: '24px' }} />
                 </button>
-                
+
                 <ArtistActionMenu
                   artist={artist}
                   isArtistLiked={isArtistLiked}
@@ -1413,7 +1393,7 @@ export default function ArtistPage() {
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-                            <SongActionMenu 
+                            <SongActionMenu
                               song={song}
                               onAddToPlaylist={handleAddToPlaylist}
                               onGoToAlbum={handleGoToAlbum}
@@ -1527,7 +1507,7 @@ export default function ArtistPage() {
                   <div className="flex items-center gap-2 mb-3 md:mb-4">
                     <h2 className="text-xl md:text-2xl font-bold">About</h2>
                     {fetchingBio && (
-                       <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin"></div>
+                      <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin"></div>
                     )}
                   </div>
                   <div className="space-y-3 md:space-y-4">

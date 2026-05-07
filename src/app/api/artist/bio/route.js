@@ -1,5 +1,30 @@
 import { NextResponse } from 'next/server';
 
+// In-memory cache for artist bios (5 minute TTL)
+const bioCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function getCachedBio(artistName) {
+  const cached = bioCache.get(artistName.toLowerCase());
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+  return null;
+}
+
+function setCachedBio(artistName, data) {
+  bioCache.set(artistName.toLowerCase(), {
+    data,
+    timestamp: Date.now()
+  });
+
+  // Cleanup old entries (keep cache size reasonable)
+  if (bioCache.size > 100) {
+    const oldestKey = bioCache.keys().next().value;
+    bioCache.delete(oldestKey);
+  }
+}
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -10,6 +35,20 @@ export async function GET(request) {
         success: false,
         error: 'Artist name is required'
       }, { status: 400 });
+    }
+
+    // Check cache first
+    const cachedBio = getCachedBio(artistName);
+    if (cachedBio) {
+      return NextResponse.json({
+        success: true,
+        data: cachedBio,
+        cached: true
+      }, {
+        headers: {
+          'Cache-Control': 'public, max-age=300, s-maxage=600', // 5 min browser, 10 min CDN
+        }
+      });
     }
 
     let bio = [];
@@ -51,24 +90,24 @@ export async function GET(request) {
         if (searchResponse.ok) {
           const searchData = await searchResponse.json();
           const primaryHit = searchData.response.hits?.[0]?.result?.primary_artist;
-          
+
           if (primaryHit?.id) {
-             const artistRes = await fetch(`https://api.genius.com/artists/${primaryHit.id}?text_format=plain`, {
-                headers: { 'Authorization': `Bearer ${process.env.GENIUS_CLIENT_ACCESS_TOKEN}` }
-             });
-             
-             if (artistRes.ok) {
-                 const artistData = await artistRes.json();
-                 const geniusBio = artistData.response.artist.description?.plain;
-                 
-                 // Clean up the text (remove [Credits], etc.)
-                 if (geniusBio && geniusBio.trim() !== '?' && geniusBio.length > 50) {
-                     bio.push({
-                         title: 'Genius Biography',
-                         text: geniusBio.slice(0, 2000) // Truncate long ones
-                     });
-                 }
-             }
+            const artistRes = await fetch(`https://api.genius.com/artists/${primaryHit.id}?text_format=plain`, {
+              headers: { 'Authorization': `Bearer ${process.env.GENIUS_CLIENT_ACCESS_TOKEN}` }
+            });
+
+            if (artistRes.ok) {
+              const artistData = await artistRes.json();
+              const geniusBio = artistData.response.artist.description?.plain;
+
+              // Clean up the text (remove [Credits], etc.)
+              if (geniusBio && geniusBio.trim() !== '?' && geniusBio.length > 50) {
+                bio.push({
+                  title: 'Genius Biography',
+                  text: geniusBio.slice(0, 2000) // Truncate long ones
+                });
+              }
+            }
           }
         }
       } catch (geniusError) {
@@ -77,15 +116,28 @@ export async function GET(request) {
     }
 
     if (bio.length === 0) {
+      // Cache empty result too (to avoid repeated failed lookups)
+      setCachedBio(artistName, []);
       return NextResponse.json({
         success: true,
         data: []
+      }, {
+        headers: {
+          'Cache-Control': 'public, max-age=300, s-maxage=600',
+        }
       });
     }
+
+    // Cache successful result
+    setCachedBio(artistName, bio);
 
     return NextResponse.json({
       success: true,
       data: bio
+    }, {
+      headers: {
+        'Cache-Control': 'public, max-age=300, s-maxage=600',
+      }
     });
 
   } catch (error) {

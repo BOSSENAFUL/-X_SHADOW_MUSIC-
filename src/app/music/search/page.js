@@ -48,33 +48,34 @@ import {
 import { memo } from "react";
 import { genres } from "@/data/genres";
 import { PlaylistCover } from "@/components/ui/playlist-cover";
+import { downloadWithMetadata } from "@/lib/clientDownload";
 
 // --- Helper Components ---
-const SongActionMenu = memo(({ 
-  song, 
-  onAddToPlaylist, 
-  onGoToArtist, 
+const SongActionMenu = memo(({
+  song,
+  onAddToPlaylist,
+  onGoToArtist,
   onGoToAlbum,
-  onDownload, 
+  onDownload,
   onShare,
   toggleLike,
   isLiked,
-  decodeHtmlEntities 
+  decodeHtmlEntities
 }) => {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
 
-  const artistNames = song.artists?.primary?.map(a => a.name).join(', ') || 
-                      song.artists?.map(a => a.name).join(', ') || 
-                      (song.primaryArtists || 'Unknown Artist');
-                      
-  const songImageUrl = song.image?.find(img => img.quality === '150x150')?.url || 
-                       song.image?.[song.image.length - 1]?.url || 
-                       '/default-playlist-image.png';
+  const artistNames = song.artists?.primary?.map(a => a.name).join(', ') ||
+    song.artists?.map(a => a.name).join(', ') ||
+    (song.primaryArtists || 'Unknown Artist');
+
+  const songImageUrl = song.image?.find(img => img.quality === '150x150')?.url ||
+    song.image?.[song.image.length - 1]?.url ||
+    '/default-playlist-image.png';
 
   const ActionItems = ({ onItemClick }) => (
     <>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -84,7 +85,7 @@ const SongActionMenu = memo(({
         <Plus className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Add to playlist</span>
       </div>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -94,7 +95,7 @@ const SongActionMenu = memo(({
         <Share className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Share</span>
       </div>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -104,7 +105,7 @@ const SongActionMenu = memo(({
         <User className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Go to artist</span>
       </div>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -114,7 +115,7 @@ const SongActionMenu = memo(({
         <Disc className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Go to album</span>
       </div>
-      <div 
+      <div
         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
@@ -125,7 +126,7 @@ const SongActionMenu = memo(({
         <span className="font-medium">Download</span>
       </div>
       <div className="h-px bg-white/5 my-1" />
-      <div 
+      <div
         className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${isLiked(song.id) ? 'text-red-500' : ''}`}
         onClick={(e) => {
           onItemClick();
@@ -157,9 +158,9 @@ const SongActionMenu = memo(({
             <DrawerHeader className="p-0">
               <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
                 <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0">
-                  <img 
-                    src={songImageUrl} 
-                    alt={song.name || song.title} 
+                  <img
+                    src={songImageUrl}
+                    alt={song.name || song.title}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -195,28 +196,28 @@ const SongActionMenu = memo(({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1 z-9999">
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => onAddToPlaylist(e, song)}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
           <Plus className="w-4 h-4 mr-2" />
           Add to playlist
         </DropdownMenuItem>
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => onShare(e, song)}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
           <Share className="w-4 h-4 mr-2" />
           Share
         </DropdownMenuItem>
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => onGoToArtist(e, song)}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
           <User className="w-4 h-4 mr-2" />
           Go to artist
         </DropdownMenuItem>
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => onGoToAlbum(e, song)}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
@@ -224,7 +225,7 @@ const SongActionMenu = memo(({
           Go to album
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-white/5" />
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={(e) => onDownload(e, song)}
           className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
         >
@@ -232,7 +233,7 @@ const SongActionMenu = memo(({
           Download
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-white/5" />
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={async (e) => {
             e.stopPropagation();
             await toggleLike(song);
@@ -1213,7 +1214,7 @@ function SearchPageContent() {
     // 4. Robust Ranking & Sorting
     const getRelevanceScore = (item) => {
       if (!item) return -1000;
-      
+
       // Decode entities for comparison - helps with exact matches
       const rawTitle = (item.title || item.name || "");
       const title = decodeHtmlEntities(rawTitle).toLowerCase().trim();
@@ -1233,9 +1234,9 @@ function SearchPageContent() {
 
       // Tier 5: Direct matches from song search generally have a base relevance
       if (!item.isLyricsMatch) {
-         // Small boost for artists extracted from top songs as they are highly relevant
-         if (item.type === 'artist' && item.isSongArtist) return 600;
-         return 400;
+        // Small boost for artists extracted from top songs as they are highly relevant
+        if (item.type === 'artist' && item.isSongArtist) return 600;
+        return 400;
       }
 
       // Tier 6: Regular lyrics matches
@@ -1249,7 +1250,7 @@ function SearchPageContent() {
       const name = decodeHtmlEntities(a.title || a.name || "").toLowerCase().trim();
       const id = a.id;
       const key = id ? `id-${id}` : `name-${name}`;
-      
+
       if (!name || artistSeen.has(key)) return false;
       artistSeen.add(key);
       return true;
@@ -1606,41 +1607,19 @@ function SearchPageContent() {
       const album = song.album?.name ? decodeHtmlEntities(song.album.name) : (typeof song.album === 'string' ? decodeHtmlEntities(song.album) : 'Unknown Album');
       const year = song.year || (song.releaseDate ? new Date(song.releaseDate).getFullYear() : '');
 
-      toast.loading(`Injecting metadata for "${title}"...`, { id: toastId });
+      toast.loading(`Downloading "${title}"...`, { id: toastId });
 
-      // 3. Call Backend API
-      const response = await fetch('/api/download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          songUrl: downloadUrl,
-          imageUrl,
-          title,
-          artist,
-          album,
-          year
-        }),
+      // 3. Use 100% client-side download (ZERO server cost!)
+      const result = await downloadWithMetadata({
+        songUrl: downloadUrl,
+        title,
+        artist
       });
 
-      if (!response.ok) throw new Error('Backend failed to process song');
-
-      const isTagged = response.headers.get('X-Tagged') === 'true';
-      const isConverted = response.headers.get('X-Converted') === 'true';
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${title} - ${artist}.mp3`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      if (isTagged) {
-        toast.success(`Downloaded "${title}" with album art! ${isConverted ? '(High-Quality MP3)' : ''}`, { id: toastId });
+      if (result.success) {
+        toast.success(`Downloaded "${title}"!`, { id: toastId });
       } else {
-        toast.error(`Download successful, but metadata injection failed for "${title}".`, { id: toastId });
+        throw new Error(result.error || 'Download failed');
       }
     } catch (error) {
       console.error('Download error:', error);
@@ -1680,10 +1659,9 @@ function SearchPageContent() {
           {/* Search Input */}
           <div className="p-4 sm:p-6 pb-4">
             <div className="relative w-full max-w-2xl mx-auto">
-              <Search className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 transition-colors ${
-                (loading || lyricsLoading || publicPlaylistsLoading || (searchQuery.trim() && !combinedSearchResults)) 
-                  ? 'text-primary animate-pulse' 
-                  : 'text-muted-foreground'
+              <Search className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 transition-colors ${(loading || lyricsLoading || publicPlaylistsLoading || (searchQuery.trim() && !combinedSearchResults))
+                ? 'text-primary animate-pulse'
+                : 'text-muted-foreground'
                 }`} />
               <Input
                 ref={searchInputRef}

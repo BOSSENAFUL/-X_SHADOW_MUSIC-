@@ -35,6 +35,7 @@ import { AddToPlaylistDialog } from "@/components/playlists/AddToPlaylistDialog"
 import { PlaylistCover } from "@/components/ui/playlist-cover";
 import { toast } from "sonner";
 import Link from "next/link";
+import { downloadWithMetadata } from "@/lib/clientDownload";
 
 export default function GenreDetailPage() {
     const router = useRouter();
@@ -457,41 +458,19 @@ export default function GenreDetailPage() {
             const album = song.album?.name ? decodeHtmlEntities(song.album.name) : 'Unknown Album';
             const year = song.year || (song.releaseDate ? new Date(song.releaseDate).getFullYear() : '');
 
-            if (!silent) toast.loading(`Injecting metadata for "${title}"...`, { id: toastId });
+            if (!silent) toast.loading(`Downloading "${title}"...`, { id: toastId });
 
-            // 3. Call Backend API
-            const response = await fetch('/api/download', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    songUrl: downloadUrl,
-                    imageUrl,
-                    title,
-                    artist,
-                    album,
-                    year
-                }),
+            // 3. Use 100% client-side download (ZERO server cost!)
+            const result = await downloadWithMetadata({
+                songUrl: downloadUrl,
+                title,
+                artist
             });
 
-            if (!response.ok) throw new Error('Backend failed to process song');
-
-            const isTagged = response.headers.get('X-Tagged') === 'true';
-            const isConverted = response.headers.get('X-Converted') === 'true';
-
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `${title} - ${artist}.mp3`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-
-            if (isTagged) {
-                if (!silent) toast.success(`Downloaded "${title}" with album art! ${isConverted ? '(High-Quality MP3)' : ''}`, { id: toastId });
+            if (result.success) {
+                if (!silent) toast.success(`Downloaded "${title}"!`, { id: toastId });
             } else {
-                if (!silent) toast.error(`Download successful, but metadata injection failed for "${title}".`, { id: toastId });
+                throw new Error(result.error || 'Download failed');
             }
         } catch (error) {
             console.error('Download error:', error);

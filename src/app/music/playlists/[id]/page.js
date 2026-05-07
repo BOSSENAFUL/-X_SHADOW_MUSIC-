@@ -90,6 +90,7 @@ import { toast } from "sonner";
 import { HiPause } from "react-icons/hi2";
 import { IoMdPlay } from "react-icons/io";
 import { ShareStoryPreview } from "@/components/share-story-preview";
+import { downloadWithMetadata } from "@/lib/clientDownload";
 
 // --- In-Memory Global Color Cache ---
 const globalColorCache = typeof window !== 'undefined' ? new Map() : null;
@@ -1242,7 +1243,7 @@ export default function PlaylistDetailPage({ params }) {
 
     if (targetPlaylist?.image) {
       // Proxy YouTube Music images through our API
-      const imageUrl = targetPlaylist.image.includes('yt3.googleusercontent.com') 
+      const imageUrl = targetPlaylist.image.includes('yt3.googleusercontent.com')
         ? `/api/proxy/image?url=${encodeURIComponent(targetPlaylist.image)}`
         : targetPlaylist.image;
       return { type: 'single', src: imageUrl };
@@ -2000,41 +2001,19 @@ export default function PlaylistDetailPage({ params }) {
       const album = song.album?.name ? decodeHtmlEntities(song.album.name) : 'Unknown Album';
       const year = song.year || (song.releaseDate ? new Date(song.releaseDate).getFullYear() : '');
 
-      if (!silent) toast.loading(`Injecting metadata for "${title}"...`, { id: toastId });
+      if (!silent) toast.loading(`Downloading "${title}"...`, { id: toastId });
 
-      // 3. Call Backend API
-      const response = await fetch('/api/download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          songUrl: downloadUrl,
-          imageUrl,
-          title,
-          artist,
-          album,
-          year
-        }),
+      // 3. Use 100% client-side download (ZERO server cost!)
+      const result = await downloadWithMetadata({
+        songUrl: downloadUrl,
+        title,
+        artist
       });
 
-      if (!response.ok) throw new Error('Backend failed to process song');
-
-      const isTagged = response.headers.get('X-Tagged') === 'true';
-      const isConverted = response.headers.get('X-Converted') === 'true';
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${title} - ${artist}.mp3`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      if (isTagged) {
-        if (!silent) toast.success(`Downloaded "${title}" with album art! ${isConverted ? '(High-Quality MP3)' : ''}`, { id: toastId });
+      if (result.success) {
+        if (!silent) toast.success(`Downloaded "${title}"!`, { id: toastId });
       } else {
-        if (!silent) toast.error(`Download successful, but metadata injection failed for "${title}".`, { id: toastId });
+        throw new Error(result.error || 'Download failed');
       }
     } catch (error) {
       console.error('Download error:', error);
@@ -2568,8 +2547,8 @@ export default function PlaylistDetailPage({ params }) {
                             onDragEnter={(e) => handleDragEnter(e, index)}
                             onDrop={(e) => handleDrop(e, index)}
                             className={`cursor-grab transition-all duration-200 select-none ${dragOverIndex === index && draggedIndex !== index
-                                ? "border-t-2 border-green-400"
-                                : ""
+                              ? "border-t-2 border-green-400"
+                              : ""
                               } ${draggedIndex === index ? "opacity-50 scale-[0.99]" : ""}`}
                           >
                             <SongRow
