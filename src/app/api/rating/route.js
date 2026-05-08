@@ -4,34 +4,40 @@ import User from "@/models/User"
 import { NextResponse } from "next/server"
 
 export async function POST(request) {
-    await connectDB()
+    try {
+        await connectDB()
 
-    const body = await request.json()
-    const { rating, comment, userId } = body
+        const body = await request.json()
+        const { rating, comment, userId } = body
 
-    if (!userId || typeof rating !== "number" || rating < 1 || rating > 5) {
+        if (!userId || typeof rating !== "number" || rating < 1 || rating > 5) {
+            return NextResponse.json(
+                { error: "Invalid rating data" },
+                { status: 400 }
+            )
+        }
+
+        const existing = await Rating.findOne({ user: userId }).select('_id').lean()
+
+        if (existing) {
+            // Targeted update — only writes changed fields, no full document rewrite
+            await Rating.updateOne(
+                { user: userId },
+                { $set: { rating, comment } }
+            )
+            const ratingDoc = await Rating.findOne({ user: userId }).lean()
+            return NextResponse.json({ ratingDoc }, { status: 200 })
+        } else {
+            const ratingDoc = await Rating.create({ user: userId, rating, comment })
+            return NextResponse.json({ ratingDoc }, { status: 201 })
+        }
+    } catch (error) {
+        console.error("Error submitting rating:", error)
         return NextResponse.json(
-            { error: "Invalid rating data" },
-            { status: 400 }
+            { error: "Failed to submit rating" },
+            { status: 500 }
         )
     }
-
-    let ratingDoc = await Rating.findOne({ user: userId })
-    let isNew = false
-
-    if (ratingDoc) {
-        ratingDoc.rating = rating
-        ratingDoc.comment = comment
-        await ratingDoc.save()
-    } else {
-        ratingDoc = await Rating.create({ user: userId, rating, comment })
-        isNew = true
-    }
-
-    return NextResponse.json(
-        { ratingDoc },
-        { status: isNew ? 201 : 200 }
-    )
 }
 
 export async function GET(request) {
@@ -43,18 +49,21 @@ export async function GET(request) {
 
     if (check && userId) {
         try {
-            const user = await User.findById(userId)
+            const user = await User.findById(userId).select('email').lean();
             if (!user) {
                 return NextResponse.json({ eligible: false, error: "User not found" })
             }
 
             const DailyActiveUser = await import("@/models/DailyActiveUser").then(mod => mod.default)
 
-            // Count distinct days the user has been active
-            // We count documents in DailyActiveUser where existing in users array
-            const activeDays = await DailyActiveUser.countDocuments({
-                "users.email": user.email
-            })
+            // Count distinct days the user has been active.
+            // Use the compound index { date: 1, 'users.email': 1 } efficiently by
+            // doing a distinct on 'date' filtered by the user's email — much faster
+            // than countDocuments which scans every document's users array.
+            const activeDates = await DailyActiveUser.distinct('date', {
+                'users.email': user.email
+            });
+            const activeDays = activeDates.length;
 
             const hasRated = await Rating.exists({ user: userId })
 

@@ -1,7 +1,64 @@
 import { NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import Playlist from '@/models/Playlist';
-import User from '@/models/User';
+
+// In-memory cache: keyed by "page:limit"
+// Community playlists don't change frequently — 2 min TTL is safe.
+const communityCache = new Map();
+const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+
+function getCached(key) {
+  const entry = communityCache.get(key);
+  if (entry && Date.now() - entry.ts < CACHE_TTL) return entry.data;
+  communityCache.delete(key);
+  return null;
+}
+
+function setCached(key, data) {
+  // Keep cache size bounded
+  if (communityCache.size >= 50) {
+    communityCache.delete(communityCache.keys().next().value);
+  }
+  communityCache.set(key, { data, ts: Date.now() });
+}
+
+/**
+ * Fetch song images from JioSaavn for playlists that have no custom cover.
+ * Uses a single batched request with a 3s timeout so it never blocks the response.
+ */
+async function fetchSongImages(songIds) {
+  if (!songIds || songIds.length === 0) return {};
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s max
+
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    const res = await fetch(
+      `${apiUrl}/api/songs?ids=${songIds.join(',')}`,
+      { signal: controller.signal }
+    );
+    clearTimeout(timeoutId);
+
+    if (!res.ok) return {};
+
+    const data = await res.json();
+    if (!data.success || !data.data) return {};
+
+    const imageMap = {};
+    data.data.forEach(song => {
+      if (song?.id) {
+        imageMap[song.id] =
+          song.image?.find(img => img.quality === '150x150')?.url ||
+          song.image?.[0]?.url ||
+          null;
+      }
+    });
+    return imageMap;
+  } catch {
+    return {};
+  }
+}
 
 export async function GET(request) {
   try {
@@ -10,11 +67,20 @@ export async function GET(request) {
     const limitNum = parseInt(searchParams.get('limit')) || 20;
     const skip = page * limitNum;
 
+    // Check cache first
+    const cacheKey = `${page}:${limitNum}`;
+    const cached = getCached(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached, {
+        headers: { 'Cache-Control': 'public, max-age=60, s-maxage=120, stale-while-revalidate=60' }
+      });
+    }
+
     await connectDB();
 
-    const query = { 
+    const query = {
       isPublic: true,
-      'songIds.0': { $exists: true } // Ensure playlist is not empty
+      'songIds.0': { $exists: true } // Only non-empty playlists
     };
 
     // Fetch total count and paginated playlists in parallel
@@ -22,43 +88,26 @@ export async function GET(request) {
       Playlist.countDocuments(query),
       Playlist.find(query)
         .populate('userId', 'name image')
+        .select('name description songIds image userId createdAt updatedAt')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limitNum)
         .lean()
     ]);
 
-    // 1. Gather all unique song IDs needed for missing images
+    // Collect song IDs needed for image resolution (only for playlists without a custom image)
     const allSongIdsToFetch = new Set();
     playlists.forEach(playlist => {
-      if (!playlist.image || playlist.image === "/default-playlist-image.png") {
-        const songsToFetch = playlist.songIds?.slice(0, 4) || [];
-        songsToFetch.forEach(id => allSongIdsToFetch.add(id));
+      const hasCustomImage = playlist.image && playlist.image !== '/default-playlist-image.png';
+      if (!hasCustomImage) {
+        playlist.songIds?.slice(0, 4).forEach(id => allSongIdsToFetch.add(id));
       }
     });
 
-    // 2. Fetch all required songs in a SINGLE request
-    const songImageCache = {};
-    if (allSongIdsToFetch.size > 0) {
-      try {
-        const songsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs?ids=${Array.from(allSongIdsToFetch).join(',')}`);
-        const songsData = await songsRes.json();
+    // Fetch song images in one batched request (with timeout fallback)
+    const songImageMap = await fetchSongImages(Array.from(allSongIdsToFetch));
 
-        if (songsData.success && songsData.data) {
-          songsData.data.forEach(song => {
-            if (song) {
-              songImageCache[song.id] = song.image?.find(img => img.quality === '150x150')?.url ||
-                song.image?.[0]?.url ||
-                "/default-playlist-image.png";
-            }
-          });
-        }
-      } catch (err) {
-        console.error('Failed to fetch song images in bulk:', err);
-      }
-    }
-
-    // 3. Transform the data and assign images from cache
+    // Transform playlists and assign images
     const processedPlaylists = playlists.map((playlist) => {
       const baseData = {
         id: playlist._id.toString(),
@@ -66,38 +115,49 @@ export async function GET(request) {
         description: playlist.description,
         songCount: playlist.songIds?.length || 0,
         userName: playlist.userId?.name || 'Unknown User',
-        userImage: playlist.userId?.image,
+        userImage: playlist.userId?.image || null,
         songIds: playlist.songIds || [],
         source: 'user',
         createdAt: playlist.createdAt,
-        updatedAt: playlist.updatedAt
+        updatedAt: playlist.updatedAt,
       };
 
-      // If playlist has a custom image, use it
-      if (playlist.image && playlist.image !== "/default-playlist-image.png") {
+      // Playlist has a custom cover image — use it directly as a string
+      const hasCustomImage = playlist.image && playlist.image !== '/default-playlist-image.png';
+      if (hasCustomImage) {
         return { ...baseData, image: playlist.image };
       }
 
-      // Use cache to build collages
+      // Build collage from song images
       const songImages = (playlist.songIds?.slice(0, 4) || [])
-        .map(id => songImageCache[id])
-        .filter(url => url && url !== "/default-playlist-image.png");
+        .map(id => songImageMap[id])
+        .filter(Boolean);
 
       if (songImages.length >= 4) {
+        // 4-image collage — PlaylistCard reads collageImages as string[]
         return { ...baseData, collageImages: songImages, image: songImages[0] };
       } else if (songImages.length > 0) {
         return { ...baseData, image: songImages[0] };
       }
 
-      return { ...baseData, image: "/default-playlist-image.png" };
+      return { ...baseData, image: null };
     });
 
-    return NextResponse.json({
+    const responseBody = {
       success: true,
       data: processedPlaylists,
       total,
       page,
-      hasMore: (page + 1) * limitNum < total
+      hasMore: (page + 1) * limitNum < total,
+    };
+
+    // Cache the result
+    setCached(cacheKey, responseBody);
+
+    return NextResponse.json(responseBody, {
+      headers: {
+        'Cache-Control': 'public, max-age=60, s-maxage=120, stale-while-revalidate=60',
+      }
     });
 
   } catch (error) {

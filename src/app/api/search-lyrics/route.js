@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { compareTwoStrings } from 'string-similarity';
-import { distance as levenshteinDistance } from 'fastest-levenshtein';
 
 // Simple in-memory cache with TTL
 const lyricsCache = new Map();
@@ -62,6 +61,10 @@ export async function GET(request) {
         success: true,
         data: cachedResult,
         cached: true
+      }, {
+        headers: {
+          'Cache-Control': 'public, max-age=600, s-maxage=1800, stale-while-revalidate=300',
+        }
       });
     }
 
@@ -88,7 +91,7 @@ export async function GET(request) {
 
         if (response.ok) {
           const data = await response.json();
-          return { query: searchQuery, data, isOriginal: searchQuery === query };
+          return { query: searchQuery, data, isOriginal: searchQuery === trimmedQuery };
         }
       } catch (error) {
         // Silent error handling
@@ -131,6 +134,10 @@ export async function GET(request) {
       return NextResponse.json({
         success: true,
         data: []
+      }, {
+        headers: {
+          'Cache-Control': 'public, max-age=300, s-maxage=600',
+        }
       });
     }
 
@@ -260,6 +267,11 @@ export async function GET(request) {
       success: true,
       data: lyricsResults,
       cached: false
+    }, {
+      headers: {
+        // Cache at CDN/browser level: 10 min browser, 30 min CDN
+        'Cache-Control': 'public, max-age=600, s-maxage=1800, stale-while-revalidate=300',
+      }
     });
 
   } catch (error) {

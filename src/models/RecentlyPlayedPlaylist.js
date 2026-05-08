@@ -13,67 +13,25 @@ import mongoose from 'mongoose';
 
 const recentPlaylistEntrySchema = new mongoose.Schema(
     {
-        // The playlist identifier (JioSaavn ID string or MongoDB ObjectId string)
-        playlistId: {
-            type: String,
-            required: true,
-        },
-
-        // Human-readable playlist name
-        playlistName: {
-            type: String,
-            required: true,
-        },
-
-        // Cover image array – same format used across the app
-        // e.g. [{ quality: '500x500', url: '...' }, ...]
-        image: [
-            {
-                quality: String,
-                url: String,
-            },
-        ],
-
-        // Number of songs in the playlist at the time it was played
-        songCount: {
-            type: Number,
-            default: 0,
-        },
-
-        // 'jiosaavn' | 'user'
-        source: {
-            type: String,
-            enum: ['jiosaavn', 'user'],
-            default: 'jiosaavn',
-        },
-
-        // Optional: owner / subtitle (e.g. "JioSaavn" or the creator's name)
-        owner: {
-            type: String,
-            default: '',
-        },
-
-        // When this playlist was last opened
-        playedAt: {
-            type: Date,
-            default: Date.now,
-        },
+        playlistId: { type: String, required: true },
+        playlistName: { type: String, required: true },
+        image: [{ quality: String, url: String }],
+        songCount: { type: Number, default: 0 },
+        source: { type: String, enum: ['jiosaavn', 'user'], default: 'jiosaavn' },
+        owner: { type: String, default: '' },
+        playedAt: { type: Date, default: Date.now },
     },
-    { _id: false } // sub-documents don't need their own _id
+    { _id: false }
 );
 
 const recentlyPlayedPlaylistSchema = new mongoose.Schema(
     {
-        // One document per user
         userId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
             required: true,
             unique: true,
-            index: true,
         },
-
-        // Ordered list of recently played playlists (newest first, max 50)
         playlists: {
             type: [recentPlaylistEntrySchema],
             default: [],
@@ -88,22 +46,9 @@ const recentlyPlayedPlaylistSchema = new mongoose.Schema(
 
 /**
  * Track a playlist visit for a user.
- *
- * Algorithm:
- *   1. Remove any existing entry for the same playlistId (de-duplicate).
- *   2. Prepend the new entry at the front of the array.
- *   3. Slice to keep only the 5 most recent entries.
- *   4. Upsert the document for the user.
- *
- * @param {string|ObjectId} userId
- * @param {Object} playlistData
- * @param {string}  playlistData.id          – playlist ID (JioSaavn or MongoDB)
- * @param {string}  playlistData.name        – playlist name
- * @param {Array}   [playlistData.image]     – image array
- * @param {number}  [playlistData.songCount] – song count
- * @param {string}  [playlistData.source]    – 'jiosaavn' | 'user'
- * @param {string}  [playlistData.owner]     – owner / subtitle
- * @returns {Promise<Object>} The updated RecentlyPlayedPlaylist document
+ * Uses two targeted operations instead of a full document save:
+ *   1. $pull  — remove any existing entry for the same playlistId (de-duplicate)
+ *   2. $push  — prepend the new entry and cap the array at 50
  */
 recentlyPlayedPlaylistSchema.statics.track = async function (userId, playlistData) {
     const newEntry = {
@@ -116,29 +61,22 @@ recentlyPlayedPlaylistSchema.statics.track = async function (userId, playlistDat
         playedAt: new Date(),
     };
 
-    // Use findOneAndUpdate with arrayFilters for an atomic upsert
-    // Step 1 – pull any duplicate entry for the same playlistId
-    // Step 2 – push the new entry to the front
-    // Step 3 – slice to cap at 5
-
-    const doc = await this.findOneAndUpdate(
+    // Step 1: Ensure the document exists and remove any duplicate entry
+    await this.updateOne(
         { userId },
-        {
-            // Pull any existing entry with the same playlistId first
-            $pull: { playlists: { playlistId: newEntry.playlistId } },
-        },
-        { new: true, upsert: true }
+        { $pull: { playlists: { playlistId: newEntry.playlistId } } },
+        { upsert: true }
     );
 
-    // After removing the duplicate, push to front and cap
+    // Step 2: Prepend the new entry and cap at 50
     const updated = await this.findOneAndUpdate(
         { userId },
         {
             $push: {
                 playlists: {
                     $each: [newEntry],
-                    $position: 0,  // insert at the front
-                    $slice: 50,     // keep only the 50 most recent
+                    $position: 0,
+                    $slice: 50,
                 },
             },
         },
@@ -150,9 +88,6 @@ recentlyPlayedPlaylistSchema.statics.track = async function (userId, playlistDat
 
 /**
  * Get the recently played playlists for a user (newest first).
- *
- * @param {string|ObjectId} userId
- * @returns {Promise<Array>} Array of playlist entry objects (max 5)
  */
 recentlyPlayedPlaylistSchema.statics.getForUser = async function (userId) {
     const doc = await this.findOne({ userId }).lean();
@@ -161,27 +96,22 @@ recentlyPlayedPlaylistSchema.statics.getForUser = async function (userId) {
 
 /**
  * Clear recently played history for a user.
- *
- * @param {string|ObjectId} userId
- * @returns {Promise<void>}
  */
 recentlyPlayedPlaylistSchema.statics.clearForUser = async function (userId) {
-    await this.findOneAndUpdate({ userId }, { $set: { playlists: [] } }, { upsert: true });
+    await this.findOneAndUpdate(
+        { userId },
+        { $set: { playlists: [] } },
+        { upsert: true }
+    );
 };
 
 /**
  * Remove a specific playlist from the recently played list for a user.
- *
- * @param {string|ObjectId} userId
- * @param {string} playlistId
- * @returns {Promise<void>}
  */
 recentlyPlayedPlaylistSchema.statics.removePlaylistForUser = async function (userId, playlistId) {
     await this.findOneAndUpdate(
         { userId },
-        {
-            $pull: { playlists: { playlistId } },
-        },
+        { $pull: { playlists: { playlistId } } },
         { new: true }
     );
 };
@@ -199,16 +129,19 @@ recentlyPlayedPlaylistSchema.methods.toJSON = function () {
     };
 };
 
-// Use the standard Next.js pattern: check models object first to avoid re-defining
+// Guard against model re-registration during hot-reload
 let RecentlyPlayedPlaylist;
 if (mongoose.models.RecentlyPlayedPlaylist) {
     RecentlyPlayedPlaylist = mongoose.models.RecentlyPlayedPlaylist;
-    // For development/hot-reloading: Ensure the new static method is attached if missing
     if (!RecentlyPlayedPlaylist.removePlaylistForUser) {
-        RecentlyPlayedPlaylist.removePlaylistForUser = recentlyPlayedPlaylistSchema.statics.removePlaylistForUser;
+        RecentlyPlayedPlaylist.removePlaylistForUser =
+            recentlyPlayedPlaylistSchema.statics.removePlaylistForUser;
     }
 } else {
-    RecentlyPlayedPlaylist = mongoose.model('RecentlyPlayedPlaylist', recentlyPlayedPlaylistSchema);
+    RecentlyPlayedPlaylist = mongoose.model(
+        'RecentlyPlayedPlaylist',
+        recentlyPlayedPlaylistSchema
+    );
 }
 
 export default RecentlyPlayedPlaylist;

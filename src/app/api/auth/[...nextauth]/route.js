@@ -2,7 +2,6 @@ import NextAuth from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import GitHubProvider from 'next-auth/providers/github';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import mongoose from 'mongoose';
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 
@@ -46,9 +45,8 @@ const authOptions = {
             return null;
           }
 
-          // Update lastActive on successful login
-          user.lastActive = new Date();
-          await user.save();
+          // Update lastActive on successful login (targeted update, not full save)
+          await User.updateOne({ _id: user._id }, { $set: { lastActive: new Date() } });
 
           return {
             id: user._id.toString(),
@@ -79,18 +77,21 @@ const authOptions = {
 
           if (existingUser) {
             console.log('Found existing user:', existingUser._id.toString());
-            // Update OAuth ID if not set
+
+            // Build update payload — only write fields that actually changed
+            const updateFields = { lastActive: new Date() };
             if (account.provider === 'google' && !existingUser.googleId) {
-              existingUser.googleId = account.providerAccountId;
-              existingUser.isVerified = true;
+              updateFields.googleId = account.providerAccountId;
+              updateFields.isVerified = true;
             }
             if (account.provider === 'github' && !existingUser.githubId) {
-              existingUser.githubId = account.providerAccountId;
-              existingUser.isVerified = true;
+              updateFields.githubId = account.providerAccountId;
+              updateFields.isVerified = true;
             }
-            // Update lastActive on every sign-in
-            existingUser.lastActive = new Date();
-            await existingUser.save();
+
+            // Single targeted update — much faster than full document save()
+            await User.updateOne({ _id: existingUser._id }, { $set: updateFields });
+
             // Set the user ID and role for OAuth users
             user.id = existingUser._id.toString();
             user.role = existingUser.role || 'user';
@@ -122,7 +123,9 @@ const authOptions = {
       }
     },
     async jwt({ token, user, trigger, session }) {
-      // If user object is present (first time login)
+      // If user object is present (first time login / OAuth sign-in)
+      // user.id and user.role are set in the signIn callback for OAuth,
+      // and returned directly from authorize() for credentials.
       if (user) {
         token.id = user.id;
         token.role = user.role || 'user';
@@ -133,19 +136,10 @@ const authOptions = {
         return { ...token, ...session };
       }
 
-      // Ensure token.id is valid, otherwise try to fetch it
-      if (!token.id || !mongoose.Types.ObjectId.isValid(token.id)) {
-        try {
-          await connectDB();
-          const dbUser = await User.findOne({ email: token.email }).select('_id role').lean();
-          if (dbUser) {
-            token.id = dbUser._id.toString();
-            token.role = dbUser.role || 'user';
-          }
-        } catch (error) {
-          console.error('JWT callback error:', error);
-        }
-      }
+      // NOTE: We intentionally do NOT query the DB here on every token refresh.
+      // token.id and token.role are written once at sign-in and persist in the
+      // signed JWT — no DB round-trip needed on subsequent requests.
+      // If a user's role changes, they need to sign out and back in.
 
       return token;
     },

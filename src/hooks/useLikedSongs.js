@@ -17,12 +17,26 @@ export function useLikedSongs(userId) {
       const cached = sessionStorage.getItem(`jammify_favorites_${userId}`);
       if (cached) {
         const { data, timestamp } = JSON.parse(cached);
-        // If less than 10 minutes old, load immediately
-        if (Date.now() - timestamp < 600000) {
-          setLikedSongs(data);
-          setLikedSongIds(new Set(data.map(song => song.songId)));
-          setLoading(false);
-          // Still fetch in background to sync, but skip skeleton
+        // Also verify the first song has downloadUrl — old cache may be missing it
+        const isValid = data?.length === 0 || data?.[0]?.downloadUrl !== undefined;
+
+        if (isValid) {
+          const age = Date.now() - timestamp;
+
+          if (age < 600000) {
+            // Cache is valid — load immediately for instant UI
+            setLikedSongs(data);
+            setLikedSongIds(new Set(data.map(song => song.songId)));
+            setLoading(false);
+
+            // If cache is very fresh (< 1 min), skip the background fetch entirely
+            if (age < 60000) return;
+
+            // Otherwise still fetch in background to sync any changes
+          }
+        } else {
+          // Stale cache missing downloadUrl — clear it
+          sessionStorage.removeItem(`jammify_favorites_${userId}`);
         }
       }
     } catch (e) {
@@ -81,6 +95,8 @@ export function useLikedSongs(userId) {
         image: songData.image,
         releaseDate: songData.releaseDate,
         language: songData.language,
+        playCount: songData.playCount || 0,
+        downloadUrl: songData.downloadUrl || [],
         likedAt: new Date().toISOString()
       }, ...prev]);
     } else {
@@ -133,6 +149,8 @@ export function useLikedSongs(userId) {
             image: songData.image,
             releaseDate: songData.releaseDate,
             language: songData.language,
+            playCount: songData.playCount || 0,
+            downloadUrl: songData.downloadUrl || [],
             likedAt: new Date().toISOString()
           }, ...prev]);
         }
@@ -151,7 +169,7 @@ export function useLikedSongs(userId) {
         });
         setLikedSongs(prev => prev.filter(song => song.songId !== songData.id));
       } else {
-        // Revert the unlike
+        // Revert the unlike (network error)
         setLikedSongIds(prev => new Set([...prev, songData.id]));
         setLikedSongs(prev => [{
           songId: songData.id,
@@ -162,6 +180,8 @@ export function useLikedSongs(userId) {
           image: songData.image,
           releaseDate: songData.releaseDate,
           language: songData.language,
+          playCount: songData.playCount || 0,
+          downloadUrl: songData.downloadUrl || [],
           likedAt: new Date().toISOString()
         }, ...prev]);
       }

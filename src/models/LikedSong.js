@@ -5,15 +5,13 @@ const likedSongSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
-        required: true,
-        index: true
+        required: true
     },
 
     // Song details from JioSaavn API
     songId: {
         type: String,
-        required: true,
-        index: true
+        required: true
     },
 
     songName: {
@@ -101,7 +99,12 @@ likedSongSchema.methods.toJSON = function () {
 
 // Static methods
 likedSongSchema.statics.findByUser = function (userId) {
-    return this.find({ userId }).sort({ likedAt: -1 });
+    // Use lean() for faster read-only queries — returns plain JS objects
+    // instead of full Mongoose documents. Keep all fields including downloadUrl
+    // since the music player needs it to stream audio.
+    return this.find({ userId })
+        .sort({ likedAt: -1 })
+        .lean();
 };
 
 likedSongSchema.statics.isLiked = function (userId, songId) {
@@ -109,15 +112,16 @@ likedSongSchema.statics.isLiked = function (userId, songId) {
 };
 
 likedSongSchema.statics.toggleLike = async function (userId, songData) {
-    const existingLike = await this.findOne({ userId, songId: songData.id });
+    // Step 1: Try to delete — if deletedCount is 1, it was liked → now unliked
+    const deleteResult = await this.deleteOne({ userId, songId: songData.id });
 
-    if (existingLike) {
-        // Unlike the song
-        await this.deleteOne({ userId, songId: songData.id });
+    if (deleteResult.deletedCount === 1) {
         return { liked: false, message: 'Song removed from favorites' };
-    } else {
-        // Like the song
-        const likedSong = new this({
+    }
+
+    // Step 2: Wasn't liked — insert it. Catch duplicate key in case of race condition.
+    try {
+        await this.create({
             userId,
             songId: songData.id,
             songName: songData.name,
@@ -130,9 +134,13 @@ likedSongSchema.statics.toggleLike = async function (userId, songData) {
             playCount: songData.playCount,
             downloadUrl: songData.downloadUrl
         });
-
-        await likedSong.save();
         return { liked: true, message: 'Song added to favorites' };
+    } catch (err) {
+        if (err.code === 11000) {
+            // Race condition — another request already liked it
+            return { liked: true, message: 'Song added to favorites' };
+        }
+        throw err;
     }
 };
 
