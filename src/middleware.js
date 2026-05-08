@@ -2,30 +2,32 @@ import { NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
 export async function middleware(req) {
+  const { pathname } = req.nextUrl;
+
   try {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-    const { pathname } = req.nextUrl;
 
     // Public routes (auth pages) - accessible when NOT logged in
-    const publicRoutes = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/verify-email"];
+    const publicRoutes = [
+      "/",
+      "/login",
+      "/signup",
+      "/forgot-password",
+      "/reset-password",
+      "/verify-email",
+    ];
 
     // Private routes - require authentication
-    const privateRoutes = ["/music", "/profile", "/settings"];
+    const isPrivateRoute =
+      pathname.startsWith("/music") ||
+      pathname.startsWith("/profile") ||
+      pathname.startsWith("/settings");
 
-    // Also protect dynamic routes that start with these paths
-    const ismusicRoute = pathname.startsWith("/music/");
-    const isProfileRoute = pathname.startsWith("/profile/");
-    const isSettingsRoute = pathname.startsWith("/settings/");
-
-    // User is NOT logged in
     if (!token) {
-      if (privateRoutes.includes(pathname) || ismusicRoute || isProfileRoute || isSettingsRoute) {
+      if (isPrivateRoute) {
         return NextResponse.redirect(new URL("/login", req.url));
       }
-    }
-
-    // User IS logged in
-    if (token) {
+    } else {
       if (publicRoutes.includes(pathname)) {
         return NextResponse.redirect(new URL("/music", req.url));
       }
@@ -33,22 +35,21 @@ export async function middleware(req) {
 
     return NextResponse.next();
   } catch (error) {
-    console.error('Middleware error:', error);
-    // On error, redirect to login for safety
+    console.error("Middleware error:", error);
     return NextResponse.redirect(new URL("/login", req.url));
   }
 }
 
 export const config = {
   matcher: [
-    "/",
-    "/login",
-    "/signup",
-    "/forgot-password",
-    "/reset-password",
-    "/verify-email",
-    "/music/:path*",
-    "/profile/:path*",
-    "/settings/:path*"
+    /*
+     * Match all paths EXCEPT:
+     * - _next/static (static files)
+     * - _next/image (image optimization)
+     * - favicon.ico
+     * - /public/ folder files
+     * - api routes
+     */
+    "/((?!_next/static|_next/image|favicon\\.ico|api/|public/).*)",
   ],
 };
