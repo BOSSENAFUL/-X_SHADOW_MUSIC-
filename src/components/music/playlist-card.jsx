@@ -9,7 +9,6 @@ import { useMusicPlayer } from "@/contexts/music-player-context";
 import { trackRecentlyPlayed } from "@/lib/track-playlist";
 
 export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
-    const [isHovered, setIsHovered] = useState(false);
     const [localPlayingId, setLocalPlayingId] = useState(null);
     const { data: session } = useSession();
     const { playSong } = useMusicPlayer();
@@ -73,16 +72,23 @@ export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
         // If it's a user playlist or they all have 'default' quality, it's likely a collage
         const isLikelyCollage = playlist.source === 'user' || playlist.image.every(img => img.quality === 'default');
         if (isLikelyCollage) {
-            collageDisplayImages = playlist.image.map(img => img.url).filter(Boolean);
+            collageDisplayImages = playlist.image.map(img => img.url).filter(url =>
+                typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/'))
+            );
         }
     }
+
+    // Helper: return the URL only if it looks like a real URL, otherwise fallback
+    const safeImageUrl = (url) => {
+        if (!url || typeof url !== 'string') return '/default-playlist-image.png';
+        if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/')) return url;
+        return '/default-playlist-image.png';
+    };
 
     return (
         <div
             className="group cursor-pointer hover:scale-105 transition-transform"
             onClick={() => onClick(playlist)}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
         >
             <div className="relative rounded-lg aspect-square overflow-hidden mb-3 bg-neutral-900 border border-white/5 shadow-lg">
                 {collageDisplayImages.length >= 4 ? (
@@ -90,7 +96,7 @@ export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
                         {collageDisplayImages.slice(0, 4).map((src, idx) => (
                             <img
                                 key={idx}
-                                src={src}
+                                src={safeImageUrl(src)}
                                 alt=""
                                 className="w-full h-full object-cover"
                                 loading="lazy"
@@ -100,12 +106,12 @@ export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
                     </div>
                 ) : (
                     <img
-                        src={
+                        src={safeImageUrl(
                             playlist.image?.[2]?.url ||
                             playlist.image?.[1]?.url ||
                             playlist.image?.[0]?.url ||
-                            (typeof playlist.image === 'string' ? playlist.image : "/default-playlist-image.png")
-                        }
+                            (typeof playlist.image === 'string' ? playlist.image : null)
+                        )}
                         alt={playlist.name || playlist.playlistName}
                         className="w-full h-full object-cover"
                         loading="lazy"

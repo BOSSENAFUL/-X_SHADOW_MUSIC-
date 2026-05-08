@@ -199,10 +199,15 @@ export default function MusicPage() {
                 const collageImages = details.data.songIds.slice(0, 4).map(id => {
                   const song = songCache[id];
                   if (!song) return '/default-playlist-image.png';
-                  return song.image?.find(img => img.quality === '150x150')?.url ||
+                  const url =
+                    song.image?.find(img => img.quality === '150x150')?.url ||
                     song.image?.find(img => img.quality === '500x500')?.url ||
-                    song.image?.[song.image.length - 1]?.url ||
-                    '/default-playlist-image.png';
+                    song.image?.[song.image.length - 1]?.url;
+                  // Validate it's a real URL before using it
+                  if (url && typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'))) {
+                    return url;
+                  }
+                  return '/default-playlist-image.png';
                 });
                 if (collageImages.length >= 4) {
                   return { ...p, collageImages };
@@ -430,9 +435,12 @@ export default function MusicPage() {
 
         if (session?.user?.id) {
           // Normalize image to the expected array format if it's a string
-          const normalizedImage = typeof image === 'string'
-            ? [{ quality: 'default', url: image }]
-            : image;
+          const rawImageUrl = typeof image === 'string' ? image : null;
+          const isValidImageUrl = rawImageUrl &&
+            (rawImageUrl.startsWith('http://') || rawImageUrl.startsWith('https://'));
+          const normalizedImage = isValidImageUrl
+            ? [{ quality: 'default', url: rawImageUrl }]
+            : Array.isArray(image) ? image : [];
 
           const trackRes = await fetch('/api/recently-played-playlists', {
             method: 'POST',
@@ -697,7 +705,8 @@ export default function MusicPage() {
       playlist.image?.[1]?.url ||
       playlist.image?.[0]?.url;
 
-    if (imageUrl) {
+    // Only proxy absolute http/https URLs — skip relative/default paths
+    if (imageUrl && typeof imageUrl === 'string' && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
       const proxiedUrl = `/api/proxy/image?url=${encodeURIComponent(imageUrl)}`;
       extractDominantColor(proxiedUrl, playlistId).then(color => {
         setHoveredColor(color);
@@ -847,9 +856,11 @@ export default function MusicPage() {
                 >
                   <div className="h-full aspect-square shrink-0 relative bg-neutral-900 border-r border-white/5">
                     {(() => {
+                      const isValidUrl = (url) =>
+                        typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/'));
                       const collageImages = playlist.collageImages || (
                         playlist.source === 'user' && playlist.image?.length >= 4
-                          ? playlist.image.map(img => img.url).filter(Boolean)
+                          ? playlist.image.map(img => img.url).filter(isValidUrl)
                           : null
                       );
 
@@ -859,12 +870,16 @@ export default function MusicPage() {
 
                       return (
                         <img
-                          src={
-                            playlist.image?.[2]?.url ||
-                            playlist.image?.[1]?.url ||
-                            playlist.image?.[0]?.url ||
-                            (typeof playlist.image === 'string' ? playlist.image : "/default-playlist-image.png")
-                          }
+                          src={(() => {
+                            const url =
+                              playlist.image?.[2]?.url ||
+                              playlist.image?.[1]?.url ||
+                              playlist.image?.[0]?.url ||
+                              (typeof playlist.image === 'string' ? playlist.image : null);
+                            if (!url || typeof url !== 'string') return '/default-playlist-image.png';
+                            if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/')) return url;
+                            return '/default-playlist-image.png';
+                          })()}
                           alt={playlist.playlistName || "Playlist"}
                           className="w-full h-full object-cover"
                           loading="lazy"
