@@ -39,10 +39,6 @@ export async function GET(request) {
       success: true,
       data: likedSongs,
       count: likedSongs.length
-    }, {
-      headers: {
-        'Cache-Control': 'private, max-age=60', // Browser cache for 1 minute
-      }
     });
 
   } catch (error) {

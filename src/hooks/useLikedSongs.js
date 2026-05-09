@@ -44,7 +44,12 @@ export function useLikedSongs(userId) {
     }
 
     try {
-      const response = await fetch(`/api/liked-songs?userId=${userId}`);
+      const response = await fetch(`/api/liked-songs?userId=${userId}`, {
+        cache: 'no-store', // Prevent browser from caching stale data
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      });
       const data = await response.json();
 
       if (data.success) {
