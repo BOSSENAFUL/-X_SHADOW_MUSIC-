@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
 
 export async function middleware(req) {
   const { pathname } = req.nextUrl;
 
   try {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    // Check for NextAuth session cookie (much faster than getToken)
+    const sessionToken =
+      req.cookies.get("next-auth.session-token") ||
+      req.cookies.get("__Secure-next-auth.session-token");
+
+    const hasSession = !!sessionToken;
 
     // Public routes (auth pages) - accessible when NOT logged in
     const publicRoutes = [
@@ -23,7 +27,7 @@ export async function middleware(req) {
       pathname.startsWith("/profile") ||
       pathname.startsWith("/settings");
 
-    if (!token) {
+    if (!hasSession) {
       if (isPrivateRoute) {
         return NextResponse.redirect(new URL("/login", req.url));
       }
@@ -36,6 +40,7 @@ export async function middleware(req) {
     return NextResponse.next();
   } catch (error) {
     console.error("Middleware error:", error);
+    // On error, redirect to login for safety
     return NextResponse.redirect(new URL("/login", req.url));
   }
 }
