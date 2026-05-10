@@ -65,14 +65,14 @@ function Slider({
           <SliderPrimitive.Range
             data-slot="slider-range"
             className={cn(
-              "bg-primary absolute data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full transition-colors duration-200"
+              "bg-foreground absolute data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full transition-colors duration-200"
             )} />
         </SliderPrimitive.Track>
         {Array.from({ length: _values.length }, (_, index) => (
           <SliderPrimitive.Thumb
             data-slot="slider-thumb"
             key={index}
-            className="block size-3 shrink-0 rounded-full border-0 bg-primary shadow-sm transition-all duration-200 hover:ring-0 focus-visible:ring-0 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50 opacity-0 group-hover:opacity-100 hover:scale-110" />
+            className="block size-3 shrink-0 rounded-full border-0 bg-foreground shadow-sm transition-all duration-200 hover:ring-0 focus-visible:ring-0 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50 opacity-0 group-hover:opacity-100 hover:scale-110" />
         ))}
       </SliderPrimitive.Root>
 
