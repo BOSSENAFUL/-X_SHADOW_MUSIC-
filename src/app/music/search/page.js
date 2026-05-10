@@ -33,6 +33,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { useMusicPlayer } from "@/contexts/music-player-context";
+import { toast } from "sonner";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { AddToPlaylistDialog } from "@/components/playlists/AddToPlaylistDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -477,17 +478,30 @@ function SearchPageContent() {
   // Save search state to sessionStorage whenever it changes
   useEffect(() => {
     if (searchQuery || searchResults) {
-      const searchState = {
-        query: searchQuery,
-        results: searchResults,
-        lyricsRes: lyricsResults,
-        publicPlaylists: publicPlaylists,
-        tab: activeTab,
-        categoryState: categoryData,
-        scrollPosition: tabScrollPositions.current[activeTab] || 0,
-        tabScrollPositions: tabScrollPositions.current
-      };
-      sessionStorage.setItem('searchPageState', JSON.stringify(searchState));
+      try {
+        // Strip downloadUrl arrays to keep storage size small
+        const slimResults = searchResults ? {
+          ...searchResults,
+          songs: searchResults.songs?.slice(0, 50).map(s => ({ ...s, downloadUrl: undefined })),
+          albums: searchResults.albums?.slice(0, 20),
+          artists: searchResults.artists?.slice(0, 20),
+          playlists: searchResults.playlists?.slice(0, 20),
+        } : null;
+        const searchState = {
+          query: searchQuery,
+          results: slimResults,
+          lyricsRes: lyricsResults?.slice(0, 20),
+          publicPlaylists: publicPlaylists?.slice(0, 20),
+          tab: activeTab,
+          categoryState: categoryData,
+          scrollPosition: tabScrollPositions.current[activeTab] || 0,
+          tabScrollPositions: tabScrollPositions.current
+        };
+        sessionStorage.setItem('searchPageState', JSON.stringify(searchState));
+      } catch (e) {
+        // Quota exceeded - clear and skip saving
+        sessionStorage.removeItem('searchPageState');
+      }
     }
   }, [searchQuery, searchResults, lyricsResults, publicPlaylists, activeTab, categoryData]);
 
@@ -496,17 +510,28 @@ function SearchPageContent() {
     const handleBeforeUnload = () => {
       if (scrollContainerRef.current) {
         tabScrollPositions.current[activeTab] = scrollContainerRef.current.scrollTop;
-        const searchState = {
-          query: searchQuery,
-          results: searchResults,
-          lyricsRes: lyricsResults,
-          publicPlaylists: publicPlaylists,
-          tab: activeTab,
-          categoryState: categoryData,
-          scrollPosition: tabScrollPositions.current[activeTab] || 0,
-          tabScrollPositions: tabScrollPositions.current
-        };
-        sessionStorage.setItem('searchPageState', JSON.stringify(searchState));
+        try {
+          const slimResults = searchResults ? {
+            ...searchResults,
+            songs: searchResults.songs?.slice(0, 50).map(s => ({ ...s, downloadUrl: undefined })),
+            albums: searchResults.albums?.slice(0, 20),
+            artists: searchResults.artists?.slice(0, 20),
+            playlists: searchResults.playlists?.slice(0, 20),
+          } : null;
+          const searchState = {
+            query: searchQuery,
+            results: slimResults,
+            lyricsRes: lyricsResults?.slice(0, 20),
+            publicPlaylists: publicPlaylists?.slice(0, 20),
+            tab: activeTab,
+            categoryState: categoryData,
+            scrollPosition: tabScrollPositions.current[activeTab] || 0,
+            tabScrollPositions: tabScrollPositions.current
+          };
+          sessionStorage.setItem('searchPageState', JSON.stringify(searchState));
+        } catch (e) {
+          sessionStorage.removeItem('searchPageState');
+        }
       }
     };
 
@@ -1382,41 +1407,39 @@ function SearchPageContent() {
     router.push(`/music/artist/${artistId}`);
   };
 
-  const handleAlbumClick = (albumId) => {
-    // Save current scroll position before navigating
-    if (scrollContainerRef.current) {
-      tabScrollPositions.current[activeTab] = scrollContainerRef.current.scrollTop;
-      const searchState = {
+  const saveSearchState = () => {
+    if (!scrollContainerRef.current) return;
+    tabScrollPositions.current[activeTab] = scrollContainerRef.current.scrollTop;
+    try {
+      const slimResults = searchResults ? {
+        ...searchResults,
+        songs: searchResults.songs?.slice(0, 50).map(s => ({ ...s, downloadUrl: undefined })),
+        albums: searchResults.albums?.slice(0, 20),
+        artists: searchResults.artists?.slice(0, 20),
+        playlists: searchResults.playlists?.slice(0, 20),
+      } : null;
+      sessionStorage.setItem('searchPageState', JSON.stringify({
         query: searchQuery,
-        results: searchResults,
-        lyricsRes: lyricsResults,
-        publicPlaylists: publicPlaylists,
+        results: slimResults,
+        lyricsRes: lyricsResults?.slice(0, 20),
+        publicPlaylists: publicPlaylists?.slice(0, 20),
         tab: activeTab,
         categoryState: categoryData,
         scrollPosition: tabScrollPositions.current[activeTab] || 0,
         tabScrollPositions: tabScrollPositions.current
-      };
-      sessionStorage.setItem('searchPageState', JSON.stringify(searchState));
+      }));
+    } catch (e) {
+      sessionStorage.removeItem('searchPageState');
     }
+  };
+
+  const handleAlbumClick = (albumId) => {
+    saveSearchState();
     router.push(`/music/album/${albumId}`);
   };
 
   const handlePlaylistClick = (playlistId) => {
-    // Save current scroll position before navigating
-    if (scrollContainerRef.current) {
-      tabScrollPositions.current[activeTab] = scrollContainerRef.current.scrollTop;
-      const searchState = {
-        query: searchQuery,
-        results: searchResults,
-        lyricsRes: lyricsResults,
-        publicPlaylists: publicPlaylists,
-        tab: activeTab,
-        categoryState: categoryData,
-        scrollPosition: tabScrollPositions.current[activeTab] || 0,
-        tabScrollPositions: tabScrollPositions.current
-      };
-      sessionStorage.setItem('searchPageState', JSON.stringify(searchState));
-    }
+    saveSearchState();
     router.push(`/music/playlist/${playlistId}`);
   };
 
