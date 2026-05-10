@@ -852,11 +852,14 @@ export function FullscreenMusicPlayer({
 
       toast.loading(`Downloading "${title}"...`, { id: toastId });
 
-      // 3. Use 100% client-side download (ZERO server cost!)
+      // 3. Use 100% client-side download with metadata embedding!
       const result = await downloadWithMetadata({
         songUrl: downloadUrl,
         title,
-        artist
+        artist,
+        album,
+        year,
+        imageUrl
       });
 
       if (result.success) {
