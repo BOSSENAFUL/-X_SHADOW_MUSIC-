@@ -798,7 +798,7 @@ export default function MusicPage() {
             {/* Liked Songs */}
             <Link
               href="/music/favorites"
-              className="group relative flex items-center bg-white/5 hover:bg-white/10 transition-colors rounded-[4px] overflow-hidden cursor-pointer h-14 md:h-16 lg:h-20 z-10"
+              className="group relative flex items-center bg-card/40 hover:bg-accent transition-colors rounded-[4px] overflow-hidden cursor-pointer h-14 md:h-16 lg:h-20 z-10"
               onMouseEnter={() => setHoveredColor("rgb(69, 10, 245)")}
               onMouseLeave={handleMouseLeave}
             >
@@ -812,7 +812,7 @@ export default function MusicPage() {
                 <Heart className="w-5 h-5 md:w-8 md:h-8 fill-white text-white " />
               </div>
               <div className="min-w-0 flex-1 px-2 md:px-3 py-2 flex items-center">
-                <h3 className="font-bold text-[13px] md:text-[14px] lg:text-[16px] text-white line-clamp-2 leading-tight">
+                <h3 className="font-bold text-[13px] md:text-[14px] lg:text-[16px] text-foreground line-clamp-2 leading-tight">
                   Liked Songs
                 </h3>
               </div>
@@ -838,7 +838,7 @@ export default function MusicPage() {
               Array.from({ length: 5 }).map((_, index) => (
                 <div
                   key={`skeleton-${index}`}
-                  className="flex items-center bg-white/5 rounded-[4px] h-14 md:h-16 lg:h-20 overflow-hidden animate-pulse"
+                  className="flex items-center bg-card/40 rounded-[4px] h-14 md:h-16 lg:h-20 overflow-hidden animate-pulse"
                 >
                   <div className="h-full aspect-square bg-muted shrink-0" />
                   <div className="min-w-0 flex-1 px-2 md:px-3">
@@ -850,11 +850,11 @@ export default function MusicPage() {
                 <Link
                   key={playlist.playlistId}
                   href={playlist.source === 'user' ? `/music/playlists/${playlist.playlistId}` : `/music/playlist/${playlist.playlistId}?songCount=${playlist.songCount || 50}`}
-                  className="group relative flex items-center bg-white/5 hover:bg-white/10 transition-colors rounded-[4px] overflow-hidden cursor-pointer h-14 md:h-16 lg:h-20 z-10"
+                  className="group relative flex items-center bg-card/40 hover:bg-accent transition-colors rounded-[4px] overflow-hidden cursor-pointer h-14 md:h-16 lg:h-20 z-10"
                   onMouseEnter={() => handlePlaylistHover(playlist)}
                   onMouseLeave={handleMouseLeave}
                 >
-                  <div className="h-full aspect-square shrink-0 relative bg-neutral-900 border-r border-white/5">
+                  <div className="h-full aspect-square shrink-0 relative bg-muted border-r border-border">
                     {(() => {
                       const isValidUrl = (url) =>
                         typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/'));
@@ -889,11 +889,11 @@ export default function MusicPage() {
                     })()}
                   </div>
                   <div className="min-w-0 flex-1 px-2 md:px-3 py-2 flex flex-col justify-center gap-0.5">
-                    <h3 className="font-bold text-[13px] md:text-[14px] lg:text-[16px] text-white line-clamp-1 leading-tight">
+                    <h3 className="font-bold text-[13px] md:text-[14px] lg:text-[16px] text-foreground line-clamp-1 leading-tight">
                       {playlist.playlistName}
                     </h3>
                     {playlist.source === 'user' && (
-                      <span className="text-[10px] text-white/40 font-medium uppercase tracking-wide">Your playlist</span>
+                      <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Your playlist</span>
                     )}
                   </div>
 

@@ -72,7 +72,7 @@ const SongActionMenu = memo(({
   const ActionItems = ({ onItemClick }) => (
     <>
       <div
-        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
           onAddToPlaylist(e, song);
@@ -82,7 +82,7 @@ const SongActionMenu = memo(({
         <span className="font-medium">Add to playlist</span>
       </div>
       <div
-        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
           if (navigator.share) {
@@ -101,7 +101,7 @@ const SongActionMenu = memo(({
         <span className="font-medium">Share</span>
       </div>
       <div
-        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
           onGoToArtist(e, song);
@@ -111,7 +111,7 @@ const SongActionMenu = memo(({
         <span className="font-medium">Go to artist</span>
       </div>
       <div
-        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
           onDownload(e, song);
@@ -120,9 +120,9 @@ const SongActionMenu = memo(({
         <Download className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Download</span>
       </div>
-      <div className="h-px bg-white/5 my-1" />
+      <div className="h-px bg-border my-1" />
       <div
-        className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${isLiked(song.id) ? 'text-red-500' : ''}`}
+        className={`flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors ${isLiked(song.id) ? 'text-red-500' : ''}`}
         onClick={(e) => {
           onItemClick();
           e.stopPropagation();
@@ -142,16 +142,16 @@ const SongActionMenu = memo(({
           <Button
             variant="ghost"
             size="sm"
-            className="p-2 h-10 w-10 text-muted-foreground hover:bg-white/5"
+            className="p-2 h-10 w-10 text-muted-foreground hover:bg-accent"
             onClick={(e) => e.stopPropagation()}
           >
             <MoreVertical className="w-5 h-5" />
           </Button>
         </DrawerTrigger>
         <div onClick={(e) => e.stopPropagation()}>
-          <DrawerContent className="bg-[#121212] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
+          <DrawerContent className="bg-popover border-none text-foreground outline-none focus:outline-none ring-0 focus-visible:ring-0">
             <DrawerHeader className="p-0">
-              <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
+              <div className="flex items-center gap-4 px-4 py-4 border-b border-border">
                 <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0">
                   <img
                     src={songImageUrl}
@@ -160,7 +160,7 @@ const SongActionMenu = memo(({
                   />
                 </div>
                 <div className="flex-1 min-w-0 flex flex-col justify-center text-left">
-                  <DrawerTitle className="text-base font-bold truncate text-white text-left">
+                  <DrawerTitle className="text-base font-bold truncate text-foreground text-left">
                     {decodeHtmlEntities(song.name)}
                   </DrawerTitle>
                   <DrawerDescription className="text-sm text-muted-foreground truncate mt-0.5 text-left">
@@ -190,37 +190,37 @@ const SongActionMenu = memo(({
           <MoreVertical className="w-4 h-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
+      <DropdownMenuContent align="end" className="w-56 bg-popover border-border text-foreground p-1">
         <DropdownMenuItem
           onClick={(e) => onAddToPlaylist(e, song)}
-          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+          className="hover:bg-accent focus:bg-accent cursor-pointer"
         >
           <Plus className="w-4 h-4 mr-2" />
           Add to playlist
         </DropdownMenuItem>
-        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem
           onClick={(e) => onGoToArtist(e, song)}
-          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+          className="hover:bg-accent focus:bg-accent cursor-pointer"
         >
           <User className="w-4 h-4 mr-2" />
           Go to artist
         </DropdownMenuItem>
-        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem
           onClick={(e) => onDownload(e, song)}
-          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+          className="hover:bg-accent focus:bg-accent cursor-pointer"
         >
           <Download className="w-4 h-4 mr-2" />
           Download
         </DropdownMenuItem>
-        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem
           onClick={(e) => {
             e.stopPropagation();
             toggleLike(song).catch(error => console.error('Error toggling song like:', error));
           }}
-          className={`${isLiked(song.id) ? 'text-red-500' : ''} hover:bg-white/10 focus:bg-white/10 cursor-pointer`}
+          className={`${isLiked(song.id) ? 'text-red-500' : ''} hover:bg-accent focus:bg-accent cursor-pointer`}
         >
           <Heart className={`w-4 h-4 mr-2 ${isLiked(song.id) ? 'fill-current' : ''}`} />
           {isLiked(song.id) ? 'Unlike' : 'Like'}
@@ -261,7 +261,7 @@ const AlbumActionMenu = memo(({
   const ActionItems = ({ onItemClick }) => (
     <>
       <div
-        className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${isAlbumLiked ? 'text-red-500' : ''}`}
+        className={`flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors ${isAlbumLiked ? 'text-red-500' : ''}`}
         onClick={() => {
           onItemClick();
           toggleAlbumLike();
@@ -271,7 +271,7 @@ const AlbumActionMenu = memo(({
         <span className="font-medium">{isAlbumLiked ? 'Unlike Album' : 'Like Album'}</span>
       </div>
       <div
-        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
         onClick={() => {
           onItemClick();
           onDownloadAlbum();
@@ -280,9 +280,9 @@ const AlbumActionMenu = memo(({
         <Download className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Download Album</span>
       </div>
-      <div className="h-px bg-white/5 my-1" />
+      <div className="h-px bg-border my-1" />
       <div
-        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
         onClick={handleShare}
       >
         <Share className="w-5 h-5 text-muted-foreground" />
@@ -300,9 +300,9 @@ const AlbumActionMenu = memo(({
           </button>
         </DrawerTrigger>
         <div onClick={(e) => e.stopPropagation()}>
-          <DrawerContent className="bg-[#121212] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
+          <DrawerContent className="bg-popover border-none text-foreground outline-none focus:outline-none ring-0 focus-visible:ring-0">
             <DrawerHeader className="p-0">
-              <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
+              <div className="flex items-center gap-4 px-4 py-4 border-b border-border">
                 <div className="w-14 h-14 rounded-lg shadow-lg overflow-hidden shrink-0 bg-muted">
                   {albumImageUrl ? (
                     <img src={albumImageUrl} alt={album.name} className="w-full h-full object-cover" />
@@ -313,7 +313,7 @@ const AlbumActionMenu = memo(({
                   )}
                 </div>
                 <div className="flex-1 min-w-0 flex flex-col justify-center text-left">
-                  <DrawerTitle className="text-base font-bold truncate text-white text-left">
+                  <DrawerTitle className="text-base font-bold truncate text-foreground text-left">
                     {album?.name}
                   </DrawerTitle>
                   <DrawerDescription className="text-sm text-muted-foreground truncate mt-0.5 text-left">
@@ -338,25 +338,25 @@ const AlbumActionMenu = memo(({
           <MoreVertical style={{ width: '24px', height: '24px' }} />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
+      <DropdownMenuContent align="end" className="w-56 bg-popover border-border text-foreground p-1">
         <DropdownMenuItem
           onClick={() => { setOpen(false); toggleAlbumLike(); }}
-          className={`hover:bg-white/10 focus:bg-white/10 cursor-pointer ${isAlbumLiked ? 'text-red-500' : ''}`}
+          className={`hover:bg-accent focus:bg-accent cursor-pointer ${isAlbumLiked ? 'text-red-500' : ''}`}
         >
           <Heart className={`w-4 h-4 mr-2 ${isAlbumLiked ? 'fill-current' : ''}`} />
           {isAlbumLiked ? 'Unlike Album' : 'Like Album'}
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => { setOpen(false); onDownloadAlbum(); }}
-          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+          className="hover:bg-accent focus:bg-accent cursor-pointer"
         >
           <Download className="w-4 h-4 mr-2" />
           Download Album
         </DropdownMenuItem>
-        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem
           onClick={handleShare}
-          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+          className="hover:bg-accent focus:bg-accent cursor-pointer"
         >
           <Share className="w-4 h-4 mr-2" />
           Share Album
@@ -790,7 +790,7 @@ export default function AlbumPage() {
     return (
       <SidebarProvider>
         <AppSidebar />
-        <SidebarInset id="album-scroll-container" className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col bg-[#121212]">
+        <SidebarInset id="album-scroll-container" className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col bg-background">
           {/* Main Ambient Gradient Layer - Matches the album UI layout */}
           <div
             className="absolute inset-0 h-[390px] pointer-events-none transition-all duration-1000"
@@ -808,7 +808,7 @@ export default function AlbumPage() {
             <div className="flex items-center gap-2 px-3 md:px-4">
               <SidebarTrigger className="-ml-1 hidden md:flex" />
               <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:flex" />
-              <Button size="sm" onClick={handleGoBack} className="mr-1 bg-background/40 hover:bg-background/60">
+              <Button size="sm" onClick={handleGoBack} className="mr-1 bg-muted/50 hover:bg-muted text-foreground">
                 <ArrowLeft className="w-4 h-4" />
                 <span className="hidden sm:inline">Back</span>
               </Button>
@@ -863,7 +863,7 @@ export default function AlbumPage() {
               : undefined
           }}
           className={`sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b transition-all duration-300 ${showHeaderTitle
-            ? "border-white/10"
+            ? "border-border text-white"
             : "bg-background border-transparent"
             }`}
         >
@@ -871,7 +871,7 @@ export default function AlbumPage() {
             <div className="flex items-center gap-2">
               <SidebarTrigger className="-ml-1 hidden md:flex" />
               <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:flex" />
-              <Button size="sm" onClick={handleGoBack} className="mr-1 bg-background/40 hover:bg-background/60">
+              <Button size="sm" onClick={handleGoBack} className="mr-1 bg-muted/50 hover:bg-muted text-foreground">
                 <ArrowLeft className="w-4 h-4" />
                 <span className="hidden sm:inline">Back</span>
               </Button>
@@ -902,7 +902,7 @@ export default function AlbumPage() {
         <div
           className="flex-1 relative transition-colors duration-1000"
           style={{
-            backgroundColor: '#121212'
+            backgroundColor: 'hsl(var(--background))'
           }}
         >
           {/* Main Ambient Gradient Layer */}
@@ -921,7 +921,7 @@ export default function AlbumPage() {
 
           <div className="relative z-10">
             {/* Album Header */}
-            <div className="p-4 pt-12 pb-2 md:p-8 md:pt-20 md:pb-4 text-white">
+            <div className="p-4 pt-12 pb-2 md:p-8 md:pt-20 md:pb-4 text-foreground">
               {/* Mobile Layout */}
               <div className="block md:hidden">
                 <div className="flex flex-col items-center text-center space-y-4">

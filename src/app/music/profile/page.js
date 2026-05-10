@@ -26,6 +26,7 @@ import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useRouter } from "next/navigation";
 import { Music, Disc, LogOut, Edit2, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ThemeSelector } from "@/components/theme-selector";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -142,7 +143,7 @@ export default function ProfilePage() {
   const ProfileSkeleton = () => (
     <div className="flex flex-col h-full">
       {/* Header Skeleton */}
-      <div className="flex flex-col md:flex-row items-center md:items-end gap-6 p-6 pb-8 bg-linear-to-b from-zinc-700/30 to-background pt-20">
+      <div className="flex flex-col md:flex-row items-center md:items-end gap-6 p-6 pb-8 bg-gradient-to-b from-muted/30 to-background pt-20">
         <Skeleton className="w-32 h-32 md:w-52 md:h-52 rounded-full shadow-2xl" />
         <div className="flex flex-col items-center md:items-start gap-4 w-full md:w-auto">
           <Skeleton className="h-4 w-20" />
@@ -197,7 +198,7 @@ export default function ProfilePage() {
 
     // Priority 3: Fallback
     return (
-      <div className="w-full h-full flex items-center justify-center bg-zinc-800 text-zinc-500">
+      <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
         <Music className="w-12 h-12" />
       </div>
     );
@@ -232,10 +233,10 @@ export default function ProfilePage() {
         ) : (
           <div className="flex-1 overflow-y-auto pb-24">
             {/* Profile Header */}
-            <div className="flex flex-col md:flex-row items-center md:items-end gap-6 p-6 pb-8 bg-linear-to-b from-zinc-700/50 via-zinc-800/20 to-background pt-20">
-              <Avatar className="w-32 h-32 md:w-52 md:h-52 shadow-2xl shadow-black/50">
+            <div className="flex flex-col md:flex-row items-center md:items-end gap-6 p-6 pb-8 bg-gradient-to-b from-muted/50 via-muted/20 to-background pt-20">
+              <Avatar className="w-32 h-32 md:w-52 md:h-52 shadow-2xl">
                 <AvatarImage src={session?.user?.image} alt={session?.user?.name} className="object-cover" />
-                <AvatarFallback className="text-6xl md:text-8xl font-black bg-zinc-800 text-zinc-400">
+                <AvatarFallback className="text-6xl md:text-8xl font-black bg-muted text-muted-foreground">
                   {session?.user?.name?.charAt(0)?.toUpperCase() || 'U'}
                 </AvatarFallback>
               </Avatar>
@@ -260,20 +261,21 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <div className="mt-2 flex gap-3">
+                <div className="mt-2 flex flex-wrap gap-3">
                   <Button
                     variant="outline"
                     size="sm"
-                    className="rounded-full border-zinc-700 bg-black/20 hover:bg-zinc-800 hover:text-white font-semibold tracking-wide px-6 cursor-pointer gap-2"
+                    className="rounded-full font-semibold tracking-wide px-6 cursor-pointer gap-2"
                     onClick={() => router.push("/music/chat")}
                   >
                     <MessageCircle className="w-4 h-4" />
                     Chat
                   </Button>
+                  <ThemeSelector variant="outline" size="sm" />
                   <Button
                     variant="outline"
                     size="sm"
-                    className="rounded-full border-zinc-700 bg-black/20 hover:bg-zinc-800 hover:text-white font-semibold tracking-wide px-6 cursor-pointer"
+                    className="rounded-full font-semibold tracking-wide px-6 cursor-pointer"
                     onClick={() => signOut({ callbackUrl: "/login" })}
                   >
                     Sign out
@@ -294,21 +296,21 @@ export default function ProfilePage() {
                       <div
                         key={playlist._id || playlist.playlistId}
                         onClick={() => router.push(`/music/playlists/${playlist._id || playlist.playlistId}`)}
-                        className="group md:p-3 rounded-md bg-card/40 md:hover:bg-zinc-800/60 transition-all duration-300 cursor-pointer"
+                        className="group md:p-3 rounded-md bg-card/40 md:hover:bg-accent transition-all duration-300 cursor-pointer"
                       >
-                        <div className="aspect-square w-full relative mb-4 shadow-lg rounded-md overflow-hidden bg-zinc-900">
+                        <div className="aspect-square w-full relative mb-4 shadow-lg rounded-md overflow-hidden bg-muted">
                           <PlaylistImage playlist={playlist} />
                         </div>
-                        <h3 className="md:font-bold truncate text-white mb-1 decoration-1 text-sm md:text-base">{playlist.name || playlist.playlistName}</h3>
+                        <h3 className="md:font-bold truncate text-foreground mb-1 decoration-1 text-sm md:text-base">{playlist.name || playlist.playlistName}</h3>
                         <p className="text-xs md:text-sm text-muted-foreground truncate">By {playlist.owner || session?.user?.name || 'You'}</p>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground border-2 border-dashed border-zinc-800 rounded-lg">
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground border-2 border-dashed border-border rounded-lg">
                     <Disc className="w-12 h-12 mb-4 opacity-50" />
                     <p>No created playlists yet.</p>
-                    <Button variant="link" onClick={() => router.push('/music/playlists')} className="text-white">Create one</Button>
+                    <Button variant="link" onClick={() => router.push('/music/playlists')} className="text-primary">Create one</Button>
                   </div>
                 )}
               </section>
@@ -322,12 +324,12 @@ export default function ProfilePage() {
                       <div
                         key={playlist.playlistId}
                         onClick={() => router.push(playlist.isUserPlaylist ? `/music/playlists/${playlist.playlistId}` : `/music/playlist/${playlist.playlistId}`)}
-                        className="group md:p-3 rounded-md bg-card/40 md:hover:bg-zinc-800/60 transition-all duration-300 cursor-pointer"
+                        className="group md:p-3 rounded-md bg-card/40 md:hover:bg-accent transition-all duration-300 cursor-pointer"
                       >
-                        <div className="aspect-square w-full relative mb-4 shadow-lg rounded-md overflow-hidden bg-zinc-900">
+                        <div className="aspect-square w-full relative mb-4 shadow-lg rounded-md overflow-hidden bg-muted">
                           <PlaylistImage playlist={playlist} />
                         </div>
-                        <h3 className="md:font-bold truncate text-white mb-1 decoration-1 text-sm md:text-base">{playlist.playlistName}</h3>
+                        <h3 className="md:font-bold truncate text-foreground mb-1 decoration-1 text-sm md:text-base">{playlist.playlistName}</h3>
                         <p className="text-xs md:text-sm text-muted-foreground truncate">By {playlist.owner || playlist.subtitle || 'Jammify'}</p>
                       </div>
                     ))}

@@ -1,6 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeProvider } from "next-themes";
+import { JammifyThemeProvider } from "@/components/jammify-theme-provider";
 import { SessionProvider } from "next-auth/react";
 import AuthProvider from "@/components/auth-provider";
 import { MusicPlayerProvider } from "@/contexts/music-player-context";
@@ -93,17 +94,19 @@ export default function RootLayout({ children }) {
             forcedTheme="dark"
             disableTransitionOnChange
           >
-            <MusicPlayerProvider>
-              <GlobalOnlineTracker />
-              <UserActivityTracker />
-              <AppRating />
-              <RouteChangeHandler />
-              {children}
-              <Toaster theme="dark" position="bottom-right" />
-              <Analytics />
-              <SpeedInsights />
-              <MusicPlayerWrapper />
-            </MusicPlayerProvider>
+            <JammifyThemeProvider>
+              <MusicPlayerProvider>
+                <GlobalOnlineTracker />
+                <UserActivityTracker />
+                <AppRating />
+                <RouteChangeHandler />
+                {children}
+                <Toaster theme="dark" position="bottom-right" />
+                <Analytics />
+                <SpeedInsights />
+                <MusicPlayerWrapper />
+              </MusicPlayerProvider>
+            </JammifyThemeProvider>
           </ThemeProvider>
         </AuthProvider>
       </body>

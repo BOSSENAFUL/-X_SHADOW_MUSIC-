@@ -60,26 +60,26 @@ function Slider({
         <SliderPrimitive.Track
           data-slot="slider-track"
           className={cn(
-            "bg-white/20 relative grow overflow-hidden rounded-full data-[orientation=horizontal]:h-1 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1 transition-all duration-200"
+            "bg-muted/50 relative grow overflow-hidden rounded-full data-[orientation=horizontal]:h-1 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1 transition-all duration-200"
           )}>
           <SliderPrimitive.Range
             data-slot="slider-range"
             className={cn(
-              "bg-white absolute data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full group-hover:bg-green-500 transition-colors duration-200"
+              "bg-primary absolute data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full transition-colors duration-200"
             )} />
         </SliderPrimitive.Track>
         {Array.from({ length: _values.length }, (_, index) => (
           <SliderPrimitive.Thumb
             data-slot="slider-thumb"
             key={index}
-            className="block size-3 shrink-0 rounded-full border-0 bg-white shadow-sm transition-all duration-200 hover:ring-0 focus-visible:ring-0 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50 opacity-0 group-hover:opacity-100 hover:scale-110" />
+            className="block size-3 shrink-0 rounded-full border-0 bg-primary shadow-sm transition-all duration-200 hover:ring-0 focus-visible:ring-0 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50 opacity-0 group-hover:opacity-100 hover:scale-110" />
         ))}
       </SliderPrimitive.Root>
 
       {/* Tooltip */}
       {showTooltip && isHovering && (
         <div
-          className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded pointer-events-none z-10"
+          className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-popover text-popover-foreground text-xs px-2 py-1 rounded pointer-events-none z-10 border border-border"
           style={{
             left: `${((tooltipValue - min) / (max - min)) * 100}%`
           }}

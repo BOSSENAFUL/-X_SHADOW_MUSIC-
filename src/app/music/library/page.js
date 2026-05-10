@@ -56,10 +56,10 @@ const LibrarySkeleton = memo(() => (
   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-x-3 gap-y-6 md:gap-x-4 md:gap-y-8">
     {Array.from({ length: 12 }).map((_, i) => (
       <div key={i} className="group relative rounded-md">
-        <Skeleton className="aspect-square w-full mb-2 rounded-md bg-zinc-800/50" />
+        <Skeleton className="aspect-square w-full mb-2 rounded-md bg-muted" />
         <div className="min-w-0 space-y-1.5 mt-1">
-          <Skeleton className="h-4 w-full bg-zinc-800/50" />
-          <Skeleton className="h-3 w-2/3 bg-zinc-800/50" />
+          <Skeleton className="h-4 w-full bg-muted" />
+          <Skeleton className="h-3 w-2/3 bg-muted" />
         </div>
       </div>
     ))}
@@ -148,7 +148,7 @@ export default function LibraryPage() {
 
           const playlistsWithCovers = data.data.map((playlist) => {
             const sc = playlist.songIds?.length || 0
-            
+
             // Priority 1: Explicitly stored image
             if (playlist.image) {
               return {
@@ -199,7 +199,7 @@ export default function LibraryPage() {
               return {
                 ...rest,
                 // Keep only necessary data for grid view
-                songCount: p.songCount, 
+                songCount: p.songCount,
                 isCollage: p.isCollage,
                 collageImages: p.collageImages,
                 image: p.image
@@ -446,7 +446,7 @@ export default function LibraryPage() {
                   <Link
                     key={`${item.type}-${item.id}`}
                     href={item.onClick}
-                    className="group relative rounded-md hover:bg-zinc-800/30 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="group relative rounded-md hover:bg-muted/30 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     aria-label={`View ${item.type} ${item.title}`}
                   >
                     {/* Image Container */}
@@ -468,8 +468,8 @@ export default function LibraryPage() {
                           loading="lazy"
                         />
                       ) : (
-                        <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
-                          <span className="text-2xl font-bold text-zinc-600">
+                        <div className="w-full h-full bg-muted flex items-center justify-center">
+                          <span className="text-2xl font-bold text-muted-foreground">
                             {item.title?.charAt(0) || "?"}
                           </span>
                         </div>
@@ -478,10 +478,10 @@ export default function LibraryPage() {
 
                     {/* Text Content */}
                     <div className="min-w-0 space-y-0.5">
-                      <h3 className="font-bold text-white truncate text-[15px]">
+                      <h3 className="font-bold text-foreground truncate text-[15px]">
                         {item.title}
                       </h3>
-                      <p className="text-sm text-zinc-400 truncate font-medium">
+                      <p className="text-sm text-muted-foreground truncate font-medium">
                         {item.subtitle}
                       </p>
                     </div>

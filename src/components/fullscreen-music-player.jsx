@@ -511,6 +511,8 @@ export function FullscreenMusicPlayer({
   const desktopLyricsContainerRef = useRef(null);
   const mobileLyricLineRefs = useRef([]);
   const desktopLyricLineRefs = useRef([]);
+  const scrollAnimationRef = useRef(null);
+  const lastScrolledIndexRef = useRef(-1);
 
   // Fetch lyrics from LRCLib API
   const fetchLyrics = async (song) => {
@@ -641,78 +643,37 @@ export function FullscreenMusicPlayer({
     }
   };
 
-  // Scroll to center the current lyric line (Spotify-like behavior) - Optimized
-  const scrollToCurrentLyric = (currentIndex) => {
+  // Scroll to keep active lyric near top (2nd line position)
+  const scrollToCurrentLyric = useCallback((currentIndex) => {
     if (currentIndex === -1) return;
+    if (currentIndex === lastScrolledIndexRef.current) return;
+    lastScrolledIndexRef.current = currentIndex;
 
-    // Check which container is currently active (mobile or desktop)
-    const mobileContainer = mobileLyricsContainerRef.current;
-    const desktopContainer = desktopLyricsContainerRef.current;
+    // Pick the right line ref
+    const mobileEl = mobileLyricLineRefs.current[currentIndex];
+    const desktopEl = desktopLyricLineRefs.current[currentIndex];
 
-    let container = null;
-    let lineRefs = null;
+    // Use whichever is visible
+    const el = (mobileEl && mobileEl.offsetParent) ? mobileEl
+      : (desktopEl && desktopEl.offsetParent) ? desktopEl
+        : null;
 
-    // Try mobile first - check if it exists and is visible
-    if (mobileContainer) {
-      try {
-        // Check if the mobile container is actually visible in the DOM
-        const rect = mobileContainer.getBoundingClientRect();
-        const isVisible =
-          rect.width > 0 &&
-          rect.height > 0 &&
-          mobileContainer.offsetParent !== null;
+    if (!el) return;
 
-        if (isVisible) {
-          container = mobileContainer;
-          lineRefs = mobileLyricLineRefs.current;
-        }
-      } catch (e) {
-        // Fallback if getBoundingClientRect fails
-      }
+    // Get the scroll container
+    const container = el.closest('.overflow-y-auto');
+    if (!container) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
     }
 
-    // Try desktop if mobile not found or not visible
-    if (!container && desktopContainer) {
-      try {
-        const rect = desktopContainer.getBoundingClientRect();
-        const isVisible =
-          rect.width > 0 &&
-          rect.height > 0 &&
-          desktopContainer.offsetParent !== null;
+    // Position active line at ~15% from top = 2nd line feel
+    const containerTop = container.getBoundingClientRect().top;
+    const elTop = el.getBoundingClientRect().top;
+    const offset = elTop - containerTop - (container.clientHeight * 0.15);
 
-        if (isVisible) {
-          container = desktopContainer;
-          lineRefs = desktopLyricLineRefs.current;
-        }
-      } catch (e) {
-        // Fallback if getBoundingClientRect fails
-      }
-    }
-
-    if (!container || !lineRefs) return;
-
-    const currentLineElement = lineRefs[currentIndex];
-    if (!currentLineElement) return;
-
-    // Get container and line dimensions
-    const containerHeight = container.clientHeight;
-    const lineTop = currentLineElement.offsetTop;
-    const lineHeight = currentLineElement.clientHeight;
-
-    // Calculate scroll position to center the line
-    const scrollPosition = lineTop - containerHeight / 2 + lineHeight / 2;
-
-    // Use smooth scrolling with optimized performance
-    if (container.scrollTo) {
-      container.scrollTo({
-        top: Math.max(0, scrollPosition),
-        behavior: "smooth",
-      });
-    } else {
-      // Fallback for older browsers
-      container.scrollTop = Math.max(0, scrollPosition);
-    }
-  };
+    container.scrollBy({ top: offset, behavior: "smooth" });
+  }, []);
 
   // Optimized like toggle with debouncing and optimistic updates
   const [isLikeLoading, setIsLikeLoading] = useState(false);
@@ -1302,20 +1263,17 @@ export function FullscreenMusicPlayer({
     setIsFullscreenOpen(isOpen);
   }, [isOpen, setIsFullscreenOpen]);
 
-  // Auto-scroll to current lyric line (Spotify-like behavior) - Optimized
+  // Auto-scroll to current lyric line
   useEffect(() => {
     if (!showLyrics || !lyrics?.syncedLyrics) return;
 
     const parsedLyrics = parseSyncedLyrics(lyrics.syncedLyrics);
     const currentLyricIndex = getCurrentLyricIndex(parsedLyrics, currentTime);
 
-    if (currentLyricIndex !== -1) {
-      // Use requestAnimationFrame for smoother performance
-      requestAnimationFrame(() => {
-        scrollToCurrentLyric(currentLyricIndex);
-      });
+    if (currentLyricIndex !== -1 && currentLyricIndex !== lastScrolledIndexRef.current) {
+      scrollToCurrentLyric(currentLyricIndex);
     }
-  }, [currentTime, showLyrics, lyrics?.syncedLyrics]);
+  }, [currentTime, showLyrics, lyrics?.syncedLyrics, scrollToCurrentLyric]);
 
   if (!isOpen || !currentSong) return null;
 
@@ -1623,7 +1581,7 @@ export function FullscreenMusicPlayer({
               </div>
 
               {/* Song Info - Compact for small screens */}
-              <div className="px-2 pb-4 shrink-0">
+              <div className="px-1 sm:px-2 pb-4 shrink-0">
                 <div className="flex items-center justify-between mb-3 sm:mb-4">
                   <div className="flex-1 min-w-0 mb-1">
                     <h1 className="text-lg sm:text-xl font-bold text-white truncate">
@@ -1675,7 +1633,7 @@ export function FullscreenMusicPlayer({
                 </div>
 
                 {/* Controls - Compact spacing for small screens */}
-                <div className="flex items-center justify-between gap-4 sm:gap-8 mb-4 sm:mb-6">
+                <div className="flex items-center justify-between max-[360px]:justify-center gap-3 max-[360px]:gap-2 sm:gap-8 mb-4 sm:mb-6">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1686,40 +1644,36 @@ export function FullscreenMusicPlayer({
                     <RxShuffle style={{ width: '24px', height: '24px' }} />
                   </Button>
 
-                  <div className="flex items-center gap-5">
+                  <Button
+                    size="xs"
+                    onClick={handlePrevious}
+                    disabled={playlist.length === 0}
+                    className="text-white  hover:bg-transparent bg-transparent"
+                  >
+                    <BiSkipPrevious style={{ width: '52px', height: '52px' }} />
+                  </Button>
 
-                    <Button
-                      size="xs"
-                      onClick={handlePrevious}
-                      disabled={playlist.length === 0}
-                      className="text-white  hover:bg-transparent bg-transparent"
-                    >
-                      <BiSkipPrevious style={{ width: '52px', height: '52px' }} />
-                    </Button>
+                  <Button
+                    variant="default"
+                    size="lg"
+                    onClick={onTogglePlayPause}
+                    className="rounded-full w-16 h-16 sm:w-20 sm:h-20 bg-white text-black hover:bg-white/90"
+                  >
+                    {isPlaying ? (
+                      <HiPause style={{ width: '30px', height: '30px' }} />
+                    ) : (
+                      <IoMdPlay style={{ width: '30px', height: '30px', marginLeft: '4px' }} />
+                    )}
+                  </Button>
 
-                    <Button
-                      variant="default"
-                      size="lg"
-                      onClick={onTogglePlayPause}
-                      className="rounded-full w-16 h-16 sm:w-20 sm:h-20 bg-white text-black hover:bg-white/90"
-                    >
-                      {isPlaying ? (
-                        <HiPause style={{ width: '30px', height: '30px' }} />
-                      ) : (
-                        <IoMdPlay style={{ width: '30px', height: '30px', marginLeft: '4px' }} />
-                      )}
-                    </Button>
-
-                    <Button
-                      size="xs"
-                      onClick={handleNext}
-                      disabled={playlist.length === 0}
-                      className="text-white  hover:bg-transparent bg-transparent"
-                    >
-                      <BiSkipNext style={{ width: '52px', height: '52px' }} />
-                    </Button>
-                  </div>
-
+                  <Button
+                    size="xs"
+                    onClick={handleNext}
+                    disabled={playlist.length === 0}
+                    className="text-white  hover:bg-transparent bg-transparent"
+                  >
+                    <BiSkipNext style={{ width: '52px', height: '52px' }} />
+                  </Button>
 
                   <Button
                     variant="ghost"
@@ -2177,61 +2131,47 @@ export function FullscreenMusicPlayer({
 
         {/* Lyrics View - Full Screen Overlay */}
         {showLyrics && (
-          <div className="fixed inset-0 z-110 overflow-hidden">
-            {/* Ambient Background */}
+          <div
+            className="fixed inset-0 z-110 overflow-hidden transition-all duration-1000 ease-out"
+            style={{
+              background: dominantColors.primary
+                ? `linear-gradient(to bottom, 
+                    ${dominantColors.primary} 0%, 
+                    ${dominantColors.accent} 50%, 
+                    ${dominantColors.secondary} 100%)`
+                : '#121212',
+            }}
+          >
+            {/* Enhanced Ambient Background */}
             <div className="absolute inset-0">
-              {/* Multiple layered background images for ambient effect */}
-              {currentSong.image?.[2]?.url && (
-                <>
-                  {/* Base blurred image */}
-                  <img
-                    src={currentSong.image[2].url}
-                    alt={currentSong.name}
-                    className="absolute inset-0 w-full h-full object-cover opacity-30 blur-3xl scale-125 transition-all duration-1000"
-                  />
-                  {/* Secondary ambient layer */}
-                  <img
-                    src={currentSong.image[2].url}
-                    alt={currentSong.name}
-                    className="absolute inset-0 w-full h-full object-cover opacity-15 blur-[100px] scale-150 transition-all duration-1000"
-                  />
-                  {/* Tertiary glow layer */}
-                  <img
-                    src={currentSong.image[2].url}
-                    alt={currentSong.name}
-                    className="absolute inset-0 w-full h-full object-cover opacity-8 blur-[150px] scale-[2] transition-all duration-1000"
-                  />
-                </>
-              )}
-
               {/* Dynamic gradient overlay based on extracted colors */}
               <div
                 className="absolute inset-0 transition-all duration-1000"
                 style={{
                   background: `
-                  radial-gradient(ellipse at top, ${dominantColors.primary}20 0%, transparent 50%),
-                  radial-gradient(ellipse at bottom left, ${dominantColors.secondary}25 0%, transparent 50%),
-                  radial-gradient(ellipse at bottom right, ${dominantColors.accent}20 0%, transparent 50%),
-                  linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.8) 50%, rgba(0,0,0,0.95) 100%)
-                `,
+              radial-gradient(ellipse at top, ${dominantColors.primary.replace('rgb', 'rgba').replace(')', ', 0.4)')} 0%, transparent 70%),
+              radial-gradient(ellipse at bottom left, ${dominantColors.secondary.replace('rgb', 'rgba').replace(')', ', 0.3)')} 0%, transparent 60%),
+              radial-gradient(ellipse at bottom right, ${dominantColors.accent.replace('rgb', 'rgba').replace(')', ', 0.25)')} 0%, transparent 60%),
+              linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.75) 100%)
+            `,
                 }}
               />
 
               {/* Color wash overlay */}
               <div
-                className="absolute inset-0 mix-blend-soft-light opacity-30 transition-all duration-1000"
+                className="absolute inset-0 mix-blend-soft-light opacity-40 transition-all duration-1000"
                 style={{
                   background: `
-                  radial-gradient(circle at 30% 20%, ${dominantColors.primary}40 0%, transparent 40%),
-                  radial-gradient(circle at 70% 80%, ${dominantColors.secondary}30 0%, transparent 40%),
-                  radial-gradient(circle at 50% 50%, ${dominantColors.accent}25 0%, transparent 60%)
-                `,
+              radial-gradient(circle at 30% 20%, ${dominantColors.primary.replace('rgb', 'rgba').replace(')', ', 0.3)')} 0%, transparent 40%),
+              radial-gradient(circle at 70% 80%, ${dominantColors.secondary.replace('rgb', 'rgba').replace(')', ', 0.25)')} 0%, transparent 40%),
+              radial-gradient(circle at 50% 50%, ${dominantColors.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')} 0%, transparent 60%)
+            `,
                 }}
               />
 
               {/* Subtle noise texture for depth */}
               <div
-                className="absolute inset-0 opacity-[0.015] mix-blend-overlay"
+                className="absolute inset-0 opacity-[0.02] mix-blend-overlay"
                 style={{
                   backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
                   backgroundSize: "256px 256px",
@@ -2240,8 +2180,8 @@ export function FullscreenMusicPlayer({
             </div>
 
             <div className="relative z-10 flex flex-col h-full">
-              {/* Lyrics Header */}
-              <div className="flex items-center justify-between p-4 border-b border-white/10">
+              {/* Lyrics Header - Minimal with just back button */}
+              <div className="flex items-center justify-start p-4 border-b border-white/10">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -2250,8 +2190,6 @@ export function FullscreenMusicPlayer({
                 >
                   <ChevronDown className="w-5 h-5" />
                 </Button>
-                <h3 className="text-lg font-semibold text-white">Lyrics</h3>
-                <div className="w-9"></div> {/* Spacer for centering */}
               </div>
 
               {/* Lyrics Content */}
@@ -2309,13 +2247,10 @@ export function FullscreenMusicPlayer({
                     ref={mobileLyricsContainerRef}
                     className="flex-1 overflow-y-auto scrollbar-hide"
                     style={{
-                      scrollBehavior: "smooth",
                       WebkitOverflowScrolling: "touch",
-                      transform: "translateZ(0)", // Force hardware acceleration
-                      willChange: "scroll-position",
                     }}
                   >
-                    <div className="space-y-6 text-center max-w-md mx-auto py-12 px-8">
+                    <div className="space-y-3 text-left max-w-2xl py-12 px-4">
                       {lyricsLoading ? (
                         <div className="flex items-center justify-center py-12">
                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white/60"></div>
@@ -2325,9 +2260,9 @@ export function FullscreenMusicPlayer({
                         </div>
                       ) : lyrics ? (
                         <>
-                          {/* Synced Lyrics - Optimized with Motion Blur */}
+                          {/* Synced Lyrics - Apple Music Style */}
                           {lyrics.syncedLyrics ? (
-                            <div className="space-y-4 text-white/90 leading-relaxed">
+                            <div className="space-y-3 leading-tight">
                               {parseSyncedLyrics(lyrics.syncedLyrics).map(
                                 (line, index) => {
                                   const currentLyricIndex =
@@ -2337,10 +2272,6 @@ export function FullscreenMusicPlayer({
                                     );
                                   const isCurrentLine =
                                     index === currentLyricIndex;
-                                  const isUpcomingLine =
-                                    index === currentLyricIndex + 1;
-                                  const isPreviousLine =
-                                    index === currentLyricIndex - 1;
 
                                   return (
                                     <p
@@ -2349,25 +2280,22 @@ export function FullscreenMusicPlayer({
                                       (mobileLyricLineRefs.current[index] =
                                         el)
                                       }
-                                      className={`text-lg transition-all duration-700 ease-out transform will-change-transform ${isCurrentLine
-                                        ? "text-white font-bold text-xl scale-105 blur-0 opacity-100"
-                                        : isUpcomingLine
-                                          ? "text-white/80 font-medium blur-0 opacity-90 scale-100"
-                                          : isPreviousLine
-                                            ? "text-white/60 blur-[0.5px] opacity-70 scale-95"
-                                            : "text-white/40 blur-[1px] opacity-50 scale-90"
+                                      className={`text-3xl font-bold transition-opacity transition-filter duration-300 ease-out ${isCurrentLine
+                                        ? "text-white opacity-100"
+                                        : "text-white/25 opacity-30"
                                         }`}
                                       style={{
+                                        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif',
+                                        fontWeight: '700',
+                                        letterSpacing: '-0.01em',
+                                        lineHeight: '1.2',
                                         filter: isCurrentLine
-                                          ? "blur(0px) brightness(1.1)"
-                                          : isUpcomingLine
-                                            ? "blur(0px) brightness(1)"
-                                            : isPreviousLine
-                                              ? "blur(0.5px) brightness(0.9)"
-                                              : "blur(1px) brightness(0.7)",
+                                          ? "blur(0px)"
+                                          : "blur(1px)",
                                         textShadow: isCurrentLine
-                                          ? "0 0 20px rgba(255,255,255,0.3)"
+                                          ? "0 1px 8px rgba(0,0,0,0.3)"
                                           : "none",
+                                        transition: "opacity 300ms ease, filter 300ms ease",
                                       }}
                                     >
                                       {line.text}
@@ -2378,17 +2306,28 @@ export function FullscreenMusicPlayer({
                             </div>
                           ) : lyrics.plainLyrics ? (
                             /* Plain Lyrics */
-                            <div className="space-y-4 text-white/90 leading-relaxed">
+                            <div className="space-y-6 leading-relaxed">
                               {lyrics.plainLyrics
                                 .split("\n")
                                 .map((line, index) => (
-                                  <p key={index} className="text-lg">
+                                  <p
+                                    key={index}
+                                    className="text-2xl text-white/60 font-semibold"
+                                    style={{
+                                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif',
+                                      letterSpacing: '-0.02em',
+                                      lineHeight: '1.3',
+                                    }}
+                                  >
                                     {line.trim()}
                                   </p>
                                 ))}
                             </div>
                           ) : (
                             <div className="text-center py-12">
+                              <div className="flex justify-center mb-4">
+                                <Mic className="w-12 h-12 text-white/30" />
+                              </div>
                               <p className="text-white/60 text-lg">
                                 No lyrics available
                               </p>
@@ -2400,6 +2339,9 @@ export function FullscreenMusicPlayer({
                         </>
                       ) : (
                         <div className="text-center py-12">
+                          <div className="flex justify-center mb-4">
+                            <Mic className="w-12 h-12 text-white/30" />
+                          </div>
                           <p className="text-white/60 text-lg">
                             No lyrics found
                           </p>
@@ -2412,221 +2354,237 @@ export function FullscreenMusicPlayer({
                   </div>
                 </div>
 
-                {/* Desktop Layout - Centered and Balanced */}
+                {/* Desktop Layout - Split Screen with Album Art + Lyrics */}
                 <div className="hidden md:flex h-full">
-                  <div className="flex items-center justify-center w-full px-8 py-8">
-                    <div className="flex items-center gap-12 lg:gap-16 max-w-6xl w-full">
-                      {/* Left Side - Album Art with Integrated Controls */}
-                      <div className="shrink-0">
-                        <div className="w-[350px] lg:w-[400px]">
-                          {/* Album Art Container with Overlay Controls */}
-                          <div className="relative aspect-square rounded-2xl overflow-hidden shadow-2xl bg-linear-to-br from-gray-800 to-gray-900 mb-6 group">
-                            {currentSong.image?.[2]?.url ? (
-                              <img
-                                src={currentSong.image[2].url}
-                                alt={currentSong.name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <IoMdPlay className="w-16 h-16 text-white/50" />
-                              </div>
-                            )}
-
-                            {/* Overlay Controls - Spotify Style */}
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300">
-                              {/* Center Play Controls */}
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <div className="flex items-center gap-4">
-                                  <Button
-                                    variant="ghost"
-                                    size="lg"
-                                    onClick={handlePrevious}
-                                    className="text-white hover:bg-white/10 rounded-full p-3"
-                                  >
-                                    <SkipBack className="w-6 h-6" />
-                                  </Button>
-
-                                  <Button
-                                    variant="default"
-                                    size="lg"
-                                    onClick={onTogglePlayPause}
-                                    className="rounded-full w-14 h-14 bg-white text-black hover:bg-white/90 hover:scale-105 transition-all duration-200"
-                                  >
-                                    {isPlaying ? (
-                                      <HiPause style={{ width: '24px', height: '24px' }} />
-                                    ) : (
-                                      <IoMdPlay style={{ width: '24px', height: '24px' }} className="ml-0.5" />
-                                    )}
-                                  </Button>
-
-                                  <Button
-                                    variant="ghost"
-                                    size="lg"
-                                    onClick={handleNext}
-                                    className="text-white hover:bg-white/10 rounded-full p-3"
-                                  >
-                                    <SkipForward className="w-6 h-6" />
-                                  </Button>
-                                </div>
-                              </div>
-
-                              {/* Bottom Progress Bar */}
-                              <div className="absolute bottom-4 left-4 right-4">
-                                <div className="flex items-center gap-2 text-xs text-white/80 mb-2">
-                                  <span>{formatTime(currentTime)}</span>
-                                  <div className="flex-1">
-                                    <Slider
-                                      value={[currentTime]}
-                                      max={duration || 100}
-                                      step={1}
-                                      onValueChange={onSeek}
-                                      onValueCommit={onSeekCommit}
-                                      className="w-full **:[[role=slider]]:bg-white **:[[role=slider]]:border-white **:[[role=slider]]:w-3 **:[[role=slider]]:h-3 [&_.bg-primary]:bg-white"
-                                    />
-                                  </div>
-                                  <span>{formatTime(duration)}</span>
-                                </div>
-                              </div>
-                            </div>
+                  {/* Left Side - Album Art with Mini Player */}
+                  <div className="w-[45%] flex flex-col items-center justify-center p-8 lg:p-16">
+                    <div className="w-full max-w-lg space-y-6 lg:space-y-8">
+                      {/* Album Art - Much Larger */}
+                      <div className="aspect-square w-full rounded-3xl overflow-hidden shadow-2xl bg-linear-to-br from-gray-800 to-gray-900 ring-1 ring-white/10">
+                        {currentSong.image?.length > 0 ? (
+                          <img
+                            src={
+                              currentSong.image.find(
+                                (img) => img.quality === "500x500"
+                              )?.url ||
+                              currentSong.image.find(
+                                (img) => img.quality === "150x150"
+                              )?.url ||
+                              currentSong.image[currentSong.image.length - 1]?.url
+                            }
+                            alt={currentSong.name}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Disc className="w-32 h-32 text-white/20" />
                           </div>
-
-                          {/* Song Info Below Album Art */}
-                          <div className="text-center px-4">
-                            <h4 className="text-white font-bold text-2xl mb-2 truncate">
-                              {decodeHtmlEntities(currentSong.name)}
-                            </h4>
-                            <p className="text-white/70 text-lg truncate">
-                              {getArtistNames(currentSong)}
-                            </p>
-                          </div>
-                        </div>
+                        )}
                       </div>
 
-                      {/* Right Side - Lyrics */}
-                      <div className="flex-1 min-w-0">
-                        <div
-                          ref={desktopLyricsContainerRef}
-                          className="h-[500px] lg:h-[600px] overflow-y-auto scrollbar-hide"
-                          style={{
-                            scrollBehavior: "smooth",
-                            WebkitOverflowScrolling: "touch",
-                            transform: "translateZ(0)", // Force hardware acceleration
-                            willChange: "scroll-position",
-                          }}
-                        >
-                          <div className="space-y-6 py-16 px-8 lg:px-12">
-                            {lyricsLoading ? (
-                              <div className="flex items-center justify-center py-12">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white/60"></div>
-                                <span className="ml-4 text-white/60 text-xl">
-                                  Loading lyrics...
-                                </span>
-                              </div>
-                            ) : lyrics ? (
-                              <>
-                                {/* Synced Lyrics - Optimized with Motion Blur */}
-                                {lyrics.syncedLyrics ? (
-                                  <div className="space-y-8 text-white/90 leading-relaxed">
-                                    {parseSyncedLyrics(lyrics.syncedLyrics).map(
-                                      (line, index) => {
-                                        const currentLyricIndex =
-                                          getCurrentLyricIndex(
-                                            parseSyncedLyrics(
-                                              lyrics.syncedLyrics
-                                            ),
-                                            currentTime
-                                          );
-                                        const isCurrentLine =
-                                          index === currentLyricIndex;
-                                        const isUpcomingLine =
-                                          index === currentLyricIndex + 1;
-                                        const isPreviousLine =
-                                          index === currentLyricIndex - 1;
+                      {/* Song Info - Below Album Art */}
+                      <div className="text-center space-y-2 px-4">
+                        <h3 className="text-3xl lg:text-4xl font-bold text-white leading-tight">
+                          {decodeHtmlEntities(currentSong.name)}
+                        </h3>
+                        <p className="text-xl lg:text-2xl text-white/70">
+                          {getArtistNames(currentSong)}
+                        </p>
+                      </div>
 
-                                        return (
-                                          <p
-                                            key={index}
-                                            ref={(el) =>
-                                            (desktopLyricLineRefs.current[
-                                              index
-                                            ] = el)
-                                            }
-                                            className={`text-xl lg:text-2xl transition-all duration-700 ease-out cursor-pointer hover:text-white/90 wrap-break-word transform will-change-transform ${isCurrentLine
-                                              ? "text-white font-bold text-2xl lg:text-3xl scale-105 blur-0 opacity-100"
-                                              : isUpcomingLine
-                                                ? "text-white/85 font-medium text-xl lg:text-2xl blur-0 opacity-95 scale-100"
-                                                : isPreviousLine
-                                                  ? "text-white/65 blur-[0.5px] opacity-75 scale-98"
-                                                  : "text-white/45 blur-[1px] opacity-60 scale-95"
-                                              }`}
-                                            style={{
-                                              filter: isCurrentLine
-                                                ? "blur(0px) brightness(1.2) saturate(1.1)"
-                                                : isUpcomingLine
-                                                  ? "blur(0px) brightness(1.05) saturate(1.05)"
-                                                  : isPreviousLine
-                                                    ? "blur(0.5px) brightness(0.95) saturate(0.95)"
-                                                    : "blur(1px) brightness(0.8) saturate(0.8)",
-                                              textShadow: isCurrentLine
-                                                ? "0 0 30px rgba(255,255,255,0.4), 0 0 60px rgba(255,255,255,0.2)"
-                                                : isUpcomingLine
-                                                  ? "0 0 15px rgba(255,255,255,0.2)"
-                                                  : "none",
-                                              backfaceVisibility: "hidden",
-                                              WebkitFontSmoothing:
-                                                "antialiased",
-                                            }}
-                                            onClick={() =>
-                                              onDirectSeek([
-                                                parseSyncedLyrics(
-                                                  lyrics.syncedLyrics
-                                                )[index]?.time || 0,
-                                              ])
-                                            }
-                                          >
-                                            {line.text}
-                                          </p>
+                      {/* Mini Player Controls */}
+                      <div className="space-y-4 px-4">
+                        {/* Progress Bar */}
+                        <div className="space-y-2">
+                          <Slider
+                            value={[currentTime]}
+                            max={duration || 100}
+                            step={0.1}
+                            onValueChange={onSeek}
+                            onValueCommit={onSeekCommit}
+                            className="w-full cursor-pointer"
+                          />
+                          <div className="flex justify-between text-sm text-white/50 font-medium tabular-nums">
+                            <span>{formatTime(currentTime)}</span>
+                            <span>{formatTime(duration)}</span>
+                          </div>
+                        </div>
+
+                        {/* Playback Controls */}
+                        <div className="flex items-center justify-between">
+                          {/* Shuffle */}
+                          <button
+                            onClick={() => setIsShuffle(!isShuffle)}
+                            className={`p-2 rounded-full transition-all duration-200 hover:bg-white/10 ${isShuffle ? "text-primary" : "text-white/50 hover:text-white"
+                              }`}
+                          >
+                            <RxShuffle className="w-5 h-5" />
+                          </button>
+
+                          {/* Previous */}
+                          <button
+                            onClick={onPrevious}
+                            className="p-2 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200"
+                          >
+                            <BiSkipPrevious className="w-8 h-8" />
+                          </button>
+
+                          {/* Play / Pause */}
+                          <button
+                            onClick={onTogglePlayPause}
+                            className="w-14 h-14 rounded-full bg-white hover:bg-white/90 text-black flex items-center justify-center hover:scale-105 transition-all duration-200 shadow-lg"
+                          >
+                            {isPlaying ? (
+                              <HiPause className="w-6 h-6" />
+                            ) : (
+                              <IoMdPlay className="w-6 h-6 ml-0.5" />
+                            )}
+                          </button>
+
+                          {/* Next */}
+                          <button
+                            onClick={onNext}
+                            className="p-2 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200"
+                          >
+                            <BiSkipNext className="w-8 h-8" />
+                          </button>
+
+                          {/* Repeat */}
+                          <button
+                            onClick={toggleRepeat}
+                            className={`p-2 rounded-full transition-all duration-200 hover:bg-white/10 ${repeatMode !== "off" ? "text-primary" : "text-white/50 hover:text-white"
+                              }`}
+                          >
+                            <BsRepeat className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Side - Lyrics */}
+                  <div className="flex-1 flex items-center justify-start px-8 lg:px-16 py-8 border-l border-white/5">
+                    <div className="w-full max-w-4xl">
+                      <div
+                        ref={desktopLyricsContainerRef}
+                        className="h-[calc(100vh-10rem)] overflow-y-auto scrollbar-hide"
+                        style={{
+                          WebkitOverflowScrolling: "touch",
+                        }}
+                      >
+                        <div className="space-y-6 py-20 text-left">
+                          {lyricsLoading ? (
+                            <div className="flex items-center justify-center py-12">
+                              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white/60"></div>
+                              <span className="ml-4 text-white/60 text-xl">
+                                Loading lyrics...
+                              </span>
+                            </div>
+                          ) : lyrics ? (
+                            <>
+                              {/* Synced Lyrics - Clean Custom Implementation */}
+                              {lyrics.syncedLyrics ? (
+                                <div className="space-y-6 leading-tight">
+                                  {parseSyncedLyrics(lyrics.syncedLyrics).map(
+                                    (line, index) => {
+                                      const currentLyricIndex =
+                                        getCurrentLyricIndex(
+                                          parseSyncedLyrics(
+                                            lyrics.syncedLyrics
+                                          ),
+                                          currentTime
                                         );
-                                      }
-                                    )}
-                                  </div>
-                                ) : lyrics.plainLyrics ? (
-                                  /* Plain Lyrics */
-                                  <div className="space-y-6 text-white/90 leading-relaxed">
-                                    {lyrics.plainLyrics
-                                      .split("\n")
-                                      .map((line, index) => (
+                                      const isCurrentLine =
+                                        index === currentLyricIndex;
+
+                                      return (
                                         <p
                                           key={index}
-                                          className="text-xl lg:text-2xl text-white/70 hover:text-white/90 transition-colors cursor-pointer wrap-break-word"
+                                          ref={(el) =>
+                                          (desktopLyricLineRefs.current[
+                                            index
+                                          ] = el)
+                                          }
+                                          className={`text-5xl xl:text-6xl font-bold cursor-pointer ${isCurrentLine
+                                            ? "text-white opacity-100"
+                                            : "text-white/20 opacity-25"
+                                            }`}
+                                          style={{
+                                            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif',
+                                            fontWeight: '700',
+                                            letterSpacing: '-0.02em',
+                                            lineHeight: '1.15',
+                                            filter: isCurrentLine
+                                              ? "blur(0px)"
+                                              : "blur(1.5px)",
+                                            textShadow: isCurrentLine
+                                              ? "0 4px 20px rgba(0,0,0,0.5), 0 0 40px rgba(255,255,255,0.1)"
+                                              : "none",
+                                            backfaceVisibility: "hidden",
+                                            WebkitFontSmoothing: "antialiased",
+                                            transition: "opacity 300ms ease, filter 300ms ease, text-shadow 300ms ease",
+                                          }}
+                                          onClick={() =>
+                                            onDirectSeek([
+                                              parseSyncedLyrics(
+                                                lyrics.syncedLyrics
+                                              )[index]?.time || 0,
+                                            ])
+                                          }
                                         >
-                                          {line.trim()}
+                                          {line.text}
                                         </p>
-                                      ))}
+                                      );
+                                    }
+                                  )}
+                                </div>
+                              ) : lyrics.plainLyrics ? (
+                                /* Plain Lyrics */
+                                <div className="space-y-6 leading-tight text-left">
+                                  {lyrics.plainLyrics
+                                    .split("\n")
+                                    .map((line, index) => (
+                                      <p
+                                        key={index}
+                                        className="text-5xl xl:text-6xl text-white/35 font-bold cursor-pointer hover:text-white/70 transition-all duration-200"
+                                        style={{
+                                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif',
+                                          letterSpacing: '-0.02em',
+                                          lineHeight: '1.15',
+                                        }}
+                                      >
+                                        {line.trim()}
+                                      </p>
+                                    ))}
+                                </div>
+                              ) : (
+                                <div className="text-center py-12">
+                                  <div className="flex justify-center mb-6">
+                                    <Mic className="w-20 h-20 text-white/20" />
                                   </div>
-                                ) : (
-                                  <div className="text-center py-12">
-                                    <p className="text-white/60 text-xl">
-                                      No lyrics available
-                                    </p>
-                                    <p className="text-white/40 text-lg mt-2">
-                                      Enjoy the music!
-                                    </p>
-                                  </div>
-                                )}
-                              </>
-                            ) : (
-                              <div className="text-center py-12">
-                                <p className="text-white/60 text-xl">
-                                  No lyrics found
-                                </p>
-                                <p className="text-white/40 text-lg mt-2">
-                                  Try searching for another song
-                                </p>
+                                  <p className="text-white/60 text-2xl font-semibold">
+                                    No lyrics available
+                                  </p>
+                                  <p className="text-white/40 text-lg mt-3">
+                                    Enjoy the music!
+                                  </p>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="text-center py-12">
+                              <div className="flex justify-center mb-6">
+                                <Mic className="w-20 h-20 text-white/20" />
                               </div>
-                            )}
-                          </div>
+                              <p className="text-white/60 text-2xl font-semibold">
+                                No lyrics found
+                              </p>
+                              <p className="text-white/40 text-lg mt-3">
+                                Try searching for another song
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

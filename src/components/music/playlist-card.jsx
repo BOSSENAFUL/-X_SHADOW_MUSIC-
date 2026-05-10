@@ -90,7 +90,7 @@ export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
             className="group cursor-pointer hover:scale-105 transition-transform"
             onClick={() => onClick(playlist)}
         >
-            <div className="relative rounded-lg aspect-square overflow-hidden mb-3 bg-neutral-900 border border-white/5 shadow-lg">
+            <div className="relative rounded-lg aspect-square overflow-hidden mb-3 bg-muted border border-border shadow-lg">
                 {collageDisplayImages.length >= 4 ? (
                     <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
                         {collageDisplayImages.slice(0, 4).map((src, idx) => (

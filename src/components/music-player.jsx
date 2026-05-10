@@ -81,7 +81,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
   const handlePrevious = () => {
     if (playlist.length === 0) return;
-    
+
     if (isShuffle) {
       const randomIndex = Math.floor(Math.random() * playlist.length);
       onSongChange?.(playlist[randomIndex], randomIndex);
@@ -97,7 +97,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
     if (repeatMode === 'one') {
       audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {});
+      audioRef.current.play().catch(() => { });
       return;
     }
 
@@ -927,12 +927,12 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                     {/* Shuffle Button */}
                     <button
                       onClick={() => setIsShuffle(!isShuffle)}
-                      className={`relative flex flex-col items-center justify-center p-0 bg-transparent hover:bg-transparent border-none outline-none shadow-none transition-colors group cursor-pointer ${isShuffle ? "text-green-500" : "text-white/60 hover:text-white"
+                      className={`relative flex flex-col items-center justify-center p-0 bg-transparent hover:bg-transparent border-none outline-none shadow-none transition-colors group cursor-pointer ${isShuffle ? "text-primary" : "text-muted-foreground hover:text-foreground"
                         }`}
                     >
                       <Shuffle style={{ width: '18px', height: '18px' }} />
                       {isShuffle && (
-                        <div className="absolute -bottom-2 w-1 h-1 bg-green-500 rounded-full" />
+                        <div className="absolute -bottom-2 w-1 h-1 bg-primary rounded-full" />
                       )}
                     </button>
 
@@ -942,18 +942,18 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                       disabled={playlist.length === 0}
                       className="hover:bg-transparent bg-transparent hover:scale-110 active:scale-95 group transition-all p-0 h-auto w-auto cursor-pointer"
                     >
-                      <BiSkipPrevious style={{ width: '32px', height: '32px' }} className="text-white/65 group-hover:text-white" />
+                      <BiSkipPrevious style={{ width: '32px', height: '32px' }} className="text-muted-foreground group-hover:text-foreground" />
                     </Button>
 
                     <Button
                       size="sm"
                       onClick={togglePlayPause}
-                      className="rounded-full w-8 h-8 bg-white hover:bg-white hover:scale-110 transition-transform active:scale-95 hover:cursor-pointer shrink-0"
+                      className="rounded-full w-8 h-8 bg-foreground hover:bg-foreground hover:scale-110 transition-transform active:scale-95 hover:cursor-pointer shrink-0"
                     >
                       {isPlaying ? (
-                        <HiPause className="text-black" style={{ width: '18px', height: '18px' }} />
+                        <HiPause className="text-background" style={{ width: '18px', height: '18px' }} />
                       ) : (
-                        <IoMdPlay style={{ width: '16px', height: '16px', marginLeft: '2px', }} className="text-black" />
+                        <IoMdPlay style={{ width: '16px', height: '16px', marginLeft: '2px', }} className="text-background" />
                       )}
                     </Button>
 
@@ -963,13 +963,13 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                       disabled={playlist.length === 0}
                       className="hover:bg-transparent bg-transparent hover:scale-110 active:scale-95 group transition-all p-0 h-auto w-auto cursor-pointer"
                     >
-                      <BiSkipNext style={{ width: '32px', height: '32px' }} className="text-white/65 group-hover:text-white" />
+                      <BiSkipNext style={{ width: '32px', height: '32px' }} className="text-muted-foreground group-hover:text-foreground" />
                     </Button>
 
                     {/* Repeat Button */}
                     <button
                       onClick={toggleRepeat}
-                      className={`relative flex flex-col items-center justify-center p-0 bg-transparent hover:bg-transparent border-none outline-none shadow-none transition-colors group cursor-pointer ${repeatMode !== "off" ? "text-green-500" : "text-white/60 hover:text-white"
+                      className={`relative flex flex-col items-center justify-center p-0 bg-transparent hover:bg-transparent border-none outline-none shadow-none transition-colors group cursor-pointer ${repeatMode !== "off" ? "text-primary" : "text-muted-foreground hover:text-foreground"
                         }`}
                     >
                       {repeatMode === "one" ? (
@@ -978,7 +978,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                         <Repeat style={{ width: '18px', height: '18px' }} />
                       )}
                       {repeatMode !== "off" && (
-                        <div className="absolute -bottom-2 w-1 h-1 bg-green-500 rounded-full" />
+                        <div className="absolute -bottom-2 w-1 h-1 bg-primary rounded-full" />
                       )}
                     </button>
                   </div>
@@ -1009,16 +1009,16 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                 {/* Volume */}
                 <div className="flex items-center gap-3 flex-1 justify-end">
                   <button
-                    className={`transition-colors p-1 cursor-pointer ${isFullscreenOpen && isFullscreenPlaylistOpen ? 'text-green-500' : 'text-white/60 hover:text-white'}`}
+                    className={`transition-colors p-1 cursor-pointer ${isFullscreenOpen && isFullscreenPlaylistOpen ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
                     title="Queue"
                     onClick={() => {
-                        if (isFullscreenOpen && isFullscreenPlaylistOpen) {
-                            setIsFullscreenOpen(false);
-                            setIsFullscreenPlaylistOpen(false);
-                        } else {
-                            setIsFullscreenOpen(true);
-                            setIsFullscreenPlaylistOpen(true);
-                        }
+                      if (isFullscreenOpen && isFullscreenPlaylistOpen) {
+                        setIsFullscreenOpen(false);
+                        setIsFullscreenPlaylistOpen(false);
+                      } else {
+                        setIsFullscreenOpen(true);
+                        setIsFullscreenPlaylistOpen(true);
+                      }
                     }}
                   >
                     <ListMusic style={{ width: '20px', height: '20px' }} />
@@ -1027,13 +1027,13 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                   {volume === 0 ? (
                     <VolumeX
                       style={{ width: '20px', height: '20px' }}
-                      className="cursor-pointer hover:text-white transition-colors ml-1"
+                      className="cursor-pointer hover:text-foreground transition-colors ml-1"
                       onClick={toggleMute}
                     />
                   ) : (
                     <Volume2
                       style={{ width: '20px', height: '20px' }}
-                      className="cursor-pointer hover:text-white transition-colors ml-1"
+                      className="cursor-pointer hover:text-foreground transition-colors ml-1"
                       onClick={toggleMute}
                     />
                   )}

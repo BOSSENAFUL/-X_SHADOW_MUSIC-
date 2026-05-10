@@ -67,7 +67,7 @@ const SongActionMenu = memo(({
   const ActionItems = ({ onItemClick }) => (
     <>
       <div
-        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
           onAddToPlaylist(e, song);
@@ -77,7 +77,7 @@ const SongActionMenu = memo(({
         <span className="font-medium">Add to playlist</span>
       </div>
       <div
-        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
           if (navigator.share) {
@@ -96,7 +96,7 @@ const SongActionMenu = memo(({
         <span className="font-medium">Share</span>
       </div>
       <div
-        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
           onGoToArtist(e, song);
@@ -106,7 +106,7 @@ const SongActionMenu = memo(({
         <span className="font-medium">Go to artist</span>
       </div>
       <div
-        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
           onGoToAlbum(e, song);
@@ -116,7 +116,7 @@ const SongActionMenu = memo(({
         <span className="font-medium">Go to album</span>
       </div>
       <div
-        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
           onDownload(e, song);
@@ -125,9 +125,9 @@ const SongActionMenu = memo(({
         <Download className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Download</span>
       </div>
-      <div className="h-px bg-white/5 my-1" />
+      <div className="h-px bg-border my-1" />
       <div
-        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors text-red-500"
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors text-red-500"
         onClick={(e) => {
           onItemClick();
           onUnlike(e, song);
@@ -146,16 +146,16 @@ const SongActionMenu = memo(({
           <Button
             variant="ghost"
             size="sm"
-            className="p-2 h-10 w-10 text-muted-foreground hover:bg-white/5"
+            className="p-2 h-10 w-10 text-muted-foreground hover:bg-accent"
             onClick={(e) => e.stopPropagation()}
           >
             <MoreVertical className="w-5 h-5" />
           </Button>
         </DrawerTrigger>
         <div onClick={(e) => e.stopPropagation()}>
-          <DrawerContent className="bg-[#121212] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
+          <DrawerContent className="bg-popover border-none text-foreground outline-none focus:outline-none ring-0 focus-visible:ring-0">
             <DrawerHeader className="p-0">
-              <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
+              <div className="flex items-center gap-4 px-4 py-4 border-b border-border">
                 <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0">
                   <img
                     src={songImageUrl}
@@ -164,7 +164,7 @@ const SongActionMenu = memo(({
                   />
                 </div>
                 <div className="flex-1 min-w-0 flex flex-col justify-center text-left">
-                  <DrawerTitle className="text-base font-bold truncate text-white text-left">
+                  <DrawerTitle className="text-base font-bold truncate text-foreground text-left">
                     {decodeHtmlEntities(song.songName)}
                   </DrawerTitle>
                   <DrawerDescription className="text-sm text-muted-foreground truncate mt-0.5 text-left">
@@ -194,41 +194,41 @@ const SongActionMenu = memo(({
           <MoreVertical className="w-4 h-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
+      <DropdownMenuContent align="end" className="w-56 bg-popover border-border text-foreground p-1">
         <DropdownMenuItem
           onClick={(e) => onAddToPlaylist(e, song)}
-          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+          className="hover:bg-accent focus:bg-accent cursor-pointer"
         >
           <Plus className="w-4 h-4 mr-2" />
           Add to playlist
         </DropdownMenuItem>
-        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem
           onClick={(e) => onGoToArtist(e, song)}
-          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+          className="hover:bg-accent focus:bg-accent cursor-pointer"
         >
           <User className="w-4 h-4 mr-2" />
           Go to artist
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={(e) => onGoToAlbum(e, song)}
-          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+          className="hover:bg-accent focus:bg-accent cursor-pointer"
         >
           <Disc className="w-4 h-4 mr-2" />
           Go to album
         </DropdownMenuItem>
-        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem
           onClick={(e) => onDownload(e, song)}
-          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+          className="hover:bg-accent focus:bg-accent cursor-pointer"
         >
           <Download className="w-4 h-4 mr-2" />
           Download
         </DropdownMenuItem>
-        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem
           onClick={(e) => onUnlike(e, song)}
-          className="text-red-500 hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+          className="text-red-500 hover:bg-accent focus:bg-accent cursor-pointer"
         >
           <Heart className="w-4 h-4 mr-2 fill-current" />
           Unlike
@@ -601,7 +601,7 @@ export default function FavoritesPage() {
             <div className="flex items-center gap-2 px-3 md:px-4">
               <SidebarTrigger className="-ml-1 hidden md:flex" />
               <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:flex" />
-              <Button size="sm" onClick={handleGoBack} className="mr-1 bg-background/40 hover:bg-background/60">
+              <Button size="sm" onClick={handleGoBack} className="mr-1 bg-muted/50 hover:bg-muted text-foreground">
                 <ArrowLeft className="w-4 h-4" />
                 <span className="hidden sm:inline">Back</span>
               </Button>
@@ -633,14 +633,14 @@ export default function FavoritesPage() {
       <AppSidebar className="hidden md:flex" />
       <SidebarInset id="favorites-scroll-container" className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col">
         <header
-          className={`sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b transition-all duration-300 ${showHeaderTitle ? "bg-[#1D1046] border-white/10" : "bg-background border-transparent"
+          className={`sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b transition-all duration-300 ${showHeaderTitle ? "bg-[#1D1046] border-border text-white" : "bg-background border-transparent"
             }`}
         >
           <div className="flex items-center justify-between w-full gap-2 px-3 md:px-4">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="-ml-1 hidden md:flex" />
               <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:flex" />
-              <Button size="sm" onClick={handleGoBack} className="mr-1 bg-background/40 hover:bg-background/60">
+              <Button size="sm" onClick={handleGoBack} className="mr-1 bg-muted/50 hover:bg-muted text-foreground">
                 <ArrowLeft className="w-4 h-4" />
                 <span className="hidden sm:inline">Back</span>
               </Button>
@@ -672,7 +672,7 @@ export default function FavoritesPage() {
 
         <div className="flex-1">
           {/* Favorites Header */}
-          <div className="p-4 md:p-6 text-white" style={{ background: "linear-gradient(to bottom, rgba(69, 10, 245, 0.5) 0%, rgba(69, 10, 245, 0.2) 100%)" }}>
+          <div className="p-4 md:p-6 text-foreground" style={{ background: "linear-gradient(to bottom, rgba(69, 10, 245, 0.5) 0%, rgba(69, 10, 245, 0.2) 100%)" }}>
             {/* Mobile Layout */}
             <div className="block md:hidden">
               <div className="flex flex-col items-center text-center space-y-4">

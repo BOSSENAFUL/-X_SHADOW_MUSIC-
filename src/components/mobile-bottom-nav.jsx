@@ -39,7 +39,7 @@ export function MobileBottomNav() {
   const { trigger } = useWebHaptics()
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-black/95 backdrop-blur-lg border-t border-white/5 md:hidden pb-safe">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-t border-border md:hidden pb-safe">
       <nav className="flex items-center justify-around h-[64px] ">
         {navItems.map((item) => {
           // Logic for active state
@@ -63,14 +63,14 @@ export function MobileBottomNav() {
                 <item.icon
                   className={cn(
                     "h-6 w-6 mb-0.5",
-                    isActive ? "text-white" : "text-neutral-500 group-hover:text-neutral-300"
+                    isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground/80"
                   )}
                   strokeWidth={isActive ? 2.5 : 2}
                 />
               </div>
               <span className={cn(
                 "truncate text-[10px] font-medium transition-colors duration-200",
-                isActive ? "text-white" : "text-neutral-500 group-hover:text-neutral-300"
+                isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground/80"
               )}>
                 {item.name}
               </span>

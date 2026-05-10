@@ -42,10 +42,10 @@ const PlaylistSkeleton = memo(() => (
   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-x-3 gap-y-6 md:gap-x-4 md:gap-y-8">
     {Array.from({ length: 12 }).map((_, i) => (
       <div key={i} className="group relative rounded-md">
-        <Skeleton className="aspect-square w-full mb-2 rounded-md bg-zinc-800/50" />
+        <Skeleton className="aspect-square w-full mb-2 rounded-md bg-muted" />
         <div className="min-w-0 space-y-1.5 mt-1">
-          <Skeleton className="h-4 w-full bg-zinc-800/50" />
-          <Skeleton className="h-3 w-2/3 bg-zinc-800/50" />
+          <Skeleton className="h-4 w-full bg-muted" />
+          <Skeleton className="h-3 w-2/3 bg-muted" />
         </div>
       </div>
     ))}
@@ -58,7 +58,7 @@ const PlaylistCard = memo(({ playlist }) => {
   const cover = useMemo(() => {
     if (playlist.image) {
       // Proxy YouTube Music images through our API
-      const imageUrl = playlist.image.includes('yt3.googleusercontent.com') 
+      const imageUrl = playlist.image.includes('yt3.googleusercontent.com')
         ? `/api/proxy/image?url=${encodeURIComponent(playlist.image)}`
         : playlist.image;
       return { type: 'single', src: imageUrl };
@@ -124,8 +124,8 @@ const PlaylistCard = memo(({ playlist }) => {
             ))}
           </div>
         ) : (
-          <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
-            <span className="text-2xl font-bold text-zinc-600">
+          <div className="w-full h-full bg-muted flex items-center justify-center">
+            <span className="text-2xl font-bold text-muted-foreground">
               {playlist.name?.charAt(0) || "?"}
             </span>
           </div>
@@ -140,10 +140,10 @@ const PlaylistCard = memo(({ playlist }) => {
       </div>
 
       <div className="min-w-0 space-y-0.5">
-        <h3 className="font-bold text-white truncate text-[15px]">
+        <h3 className="font-bold text-foreground truncate text-[15px]">
           {playlist.name}
         </h3>
-        <p className="text-sm text-zinc-400 truncate font-medium">
+        <p className="text-sm text-muted-foreground truncate font-medium">
           {playlist.songIds?.length || 0} songs
         </p>
       </div>
@@ -410,7 +410,7 @@ export default function PlaylistsPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           url: importUrl,
           source: importSource // Pass the source to the API
         }),
@@ -459,25 +459,25 @@ export default function PlaylistsPage() {
     }
 
     setImportStage(1);
-    const stages = importSource === "spotify" 
+    const stages = importSource === "spotify"
       ? [
-          { time: 0, msg: "Connecting to Spotify API..." },
-          { time: 2000, msg: "Fetching playlist metadata..." },
-          { time: 5000, msg: "Analyzing tracks and metadata..." },
-          { time: 10000, msg: "Finding matches in Jammify database..." },
-          { time: 25000, msg: "Optimizing matching accuracy..." },
-          { time: 40000, msg: "Finalizing your new playlist..." },
-          { time: 55000, msg: "Almost there, wrapping up..." },
-        ]
+        { time: 0, msg: "Connecting to Spotify API..." },
+        { time: 2000, msg: "Fetching playlist metadata..." },
+        { time: 5000, msg: "Analyzing tracks and metadata..." },
+        { time: 10000, msg: "Finding matches in Jammify database..." },
+        { time: 25000, msg: "Optimizing matching accuracy..." },
+        { time: 40000, msg: "Finalizing your new playlist..." },
+        { time: 55000, msg: "Almost there, wrapping up..." },
+      ]
       : [
-          { time: 0, msg: "Connecting to YouTube Music..." },
-          { time: 2000, msg: "Fetching playlist information..." },
-          { time: 5000, msg: "Extracting track details..." },
-          { time: 10000, msg: "Matching songs in Jammify..." },
-          { time: 25000, msg: "Verifying audio quality..." },
-          { time: 40000, msg: "Creating your playlist..." },
-          { time: 55000, msg: "Almost done, finalizing..." },
-        ];
+        { time: 0, msg: "Connecting to YouTube Music..." },
+        { time: 2000, msg: "Fetching playlist information..." },
+        { time: 5000, msg: "Extracting track details..." },
+        { time: 10000, msg: "Matching songs in Jammify..." },
+        { time: 25000, msg: "Verifying audio quality..." },
+        { time: 40000, msg: "Creating your playlist..." },
+        { time: 55000, msg: "Almost done, finalizing..." },
+      ];
 
     let currentStage = 0;
     const interval = setInterval(() => {
@@ -541,9 +541,9 @@ export default function PlaylistsPage() {
                     <span className="">Import</span>
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[480px] max-w-[95vw] overflow-hidden p-0 border-zinc-800 bg-zinc-950">
+                <DialogContent className="sm:max-w-[480px] max-w-[95vw] overflow-hidden p-0 border-border bg-popover">
                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 via-red-500 to-blue-500 opacity-50" />
-                  
+
                   <DialogHeader className="p-4 sm:p-6 pb-3 sm:pb-4">
                     <div className="flex items-center gap-3 mb-1">
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -551,7 +551,7 @@ export default function PlaylistsPage() {
                       </div>
                       <div className="min-w-0">
                         <DialogTitle className="text-lg sm:text-xl font-bold">Import Playlist</DialogTitle>
-                        <DialogDescription className="text-xs sm:text-sm text-zinc-400">
+                        <DialogDescription className="text-xs sm:text-sm text-muted-foreground">
                           Choose where to import from
                         </DialogDescription>
                       </div>
@@ -566,21 +566,21 @@ export default function PlaylistsPage() {
                         setShowImportOptions(false);
                         setShowImportDialog(true);
                       }}
-                      className="w-full group relative overflow-hidden rounded-xl border-2 border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 hover:border-[#1DB954] active:scale-[0.98] transition-all p-4 sm:p-5 text-left"
+                      className="w-full group relative overflow-hidden rounded-xl border-2 border-border bg-card hover:bg-accent hover:border-[#1DB954] active:scale-[0.98] transition-all p-4 sm:p-5 text-left"
                     >
                       <div className="flex items-center gap-3 sm:gap-4">
                         <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#1DB954] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-lg shadow-[#1DB954]/20">
-                          <img 
-                            src="/icon-512.png" 
-                            alt="Spotify" 
+                          <img
+                            src="/icon-512.png"
+                            alt="Spotify"
                             className="w-10 h-10 sm:w-11 sm:h-11"
                           />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-white text-base sm:text-lg mb-0.5 sm:mb-1">Spotify</h3>
-                          <p className="text-xs sm:text-sm text-zinc-400 line-clamp-1">Import your Spotify playlists</p>
+                          <h3 className="font-bold text-foreground text-base sm:text-lg mb-0.5 sm:mb-1">Spotify</h3>
+                          <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1">Import your Spotify playlists</p>
                         </div>
-                        <svg className="w-5 h-5 sm:w-6 sm:h-6 text-zinc-600 group-hover:text-zinc-300 transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                         </svg>
                       </div>
@@ -593,21 +593,21 @@ export default function PlaylistsPage() {
                         setShowImportOptions(false);
                         setShowImportDialog(true);
                       }}
-                      className="w-full group relative overflow-hidden rounded-xl border-2 border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 hover:border-red-500 active:scale-[0.98] transition-all p-4 sm:p-5 text-left"
+                      className="w-full group relative overflow-hidden rounded-xl border-2 border-border bg-card hover:bg-accent hover:border-red-500 active:scale-[0.98] transition-all p-4 sm:p-5 text-left"
                     >
                       <div className="flex items-center gap-3 sm:gap-4">
                         <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-red-500 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-lg shadow-red-500/20">
-                          <img 
-                            src="/Youtube_Music_icon.svg" 
-                            alt="YouTube Music" 
+                          <img
+                            src="/Youtube_Music_icon.svg"
+                            alt="YouTube Music"
                             className="w-10 h-10 sm:w-11 sm:h-11"
                           />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-white text-base sm:text-lg mb-0.5 sm:mb-1">YouTube Music</h3>
-                          <p className="text-xs sm:text-sm text-zinc-400 line-clamp-1">Import YouTube Music playlists</p>
+                          <h3 className="font-bold text-foreground text-base sm:text-lg mb-0.5 sm:mb-1">YouTube Music</h3>
+                          <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1">Import YouTube Music playlists</p>
                         </div>
-                        <svg className="w-5 h-5 sm:w-6 sm:h-6 text-zinc-600 group-hover:text-zinc-300 transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                         </svg>
                       </div>
@@ -615,9 +615,9 @@ export default function PlaylistsPage() {
                   </div>
 
                   <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-0">
-                    <div className="rounded-lg bg-zinc-900/50 border border-zinc-800/50 p-3">
-                      <p className="text-[10px] sm:text-[11px] text-zinc-500 text-center leading-relaxed">
-                        Make sure your playlist is set to <span className="text-zinc-300 font-semibold">Public</span> before importing
+                    <div className="rounded-lg bg-muted border border-border p-3">
+                      <p className="text-[10px] sm:text-[11px] text-muted-foreground text-center leading-relaxed">
+                        Make sure your playlist is set to <span className="text-foreground font-semibold">Public</span> before importing
                       </p>
                     </div>
                   </div>
@@ -639,26 +639,25 @@ export default function PlaylistsPage() {
                   setShowImportDialog(val);
                 }
               }}>
-                <DialogContent className="sm:max-w-[450px] max-w-[95vw] overflow-hidden p-0 border-zinc-800 bg-zinc-950">
+                <DialogContent className="sm:max-w-[450px] max-w-[95vw] overflow-hidden p-0 border-border bg-popover">
                   <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-green-500 via-emerald-500 to-teal-500 opacity-50" />
 
                   {importStage === 0 && importSource && (
                     <>
                       <DialogHeader className="p-4 sm:p-6 pb-3 sm:pb-4">
                         <div className="flex items-center gap-3 mb-1">
-                          <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 ${
-                            importSource === "spotify" ? "bg-[#1DB954]" : "bg-red-500"
-                          }`}>
+                          <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 ${importSource === "spotify" ? "bg-[#1DB954]" : "bg-red-500"
+                            }`}>
                             {importSource === "spotify" ? (
-                              <img 
-                                src="/icon-512.png" 
-                                alt="Spotify" 
+                              <img
+                                src="/icon-512.png"
+                                alt="Spotify"
                                 className="w-7 h-7 sm:w-8 sm:h-8"
                               />
                             ) : (
-                              <img 
-                                src="/Youtube_Music_icon.svg" 
-                                alt="YouTube Music" 
+                              <img
+                                src="/Youtube_Music_icon.svg"
+                                alt="YouTube Music"
                                 className="w-7 h-7 sm:w-8 sm:h-8"
                               />
                             )}
@@ -667,8 +666,8 @@ export default function PlaylistsPage() {
                             <DialogTitle className="text-lg sm:text-xl font-bold leading-tight">
                               Import from {importSource === "spotify" ? "Spotify" : "YouTube Music"}
                             </DialogTitle>
-                            <DialogDescription className="text-xs sm:text-sm text-zinc-400 mt-0.5">
-                              {importSource === "spotify" 
+                            <DialogDescription className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                              {importSource === "spotify"
                                 ? "Bring your favorite playlists to Jammify"
                                 : "Transfer your YouTube Music playlists"
                               }
@@ -679,7 +678,7 @@ export default function PlaylistsPage() {
 
                       <div className="px-4 sm:px-6 pb-4 sm:pb-6 space-y-3 sm:space-y-4">
                         <div className="space-y-2">
-                          <Label htmlFor="url" className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-zinc-500">
+                          <Label htmlFor="url" className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-muted-foreground">
                             Playlist URL or Link
                           </Label>
                           <div className="relative">
@@ -690,58 +689,56 @@ export default function PlaylistsPage() {
                                   ? "https://open.spotify.com/playlist/..."
                                   : "https://music.youtube.com/playlist?list=..."
                               }
-                              className={`h-11 sm:h-12 text-sm bg-zinc-900 border-zinc-800 pr-10 ${
-                                importSource === "spotify"
-                                  ? "focus:border-[#1DB954]/50 focus:ring-[#1DB954]/20"
-                                  : "focus:border-red-500/50 focus:ring-red-500/20"
-                              }`}
+                              className={`h-11 sm:h-12 text-sm bg-background border-border pr-10 ${importSource === "spotify"
+                                ? "focus:border-[#1DB954]/50 focus:ring-[#1DB954]/20"
+                                : "focus:border-red-500/50 focus:ring-red-500/20"
+                                }`}
                               value={importUrl}
                               onChange={(e) => setImportUrl(e.target.value)}
                             />
                             {((importSource === "spotify" && importUrl.includes('spotify.com/playlist/')) ||
                               (importSource === "youtube" && importUrl.includes('music.youtube.com/playlist'))) && (
-                              <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                <div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center">
-                                  <svg className="w-3 h-3 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                  </svg>
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                  <div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center">
+                                    <svg className="w-3 h-3 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  </div>
                                 </div>
-                              </div>
-                            )}
+                              )}
                           </div>
-                          <p className="text-[10px] sm:text-[11px] text-zinc-500 px-1">
-                            Make sure the playlist is set to <span className="text-zinc-300 font-medium">Public</span> on {importSource === "spotify" ? "Spotify" : "YouTube Music"}.
+                          <p className="text-[10px] sm:text-[11px] text-muted-foreground px-1">
+                            Make sure the playlist is set to <span className="text-foreground font-medium">Public</span> on {importSource === "spotify" ? "Spotify" : "YouTube Music"}.
                           </p>
                         </div>
 
-                        <div className="rounded-lg bg-zinc-900/50 border border-zinc-800/50 p-3 sm:p-4 space-y-2 sm:space-y-3">
-                          <h4 className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-zinc-500">How to get the link</h4>
+                        <div className="rounded-lg bg-muted/50 border border-border p-3 sm:p-4 space-y-2 sm:space-y-3">
+                          <h4 className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-muted-foreground">How to get the link</h4>
                           <div className="flex flex-col sm:flex-row gap-3">
                             <div className="flex-1 space-y-1">
                               {importSource === "spotify" ? (
                                 <>
-                                  <p className="text-xs text-zinc-300">1. Open Spotify playlist</p>
-                                  <p className="text-xs text-zinc-300">2. Click <span className="font-bold">...</span> → <span className="font-bold">Share</span></p>
-                                  <p className="text-xs text-zinc-300">3. Select <span className="font-bold">Copy link to playlist</span></p>
+                                  <p className="text-xs text-foreground">1. Open Spotify playlist</p>
+                                  <p className="text-xs text-foreground">2. Click <span className="font-bold">...</span> → <span className="font-bold">Share</span></p>
+                                  <p className="text-xs text-foreground">3. Select <span className="font-bold">Copy link to playlist</span></p>
                                 </>
                               ) : (
                                 <>
-                                  <p className="text-xs text-zinc-300">1. Open YouTube Music playlist</p>
-                                  <p className="text-xs text-zinc-300">2. Click <span className="font-bold">⋮</span> → <span className="font-bold">Share</span></p>
-                                  <p className="text-xs text-zinc-300">3. Select <span className="font-bold">Copy link</span></p>
+                                  <p className="text-xs text-foreground">1. Open YouTube Music playlist</p>
+                                  <p className="text-xs text-foreground">2. Click <span className="font-bold">⋮</span> → <span className="font-bold">Share</span></p>
+                                  <p className="text-xs text-foreground">3. Select <span className="font-bold">Copy link</span></p>
                                 </>
                               )}
                             </div>
-                            <div className="hidden sm:block w-px bg-zinc-800" />
+                            <div className="hidden sm:block w-px bg-border" />
                             <div className="flex sm:flex-1 items-center justify-center sm:justify-center">
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className={`h-8 text-[11px] w-full sm:w-auto ${
-                                  importSource === "spotify"
-                                    ? "text-[#1DB954] hover:text-[#1DB954] hover:bg-[#1DB954]/10"
-                                    : "text-red-500 hover:text-red-500 hover:bg-red-500/10"
-                                }`}
+                                className={`h-8 text-[11px] w-full sm:w-auto ${importSource === "spotify"
+                                  ? "text-[#1DB954] hover:text-[#1DB954] hover:bg-[#1DB954]/10"
+                                  : "text-red-500 hover:text-red-500 hover:bg-red-500/10"
+                                  }`}
                                 onClick={async () => {
                                   try {
                                     const text = await navigator.clipboard.readText();
@@ -762,13 +759,12 @@ export default function PlaylistsPage() {
                         </div>
                       </div>
 
-                      <DialogFooter className="p-4 sm:p-6 pt-0 bg-zinc-900/30 border-t border-zinc-800/50">
+                      <DialogFooter className="p-4 sm:p-6 pt-0 bg-muted/30 border-t border-border">
                         <Button
-                          className={`w-full h-11 font-bold transition-all shadow-lg ${
-                            importSource === "spotify"
-                              ? "bg-[#1DB954] hover:bg-[#1ed760] text-black shadow-[#1DB954]/10"
-                              : "bg-red-500 hover:bg-red-600 text-white shadow-red-500/10"
-                          }`}
+                          className={`w-full h-11 font-bold transition-all shadow-lg ${importSource === "spotify"
+                            ? "bg-[#1DB954] hover:bg-[#1ed760] text-black shadow-[#1DB954]/10"
+                            : "bg-red-500 hover:bg-red-600 text-white shadow-red-500/10"
+                            }`}
                           onClick={handleImportPlaylist}
                           disabled={
                             isImporting ||
@@ -785,26 +781,26 @@ export default function PlaylistsPage() {
                   {importStage === 1 && importSource && (
                     <div className="p-10 flex flex-col items-center justify-center space-y-6 min-h-[300px]">
                       <div className="relative">
-                        <div className="w-20 h-20 rounded-full border-2 border-zinc-800 flex items-center justify-center">
+                        <div className="w-20 h-20 rounded-full border-2 border-border flex items-center justify-center">
                           <Loader2 className="w-8 h-8 text-[#1DB954] animate-spin" />
                         </div>
                         <div className="absolute -bottom-2 -right-2">
-                          <div className="w-8 h-8 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center">
-                            <Music className="w-4 h-4 text-zinc-400" />
+                          <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center">
+                            <Music className="w-4 h-4 text-muted-foreground" />
                           </div>
                         </div>
                       </div>
 
                       <div className="text-center space-y-2">
-                        <h3 className="text-lg font-bold text-white">Importing your music</h3>
-                        <p className="text-sm text-zinc-400 animate-pulse">{importMessage}</p>
+                        <h3 className="text-lg font-bold text-foreground">Importing your music</h3>
+                        <p className="text-sm text-muted-foreground animate-pulse">{importMessage}</p>
                       </div>
 
-                      <div className="w-full max-w-[240px] h-1.5 bg-zinc-900 rounded-full overflow-hidden">
+                      <div className="w-full max-w-[240px] h-1.5 bg-muted rounded-full overflow-hidden">
                         <div className="h-full bg-[#1DB954] animate-progress" />
                       </div>
 
-                      <p className="text-[10px] text-zinc-500 text-center max-w-[280px]">
+                      <p className="text-[10px] text-muted-foreground text-center max-w-[280px]">
                         This may take a minute or two depending on the playlist size.
                         We are matching songs with the highest quality versions available.
                       </p>
@@ -820,11 +816,11 @@ export default function PlaylistsPage() {
                       </div>
 
                       <div className="text-center space-y-1">
-                        <h3 className="text-xl font-bold text-white">Import Successful!</h3>
-                        <p className="text-sm text-zinc-400">Your playlist has been added to your library.</p>
+                        <h3 className="text-xl font-bold text-foreground">Import Successful!</h3>
+                        <p className="text-sm text-muted-foreground">Your playlist has been added to your library.</p>
                       </div>
 
-                      <p className="text-xs text-zinc-500">Refreshing your library...</p>
+                      <p className="text-xs text-muted-foreground">Refreshing your library...</p>
                     </div>
                   )}
                 </DialogContent>
@@ -885,7 +881,7 @@ export default function PlaylistsPage() {
                 <Link
                   key={playlist._id}
                   href={`/music/playlists/${playlist._id}`}
-                  className="group relative rounded-md hover:bg-zinc-800/30 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="group relative rounded-md hover:bg-muted/30 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   aria-label={`View playlist ${playlist.name}`}
                 >
                   <PlaylistCard playlist={playlist} />

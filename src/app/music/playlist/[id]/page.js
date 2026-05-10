@@ -74,7 +74,7 @@ const SongActionMenu = memo(({
   const ActionItems = ({ onItemClick }) => (
     <>
       <div
-        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
           onAddToPlaylist(e, song);
@@ -84,7 +84,7 @@ const SongActionMenu = memo(({
         <span className="font-medium">Add to playlist</span>
       </div>
       <div
-        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
           if (navigator.share) {
@@ -103,7 +103,7 @@ const SongActionMenu = memo(({
         <span className="font-medium">Share</span>
       </div>
       <div
-        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
           onGoToArtist(e, song);
@@ -114,7 +114,7 @@ const SongActionMenu = memo(({
       </div>
       {onGoToAlbum && (
         <div
-          className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+          className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
           onClick={(e) => {
             onItemClick();
             onGoToAlbum(e, song);
@@ -125,7 +125,7 @@ const SongActionMenu = memo(({
         </div>
       )}
       <div
-        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
           onDownload(e, song);
@@ -134,9 +134,9 @@ const SongActionMenu = memo(({
         <Download className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Download</span>
       </div>
-      <div className="h-px bg-white/5 my-1" />
+      <div className="h-px bg-border my-1" />
       <div
-        className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${isLiked(song.id) ? 'text-red-500' : ''}`}
+        className={`flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors ${isLiked(song.id) ? 'text-red-500' : ''}`}
         onClick={(e) => {
           onItemClick();
           e.stopPropagation();
@@ -156,16 +156,16 @@ const SongActionMenu = memo(({
           <Button
             variant="ghost"
             size="sm"
-            className="p-2 h-10 w-10 text-muted-foreground hover:bg-white/5"
+            className="p-2 h-10 w-10 text-muted-foreground hover:bg-accent"
             onClick={(e) => e.stopPropagation()}
           >
             <MoreVertical className="w-5 h-5" />
           </Button>
         </DrawerTrigger>
         <div onClick={(e) => e.stopPropagation()}>
-          <DrawerContent className="bg-[#121212] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
+          <DrawerContent className="bg-popover border-none text-foreground outline-none focus:outline-none ring-0 focus-visible:ring-0">
             <DrawerHeader className="p-0">
-              <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
+              <div className="flex items-center gap-4 px-4 py-4 border-b border-border">
                 <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0">
                   <img
                     src={songImageUrl}
@@ -174,7 +174,7 @@ const SongActionMenu = memo(({
                   />
                 </div>
                 <div className="flex-1 min-w-0 flex flex-col justify-center text-left">
-                  <DrawerTitle className="text-base font-bold truncate text-white text-left">
+                  <DrawerTitle className="text-base font-bold truncate text-foreground text-left">
                     {decodeHtmlEntities(song.name)}
                   </DrawerTitle>
                   <DrawerDescription className="text-sm text-muted-foreground truncate mt-0.5 text-left">
@@ -204,18 +204,18 @@ const SongActionMenu = memo(({
           <MoreVertical className="w-4 h-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
+      <DropdownMenuContent align="end" className="w-56 bg-popover border-border text-foreground p-1">
         <DropdownMenuItem
           onClick={(e) => onAddToPlaylist(e, song)}
-          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+          className="hover:bg-accent focus:bg-accent cursor-pointer"
         >
           <Plus className="w-4 h-4 mr-2" />
           Add to playlist
         </DropdownMenuItem>
-        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem
           onClick={(e) => onGoToArtist(e, song)}
-          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+          className="hover:bg-accent focus:bg-accent cursor-pointer"
         >
           <User className="w-4 h-4 mr-2" />
           Go to artist
@@ -223,27 +223,27 @@ const SongActionMenu = memo(({
         {onGoToAlbum && (
           <DropdownMenuItem
             onClick={(e) => onGoToAlbum(e, song)}
-            className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+            className="hover:bg-accent focus:bg-accent cursor-pointer"
           >
             <Disc className="w-4 h-4 mr-2" />
             Go to album
           </DropdownMenuItem>
         )}
-        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem
           onClick={(e) => onDownload(e, song)}
-          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+          className="hover:bg-accent focus:bg-accent cursor-pointer"
         >
           <Download className="w-4 h-4 mr-2" />
           Download
         </DropdownMenuItem>
-        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem
           onClick={(e) => {
             e.stopPropagation();
             toggleLike(song).catch(error => console.error('Error toggling song like:', error));
           }}
-          className={`${isLiked(song.id) ? 'text-red-500' : ''} hover:bg-white/10 focus:bg-white/10 cursor-pointer`}
+          className={`${isLiked(song.id) ? 'text-red-500' : ''} hover:bg-accent focus:bg-accent cursor-pointer`}
         >
           <Heart className={`w-4 h-4 mr-2 ${isLiked(song.id) ? 'fill-current' : ''}`} />
           {isLiked(song.id) ? 'Unlike' : 'Like'}
@@ -279,7 +279,7 @@ const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }
       {sortOptions.map(option => (
         <button
           key={option.id}
-          className={`flex items-center justify-between px-3 py-2.5 rounded-sm hover:bg-white/10 transition-colors text-sm ${sortBy === option.id ? 'text-[#1ed760] font-medium' : 'text-white/90'}`}
+          className={`flex items-center justify-between px-3 py-2.5 rounded-sm hover:bg-accent transition-colors text-sm ${sortBy === option.id ? 'text-[#1ed760] font-medium' : 'text-foreground'}`}
           onClick={() => {
             setSortBy(option.id);
             closeOnSelect();
@@ -289,12 +289,12 @@ const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }
           {sortBy === option.id && <Check className="w-4 h-4" />}
         </button>
       ))}
-      <div className="h-px bg-white/5 my-2" />
+      <div className="h-px bg-border my-2" />
       <div className="px-3 py-2 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">View as</div>
       {viewOptions.map(option => (
         <button
           key={option.id}
-          className={`flex items-center justify-between px-3 py-2.5 rounded-sm hover:bg-white/10 transition-colors text-sm ${viewAs === option.id ? 'text-[#1ed760] font-medium' : 'text-white/90'}`}
+          className={`flex items-center justify-between px-3 py-2.5 rounded-sm hover:bg-accent transition-colors text-sm ${viewAs === option.id ? 'text-[#1ed760] font-medium' : 'text-foreground'}`}
           onClick={() => {
             setViewAs(option.id);
             closeOnSelect();
@@ -317,13 +317,13 @@ const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }
     return (
       <Drawer open={open} onOpenChange={setOpen}>
         <DrawerTrigger asChild>
-          <button className="flex items-center gap-2 text-sm font-medium text-white/80 hover:text-white transition-colors py-2 px-1">
+          <button className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-foreground transition-colors py-2 px-1">
             <span className={sortBy !== 'custom' ? 'text-[#1ed760]' : ''}>{currentSortLabel}</span>
             <List className="w-4 h-4" />
           </button>
         </DrawerTrigger>
         <DrawerPortal>
-          <DrawerContent className="bg-[#1a1a1a] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
+          <DrawerContent className="bg-popover border-none text-foreground outline-none focus:outline-none ring-0 focus-visible:ring-0">
             <DrawerHeader className="sr-only">
               <DrawerTitle>Sort and View Options</DrawerTitle>
               <DrawerDescription>Select sorting order and view mode for the current playlist</DrawerDescription>
@@ -339,12 +339,12 @@ const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex items-center justify-center gap-2 text-sm font-medium text-white/80 hover:text-white transition-colors h-9 px-3 hover:bg-white/5 rounded-md">
+        <button className="flex items-center justify-center gap-2 text-sm font-medium text-foreground hover:text-foreground transition-colors h-9 px-3 hover:bg-accent rounded-md">
           <span className={sortBy !== 'custom' ? 'text-[#1ed760]' : ''}>{currentSortLabel}</span>
           <List className="w-4 h-4" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64 bg-[#282828] border-none text-white p-0 shadow-xl ring-1 ring-black/20">
+      <DropdownMenuContent align="end" className="w-64 bg-popover border-none text-foreground p-0 shadow-xl ring-1 ring-border">
         <Content />
       </DropdownMenuContent>
     </DropdownMenu>
@@ -376,7 +376,7 @@ const PlaylistActionMenu = memo(({
   const ActionItems = ({ onItemClick }) => (
     <>
       <div
-        className={`flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors ${isLiked ? 'text-red-500' : ''}`}
+        className={`flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors ${isLiked ? 'text-red-500' : ''}`}
         onClick={() => {
           onItemClick();
           toggleLike();
@@ -387,7 +387,7 @@ const PlaylistActionMenu = memo(({
       </div>
 
       <div
-        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
         onClick={() => {
           onItemClick();
           onDownload();
@@ -398,7 +398,7 @@ const PlaylistActionMenu = memo(({
       </div>
 
       <div
-        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
         onClick={() => {
           onItemClick();
           onShare();
@@ -419,16 +419,16 @@ const PlaylistActionMenu = memo(({
           </button>
         </DrawerTrigger>
         <div onClick={(e) => e.stopPropagation()}>
-          <DrawerContent className="bg-[#121212] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
+          <DrawerContent className="bg-popover border-none text-foreground outline-none focus:outline-none ring-0 focus-visible:ring-0">
             <DrawerHeader className="p-0 text-left">
               <DrawerTitle className="sr-only">Playlist Options</DrawerTitle>
               <DrawerDescription className="sr-only">Actions for {playlist.name}</DrawerDescription>
-              <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
-                <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0 bg-neutral-800">
+              <div className="flex items-center gap-4 px-4 py-4 border-b border-border">
+                <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0 bg-muted">
                   <img src={playlistImageUrl} alt={playlist.name} className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-1 min-w-0 flex flex-col justify-center text-left">
-                  <div className="text-base font-bold truncate text-white text-left">
+                  <div className="text-base font-bold truncate text-foreground text-left">
                     {decodeHtmlEntities(playlist.name)}
                   </div>
                   <div className="text-sm text-muted-foreground truncate mt-0.5 text-left">
@@ -453,20 +453,20 @@ const PlaylistActionMenu = memo(({
           <MoreVertical style={{ width: '24px', height: '24px' }} />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 bg-neutral-900 border-white/10 text-white p-1">
+      <DropdownMenuContent align="end" className="w-56 bg-popover border-border text-foreground p-1">
         <DropdownMenuItem
           onClick={toggleLike}
-          className={`hover:bg-white/10 focus:bg-white/10 cursor-pointer ${isLiked ? 'text-red-500' : ''}`}
+          className={`hover:bg-accent focus:bg-accent cursor-pointer ${isLiked ? 'text-red-500' : ''}`}
         >
           <Heart className={`w-4 h-4 mr-2 ${isLiked ? 'fill-current' : ''}`} />
           {isLiked ? 'Remove from library' : 'Save to library'}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={onDownload} className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
+        <DropdownMenuItem onClick={onDownload} className="hover:bg-accent focus:bg-accent cursor-pointer">
           <Download className="w-4 h-4 mr-2" />
           Download playlist
         </DropdownMenuItem>
-        <DropdownMenuSeparator className="bg-white/5" />
-        <DropdownMenuItem onClick={onShare} className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
+        <DropdownMenuSeparator className="bg-border" />
+        <DropdownMenuItem onClick={onShare} className="hover:bg-accent focus:bg-accent cursor-pointer">
           <Share className="w-4 h-4 mr-2" />
           Share playlist
         </DropdownMenuItem>
@@ -1048,7 +1048,7 @@ function PlaylistPageContent() {
     return (
       <SidebarProvider >
         <AppSidebar />
-        <SidebarInset id="playlist-scroll-container" className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col bg-[#121212]">
+        <SidebarInset id="playlist-scroll-container" className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col bg-background">
           {/* Main Ambient Gradient Layer - Added to skeleton to show color as soon as it's available */}
           <div
             className="absolute inset-0 h-[450px] pointer-events-none transition-all duration-1000"
@@ -1066,7 +1066,7 @@ function PlaylistPageContent() {
             <div className="flex items-center gap-2 px-3 md:px-4">
               <SidebarTrigger className="-ml-1 hidden md:flex" />
               <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:flex" />
-              <Button size="sm" onClick={handleGoBack} className="mr-1 bg-background/40 hover:bg-background/60">
+              <Button size="sm" onClick={handleGoBack} className="mr-1 bg-muted/50 hover:bg-muted text-foreground">
                 <ArrowLeft className="w-4 h-4" />
                 <span className="hidden sm:inline">Back</span>
               </Button>
@@ -1119,7 +1119,7 @@ function PlaylistPageContent() {
               : undefined
           }}
           className={`fixed md:sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b transition-all duration-300 w-full ${showHeaderTitle
-            ? "border-white/10"
+            ? "border-border"
             : "bg-transparent md:bg-background border-transparent"
             }`}
         >
@@ -1135,7 +1135,7 @@ function PlaylistPageContent() {
             <div className="flex items-center gap-2">
               <SidebarTrigger className="-ml-1 hidden md:flex" />
               <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:flex" />
-              <Button size="sm" onClick={handleGoBack} className="mr-1 bg-background/40 hover:bg-background/60">
+              <Button size="sm" onClick={handleGoBack} className="mr-1 bg-muted/50 hover:bg-muted text-foreground">
                 <ArrowLeft className="w-4 h-4" />
                 <span className="hidden sm:inline">Back</span>
               </Button>
@@ -1186,7 +1186,7 @@ function PlaylistPageContent() {
         <div
           className="flex-1 relative transition-colors duration-1000"
           style={{
-            backgroundColor: '#121212'
+            backgroundColor: 'hsl(var(--background))'
           }}
         >
           {/* Main Ambient Gradient Layer */}
@@ -1205,7 +1205,7 @@ function PlaylistPageContent() {
 
           <div className="relative z-10">
             {/* Playlist Header */}
-            <div className="p-4 pt-12 pb-2 md:p-8 md:pt-20 md:pb-4 text-white">
+            <div className="p-4 pt-12 pb-2 md:p-8 md:pt-20 md:pb-4 text-foreground">
               {/* Mobile Layout */}
               <div className="block md:hidden">
                 <div
@@ -1245,11 +1245,11 @@ function PlaylistPageContent() {
                       {playlist.name}
                     </h1>
                     {(playlist.subtitle || playlist.header_desc) && (
-                      <p className="text-xs opacity-50 line-clamp-2 text-start">
+                      <p className="text-xs text-muted-foreground line-clamp-2 text-start">
                         {playlist.subtitle || playlist.header_desc}
                       </p>
                     )}
-                    <div className="flex items-center justify-start gap-2 text-sm opacity-80">
+                    <div className="flex items-center justify-start gap-2 text-sm text-muted-foreground">
                       <span className="font-semibold">JioSaavn</span>
                       <span>•</span>
                       <span>{playlist.songCount || songs.length} songs</span>
@@ -1289,11 +1289,11 @@ function PlaylistPageContent() {
                     {playlist.name}
                   </h1>
                   {(playlist.subtitle || playlist.header_desc) && (
-                    <p className="text-base opacity-90 mb-4 line-clamp-2 max-w-2xl">
+                    <p className="text-base text-muted-foreground mb-4 line-clamp-2 max-w-2xl">
                       {playlist.subtitle || playlist.header_desc}
                     </p>
                   )}
-                  <div className="flex items-center gap-2 text-sm opacity-80">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <span className="font-semibold">JioSaavn</span>
                     <span>•</span>
                     <span>{playlist.songCount || songs.length} songs</span>
@@ -1358,15 +1358,15 @@ function PlaylistPageContent() {
                   {/* Search Bar */}
                   <div ref={searchContainerRef}>
                     <div
-                      className={`flex items-center transition-all duration-300 ease-in-out ${isSearchVisible ? 'w-40 md:w-56 h-9 px-2.5 rounded-md border border-white/10 bg-white/5 justify-start' : 'w-9 h-9 justify-center rounded-full bg-white/5 hover:bg-white/10 cursor-pointer border-none'}`}
+                      className={`flex items-center transition-all duration-300 ease-in-out ${isSearchVisible ? 'w-40 md:w-56 h-9 px-2.5 rounded-md border border-border bg-muted/50 justify-start' : 'w-9 h-9 justify-center rounded-full bg-muted/50 hover:bg-muted cursor-pointer border-none'}`}
                       onClick={() => !isSearchVisible && setIsSearchVisible(true)}
                     >
-                      <Search className={`w-4 h-4 text-muted-foreground shrink-0 transition-colors ${isSearchVisible ? 'text-white/70' : ''}`} />
+                      <Search className={`w-4 h-4 text-muted-foreground shrink-0 transition-colors ${isSearchVisible ? 'text-foreground' : ''}`} />
                       <input
                         ref={searchInputRef}
                         type="text"
                         placeholder="Search in playlist"
-                        className={`bg-transparent border-none outline-none text-white text-xs md:text-sm placeholder:text-white/40 transition-all duration-300 ${isSearchVisible ? 'w-full ml-2 opacity-100 visible' : 'w-0 ml-0 opacity-0 invisible'}`}
+                        className={`bg-transparent border-none outline-none text-foreground text-xs md:text-sm placeholder:text-muted-foreground transition-all duration-300 ${isSearchVisible ? 'w-full ml-2 opacity-100 visible' : 'w-0 ml-0 opacity-0 invisible'}`}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyDown={(e) => {
