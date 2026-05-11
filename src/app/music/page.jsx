@@ -390,9 +390,34 @@ export default function MusicPage() {
     return () => { isMounted = false; };
   }, [userCountry]);
 
-  const handlePlayClick = useCallback((item, type) => {
-    console.log(`Playing ${type}:`, item);
-  }, []);
+  const handlePlayClick = useCallback(async (item, type) => {
+    if (type === 'liked-songs') {
+      const pid = 'liked-songs';
+      if (playingId === pid) return;
+      setPlayingId(pid);
+      try {
+        const res = await fetch(`/api/liked-songs?userId=${session?.user?.id}`);
+        const data = await res.json();
+        if (data.success && data.data?.length > 0) {
+          // Map stored liked song format to the format playSong expects
+          const songs = data.data.map(s => ({
+            id: s.songId,
+            name: s.songName,
+            artists: { primary: s.artists || [] },
+            album: s.album,
+            duration: s.duration,
+            image: s.image,
+            downloadUrl: s.downloadUrl,
+          }));
+          playSong(songs[0], songs, pid);
+        }
+      } catch (err) {
+        console.error('Error playing liked songs:', err);
+      } finally {
+        setPlayingId(null);
+      }
+    }
+  }, [playingId, playSong, session?.user?.id]);
 
   // Play a playlist directly from any card (Recently played info or Home sections)
   const handlePlaylistPlay = useCallback(async (playlist, e = null) => {
@@ -798,7 +823,7 @@ export default function MusicPage() {
             {/* Liked Songs */}
             <Link
               href="/music/favorites"
-              className="group relative flex items-center bg-card/40 hover:bg-accent transition-colors rounded-[4px] overflow-hidden cursor-pointer h-14 md:h-16 lg:h-20 z-10"
+              className="group relative flex items-center bg-white/[0.08] hover:bg-white/[0.13] transition-colors rounded-[4px] overflow-hidden cursor-pointer h-14 md:h-16 lg:h-20 z-10"
               onMouseEnter={() => setHoveredColor("rgb(69, 10, 245)")}
               onMouseLeave={handleMouseLeave}
             >
@@ -827,7 +852,10 @@ export default function MusicPage() {
                     handlePlayClick({ type: "liked-songs" }, "liked-songs");
                   }}
                 >
-                  <IoMdPlay className="w-4 h-4 md:w-6 md:h-6 fill-black translate-x-0.5" />
+                  {playingId === 'liked-songs'
+                    ? <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin text-black" />
+                    : <IoMdPlay className="w-4 h-4 md:w-6 md:h-6 fill-black translate-x-0.5" />
+                  }
                 </div>
               </div>
             </Link>
@@ -838,7 +866,7 @@ export default function MusicPage() {
               Array.from({ length: 5 }).map((_, index) => (
                 <div
                   key={`skeleton-${index}`}
-                  className="flex items-center bg-card/40 rounded-[4px] h-14 md:h-16 lg:h-20 overflow-hidden animate-pulse"
+                  className="flex items-center bg-secondary rounded-[4px] h-14 md:h-16 lg:h-20 overflow-hidden animate-pulse"
                 >
                   <div className="h-full aspect-square bg-muted shrink-0" />
                   <div className="min-w-0 flex-1 px-2 md:px-3">
@@ -850,7 +878,7 @@ export default function MusicPage() {
                 <Link
                   key={playlist.playlistId}
                   href={playlist.source === 'user' ? `/music/playlists/${playlist.playlistId}` : `/music/playlist/${playlist.playlistId}?songCount=${playlist.songCount || 50}`}
-                  className="group relative flex items-center bg-card/40 hover:bg-accent transition-colors rounded-[4px] overflow-hidden cursor-pointer h-14 md:h-16 lg:h-20 z-10"
+                  className="group relative flex items-center bg-white/[0.08] hover:bg-white/[0.13] transition-colors rounded-[4px] overflow-hidden cursor-pointer h-14 md:h-16 lg:h-20 z-10"
                   onMouseEnter={() => handlePlaylistHover(playlist)}
                   onMouseLeave={handleMouseLeave}
                 >

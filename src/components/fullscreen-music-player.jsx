@@ -1,5 +1,9 @@
 "use client";
 
+// Module-level lyrics cache — persists for the entire browser session.
+// Key: songId, Value: lyrics data (or null if not found).
+const lyricsCache = new Map();
+
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -578,6 +582,13 @@ export function FullscreenMusicPlayer({
   const fetchLyrics = async (song) => {
     if (!song) return null;
 
+    // Check cache first
+    const cacheKey = song.id || song.songId;
+    if (cacheKey && lyricsCache.has(cacheKey)) {
+      console.log('Lyrics cache hit:', cacheKey);
+      return lyricsCache.get(cacheKey);
+    }
+
     try {
       setLyricsLoading(true);
 
@@ -674,13 +685,16 @@ export function FullscreenMusicPlayer({
           // If we have a very strong name + duration match, accept it even if artist is different
           if (bestMatch && bestMatch.matchScore >= 25) {
             console.log("Found strong lyric match through search:", bestMatch);
+            if (cacheKey) lyricsCache.set(cacheKey, bestMatch);
             return bestMatch;
           } else if (bestMatch && bestMatch.matchScore > 10) {
             console.log("Found likely lyric match through search:", bestMatch);
+            if (cacheKey) lyricsCache.set(cacheKey, bestMatch);
             return bestMatch;
           }
         }
 
+        if (cacheKey) lyricsCache.set(cacheKey, null);
         return null;
       }
 
@@ -693,6 +707,7 @@ export function FullscreenMusicPlayer({
       const data = await response.json();
       console.log("Lyrics data received:", data);
 
+      if (cacheKey) lyricsCache.set(cacheKey, data);
       return data;
     } catch (error) {
       // Handle network errors, CORS issues, etc.
@@ -1305,6 +1320,14 @@ export function FullscreenMusicPlayer({
   // Fetch lyrics when song changes
   useEffect(() => {
     if (currentSong && showLyrics) {
+      // Check cache synchronously first - instant display, no loading state
+      const cacheKey = currentSong.id || currentSong.songId;
+      if (cacheKey && lyricsCache.has(cacheKey)) {
+        setLyrics(lyricsCache.get(cacheKey));
+        return;
+      }
+      // Not cached - fetch async
+      setLyrics(null);
       fetchLyrics(currentSong).then((lyricsData) => {
         setLyrics(lyricsData);
       });
@@ -1314,9 +1337,14 @@ export function FullscreenMusicPlayer({
   // Handle lyrics button click
   const handleLyricsToggle = async () => {
     if (!showLyrics && currentSong && !lyrics) {
-      // Fetch lyrics when opening for the first time
-      const lyricsData = await fetchLyrics(currentSong);
-      setLyrics(lyricsData);
+      // Check cache first for instant display
+      const cacheKey = currentSong.id || currentSong.songId;
+      if (cacheKey && lyricsCache.has(cacheKey)) {
+        setLyrics(lyricsCache.get(cacheKey));
+      } else {
+        const lyricsData = await fetchLyrics(currentSong);
+        setLyrics(lyricsData);
+      }
     }
     setShowLyrics(!showLyrics);
   };
@@ -2315,11 +2343,14 @@ export function FullscreenMusicPlayer({
                   >
                     <div className="space-y-3 text-left max-w-2xl py-12 px-4">
                       {lyricsLoading ? (
-                        <div className="flex items-center justify-center py-12">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white/60"></div>
-                          <span className="ml-3 text-white/60">
-                            Loading lyrics...
-                          </span>
+                        <div className="space-y-4 py-8 px-2">
+                          {[80, 60, 90, 50, 75, 65, 85, 55].map((w, i) => (
+                            <div
+                              key={i}
+                              className="h-5 rounded-full bg-white/10 animate-pulse"
+                              style={{ width: `${w}%`, animationDelay: `${i * 80}ms` }}
+                            />
+                          ))}
                         </div>
                       ) : lyrics ? (
                         <>
@@ -2343,14 +2374,14 @@ export function FullscreenMusicPlayer({
                                       (mobileLyricLineRefs.current[index] =
                                         el)
                                       }
-                                      className="text-3xl font-bold"
+                                      className="text-3xl font-bold cursor-pointer"
                                       style={{
                                         fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
                                         fontWeight: '700',
                                         letterSpacing: '-0.01em',
                                         lineHeight: '1.2',
                                         color: isCurrentLine
-                                          ? "rgba(255,255,255,1)"
+                                          ? "rgba(255,255,255,0.75)"
                                           : "rgba(255,255,255,0.25)",
                                         opacity: isCurrentLine ? 1 : 0.3,
                                         filter: isCurrentLine
@@ -2358,6 +2389,11 @@ export function FullscreenMusicPlayer({
                                           : "blur(1px)",
                                         transition: "color 400ms ease, opacity 400ms ease, filter 400ms ease",
                                       }}
+                                      onClick={() =>
+                                        onDirectSeek([
+                                          parseSyncedLyrics(lyrics.syncedLyrics)[index]?.time || 0,
+                                        ])
+                                      }
                                     >
                                       {line.text}
                                     </p>
@@ -2537,11 +2573,14 @@ export function FullscreenMusicPlayer({
                       >
                         <div className="space-y-6 py-20 text-left">
                           {lyricsLoading ? (
-                            <div className="flex items-center justify-center py-12">
-                              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white/60"></div>
-                              <span className="ml-4 text-white/60 text-xl">
-                                Loading lyrics...
-                              </span>
+                            <div className="space-y-5 px-2">
+                              {[70, 55, 85, 45, 80, 60, 90, 50, 75].map((w, i) => (
+                                <div
+                                  key={i}
+                                  className="h-6 rounded-full bg-white/10 animate-pulse"
+                                  style={{ width: `${w}%`, animationDelay: `${i * 80}ms` }}
+                                />
+                              ))}
                             </div>
                           ) : lyrics ? (
                             <>
@@ -2575,7 +2614,7 @@ export function FullscreenMusicPlayer({
                                             letterSpacing: '-0.02em',
                                             lineHeight: '1.15',
                                             color: isCurrentLine
-                                              ? "rgba(255,255,255,1)"
+                                              ? "rgba(255,255,255,0.85)"
                                               : "rgba(255,255,255,0.2)",
                                             opacity: isCurrentLine ? 1 : 0.25,
                                             filter: isCurrentLine
