@@ -4,7 +4,7 @@
 // Key: songId, Value: lyrics data (or null if not found).
 const lyricsCache = new Map();
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -246,6 +246,12 @@ export function FullscreenMusicPlayer({
   const [shuffledPlaylist, setShuffledPlaylist] = useState([]);
   const [lyrics, setLyrics] = useState(null);
   const [lyricsLoading, setLyricsLoading] = useState(false);
+
+  // Parse synced lyrics once — only re-runs when lyrics data changes, not every render tick
+  const parsedLyrics = useMemo(
+    () => (lyrics?.syncedLyrics ? parseSyncedLyrics(lyrics.syncedLyrics) : []),
+    [lyrics?.syncedLyrics]
+  );
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState(null);
   const [openActionMenu, setOpenActionMenu] = useState(false);
@@ -745,7 +751,7 @@ export function FullscreenMusicPlayer({
     // Position active line at ~15% from top = 2nd line feel
     const containerTop = container.getBoundingClientRect().top;
     const elTop = el.getBoundingClientRect().top;
-    const offset = elTop - containerTop - (container.clientHeight * 0.15);
+    const offset = elTop - containerTop - (container.clientHeight * 0.12);
 
     container.scrollBy({ top: offset, behavior: "smooth" });
   }, []);
@@ -1358,13 +1364,12 @@ export function FullscreenMusicPlayer({
   useEffect(() => {
     if (!showLyrics || !lyrics?.syncedLyrics) return;
 
-    const parsedLyrics = parseSyncedLyrics(lyrics.syncedLyrics);
     const currentLyricIndex = getCurrentLyricIndex(parsedLyrics, currentTime);
 
     if (currentLyricIndex !== -1 && currentLyricIndex !== lastScrolledIndexRef.current) {
       scrollToCurrentLyric(currentLyricIndex);
     }
-  }, [currentTime, showLyrics, lyrics?.syncedLyrics, scrollToCurrentLyric]);
+  }, [currentTime, showLyrics, lyrics?.syncedLyrics, parsedLyrics, scrollToCurrentLyric]);
 
   if (!isOpen || !currentSong) return null;
 
@@ -2323,7 +2328,7 @@ export function FullscreenMusicPlayer({
                       variant="default"
                       size="sm"
                       onClick={onTogglePlayPause}
-                      className="shrink-0 rounded-full w-12 h-12 bg-green-500 hover:bg-green-600 text-black hover:scale-105 transition-all duration-200"
+                      className="shrink-0 rounded-full w-12 h-12 bg-white/20 hover:bg-white/30 text-white hover:scale-105 transition-all duration-200"
                     >
                       {isPlaying ? (
                         <HiPause style={{ width: '20px', height: '20px' }} />
@@ -2356,24 +2361,15 @@ export function FullscreenMusicPlayer({
                         <>
                           {/* Synced Lyrics - Apple Music Style */}
                           {lyrics.syncedLyrics ? (
-                            <div className="space-y-3 leading-tight">
-                              {parseSyncedLyrics(lyrics.syncedLyrics).map(
-                                (line, index) => {
-                                  const currentLyricIndex =
-                                    getCurrentLyricIndex(
-                                      parseSyncedLyrics(lyrics.syncedLyrics),
-                                      currentTime
-                                    );
-                                  const isCurrentLine =
-                                    index === currentLyricIndex;
-
+                            <div className="space-y-6 leading-tight">
+                              {(() => {
+                                const currentLyricIndex = getCurrentLyricIndex(parsedLyrics, currentTime);
+                                return parsedLyrics.map((line, index) => {
+                                  const isCurrentLine = index === currentLyricIndex;
                                   return (
                                     <p
                                       key={index}
-                                      ref={(el) =>
-                                      (mobileLyricLineRefs.current[index] =
-                                        el)
-                                      }
+                                      ref={(el) => (mobileLyricLineRefs.current[index] = el)}
                                       className="text-3xl font-bold cursor-pointer"
                                       style={{
                                         fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
@@ -2386,20 +2382,16 @@ export function FullscreenMusicPlayer({
                                         opacity: isCurrentLine ? 1 : 0.3,
                                         filter: isCurrentLine
                                           ? "blur(0px)"
-                                          : "blur(1px)",
+                                          : "blur(1.5px)",
                                         transition: "color 400ms ease, opacity 400ms ease, filter 400ms ease",
                                       }}
-                                      onClick={() =>
-                                        onDirectSeek([
-                                          parseSyncedLyrics(lyrics.syncedLyrics)[index]?.time || 0,
-                                        ])
-                                      }
+                                      onClick={() => onDirectSeek([parsedLyrics[index]?.time || 0])}
                                     >
                                       {line.text}
                                     </p>
                                   );
-                                }
-                              )}
+                                });
+                              })()}
                             </div>
                           ) : lyrics.plainLyrics ? (
                             /* Plain Lyrics */
@@ -2586,27 +2578,15 @@ export function FullscreenMusicPlayer({
                             <>
                               {/* Synced Lyrics - Clean Custom Implementation */}
                               {lyrics.syncedLyrics ? (
-                                <div className="space-y-6 leading-tight">
-                                  {parseSyncedLyrics(lyrics.syncedLyrics).map(
-                                    (line, index) => {
-                                      const currentLyricIndex =
-                                        getCurrentLyricIndex(
-                                          parseSyncedLyrics(
-                                            lyrics.syncedLyrics
-                                          ),
-                                          currentTime
-                                        );
-                                      const isCurrentLine =
-                                        index === currentLyricIndex;
-
+                                <div className="space-y-12 leading-tight">
+                                  {(() => {
+                                    const currentLyricIndex = getCurrentLyricIndex(parsedLyrics, currentTime);
+                                    return parsedLyrics.map((line, index) => {
+                                      const isCurrentLine = index === currentLyricIndex;
                                       return (
                                         <p
                                           key={index}
-                                          ref={(el) =>
-                                          (desktopLyricLineRefs.current[
-                                            index
-                                          ] = el)
-                                          }
+                                          ref={(el) => (desktopLyricLineRefs.current[index] = el)}
                                           className="text-5xl xl:text-6xl font-bold cursor-pointer"
                                           style={{
                                             fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
@@ -2624,19 +2604,13 @@ export function FullscreenMusicPlayer({
                                             WebkitFontSmoothing: "antialiased",
                                             transition: "color 400ms ease, opacity 400ms ease, filter 400ms ease",
                                           }}
-                                          onClick={() =>
-                                            onDirectSeek([
-                                              parseSyncedLyrics(
-                                                lyrics.syncedLyrics
-                                              )[index]?.time || 0,
-                                            ])
-                                          }
+                                          onClick={() => onDirectSeek([parsedLyrics[index]?.time || 0])}
                                         >
                                           {line.text}
                                         </p>
                                       );
-                                    }
-                                  )}
+                                    });
+                                  })()}
                                 </div>
                               ) : lyrics.plainLyrics ? (
                                 /* Plain Lyrics */
