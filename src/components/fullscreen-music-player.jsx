@@ -246,6 +246,9 @@ export function FullscreenMusicPlayer({
   const [shuffledPlaylist, setShuffledPlaylist] = useState([]);
   const [lyrics, setLyrics] = useState(null);
   const [lyricsLoading, setLyricsLoading] = useState(false);
+  // True from the moment we decide to fetch until the result lands —
+  // prevents the "No lyrics found" flash while the request is in-flight
+  const [lyricsFetching, setLyricsFetching] = useState(false);
 
   // Parse synced lyrics once — only re-runs when lyrics data changes, not every render tick
   const parsedLyrics = useMemo(
@@ -585,28 +588,24 @@ export function FullscreenMusicPlayer({
   const lastScrolledIndexRef = useRef(-1);
 
   // Fetch lyrics from LRCLib API
-  const fetchLyrics = async (song) => {
+  const fetchLyrics = async (song, signal) => {
     if (!song) return null;
 
     // Check cache first
     const cacheKey = song.id || song.songId;
     if (cacheKey && lyricsCache.has(cacheKey)) {
-      console.log('Lyrics cache hit:', cacheKey);
       return lyricsCache.get(cacheKey);
     }
 
     try {
       setLyricsLoading(true);
 
-      // Get song details
       const artistName = getArtistNames(song);
       const trackName = decodeHtmlEntities(song.name || song.title);
-      const albumName = song.album?.name
-        ? decodeHtmlEntities(song.album.name)
-        : "";
+      const albumName = song.album?.name ? decodeHtmlEntities(song.album.name) : "";
       const duration = song.duration || 0;
 
-      // Method 1: Try exact match using get endpoint
+      // Method 1: exact match
       const params = new URLSearchParams();
       params.append("artist_name", artistName);
       params.append("track_name", trackName);
@@ -614,87 +613,52 @@ export function FullscreenMusicPlayer({
       if (duration) params.append("duration", duration.toString());
 
       const getApiUrl = `https://lrclib.net/api/get?${params.toString()}`;
-      console.log("Fetching lyrics (exact match) from:", getApiUrl);
+      let response = await fetch(getApiUrl, { signal });
 
-      let response = await fetch(getApiUrl);
-
-      // If exact match fails (404), try searching
+      // Method 2: search fallback on 404
       if (response.status === 404) {
-        console.log("Exact match not found, trying search API...");
         const query = `${artistName} ${trackName}`;
         const searchApiUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(query)}`;
-        console.log("Searching lyrics from:", searchApiUrl);
 
         let searchResults = [];
-        response = await fetch(searchApiUrl);
-        if (response.ok) {
-          searchResults = await response.json();
-        }
+        response = await fetch(searchApiUrl, { signal });
+        if (response.ok) searchResults = await response.json();
 
-        // If no results with artist, try searching with JUST track name
-        // (Great for slowed/reverb or common tracks where artist name varies)
-        if (!searchResults || searchResults.length === 0) {
-          console.log("No results with artist, trying track name only...");
+        // Method 3: track name only
+        if (!searchResults?.length) {
           const trackOnlyUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(trackName)}`;
-          const trackResponse = await fetch(trackOnlyUrl);
-          if (trackResponse.ok) {
-            searchResults = await trackResponse.json();
-          }
+          const trackResponse = await fetch(trackOnlyUrl, { signal });
+          if (trackResponse.ok) searchResults = await trackResponse.json();
         }
 
-        if (searchResults && searchResults.length > 0) {
-          // Find the best match among search results
-          // We look for:
-          // 1. Closest duration (within 10 seconds)
-          // 2. Results that actually have lyrics
+        if (searchResults?.length > 0) {
           const matches = searchResults
             .filter(r => r.syncedLyrics || r.plainLyrics)
             .map(r => {
               let score = 0;
-
-              // Helper for normalization
               const normalize = (str) =>
-                (str || "")
-                  .toLowerCase()
-                  .replace(/[^\w\s]/gi, " ")
-                  .replace(/\s+/g, " ")
-                  .trim();
-
+                (str || "").toLowerCase().replace(/[^\w\s]/gi, " ").replace(/\s+/g, " ").trim();
               const rNameNorm = normalize(r.name || r.trackName);
               const sNameNorm = normalize(trackName);
-
-              // Name match (case insensitive)
               const rName = (r.name || r.trackName || "").toLowerCase();
               const sName = trackName.toLowerCase();
-
               if (rName === sName || rNameNorm === sNameNorm) score += 15;
               else if (rName.includes(sName) || sName.includes(rName)) score += 8;
               else if (rNameNorm.includes(sNameNorm) || sNameNorm.includes(rNameNorm)) score += 5;
-
-              // Artist match
               const rArtist = (r.artistName || "").toLowerCase();
               const sArtist = artistName.toLowerCase();
               if (rArtist === sArtist) score += 10;
               else if (rArtist.includes(sArtist) || sArtist.includes(rArtist)) score += 5;
-
-              // Duration match (very important to avoid wrong versions/covers)
               const durationDiff = Math.abs((r.duration || 0) - duration);
-              if (durationDiff <= 2) score += 20; // Perfect duration match is key
+              if (durationDiff <= 2) score += 20;
               else if (durationDiff <= 5) score += 12;
               else if (durationDiff <= 10) score += 7;
-
               return { ...r, matchScore: score };
             })
             .sort((a, b) => b.matchScore - a.matchScore);
 
           const bestMatch = matches[0];
-          // If we have a very strong name + duration match, accept it even if artist is different
-          if (bestMatch && bestMatch.matchScore >= 25) {
-            console.log("Found strong lyric match through search:", bestMatch);
-            if (cacheKey) lyricsCache.set(cacheKey, bestMatch);
-            return bestMatch;
-          } else if (bestMatch && bestMatch.matchScore > 10) {
-            console.log("Found likely lyric match through search:", bestMatch);
+          if (bestMatch && bestMatch.matchScore > 10) {
             if (cacheKey) lyricsCache.set(cacheKey, bestMatch);
             return bestMatch;
           }
@@ -704,19 +668,14 @@ export function FullscreenMusicPlayer({
         return null;
       }
 
-      // Handle other HTTP errors for the GET request
-      if (!response.ok) {
-        console.warn(`Lyrics API returned status: ${response.status}`);
-        return null;
-      }
+      if (!response.ok) return null;
 
       const data = await response.json();
-      console.log("Lyrics data received:", data);
-
       if (cacheKey) lyricsCache.set(cacheKey, data);
       return data;
     } catch (error) {
-      // Handle network errors, CORS issues, etc.
+      // AbortError is expected when the user closes lyrics — not a real error
+      if (error.name === 'AbortError') return null;
       console.warn("Could not fetch lyrics:", error.message);
       return null;
     } finally {
@@ -1324,34 +1283,59 @@ export function FullscreenMusicPlayer({
   }, [currentSong?.id, playlist]);
 
   // Fetch lyrics when song changes
+  // Reset lyricsFetching when the lyrics panel is closed
   useEffect(() => {
-    if (currentSong && showLyrics) {
-      // Check cache synchronously first - instant display, no loading state
-      const cacheKey = currentSong.id || currentSong.songId;
-      if (cacheKey && lyricsCache.has(cacheKey)) {
-        setLyrics(lyricsCache.get(cacheKey));
-        return;
-      }
-      // Not cached - fetch async
+    if (!showLyrics) {
+      setLyricsFetching(false);
       setLyrics(null);
-      fetchLyrics(currentSong).then((lyricsData) => {
-        setLyrics(lyricsData);
-      });
     }
+  }, [showLyrics]);
+
+  // Single source of truth for lyrics fetching.
+  // An in-flight Map prevents duplicate requests for the same song.
+  const lyricsInFlight = useRef(new Map());
+
+  useEffect(() => {
+    if (!currentSong || !showLyrics) return;
+
+    const cacheKey = currentSong.id || currentSong.songId;
+
+    // Cache hit — instant, no network
+    if (cacheKey && lyricsCache.has(cacheKey)) {
+      setLyrics(lyricsCache.get(cacheKey));
+      return;
+    }
+
+    // Already fetching this song — don't fire a second request
+    if (cacheKey && lyricsInFlight.current.has(cacheKey)) return;
+
+    const controller = new AbortController();
+    if (cacheKey) lyricsInFlight.current.set(cacheKey, controller);
+
+    setLyrics(null);
+    setLyricsFetching(true); // show skeleton immediately — no gap before lyricsLoading turns true
+    fetchLyrics(currentSong, controller.signal).then((lyricsData) => {
+      if (!controller.signal.aborted) {
+        setLyrics(lyricsData);
+        setLyricsFetching(false);
+      }
+    }).finally(() => {
+      if (cacheKey) lyricsInFlight.current.delete(cacheKey);
+    });
+
+    return () => {
+      controller.abort();
+      if (cacheKey) lyricsInFlight.current.delete(cacheKey);
+      // Do NOT reset lyricsFetching here — if the song changed while lyrics
+      // panel is still open, the next effect run will immediately set it true
+      // again for the new song. Resetting here causes the "No lyrics found"
+      // flash between the two effect runs.
+    };
   }, [currentSong?.id, showLyrics]);
 
-  // Handle lyrics button click
-  const handleLyricsToggle = async () => {
-    if (!showLyrics && currentSong && !lyrics) {
-      // Check cache first for instant display
-      const cacheKey = currentSong.id || currentSong.songId;
-      if (cacheKey && lyricsCache.has(cacheKey)) {
-        setLyrics(lyricsCache.get(cacheKey));
-      } else {
-        const lyricsData = await fetchLyrics(currentSong);
-        setLyrics(lyricsData);
-      }
-    }
+  // Handle lyrics button click — just toggle visibility.
+  // The useEffect above handles all fetching.
+  const handleLyricsToggle = () => {
     setShowLyrics(!showLyrics);
   };
 
@@ -2347,7 +2331,7 @@ export function FullscreenMusicPlayer({
                     }}
                   >
                     <div className="space-y-3 text-left max-w-2xl py-12 px-4">
-                      {lyricsLoading ? (
+                      {lyricsLoading || lyricsFetching ? (
                         <div className="space-y-4 py-8 px-2">
                           {[80, 60, 90, 50, 75, 65, 85, 55].map((w, i) => (
                             <div
@@ -2564,7 +2548,7 @@ export function FullscreenMusicPlayer({
                         }}
                       >
                         <div className="space-y-6 py-20 text-left">
-                          {lyricsLoading ? (
+                          {lyricsLoading || lyricsFetching ? (
                             <div className="space-y-5 px-2">
                               {[70, 55, 85, 45, 80, 60, 90, 50, 75].map((w, i) => (
                                 <div

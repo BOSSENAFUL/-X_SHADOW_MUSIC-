@@ -120,8 +120,9 @@ export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
                 )}
 
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className={`absolute bottom-2 right-2 transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-20 hidden md:block ${currentPlayingId === id ? 'opacity-100 translate-y-0' : 'opacity-0 group-hover:opacity-100'}`}>
-                    <div
+                <div className={`absolute bottom-2 right-2 transition-all duration-300 z-20 hidden md:block ${currentPlayingId === id ? 'opacity-100 translate-y-0' : 'opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0'}`}>
+                    <button
+                        type="button"
                         className="rounded-full w-10 h-10 md:w-12 md:h-12 bg-green-500 hover:bg-green-400 flex items-center justify-center text-black shadow-lg hover:scale-105 transition-transform"
                         onClick={handlePlaylistPlay}
                     >
@@ -130,7 +131,7 @@ export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
                         ) : (
                             <IoMdPlay className="w-5 h-5 md:w-6 md:h-6 fill-black translate-x-0.5" />
                         )}
-                    </div>
+                    </button>
                 </div>
             </div>
             <div className="space-y-1 px-1">

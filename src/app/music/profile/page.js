@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { useLikedPlaylists } from "@/hooks/useLikedPlaylists";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useRouter } from "next/navigation";
-import { Music, Disc, LogOut, Edit2, MessageCircle } from "lucide-react";
+import { Music, Disc, LogOut, Edit2, MessageCircle, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeSelector } from "@/components/theme-selector";
 
@@ -226,6 +226,15 @@ export default function ProfilePage() {
               </BreadcrumbList>
             </Breadcrumb>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.push("/music/settings")}
+            className="h-9 w-9 rounded-full"
+            title="Settings"
+          >
+            <Settings className="w-4 h-4" />
+          </Button>
         </header>
 
         {loading ? (

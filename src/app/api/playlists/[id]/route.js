@@ -5,9 +5,12 @@ import connectDB from '@/lib/mongodb';
 import Playlist from '@/models/Playlist';
 import User from '@/models/User';
 import RecentlyPlayedPlaylist from '@/models/RecentlyPlayedPlaylist';
+import { getSpotifyPlaylistModel } from '@/models/SpotifyPlaylist';
 import mongoose from 'mongoose';
 
 // GET - Get specific playlist (with privacy controls)
+// Falls back to the spotify-playlists DB when the ID is not found in the
+// main user-playlist collection, so the same UI works for both types.
 export async function GET(request, { params }) {
   try {
     const session = await getServerSession(authOptions);
@@ -22,45 +25,62 @@ export async function GET(request, { params }) {
 
     await connectDB();
 
-    // First, try to find the playlist
-    const playlist = await Playlist.findById(id).lean();
+    // ── Run both DB lookups in parallel ────────────────────────────────
+    // Most IDs belong to user playlists, but spotify playlist IDs are valid
+    // ObjectIds too. Running both concurrently avoids a serial round-trip
+    // penalty when the ID turns out to be a spotify playlist.
+    const SpotifyPlaylist = await getSpotifyPlaylistModel();
 
-    if (!playlist) {
+    const [playlist, spotifyPlaylist] = await Promise.all([
+      Playlist.findById(id).lean(),
+      SpotifyPlaylist.findById(id).lean(),
+    ]);
+
+    // ── 1. User playlist ────────────────────────────────────────────────
+    if (playlist) {
+      const owner = await User.findById(playlist.userId).select('name image').lean();
+      const ownerName = owner ? owner.name : 'Unknown User';
+      const ownerImage = owner ? owner.image : null;
+      const isOwner = !!(session?.user?.id && playlist.userId.toString() === session.user.id);
+
+      if (!playlist.isPublic && !isOwner) {
+        return NextResponse.json(
+          { success: false, error: 'This playlist is private' },
+          { status: 403 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: { ...playlist, ownerName, ownerImage, isOwner },
+      });
+    }
+
+    // ── 2. Spotify playlist ─────────────────────────────────────────────
+    if (!spotifyPlaylist) {
       return NextResponse.json(
         { success: false, error: 'Playlist not found' },
         { status: 404 }
       );
     }
 
-    // Fetch the owner's information
-    const owner = await User.findById(playlist.userId).select('name image').lean();
-    const ownerName = owner ? owner.name : 'Unknown User';
-    const ownerImage = owner ? owner.image : null;
-
-    // Check access permissions
-    const isOwner = session?.user?.id && playlist.userId.toString() === session.user.id;
-    const isPublic = playlist.isPublic;
-
-    // Private playlist access rules
-    if (!isPublic) {
-      // Private playlists can only be accessed by the owner
-      if (!isOwner) {
-        return NextResponse.json(
-          { success: false, error: 'This playlist is private' },
-          { status: 403 }
-        );
-      }
-    }
-
-    // Return playlist data with owner name
     return NextResponse.json({
       success: true,
       data: {
-        ...playlist,
-        ownerName: ownerName,
-        ownerImage: ownerImage,
-        isOwner: isOwner
-      }
+        _id: spotifyPlaylist._id.toString(),
+        name: spotifyPlaylist.name,
+        description: spotifyPlaylist.description ?? '',
+        image: spotifyPlaylist.image ?? '',
+        songIds: spotifyPlaylist.songIds ?? [],
+        isPublic: true,
+        isOwner: false,
+        ownerName: 'Spotify',
+        ownerImage: null,
+        createdAt: spotifyPlaylist.createdAt,
+        updatedAt: spotifyPlaylist.updatedAt,
+        sourceType: spotifyPlaylist.sourceType ?? 'spotify',
+        sourceUrl: spotifyPlaylist.sourceUrl ?? '',
+      },
     });
 
   } catch (error) {

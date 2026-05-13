@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useState, useEffect, useCallback, memo, useMemo } from "react";
+import { useState, useEffect, useCallback, memo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -73,21 +73,18 @@ AmbientGradient.displayName = "AmbientGradient";
 export default function MusicPage() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
-  const [newReleases, setNewReleases] = useState([]);
-  const [trendingPlaylists, setTrendingPlaylists] = useState([]);
-  const [topHitsPlaylists, setTopHitsPlaylists] = useState([]);
-  const [englishTopPlaylists, setEnglishTopPlaylists] = useState([]);
-  // International-only genre sections
-  const [partyPlaylists, setPartyPlaylists] = useState([]);
-  const [hipHopPlaylists, setHipHopPlaylists] = useState([]);
-  const [dancePlaylists, setDancePlaylists] = useState([]);
-  const [rockPlaylists, setRockPlaylists] = useState([]);
-  const [metalPlaylists, setMetalPlaylists] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [trendingLoading, setTrendingLoading] = useState(true);
-  const [topHitsLoading, setTopHitsLoading] = useState(true);
-  const [englishTopLoading, setEnglishTopLoading] = useState(true);
-  const [genreLoading, setGenreLoading] = useState(true);
+  const [popularHindiPlaylists, setPopularHindiPlaylists] = useState([]);
+  const [popularHindiLoading, setPopularHindiLoading] = useState(true);
+  const [popularHindiSectionId, setPopularHindiSectionId] = useState(null);
+  // DB-driven sections from spotify-playlists DB
+  const [dbSections, setDbSections] = useState({
+    newTrending: { playlists: [], sectionId: null, loading: true },
+    bollywoodRomance: { playlists: [], sectionId: null, loading: true },
+    chillSad: { playlists: [], sectionId: null, loading: true },
+    popularParty: { playlists: [], sectionId: null, loading: true },
+    englishTopHits: { playlists: [], sectionId: null, loading: true },
+    englishTrending: { playlists: [], sectionId: null, loading: true },
+  });
   const [communityPlaylists, setCommunityPlaylists] = useState([]);
   const [communityLoading, setCommunityLoading] = useState(true);
   const [recentlyPlayed, setRecentlyPlayed] = useState([]);
@@ -95,10 +92,25 @@ export default function MusicPage() {
   const [playlistColors, setPlaylistColors] = useState({});
   const [hoveredColor, setHoveredColor] = useState(null);
   const [playingId, setPlayingId] = useState(null);
-  // Geolocation: 'IN' = India, anything else = international
-  const [userCountry, setUserCountry] = useState(null);
-  const isIndian = userCountry === 'IN';
-  const isInternational = userCountry !== null && userCountry !== 'IN';
+
+  // Read feed preference from localStorage (set in Settings)
+  const [feedPreference, setFeedPreference] = useState('all');
+
+  // Read from localStorage after mount + re-read when tab becomes visible
+  useEffect(() => {
+    const read = () => {
+      const pref = localStorage.getItem('feed_preference') || 'all';
+      setFeedPreference(pref);
+    };
+    read(); // initial read after hydration
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') read();
+    });
+    return () => document.removeEventListener('visibilitychange', read);
+  }, []);
+
+  const showIndian = feedPreference === 'indian' || feedPreference === 'all';
+  const showGlobal = feedPreference === 'global' || feedPreference === 'all';
 
   const { playSong } = useMusicPlayer();
 
@@ -232,163 +244,270 @@ export default function MusicPage() {
     return () => { isMounted = false; };
   }, [session?.user?.id, sessionStatus]);
 
-  // Detect user country via IP geolocation (cached in localStorage for 24h)
+  // Fetch remaining DB sections in one batch
   useEffect(() => {
     let isMounted = true;
-    const detectCountry = async () => {
+
+    const SECTION_NAMES = {
+      newTrending: 'new & trending',
+      bollywoodRomance: 'bollywood romance',
+      chillSad: 'chill & sad',
+      popularParty: 'popular party playlists',
+    };
+
+    // English sections share names with Hindi ones — match by hardcoded ID
+    const ENGLISH_SECTION_IDS = {
+      englishTopHits: '6a04071717b699631f905913',
+      englishTrending: '6a047203f2b5dded647a6dcf',
+    };
+
+    const CACHE_KEY = 'db_sections_data';
+    const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+    const fetchDbSections = async () => {
+      // Fast path: serve from cache
       try {
-        const cached = localStorage.getItem('user_country_cache');
-        if (cached) {
-          const { country, ts } = JSON.parse(cached);
-          // Cache valid for 24 hours
-          if (Date.now() - ts < 86400000) {
-            if (isMounted) setUserCountry(country);
+        const cachedRaw = sessionStorage.getItem(CACHE_KEY);
+        if (cachedRaw) {
+          const { data, ts } = JSON.parse(cachedRaw);
+          if (Date.now() - ts < CACHE_TTL && data) {
+            if (isMounted) {
+              setDbSections({
+                newTrending: { playlists: data.newTrending || [], sectionId: data.newTrendingId || null, loading: false },
+                bollywoodRomance: { playlists: data.bollywoodRomance || [], sectionId: data.bollywoodRomanceId || null, loading: false },
+                chillSad: { playlists: data.chillSad || [], sectionId: data.chillSadId || null, loading: false },
+                popularParty: { playlists: data.popularParty || [], sectionId: data.popularPartyId || null, loading: false },
+                englishTopHits: { playlists: data.englishTopHits || [], sectionId: data.englishTopHitsId || null, loading: false },
+                englishTrending: { playlists: data.englishTrending || [], sectionId: data.englishTrendingId || null, loading: false },
+              });
+            }
             return;
           }
         }
-        const res = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(5000) });
-        const data = await res.json();
-        const country = data?.country_code || 'IN'; // fallback to IN
-        if (isMounted) {
-          setUserCountry(country);
-          localStorage.setItem('user_country_cache', JSON.stringify({ country, ts: Date.now() }));
-        }
-      } catch {
-        // On error, default to India (our primary market)
-        if (isMounted) setUserCountry('IN');
-      }
-    };
-    detectCountry();
-    return () => { isMounted = false; };
-  }, []);
-
-  useEffect(() => {
-    // Don't fetch until we know the user's region
-    if (userCountry === null) return;
-
-    let isMounted = true;
-    const fetchHomeSections = async () => {
-      const cacheKey = `home_sections_${userCountry}`;
-      // Check session cache first
-      const cached = sessionStorage.getItem(cacheKey);
-      if (cached && isMounted) {
-        try {
-          const homeData = JSON.parse(cached);
-          setNewReleases(homeData.newReleases || []);
-          setTrendingPlaylists(homeData.trending || []);
-          setTopHitsPlaylists(homeData.topHits || []);
-          setEnglishTopPlaylists(homeData.englishTop || []);
-          setCommunityPlaylists(homeData.community || []);
-          // Genre sections (only populated for international)
-          setPartyPlaylists(homeData.party || []);
-          setHipHopPlaylists(homeData.hipHop || []);
-          setDancePlaylists(homeData.dance || []);
-          setRockPlaylists(homeData.rock || []);
-          setMetalPlaylists(homeData.metal || []);
-          setLoading(false);
-          setTrendingLoading(false);
-          setTopHitsLoading(false);
-          setEnglishTopLoading(false);
-          setGenreLoading(false);
-          setCommunityLoading(false);
-          // Still fetch in background to refresh cache
-        } catch (e) {
-          console.error("Cache parse error:", e);
-        }
-      }
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-      const isIN = userCountry === 'IN';
-
-      // Choose queries based on user's region
-      const queries = isIN
-        ? {
-          newReleases: 'new%20releases',
-          trending: 'trending',
-          topHits: 'top%20hits',
-          englishTop: 'english%20top',
-        }
-        : {
-          newReleases: 'english%20new%20releases',
-          trending: 'english%20hits%20top',
-          topHits: 'pop%20hits%20english',
-          englishTop: 'english%20love',
-        };
+      } catch { /* ignore */ }
 
       try {
-        if (!cached && isMounted) {
-          setLoading(true);
-          setTrendingLoading(true);
-          setTopHitsLoading(true);
-          setEnglishTopLoading(true);
-          if (!isIN) setGenreLoading(true);
+        // Fetch all sections once
+        const sectionsRes = await fetch('/api/sections');
+        const sectionsData = await sectionsRes.json();
+        if (!isMounted || !sectionsData.success) return;
+
+        // Match Hindi sections by name
+        const matched = {};
+        for (const [key, name] of Object.entries(SECTION_NAMES)) {
+          const found = sectionsData.data.find(s => s.name.toLowerCase() === name);
+          matched[key] = found?._id ?? null;
+        }
+        // English sections matched by hardcoded ID (avoid name collision with Hindi)
+        for (const [key, id] of Object.entries(ENGLISH_SECTION_IDS)) {
+          matched[key] = sectionsData.data.find(s => s._id === id)?._id ?? id;
         }
 
-        const results = await Promise.all([
-          fetch(`${apiUrl}/api/search/playlists?query=${queries.newReleases}&page=0&limit=20`).then(r => r.json()).catch(() => ({ success: false })),
-          fetch(`${apiUrl}/api/search/playlists?query=${queries.trending}&page=0&limit=20`).then(r => r.json()).catch(() => ({ success: false })),
-          fetch(`${apiUrl}/api/search/playlists?query=${queries.topHits}&page=0&limit=20`).then(r => r.json()).catch(() => ({ success: false })),
-          fetch(`${apiUrl}/api/search/playlists?query=${queries.englishTop}&page=0&limit=20`).then(r => r.json()).catch(() => ({ success: false })),
-          fetch(`/api/playlists/community`).then(r => r.json()).catch(() => ({ success: false })),
-          // Genre sections — only fetched for international users
-          ...(!isIN ? [
-            fetch(`${apiUrl}/api/search/playlists?query=english%20party&page=0&limit=20`).then(r => r.json()).catch(() => ({ success: false })),
-            fetch(`${apiUrl}/api/search/playlists?query=english%20hip-hop&page=0&limit=20`).then(r => r.json()).catch(() => ({ success: false })),
-            fetch(`${apiUrl}/api/search/playlists?query=english%20dance&page=0&limit=20`).then(r => r.json()).catch(() => ({ success: false })),
-            fetch(`${apiUrl}/api/search/playlists?query=english%20rock&page=0&limit=20`).then(r => r.json()).catch(() => ({ success: false })),
-            fetch(`${apiUrl}/api/search/playlists?query=english%20metal&page=0&limit=20`).then(r => r.json()).catch(() => ({ success: false })),
-          ] : [])
+        // Fetch playlists for all matched sections in parallel
+        const fetchSection = async (sectionId) => {
+          if (!sectionId) return [];
+          const res = await fetch(`/api/spotify-playlists?sectionId=${sectionId}&limit=20`);
+          const data = await res.json();
+          if (!data.success) return [];
+          return data.data.map(p => ({
+            id: p._id,
+            name: p.name,
+            image: p.image ? [{ quality: 'default', url: p.image }] : [],
+            songCount: p.songCount ?? 0,
+            description: p.description ?? '',
+            source: 'spotify',
+            sourceUrl: p.sourceUrl ?? '',
+            songIds: p.songIds ?? [],
+          }));
+        };
+
+        const [
+          newTrendingPlaylists,
+          bollywoodRomancePlaylists,
+          chillSadPlaylists,
+          popularPartyPlaylists,
+          englishTopHitsPlaylists,
+          englishTrendingPlaylists,
+        ] = await Promise.all([
+          fetchSection(matched.newTrending),
+          fetchSection(matched.bollywoodRomance),
+          fetchSection(matched.chillSad),
+          fetchSection(matched.popularParty),
+          fetchSection(matched.englishTopHits),
+          fetchSection(matched.englishTrending),
         ]);
 
         if (!isMounted) return;
 
-        const [newRes, trending, topHits, englishTop, communityRes, partyRes, hipHopRes, danceRes, rockRes, metalRes] = results;
-
-        const homeData = {
-          newReleases: newRes.success ? newRes.data.results : [],
-          trending: trending.success ? trending.data.results : [],
-          topHits: topHits.success ? topHits.data.results : [],
-          englishTop: englishTop.success ? englishTop.data.results : [],
-          community: communityRes.success ? communityRes.data : [],
-          // Genre — only populated for international
-          party: partyRes?.success ? partyRes.data.results : [],
-          hipHop: hipHopRes?.success ? hipHopRes.data.results : [],
-          dance: danceRes?.success ? danceRes.data.results : [],
-          rock: rockRes?.success ? rockRes.data.results : [],
-          metal: metalRes?.success ? metalRes.data.results : [],
+        const newState = {
+          newTrending: { playlists: newTrendingPlaylists, sectionId: matched.newTrending, loading: false },
+          bollywoodRomance: { playlists: bollywoodRomancePlaylists, sectionId: matched.bollywoodRomance, loading: false },
+          chillSad: { playlists: chillSadPlaylists, sectionId: matched.chillSad, loading: false },
+          popularParty: { playlists: popularPartyPlaylists, sectionId: matched.popularParty, loading: false },
+          englishTopHits: { playlists: englishTopHitsPlaylists, sectionId: matched.englishTopHits, loading: false },
+          englishTrending: { playlists: englishTrendingPlaylists, sectionId: matched.englishTrending, loading: false },
         };
 
-        setNewReleases(homeData.newReleases);
-        setTrendingPlaylists(homeData.trending);
-        setTopHitsPlaylists(homeData.topHits);
-        setEnglishTopPlaylists(homeData.englishTop);
-        setCommunityPlaylists(homeData.community);
-        if (!isIN) {
-          setPartyPlaylists(homeData.party);
-          setHipHopPlaylists(homeData.hipHop);
-          setDancePlaylists(homeData.dance);
-          setRockPlaylists(homeData.rock);
-          setMetalPlaylists(homeData.metal);
-        }
+        setDbSections(newState);
 
-        sessionStorage.setItem(cacheKey, JSON.stringify(homeData));
-      } catch (error) {
-        console.error("Error fetching home sections:", error);
-      } finally {
+        // Cache
+        try {
+          sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+            ts: Date.now(),
+            data: {
+              newTrending: newTrendingPlaylists,
+              newTrendingId: matched.newTrending,
+              bollywoodRomance: bollywoodRomancePlaylists,
+              bollywoodRomanceId: matched.bollywoodRomance,
+              chillSad: chillSadPlaylists,
+              chillSadId: matched.chillSad,
+              popularParty: popularPartyPlaylists,
+              popularPartyId: matched.popularParty,
+              englishTopHits: englishTopHitsPlaylists,
+              englishTopHitsId: matched.englishTopHits,
+              englishTrending: englishTrendingPlaylists,
+              englishTrendingId: matched.englishTrending,
+            },
+          }));
+        } catch { /* storage full */ }
+
+      } catch (err) {
+        console.error('Error fetching DB sections:', err);
         if (isMounted) {
-          setLoading(false);
-          setTrendingLoading(false);
-          setTopHitsLoading(false);
-          setEnglishTopLoading(false);
-          setGenreLoading(false);
-          setCommunityLoading(false);
+          setDbSections(prev => ({
+            newTrending: { ...prev.newTrending, loading: false },
+            bollywoodRomance: { ...prev.bollywoodRomance, loading: false },
+            chillSad: { ...prev.chillSad, loading: false },
+            popularParty: { ...prev.popularParty, loading: false },
+            englishTopHits: { ...prev.englishTopHits, loading: false },
+            englishTrending: { ...prev.englishTrending, loading: false },
+          }));
         }
       }
     };
 
-    fetchHomeSections();
+    fetchDbSections();
     return () => { isMounted = false; };
-  }, [userCountry]);
+  }, []);
+
+  // Fetch "Popular Hindi Playlists" section from the playlists DB
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchPopularHindi = async () => {
+      try {
+        const SECTION_CACHE_KEY = 'popular_hindi_section_id';
+        const PLAYLISTS_CACHE_KEY = 'popular_hindi_playlists';
+        const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+        // Fast path: serve cached playlists if still fresh
+        try {
+          const cachedRaw = sessionStorage.getItem(PLAYLISTS_CACHE_KEY);
+          if (cachedRaw) {
+            const { data, ts } = JSON.parse(cachedRaw);
+            if (Date.now() - ts < CACHE_TTL && data?.length > 0) {
+              if (isMounted) {
+                setPopularHindiPlaylists(data);
+                // Also restore the sectionId so Show All works
+                const cachedSectionId = sessionStorage.getItem(SECTION_CACHE_KEY);
+                if (cachedSectionId) setPopularHindiSectionId(cachedSectionId);
+                setPopularHindiLoading(false);
+              }
+              return;
+            }
+          }
+        } catch { /* ignore bad cache */ }
+
+        // Resolve sectionId (cached separately — it never changes)
+        let sectionId = sessionStorage.getItem(SECTION_CACHE_KEY);
+
+        if (!sectionId) {
+          const [genresData, sectionsData] = await Promise.all([
+            fetch('/api/genres').then(r => r.json()),
+            fetch('/api/sections').then(r => r.json()),
+          ]);
+
+          if (!isMounted) return;
+          if (!genresData.success || !sectionsData.success) {
+            if (isMounted) setPopularHindiLoading(false);
+            return;
+          }
+
+          const hindiGenre = genresData.data.find(
+            (g) => g.name.toLowerCase() === 'hindi'
+          );
+          if (!hindiGenre) { if (isMounted) setPopularHindiLoading(false); return; }
+
+          const popularSection = sectionsData.data.find(
+            (s) => s.genreId === hindiGenre._id &&
+              s.name.toLowerCase() === 'popular hindi playlists'
+          );
+          if (!popularSection) { if (isMounted) setPopularHindiLoading(false); return; }
+
+          sectionId = popularSection._id;
+          sessionStorage.setItem(SECTION_CACHE_KEY, sectionId);
+        }
+
+        if (isMounted) setPopularHindiSectionId(sectionId);
+
+        // Fetch all playlists for that section
+        const playlistsRes = await fetch(
+          `/api/spotify-playlists?sectionId=${sectionId}&limit=20`
+        );
+        const playlistsData = await playlistsRes.json();
+        if (!isMounted || !playlistsData.success) return;
+
+        const normalised = playlistsData.data.map((p) => ({
+          id: p._id,
+          name: p.name,
+          image: p.image ? [{ quality: 'default', url: p.image }] : [],
+          songCount: p.songCount ?? 0,
+          description: p.description ?? '',
+          source: 'spotify',
+          sourceUrl: p.sourceUrl ?? '',
+          songIds: p.songIds ?? [],
+        }));
+
+        if (isMounted) setPopularHindiPlaylists(normalised);
+
+        // Cache the normalised result with a timestamp
+        try {
+          sessionStorage.setItem(PLAYLISTS_CACHE_KEY, JSON.stringify({
+            data: normalised,
+            ts: Date.now(),
+          }));
+        } catch { /* storage full — skip */ }
+
+      } catch (err) {
+        console.error('Error fetching Popular Hindi Playlists:', err);
+      } finally {
+        if (isMounted) setPopularHindiLoading(false);
+      }
+    };
+
+    fetchPopularHindi();
+    return () => { isMounted = false; };
+  }, []);
+
+  // Fetch community playlists
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCommunity = async () => {
+      try {
+        const res = await fetch('/api/playlists/community');
+        const data = await res.json();
+        if (isMounted && data.success) {
+          setCommunityPlaylists(data.data || []);
+        }
+      } catch (err) {
+        console.error('Error fetching community playlists:', err);
+      } finally {
+        if (isMounted) setCommunityLoading(false);
+      }
+    };
+    fetchCommunity();
+    return () => { isMounted = false; };
+  }, []);
 
   const handlePlayClick = useCallback(async (item, type) => {
     if (type === 'liked-songs') {
@@ -447,6 +566,20 @@ export default function MusicPage() {
             songs = result.data.songIds.map(id => map[id]).filter(Boolean);
           }
         }
+      } else if (source === 'spotify') {
+        // The list API strips songIds for payload size — fetch the full doc
+        // via /api/playlists/[id] which transparently handles the spotify fallback
+        const fullRes = await fetch(`/api/playlists/${pid}`).then(r => r.json()).catch(() => ({}));
+        const ids = fullRes.success ? (fullRes.data?.songIds ?? []) : [];
+        if (ids.length > 0) {
+          const songsRes = await fetch(`${apiUrl}/api/songs?ids=${ids.join(',')}`);
+          const songsData = await songsRes.json();
+          if (songsData.success && songsData.data) {
+            const map = {};
+            songsData.data.forEach(s => { if (s) map[s.id] = s; });
+            songs = ids.map(id => map[id]).filter(Boolean);
+          }
+        }
       } else {
         const res = await fetch(`${apiUrl}/api/playlists?id=${pid}&page=0&limit=${songCount || 50}`);
         const data = await res.json();
@@ -477,7 +610,7 @@ export default function MusicPage() {
                 image: normalizedImage,
                 songCount: songs.length,
                 source: source,
-                owner: playlist.userName || playlist.owner || playlist.subtitle || (source === 'user' ? 'You' : 'JioSaavn')
+                owner: playlist.userName || playlist.owner || playlist.subtitle || (source === 'user' ? 'You' : source === 'spotify' ? 'Spotify' : 'JioSaavn')
               }
             }),
           });
@@ -505,11 +638,6 @@ export default function MusicPage() {
     } else {
       console.log(`Clicked ${type}:`, item);
     }
-  }, [router]);
-
-  const handleShowAll = useCallback(() => {
-    // Navigate to existing new releases page
-    router.push("/music/discover/new-releases");
   }, [router]);
 
   const handleMouseLeave = useCallback(() => {
@@ -877,7 +1005,7 @@ export default function MusicPage() {
               : recentlyPlayed.slice(0, 5).map((playlist) => (
                 <Link
                   key={playlist.playlistId}
-                  href={playlist.source === 'user' ? `/music/playlists/${playlist.playlistId}` : `/music/playlist/${playlist.playlistId}?songCount=${playlist.songCount || 50}`}
+                  href={playlist.source === 'user' || playlist.source === 'spotify' ? `/music/playlists/${playlist.playlistId}` : `/music/playlist/${playlist.playlistId}?songCount=${playlist.songCount || 50}`}
                   className="group relative flex items-center bg-white/[0.08] hover:bg-white/[0.13] transition-colors rounded-[4px] overflow-hidden cursor-pointer h-14 md:h-16 lg:h-20 z-10"
                   onMouseEnter={() => handlePlaylistHover(playlist)}
                   onMouseLeave={handleMouseLeave}
@@ -957,7 +1085,7 @@ export default function MusicPage() {
               onShowAll={() => router.push("/music/discover/recently-played")}
               onPlaylistClick={(playlist) => {
                 const pid = playlist.id || playlist.playlistId;
-                if (playlist.source === "user") {
+                if (playlist.source === "user" || playlist.source === "spotify") {
                   router.push(`/music/playlists/${pid}`);
                 } else {
                   router.push(`/music/playlist/${pid}?songCount=${playlist.songCount || 50}`);
@@ -984,99 +1112,95 @@ export default function MusicPage() {
             />
           )}
 
-          {/* "New Release" — title adapts to region */}
-          <PlaylistSection
-            title={isInternational ? "New English Releases" : "New Release"}
-            playlists={newReleases}
-            loading={loading}
-            onShowAll={handleShowAll}
-            onPlaylistClick={(playlist) => handleCardClick(playlist, "playlist")}
-            onPlayClick={handlePlaylistPlay}
-            playingId={playingId}
-          />
+          {/* Popular Hindi Playlists — from our playlists DB */}
+          {showIndian && (popularHindiLoading || popularHindiPlaylists.length > 0) && (
+            <PlaylistSection
+              title="Popular Hindi Playlists"
+              playlists={popularHindiPlaylists}
+              loading={popularHindiLoading}
+              onShowAll={() => popularHindiSectionId && router.push(`/music/section/${popularHindiSectionId}`)}
+              onPlaylistClick={(playlist) => { router.push(`/music/playlists/${playlist.id}`); }}
+              onPlayClick={handlePlaylistPlay}
+              playingId={playingId}
+            />
+          )}
 
-          {/* Trending — label adapts to region */}
-          <PlaylistSection
-            title={isInternational ? "English Hits" : "Trending Playlists"}
-            playlists={trendingPlaylists}
-            loading={trendingLoading}
-            onShowAll={() => router.push("/music/discover/playlists")}
-            onPlaylistClick={(playlist) => handleCardClick(playlist, "playlist")}
-            onPlayClick={handlePlaylistPlay}
-            playingId={playingId}
-          />
+          {/* New & Trending */}
+          {showIndian && (dbSections.newTrending.loading || dbSections.newTrending.playlists.length > 0) && (
+            <PlaylistSection
+              title="New & Trending"
+              playlists={dbSections.newTrending.playlists}
+              loading={dbSections.newTrending.loading}
+              onShowAll={() => dbSections.newTrending.sectionId && router.push(`/music/section/${dbSections.newTrending.sectionId}`)}
+              onPlaylistClick={(playlist) => { router.push(`/music/playlists/${playlist.id}`); }}
+              onPlayClick={handlePlaylistPlay}
+              playingId={playingId}
+            />
+          )}
 
-          {/* Top Hits — label adapts to region */}
-          <PlaylistSection
-            title={isInternational ? "Pop Hits" : "Top Hits Playlists"}
-            playlists={topHitsPlaylists}
-            loading={topHitsLoading}
-            onShowAll={() => router.push("/music/discover/top-hits")}
-            onPlaylistClick={(playlist) => handleCardClick(playlist, "playlist")}
-            onPlayClick={handlePlaylistPlay}
-            playingId={playingId}
-          />
+          {/* Bollywood Romance */}
+          {showIndian && (dbSections.bollywoodRomance.loading || dbSections.bollywoodRomance.playlists.length > 0) && (
+            <PlaylistSection
+              title="Bollywood Romance"
+              playlists={dbSections.bollywoodRomance.playlists}
+              loading={dbSections.bollywoodRomance.loading}
+              onShowAll={() => dbSections.bollywoodRomance.sectionId && router.push(`/music/section/${dbSections.bollywoodRomance.sectionId}`)}
+              onPlaylistClick={(playlist) => { router.push(`/music/playlists/${playlist.id}`); }}
+              onPlayClick={handlePlaylistPlay}
+              playingId={playingId}
+            />
+          )}
 
-          {/* Last section — International for others, English Top for India */}
-          <PlaylistSection
-            title={isInternational ? "English Love Songs" : "English Top Playlists"}
-            playlists={englishTopPlaylists}
-            loading={englishTopLoading}
-            onShowAll={() => router.push("/music/discover/english-top")}
-            onPlaylistClick={(playlist) => handleCardClick(playlist, "playlist")}
-            onPlayClick={handlePlaylistPlay}
-            playingId={playingId}
-          />
+          {/* Chill & Sad */}
+          {showIndian && (dbSections.chillSad.loading || dbSections.chillSad.playlists.length > 0) && (
+            <PlaylistSection
+              title="Chill & Sad"
+              playlists={dbSections.chillSad.playlists}
+              loading={dbSections.chillSad.loading}
+              onShowAll={() => dbSections.chillSad.sectionId && router.push(`/music/section/${dbSections.chillSad.sectionId}`)}
+              onPlaylistClick={(playlist) => { router.push(`/music/playlists/${playlist.id}`); }}
+              onPlayClick={handlePlaylistPlay}
+              playingId={playingId}
+            />
+          )}
 
-          {/* International-only genre sections */}
-          {isInternational && (
-            <>
-              <PlaylistSection
-                title="English Party"
-                playlists={partyPlaylists}
-                loading={genreLoading}
-                onShowAll={() => router.push("/music/discover/genre/party")}
-                onPlaylistClick={(playlist) => handleCardClick(playlist, "playlist")}
-                onPlayClick={handlePlaylistPlay}
-                playingId={playingId}
-              />
-              <PlaylistSection
-                title="English Hip-Hop"
-                playlists={hipHopPlaylists}
-                loading={genreLoading}
-                onShowAll={() => router.push("/music/discover/genre/hip-hop")}
-                onPlaylistClick={(playlist) => handleCardClick(playlist, "playlist")}
-                onPlayClick={handlePlaylistPlay}
-                playingId={playingId}
-              />
-              <PlaylistSection
-                title="English Dance"
-                playlists={dancePlaylists}
-                loading={genreLoading}
-                onShowAll={() => router.push("/music/discover/genre/dance")}
-                onPlaylistClick={(playlist) => handleCardClick(playlist, "playlist")}
-                onPlayClick={handlePlaylistPlay}
-                playingId={playingId}
-              />
-              <PlaylistSection
-                title="English Rock"
-                playlists={rockPlaylists}
-                loading={genreLoading}
-                onShowAll={() => router.push("/music/discover/genre/rock")}
-                onPlaylistClick={(playlist) => handleCardClick(playlist, "playlist")}
-                onPlayClick={handlePlaylistPlay}
-                playingId={playingId}
-              />
-              <PlaylistSection
-                title="English Metal"
-                playlists={metalPlaylists}
-                loading={genreLoading}
-                onShowAll={() => router.push("/music/discover/genre/metal")}
-                onPlaylistClick={(playlist) => handleCardClick(playlist, "playlist")}
-                onPlayClick={handlePlaylistPlay}
-                playingId={playingId}
-              />
-            </>
+          {/* Popular Party Playlists */}
+          {showIndian && (dbSections.popularParty.loading || dbSections.popularParty.playlists.length > 0) && (
+            <PlaylistSection
+              title="Popular Party Playlists"
+              playlists={dbSections.popularParty.playlists}
+              loading={dbSections.popularParty.loading}
+              onShowAll={() => dbSections.popularParty.sectionId && router.push(`/music/section/${dbSections.popularParty.sectionId}`)}
+              onPlaylistClick={(playlist) => { router.push(`/music/playlists/${playlist.id}`); }}
+              onPlayClick={handlePlaylistPlay}
+              playingId={playingId}
+            />
+          )}
+
+          {/* English Top Hits */}
+          {showGlobal && (dbSections.englishTopHits.loading || dbSections.englishTopHits.playlists.length > 0) && (
+            <PlaylistSection
+              title="English Top Hits"
+              playlists={dbSections.englishTopHits.playlists}
+              loading={dbSections.englishTopHits.loading}
+              onShowAll={() => dbSections.englishTopHits.sectionId && router.push(`/music/section/${dbSections.englishTopHits.sectionId}`)}
+              onPlaylistClick={(playlist) => { router.push(`/music/playlists/${playlist.id}`); }}
+              onPlayClick={handlePlaylistPlay}
+              playingId={playingId}
+            />
+          )}
+
+          {/* English New & Trending */}
+          {showGlobal && (dbSections.englishTrending.loading || dbSections.englishTrending.playlists.length > 0) && (
+            <PlaylistSection
+              title="English New & Trending"
+              playlists={dbSections.englishTrending.playlists}
+              loading={dbSections.englishTrending.loading}
+              onShowAll={() => dbSections.englishTrending.sectionId && router.push(`/music/section/${dbSections.englishTrending.sectionId}`)}
+              onPlaylistClick={(playlist) => { router.push(`/music/playlists/${playlist.id}`); }}
+              onPlayClick={handlePlaylistPlay}
+              playingId={playingId}
+            />
           )}
 
           {/* Bottom padding to prevent content being hidden behind music player */}

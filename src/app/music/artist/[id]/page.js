@@ -61,7 +61,7 @@ const SongActionMenu = memo(({
   const [open, setOpen] = useState(false);
 
   const artistNames = song.artists?.primary?.map(a => a.name).join(', ') ||
-    song.artists?.map(a => a.name).join(', ') ||
+    (Array.isArray(song.artists) ? song.artists.map(a => a.name).join(', ') : null) ||
     'Unknown Artist';
   const songImageUrl = song.image?.find(img => img.quality === '150x150')?.url ||
     song.image?.[song.image.length - 1]?.url ||
