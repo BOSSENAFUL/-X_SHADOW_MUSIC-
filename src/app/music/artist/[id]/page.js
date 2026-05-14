@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Play, ArrowLeft, Heart, MoreVertical, Shuffle, Users, Calendar, Plus, Disc, Share, Download } from "lucide-react";
+import { Play, ArrowLeft, Heart, MoreVertical, Shuffle, Users, Calendar, Plus, Disc, Share, Download, Music2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,6 +58,7 @@ const SongActionMenu = memo(({
   decodeHtmlEntities
 }) => {
   const isMobile = useIsMobile();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   const artistNames = song.artists?.primary?.map(a => a.name).join(', ') ||
@@ -78,6 +79,16 @@ const SongActionMenu = memo(({
       >
         <Plus className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Add to playlist</span>
+      </div>
+      <div
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
+        onClick={() => {
+          onItemClick();
+          router.push(`/music/song/${song.id}`);
+        }}
+      >
+        <Music2 className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Song detail</span>
       </div>
       <div
         className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
@@ -195,6 +206,14 @@ const SongActionMenu = memo(({
         >
           <Plus className="w-4 h-4 mr-2" />
           Add to playlist
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-border" />
+        <DropdownMenuItem
+          onClick={(e) => { e.stopPropagation(); router.push(`/music/song/${song.id}`); }}
+          className="hover:bg-accent focus:bg-accent cursor-pointer"
+        >
+          <Music2 className="w-4 h-4 mr-2" />
+          Song detail
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem
@@ -394,6 +413,10 @@ export default function ArtistPage() {
   const [albumPage, setAlbumPage] = useState(0);
   const [hasMoreAlbums, setHasMoreAlbums] = useState(true);
   const [fetchingMoreAlbums, setFetchingMoreAlbums] = useState(false);
+  const [latestTab, setLatestTab] = useState('songs');
+  const [latestSongs, setLatestSongs] = useState([]);
+  const [latestAlbums, setLatestAlbums] = useState([]);
+  const [latestLoading, setLatestLoading] = useState(false);
   const [showAllTopSongs, setShowAllTopSongs] = useState(false);
   const mobileTitleRef = useRef(null);
   const desktopTitleRef = useRef(null);
@@ -417,7 +440,12 @@ export default function ArtistPage() {
 
     const fetchArtistDetails = async () => {
       try {
-        if (isMounted) setLoading(true);
+        if (isMounted) {
+          setLoading(true);
+          // Reset discography so the "skip if populated" guard doesn't show stale data
+          setLatestSongs([]);
+          setLatestAlbums([]);
+        }
         console.log(`Fetching artist ${artistId}`);
 
         const artistResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/artists?id=${artistId}`);
@@ -493,6 +521,24 @@ export default function ArtistPage() {
       isMounted = false;
     };
   }, [artistId]);
+
+  // Build latest releases from already-fetched songs + albums, sorted by year desc.
+  // Only run once per artist (when data first arrives) — skip if already populated
+  // to prevent re-sorting when pagination loads more songs and changes the `songs` array.
+  useEffect(() => {
+    if (songs.length === 0 && albums.length === 0) return;
+
+    const sortByYear = (arr) =>
+      [...arr].sort((a, b) => {
+        const yearA = a.releaseDate ? new Date(a.releaseDate).getFullYear() : (Number(a.year) || 0);
+        const yearB = b.releaseDate ? new Date(b.releaseDate).getFullYear() : (Number(b.year) || 0);
+        return yearB - yearA;
+      });
+
+    setLatestSongs(prev => prev.length > 0 ? prev : sortByYear(songs).slice(0, 20));
+    setLatestAlbums(prev => prev.length > 0 ? prev : sortByYear(albums).slice(0, 20));
+    setLatestLoading(false);
+  }, [songs, albums]);
 
   // Effect to handle scroll and show/hide title in header
   useEffect(() => {
@@ -1316,10 +1362,10 @@ export default function ArtistPage() {
                       return (
                         <div
                           key={song.id || index}
-                          className={`flex items-center gap-2 md:gap-4 pl-1 pr-0 py-2
-                           rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''}`}
+                          className={`flex items-center gap-2 md:gap-4 pl-1 pr-0 py-2 rounded hover:bg-muted/50 group cursor-pointer`}
                           onClick={() => handlePlayClick(song, index)}
                         >
+                          {/* Play indicator column */}
                           <div className="w-6 md:w-8 text-center shrink-0">
                             {isCurrentSong && isPlaying ? (
                               <div className="flex items-center justify-center">
@@ -1342,6 +1388,7 @@ export default function ArtistPage() {
                             )}
                           </div>
 
+                          {/* Thumbnail */}
                           <div className="w-12 h-12 md:w-12 md:h-12 rounded bg-muted shrink-0 overflow-hidden">
                             {song.image?.length > 0 ? (
                               <img
@@ -1364,18 +1411,23 @@ export default function ArtistPage() {
                             )}
                           </div>
 
+                          {/* Song name + album subtitle */}
                           <div className="flex-1 min-w-0">
-                            <p className={`font-medium truncate text-sm md:text-base ${isCurrentSong ? 'text-green-500' : ''
-                              }`}>
+                            <p className={`font-medium truncate text-sm md:text-base ${isCurrentSong ? 'text-green-500' : ''}`}>
                               {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
                             </p>
-                            <p className={`text-xs md:text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
-                              }`}>
+                            <p
+                              className={`text-xs md:text-sm truncate cursor-pointer ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'}`}
+                              onClick={() => handlePlayClick(song, index)}
+                            >
                               {song.album?.name || 'Unknown Album'}
                             </p>
                           </div>
 
-                          <div className="w-24 lg:w-32 text-right text-sm text-muted-foreground hidden md:block pr-4">
+                          <div
+                            className="w-24 lg:w-32 text-right text-sm text-muted-foreground hidden md:block pr-4 cursor-pointer"
+                            onClick={() => handlePlayClick(song, index)}
+                          >
                             {song.playCount ? Number(song.playCount).toLocaleString() : ''}
                           </div>
 
@@ -1440,6 +1492,152 @@ export default function ArtistPage() {
                       </Button>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* Latest Releases — tabbed: Songs | Albums */}
+              {(latestLoading || latestSongs.length > 0 || latestAlbums.length > 0) && (
+                <div>
+                  {/* Header + tabs */}
+                  <div className="flex items-center justify-between mb-3 md:mb-4">
+                    <h2 className="text-xl md:text-2xl font-bold">Discography</h2>
+                    <div className="flex items-center gap-1 bg-muted/50 rounded-full p-1">
+                      <button
+                        onClick={() => setLatestTab('songs')}
+                        className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${latestTab === 'songs' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                      >
+                        Singles &amp; Songs
+                      </button>
+                      <button
+                        onClick={() => setLatestTab('albums')}
+                        className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${latestTab === 'albums' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                      >
+                        Albums
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Loading skeleton */}
+                  {latestLoading && (
+                    <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+                      {Array.from({ length: 8 }).map((_, i) => (
+                        <div key={i} className="shrink-0 w-[140px] md:w-[160px] lg:w-[180px] space-y-2">
+                          <div className="aspect-square rounded-lg bg-muted animate-pulse" />
+                          <div className="h-3 bg-muted animate-pulse rounded w-3/4" />
+                          <div className="h-3 bg-muted animate-pulse rounded w-1/2" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Songs tab */}
+                  {!latestLoading && latestTab === 'songs' && (
+                    <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory">
+                      {latestSongs.length > 0 ? latestSongs.map((song, index) => {
+                        const isCurrentSong = currentSong?.id === song.id;
+                        const imgUrl =
+                          song.image?.find(i => i.quality === '500x500')?.url ||
+                          song.image?.find(i => i.quality === '150x150')?.url ||
+                          song.image?.[song.image.length - 1]?.url ||
+                          '/default-playlist-image.png';
+                        const releaseYear = song.releaseDate
+                          ? new Date(song.releaseDate).getFullYear()
+                          : song.year || '';
+                        // First item gets "Latest Release" badge
+                        const isLatest = index === 0;
+                        return (
+                          <Link
+                            key={song.id || index}
+                            href={`/music/song/${song.id}`}
+                            className="group cursor-pointer shrink-0 snap-start w-[140px] md:w-[160px] lg:w-[180px]"
+                          >
+                            <div className="relative rounded-lg aspect-square overflow-hidden mb-2 bg-muted">
+                              <img
+                                src={imgUrl}
+                                alt={song.name}
+                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                loading="lazy"
+                                onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
+                              <div
+                                className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-1 group-hover:translate-y-0 hidden md:flex"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handlePlayClick(song, songs.findIndex(s => s.id === song.id));
+                                }}
+                              >
+                                <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-green-500 hover:bg-green-400 hover:scale-105 flex items-center justify-center shadow-lg transition-transform">
+                                  {isCurrentSong && isPlaying
+                                    ? <HiPause className="w-4 h-4 text-black" />
+                                    : <IoMdPlay className="w-4 h-4 text-black ml-0.5" />
+                                  }
+                                </div>
+                              </div>
+                            </div>
+                            <div className="space-y-0.5 px-1">
+                              <p className={`text-xs md:text-sm font-bold leading-tight line-clamp-1 ${isCurrentSong ? 'text-green-500' : 'text-foreground'}`}>
+                                {decodeHtmlEntities(song.name)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {isLatest && <span className="text-foreground font-medium">Latest Release · </span>}
+                                {releaseYear} · Single
+                              </p>
+                            </div>
+                          </Link>
+                        );
+                      }) : (
+                        <p className="text-sm text-muted-foreground py-4">No songs found</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Albums tab */}
+                  {!latestLoading && latestTab === 'albums' && (
+                    <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory">
+                      {latestAlbums.length > 0 ? latestAlbums.map((album, index) => {
+                        const releaseYear = album.releaseDate
+                          ? new Date(album.releaseDate).getFullYear()
+                          : album.year || '';
+                        const isLatest = index === 0;
+                        const typeLabel = album.type === 'single' ? 'Single' : album.type === 'ep' ? 'EP' : 'Album';
+                        return (
+                          <Link
+                            key={album.id}
+                            href={`/music/album/${album.id}`}
+                            className="group cursor-pointer shrink-0 snap-start w-[140px] md:w-[160px] lg:w-[180px]"
+                          >
+                            <div className="relative rounded-lg aspect-square overflow-hidden mb-2 bg-muted">
+                              <img
+                                src={album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url || '/def playlist image.jpg'}
+                                alt={album.name}
+                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                onError={(e) => { e.target.src = '/def playlist image.jpg'; }}
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
+                              <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-1 group-hover:translate-y-0">
+                                <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-green-500 hover:bg-green-400 hover:scale-105 flex items-center justify-center shadow-lg transition-transform">
+                                  <IoMdPlay className="w-4 h-4 text-black ml-0.5" />
+                                </div>
+                              </div>
+                            </div>
+                            <div className="space-y-0.5 px-1">
+                              <p className="text-xs md:text-sm font-bold leading-tight line-clamp-1 text-foreground">
+                                {album.name}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {isLatest && <span className="text-foreground font-medium">Latest Release · </span>}
+                                {releaseYear} · {typeLabel}
+                              </p>
+                            </div>
+                          </Link>
+                        );
+                      }) : (
+                        <p className="text-sm text-muted-foreground py-4">No albums found</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

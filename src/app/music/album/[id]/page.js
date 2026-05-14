@@ -28,7 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Play, ArrowLeft, Heart, MoreVertical, Clock, Shuffle, Calendar, Disc, Plus, User, Share, Download } from "lucide-react";
+import { Play, ArrowLeft, Heart, MoreVertical, Clock, Shuffle, Calendar, Disc, Plus, User, Share, Download, Music2 } from "lucide-react";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useLikedAlbums } from "@/hooks/useLikedAlbums";
 import { useMusicPlayer } from "@/contexts/music-player-context";
@@ -60,6 +60,7 @@ const SongActionMenu = memo(({
   decodeHtmlEntities
 }) => {
   const isMobile = useIsMobile();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   const artistNames = song.artists?.primary?.map(a => a.name).join(', ') ||
@@ -80,6 +81,16 @@ const SongActionMenu = memo(({
       >
         <Plus className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Add to playlist</span>
+      </div>
+      <div
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
+        onClick={() => {
+          onItemClick();
+          router.push(`/music/song/${song.id}`);
+        }}
+      >
+        <Music2 className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Song detail</span>
       </div>
       <div
         className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
@@ -197,6 +208,14 @@ const SongActionMenu = memo(({
         >
           <Plus className="w-4 h-4 mr-2" />
           Add to playlist
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-border" />
+        <DropdownMenuItem
+          onClick={(e) => { e.stopPropagation(); router.push(`/music/song/${song.id}`); }}
+          className="hover:bg-accent focus:bg-accent cursor-pointer"
+        >
+          <Music2 className="w-4 h-4 mr-2" />
+          Song detail
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem
@@ -1152,7 +1171,13 @@ export default function AlbumPage() {
                         <div className="min-w-0 flex-1">
                           <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''
                             }`}>
-                            {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
+                            <Link
+                              href={`/music/song/${song.id}`}
+                              className="hover:underline"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
+                            </Link>
                           </p>
                           <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
                             }`}>

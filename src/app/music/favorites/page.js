@@ -28,7 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Play, ArrowLeft, Heart, MoreVertical, Clock, Shuffle, Download, Plus, User, Disc, Share, X } from "lucide-react";
+import { Play, ArrowLeft, Heart, MoreVertical, Clock, Shuffle, Download, Plus, User, Disc, Share, X, Music2 } from "lucide-react";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { AddToPlaylistDialog } from "@/components/playlists/AddToPlaylistDialog";
@@ -57,6 +57,7 @@ const SongActionMenu = memo(({
   decodeHtmlEntities
 }) => {
   const isMobile = useIsMobile();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   const artistNames = song.artists?.map(a => a.name).join(', ') || 'Unknown Artist';
@@ -75,6 +76,16 @@ const SongActionMenu = memo(({
       >
         <Plus className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Add to playlist</span>
+      </div>
+      <div
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
+        onClick={() => {
+          onItemClick();
+          router.push(`/music/song/${song.songId}`);
+        }}
+      >
+        <Music2 className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Song detail</span>
       </div>
       <div
         className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
@@ -201,6 +212,14 @@ const SongActionMenu = memo(({
         >
           <Plus className="w-4 h-4 mr-2" />
           Add to playlist
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-border" />
+        <DropdownMenuItem
+          onClick={(e) => { e.stopPropagation(); router.push(`/music/song/${song.songId}`); }}
+          className="hover:bg-accent focus:bg-accent cursor-pointer"
+        >
+          <Music2 className="w-4 h-4 mr-2" />
+          Song detail
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem

@@ -82,7 +82,8 @@ import {
   Search,
   Check,
   LayoutList,
-  List
+  List,
+  Music2
 } from "lucide-react";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
@@ -109,6 +110,7 @@ const SongActionMenu = memo(({
   decodeHtmlEntities
 }) => {
   const isMobile = useIsMobile();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   const artistNames = song.artists?.primary?.map(a => a.name).join(', ') ||
@@ -156,6 +158,16 @@ const SongActionMenu = memo(({
         <span className="font-medium">Share</span>
       </div>
 
+      <div
+        className="flex items-center gap-4 p-3 hover:bg-accent/50 cursor-pointer transition-colors"
+        onClick={() => {
+          onItemClick();
+          router.push(`/music/song/${song.id}`);
+        }}
+      >
+        <Music2 className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Song detail</span>
+      </div>
       <div
         className="flex items-center gap-4 p-3 hover:bg-accent/50 cursor-pointer transition-colors"
         onClick={(e) => {

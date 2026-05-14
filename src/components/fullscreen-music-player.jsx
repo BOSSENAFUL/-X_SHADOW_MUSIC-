@@ -28,6 +28,7 @@ import {
   Share,
   Download,
   ArrowUpDown,
+  Music2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -1523,6 +1524,16 @@ export function FullscreenMusicPlayer({
                         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
                         onClick={() => {
                           setOpenActionMenu(false);
+                          router.push(`/music/song/${currentSong.id}`);
+                        }}
+                      >
+                        <Music2 className="w-5 h-5 text-muted-foreground" />
+                        <span className="font-medium">Song detail</span>
+                      </div>
+                      <div
+                        className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
+                        onClick={() => {
+                          setOpenActionMenu(false);
                           if (navigator.share) {
                             navigator.share({
                               title: currentSong.name || currentSong.title,
@@ -1611,6 +1622,15 @@ export function FullscreenMusicPlayer({
                       Add to playlist
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="bg-white/5" />
+                    <DropdownMenuItem
+                      onClick={() => { setOpenActionMenu(false); router.push(`/music/song/${currentSong.id}`); }}
+                      className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+                    >
+                      <Music2 className="w-4 h-4 mr-2" />
+                      Song detail
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-white/5" />
+
                     <DropdownMenuItem
                       onClick={() => setShowPlaylist(!showPlaylist)}
                       className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"

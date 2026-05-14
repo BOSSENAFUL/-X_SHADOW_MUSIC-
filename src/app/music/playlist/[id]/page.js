@@ -27,7 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Play, ArrowLeft, Heart, MoreVertical, Clock, Shuffle, Plus, User, Disc, Download, Loader2 } from "lucide-react";
+import { Play, ArrowLeft, Heart, MoreVertical, Clock, Shuffle, Plus, User, Disc, Download, Loader2, Music2 } from "lucide-react";
 import { ShareStoryPreview } from "@/components/share-story-preview";
 import { toast } from "sonner";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
@@ -62,6 +62,7 @@ const SongActionMenu = memo(({
   decodeHtmlEntities
 }) => {
   const isMobile = useIsMobile();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   const artistNames = song.artists?.primary?.map(a => a.name).join(', ') ||
@@ -82,6 +83,16 @@ const SongActionMenu = memo(({
       >
         <Plus className="w-5 h-5 text-muted-foreground" />
         <span className="font-medium">Add to playlist</span>
+      </div>
+      <div
+        className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
+        onClick={() => {
+          onItemClick();
+          router.push(`/music/song/${song.id}`);
+        }}
+      >
+        <Music2 className="w-5 h-5 text-muted-foreground" />
+        <span className="font-medium">Song detail</span>
       </div>
       <div
         className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
@@ -211,6 +222,14 @@ const SongActionMenu = memo(({
         >
           <Plus className="w-4 h-4 mr-2" />
           Add to playlist
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-border" />
+        <DropdownMenuItem
+          onClick={(e) => { e.stopPropagation(); router.push(`/music/song/${song.id}`); }}
+          className="hover:bg-accent focus:bg-accent cursor-pointer"
+        >
+          <Music2 className="w-4 h-4 mr-2" />
+          Song detail
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem
