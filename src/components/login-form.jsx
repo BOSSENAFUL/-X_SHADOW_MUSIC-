@@ -5,8 +5,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Github, Mail, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
-import { signIn, getSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,7 +19,6 @@ const loginSchema = z.object({
 export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const router = useRouter();
 
   const {
     register,
@@ -40,7 +38,7 @@ export default function LoginForm() {
       if (result?.error) {
         setError("Authentication failed. Please try again.");
       } else if (result?.ok) {
-        router.push("/music");
+        window.location.href = "/music";
       }
     } catch (error) {
       setError("Something went wrong. Please try again.");
@@ -60,7 +58,7 @@ export default function LoginForm() {
       if (result?.error) {
         setError(result.error);
       } else if (result?.ok) {
-        router.push("/music");
+        window.location.href = "/music";
       }
     } catch (error) {
       setError("Something went wrong. Please try again.");
