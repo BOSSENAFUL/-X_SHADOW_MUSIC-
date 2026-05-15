@@ -281,6 +281,10 @@ export default function SongPage() {
         let mounted = true;
         setLoading(true);
 
+        // Check sessionStorage cache first for instant color
+        const cachedColor = sessionStorage.getItem(`song-color-${songId}`);
+        if (cachedColor) setDominantColor(cachedColor);
+
         (async () => {
             try {
                 const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/songs/${songId}`);
@@ -289,10 +293,20 @@ export default function SongPage() {
                 if (data.success && data.data?.[0]) {
                     const s = data.data[0];
                     setSong(s);
-                    const imgUrl = s.image?.find(i => i.quality === "500x500")?.url ||
-                        s.image?.[s.image.length - 1]?.url;
-                    if (imgUrl) {
-                        extractDominantColor(imgUrl).then(c => { if (mounted) setDominantColor(c); });
+                    // Only extract color if not already loaded from cache
+                    if (!cachedColor) {
+                        // Use 150x150 thumbnail for faster canvas processing
+                        const imgUrl = s.image?.find(i => i.quality === "150x150")?.url ||
+                            s.image?.find(i => i.quality === "500x500")?.url ||
+                            s.image?.[s.image.length - 1]?.url;
+                        if (imgUrl) {
+                            extractDominantColor(imgUrl).then(c => {
+                                if (mounted) {
+                                    setDominantColor(c);
+                                    sessionStorage.setItem(`song-color-${songId}`, c);
+                                }
+                            });
+                        }
                     }
                 }
             } catch (err) {
