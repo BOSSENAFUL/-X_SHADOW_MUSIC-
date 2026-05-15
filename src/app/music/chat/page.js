@@ -242,14 +242,12 @@ export default function ChatPage() {
                             </span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {post.type === 'issue' && (
-                            <div className="text-destructive text-[10px] font-bold flex items-center gap-1.5 uppercase tracking-wide">
-                              <AlertCircle className="w-3.5 h-3.5" />
-                              Issue
-                            </div>
-                          )}
-                        </div>
+                        {post.type === 'issue' && (
+                          <div className="text-destructive text-[10px] font-bold flex items-center gap-1.5 uppercase tracking-wide">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            Issue
+                          </div>
+                        )}
                       </div>
 
                       <h3 className="text-lg font-bold text-foreground mb-2 leading-snug group-hover:text-foreground transition-colors">

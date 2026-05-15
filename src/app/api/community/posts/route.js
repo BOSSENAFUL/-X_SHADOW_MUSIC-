@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import dbConnect from '@/lib/mongodb';
 import CommunityPost from '@/models/CommunityPost';
 import CommunityComment from '@/models/CommunityComment';
-import User from '@/models/User'; // Ensure User is registered to resolve population
+import User from '@/models/User';
 import mongoose from 'mongoose';
 
 const FEATURED_USER_ID = "6933abbaf6ce46addfd82b25";
@@ -12,28 +12,41 @@ export async function GET(req) {
   try {
     await dbConnect();
 
-    // Find all post IDs where the featured user has commented
-    const commentedPostDocs = await CommunityComment.find(
+    // Get all comments by the featured user, newest first
+    const userComments = await CommunityComment.find(
       { author: new mongoose.Types.ObjectId(FEATURED_USER_ID) },
-      { post: 1 }
-    ).lean();
+      { post: 1, createdAt: 1 }
+    )
+      .sort({ createdAt: -1 })
+      .lean();
 
-    const commentedPostIds = new Set(
-      commentedPostDocs.map(c => c.post.toString())
-    );
+    // Map of postId -> latest comment time by this user (first hit wins since sorted desc)
+    const commentedPostTimeMap = new Map();
+    for (const c of userComments) {
+      const id = c.post.toString();
+      if (!commentedPostTimeMap.has(id)) {
+        commentedPostTimeMap.set(id, c.createdAt);
+      }
+    }
 
     const posts = await CommunityPost.find({})
       .populate('author', 'name image')
       .sort({ createdAt: -1 })
-      .limit(50);
+      .limit(50)
+      .lean();
 
-    // Sort: posts where featured user commented come first, rest follow in original order
-    const sorted = [
-      ...posts.filter(p => commentedPostIds.has(p._id.toString())),
-      ...posts.filter(p => !commentedPostIds.has(p._id.toString())),
-    ];
+    // Posts this user commented on, sorted by their latest comment time (newest first)
+    const commented = posts
+      .filter(p => commentedPostTimeMap.has(p._id.toString()))
+      .sort((a, b) =>
+        new Date(commentedPostTimeMap.get(b._id.toString())) -
+        new Date(commentedPostTimeMap.get(a._id.toString()))
+      );
 
-    return NextResponse.json({ success: true, data: sorted });
+    // Remaining posts in original newest-first order
+    const rest = posts.filter(p => !commentedPostTimeMap.has(p._id.toString()));
+
+    return NextResponse.json({ success: true, data: [...commented, ...rest] });
   } catch (error) {
     console.error("GET Community posts error:", error);
     return NextResponse.json({ success: false, error: "Failed to fetch posts" }, { status: 500 });

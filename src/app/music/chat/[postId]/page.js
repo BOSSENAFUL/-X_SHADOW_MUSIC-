@@ -324,7 +324,7 @@ export default function PostDetailPage({ params }) {
               <div className="flex-1 flex flex-col gap-3">
                 <Textarea
                   placeholder="Add a comment..."
-                  className="bg-transparent border-0 border-b border-zinc-800 rounded-none px-0 py-2 focus-visible:ring-0 focus-visible:border-zinc-500 resize-none min-h-[40px] text-sm md:text-base text-zinc-200"
+                  className="bg-transparent  border-0 border-b border-zinc-800 rounded-none px-2 py-2 focus-visible:ring-0 focus-visible:border-zinc-500 resize-none min-h-[40px] text-sm md:text-base text-zinc-200"
                   value={commentContent}
                   onChange={(e) => setCommentContent(e.target.value)}
                 />
