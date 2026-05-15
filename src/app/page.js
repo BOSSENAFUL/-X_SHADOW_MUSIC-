@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { AppPreview } from "@/components/app-preview";
 import UserReviews from "@/components/user-reviews";
+import FaqSection from "@/components/faq-section";
 import { Download, Play, Music, Radio, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 import Image from "next/image";
@@ -29,7 +30,7 @@ export default function Home() {
       <div className="absolute bottom-0 left-0 w-[30vw] h-[30vw] rounded-full bg-primary/5 blur-[100px] pointer-events-none -z-10 opacity-40 -translate-x-1/3 translate-y-1/3" />
 
       {/* Header */}
-      <motion.header 
+      <motion.header
         className="fixed top-0 left-0 right-0 z-50 border-b border-border/10 bg-background/60 backdrop-blur-xl supports-backdrop-filter:bg-background/40"
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -44,14 +45,14 @@ export default function Home() {
           </Link>
 
           <nav className="flex items-center gap-2 sm:gap-6">
-            <Link 
-              href="/features" 
+            <Link
+              href="/features"
               className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-2 py-2"
             >
               Features
             </Link>
-            <Link 
-              href="/music" 
+            <Link
+              href="/music"
               className="inline-flex h-9 sm:h-10 items-center justify-center rounded-full bg-primary/10 px-4 sm:px-6 text-sm font-medium text-primary transition-colors hover:bg-primary/20"
             >
               Web Player
@@ -62,9 +63,9 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="flex flex-col items-center justify-center min-h-svh px-4 pt-24 pb-16 sm:px-6 md:px-12 w-full max-w-7xl mx-auto text-center">
-        
+
         {/* Version Badge */}
-        <motion.div 
+        <motion.div
           custom={0}
           initial="hidden"
           animate="visible"
@@ -78,7 +79,7 @@ export default function Home() {
         </motion.div>
 
         {/* Hero Text */}
-        <motion.h1 
+        <motion.h1
           custom={1}
           initial="hidden"
           animate="visible"
@@ -89,7 +90,7 @@ export default function Home() {
           <span className="text-transparent bg-clip-text bg-linear-to-r from-foreground via-foreground/90 to-muted-foreground">how it should be.</span>
         </motion.h1>
 
-        <motion.p 
+        <motion.p
           custom={2}
           initial="hidden"
           animate="visible"
@@ -100,7 +101,7 @@ export default function Home() {
         </motion.p>
 
         {/* CTA Buttons */}
-        <motion.div 
+        <motion.div
           custom={3}
           initial="hidden"
           animate="visible"
@@ -126,7 +127,7 @@ export default function Home() {
         </motion.div>
 
         {/* Stats Section */}
-        <motion.div 
+        <motion.div
           custom={4}
           initial="hidden"
           animate="visible"
@@ -140,9 +141,9 @@ export default function Home() {
             <div className="text-3xl sm:text-4xl font-semibold tracking-tight">80M+</div>
             <p className="text-sm font-medium text-muted-foreground">Tracks available</p>
           </div>
-          
+
           <div className="flex flex-col items-center justify-center gap-2 group">
-             <div className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center text-primary mb-2 group-hover:scale-110 transition-transform">
+            <div className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center text-primary mb-2 group-hover:scale-110 transition-transform">
               <Radio className="w-5 h-5" />
             </div>
             <div className="text-3xl sm:text-4xl font-semibold tracking-tight">Premium</div>
@@ -150,7 +151,7 @@ export default function Home() {
           </div>
 
           <div className="flex flex-col items-center justify-center gap-2 group">
-             <div className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center text-primary mb-2 group-hover:scale-110 transition-transform">
+            <div className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center text-primary mb-2 group-hover:scale-110 transition-transform">
               <Play className="w-5 h-5 ml-0.5 fill-current" />
             </div>
             <div className="text-3xl sm:text-4xl font-semibold tracking-tight">Ad-Free</div>
@@ -163,6 +164,7 @@ export default function Home() {
       <div className="relative z-10 bg-background pt-10 pb-20 border-t border-border/20">
         <UserReviews />
         <AppPreview />
+        <FaqSection />
       </div>
     </div>
   );
