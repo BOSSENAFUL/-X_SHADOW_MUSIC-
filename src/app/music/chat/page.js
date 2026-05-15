@@ -24,7 +24,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MessageSquare, AlertCircle, Send, Plus, Loader2, ThumbsUp, MessageCircle } from "lucide-react";
+import { MessageSquare, AlertCircle, Send, Plus, Loader2, ThumbsUp, MessageCircle, ChevronDown } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 
@@ -35,6 +36,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
+  const [sortMode, setSortMode] = useState("admin"); // "admin" | "new"
 
   // New Post Form State
   const [showForm, setShowForm] = useState(false);
@@ -44,12 +46,12 @@ export default function ChatPage() {
 
   useEffect(() => {
     fetchPosts();
-  }, []);
+  }, [sortMode]);
 
   const fetchPosts = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/community/posts");
+      const res = await fetch(`/api/community/posts?sort=${sortMode}`);
       const data = await res.json();
       if (data.success) {
         setPosts(data.data);
@@ -202,8 +204,32 @@ export default function ChatPage() {
                 <TabsTrigger value="post" className="p-0 h-auto bg-transparent border-none shadow-none text-muted-foreground data-[state=active]:text-foreground font-bold text-xs md:text-sm uppercase tracking-wider transition-none">Posts</TabsTrigger>
                 <TabsTrigger value="issue" className="p-0 h-auto bg-transparent border-none shadow-none text-muted-foreground data-[state=active]:text-foreground font-bold text-xs md:text-sm uppercase tracking-wider transition-none">Issues</TabsTrigger>
               </TabsList>
-              <div className="text-[10px] md:text-xs text-muted-foreground font-medium uppercase tracking-widest hidden sm:block">
-                {filteredPosts.length} Results
+              <div className="flex items-center gap-3">
+                <div className="text-[10px] md:text-xs text-muted-foreground font-medium uppercase tracking-widest hidden sm:block">
+                  {filteredPosts.length} Results
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-1.5 text-[10px] md:text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
+                      {sortMode === "admin" ? "Admin" : "New"}
+                      <ChevronDown className="w-3 h-3" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52 bg-popover border-border text-foreground p-1">
+                    <DropdownMenuItem
+                      onClick={() => setSortMode("new")}
+                      className={`text-xs cursor-pointer hover:bg-accent focus:bg-accent ${sortMode === "new" ? "text-foreground font-semibold" : "text-muted-foreground"}`}
+                    >
+                      New Posts
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setSortMode("admin")}
+                      className={`text-xs cursor-pointer hover:bg-accent focus:bg-accent whitespace-nowrap ${sortMode === "admin" ? "text-foreground font-semibold" : "text-muted-foreground"}`}
+                    >
+                      Admin Latest Commented
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
 

@@ -12,7 +12,21 @@ export async function GET(req) {
   try {
     await dbConnect();
 
-    // Get all comments by the featured user, newest first
+    const { searchParams } = new URL(req.url);
+    const sort = searchParams.get('sort') || 'admin'; // 'new' | 'admin'
+
+    const posts = await CommunityPost.find({})
+      .populate('author', 'name image')
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+
+    if (sort === 'new') {
+      // Plain newest-first, no reordering
+      return NextResponse.json({ success: true, data: posts });
+    }
+
+    // sort === 'admin': posts where admin last commented come first, ordered by their latest comment time
     const userComments = await CommunityComment.find(
       { author: new mongoose.Types.ObjectId(FEATURED_USER_ID) },
       { post: 1, createdAt: 1 }
@@ -20,7 +34,7 @@ export async function GET(req) {
       .sort({ createdAt: -1 })
       .lean();
 
-    // Map of postId -> latest comment time by this user (first hit wins since sorted desc)
+    // Map postId -> latest comment time (first hit wins since sorted desc)
     const commentedPostTimeMap = new Map();
     for (const c of userComments) {
       const id = c.post.toString();
@@ -29,13 +43,6 @@ export async function GET(req) {
       }
     }
 
-    const posts = await CommunityPost.find({})
-      .populate('author', 'name image')
-      .sort({ createdAt: -1 })
-      .limit(50)
-      .lean();
-
-    // Posts this user commented on, sorted by their latest comment time (newest first)
     const commented = posts
       .filter(p => commentedPostTimeMap.has(p._id.toString()))
       .sort((a, b) =>
@@ -43,7 +50,6 @@ export async function GET(req) {
         new Date(commentedPostTimeMap.get(a._id.toString()))
       );
 
-    // Remaining posts in original newest-first order
     const rest = posts.filter(p => !commentedPostTimeMap.has(p._id.toString()));
 
     return NextResponse.json({ success: true, data: [...commented, ...rest] });
