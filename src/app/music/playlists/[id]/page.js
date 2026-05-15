@@ -2336,6 +2336,8 @@ export default function PlaylistDetailPage({ params }) {
                     <div className="flex items-center justify-start gap-2 text-sm text-muted-foreground">
                       {playlist.ownerImage ? (
                         <img src={playlist.ownerImage} alt={playlist.ownerName} className="w-6 h-6 rounded-full object-cover" />
+                      ) : playlist.ownerName === 'Spotify' ? (
+                        <img src="https://i.postimg.cc/g25JqFyg/icon-192.png" alt="Jammify" className="w-6 h-6 rounded-full object-cover" />
                       ) : (
                         <div className="w-6 h-6 rounded-full bg-muted/30 flex items-center justify-center">
                           <User className="w-3 h-3" />
@@ -2415,6 +2417,8 @@ export default function PlaylistDetailPage({ params }) {
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     {playlist.ownerImage ? (
                       <img src={playlist.ownerImage} alt={playlist.ownerName} className="w-6 h-6 rounded-full object-cover" />
+                    ) : playlist.ownerName === 'Spotify' ? (
+                      <img src="https://i.postimg.cc/g25JqFyg/icon-192.png" alt="Jammify" className="w-6 h-6 rounded-full object-cover" />
                     ) : (
                       <div className="w-6 h-6 rounded-full bg-muted/30 flex items-center justify-center">
                         <User className="w-3 h-3 text-muted-foreground" />
