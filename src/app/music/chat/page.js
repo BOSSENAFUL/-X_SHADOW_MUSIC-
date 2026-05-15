@@ -36,7 +36,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
-  const [sortMode, setSortMode] = useState("admin"); // "admin" | "new"
+  const [sortMode, setSortMode] = useState("new"); // "new" | "admin"
 
   // New Post Form State
   const [showForm, setShowForm] = useState(false);
