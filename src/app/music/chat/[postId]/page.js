@@ -50,6 +50,29 @@ export default function PostDetailPage({ params }) {
   const [replyContent, setReplyContent] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Renders text with clickable URLs
+  const renderWithLinks = (text) => {
+    if (!text) return null;
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    return parts.map((part, i) =>
+      urlRegex.test(part) ? (
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="text-primary underline underline-offset-2 break-all hover:text-primary/80 transition-colors"
+        >
+          {part}
+        </a>
+      ) : (
+        part
+      )
+    );
+  };
+
   useEffect(() => {
     fetchPostAndComments();
   }, [postId]);
@@ -285,7 +308,7 @@ export default function PostDetailPage({ params }) {
             <Card className="bg-transparent border-border/60 overflow-hidden rounded-xl">
               <CardContent className="p-4 md:p-6 lg:p-8">
                 <p className="text-sm md:text-base text-foreground leading-relaxed whitespace-pre-wrap font-medium">
-                  {post.content}
+                  {renderWithLinks(post.content)}
                 </p>
               </CardContent>
               <CardFooter className="bg-muted/10 border-t border-border/40 p-3 md:p-4 px-4 md:px-6 flex items-center justify-between">
@@ -367,7 +390,7 @@ export default function PostDetailPage({ params }) {
                             </span>
                           </div>
                           <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                            {comment.content}
+                            {renderWithLinks(comment.content)}
                           </div>
                           <div className="flex items-center gap-4 text-xs font-semibold text-muted-foreground pt-1">
                             <button
@@ -421,7 +444,7 @@ export default function PostDetailPage({ params }) {
                                   </span>
                                 </div>
                                 <div className="text-xs md:text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                                  {reply.content}
+                                  {renderWithLinks(reply.content)}
                                 </div>
                                 <div className="flex items-center gap-4 text-xs font-semibold text-muted-foreground pt-1">
                                   <button
