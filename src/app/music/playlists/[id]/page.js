@@ -301,6 +301,14 @@ const SongActionMenu = memo(({
         </DropdownMenuItem>
 
         <DropdownMenuItem
+          onClick={(e) => { e.stopPropagation(); router.push(`/music/song/${song.id}`); }}
+          className="hover:bg-accent focus:bg-accent cursor-pointer"
+        >
+          <Music2 className="w-4 h-4 mr-2" />
+          Song detail
+        </DropdownMenuItem>
+
+        <DropdownMenuItem
           onClick={(e) => {
             e.stopPropagation();
             onGoToArtist(e, song);
