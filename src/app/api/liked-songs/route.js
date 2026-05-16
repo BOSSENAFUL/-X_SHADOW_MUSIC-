@@ -3,6 +3,7 @@ import connectDB from '@/lib/mongodb';
 import LikedSong from '@/models/LikedSong';
 import mongoose from 'mongoose';
 import cache from '@/lib/cache';
+import { markMixStale } from '@/lib/recommendations';
 
 // GET - Fetch all liked songs for a user
 export async function GET(request) {
@@ -77,6 +78,9 @@ export async function POST(request) {
 
     // Invalidate cache when data changes
     cache.delete(`liked-songs:${userId}`);
+
+    // Mark liked songs mix as stale — will refresh on next visit
+    markMixStale(userId, 'liked_songs').catch(() => { });
 
     return NextResponse.json({
       success: true,

@@ -11,6 +11,7 @@ export function PlaylistSection({
     onPlaylistClick,
     onPlayClick,
     playingId,
+    extraActions,
 }) {
     const scrollContainerRef = useRef(null);
 
@@ -46,6 +47,7 @@ export function PlaylistSection({
                             <ChevronRight className="w-4 h-4" />
                         </Button>
                     </div>
+                    {extraActions}
                     {onShowAll && (
                         <Button
                             variant="ghost"

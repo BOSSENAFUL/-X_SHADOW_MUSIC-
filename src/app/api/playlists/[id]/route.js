@@ -4,6 +4,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import connectDB from '@/lib/mongodb';
 import Playlist from '@/models/Playlist';
 import User from '@/models/User';
+import RecommendedMix from '@/models/RecommendedMix';
 import RecentlyPlayedPlaylist from '@/models/RecentlyPlayedPlaylist';
 import { getSpotifyPlaylistModel } from '@/models/SpotifyPlaylist';
 import mongoose from 'mongoose';
@@ -58,6 +59,34 @@ export async function GET(request, { params }) {
 
     // ── 2. Spotify playlist ─────────────────────────────────────────────
     if (!spotifyPlaylist) {
+      // ── 3. Recommended Mix ──────────────────────────────────────────
+      if (session?.user?.id) {
+        const mix = await RecommendedMix.findOne({
+          _id: id,
+          userId: new mongoose.Types.ObjectId(session.user.id),
+        }).lean();
+
+        if (mix) {
+          return NextResponse.json({
+            success: true,
+            data: {
+              _id: mix._id.toString(),
+              name: mix.title,
+              description: `${mix.songIds?.length || 0} songs • Generated mix`,
+              image: mix.coverImage || null,
+              songIds: mix.songIds ?? [],
+              isPublic: true,
+              isOwner: true,
+              ownerName: 'Jammify',
+              ownerImage: 'https://i.postimg.cc/1X6Ljztt/extension-icon-192px.png',
+              createdAt: mix.generatedAt,
+              updatedAt: mix.createdAt,
+              sourceType: 'mix',
+            },
+          });
+        }
+      }
+
       return NextResponse.json(
         { success: false, error: 'Playlist not found' },
         { status: 404 }

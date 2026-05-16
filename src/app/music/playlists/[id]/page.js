@@ -1182,7 +1182,15 @@ export default function PlaylistDetailPage({ params }) {
 
       try {
         const response = await fetch(`/api/playlists/${playlistId}`);
-        const result = await response.json();
+
+        let result;
+        try {
+          result = await response.json();
+        } catch {
+          console.error('Empty or invalid JSON response from playlist API');
+          setLoading(false);
+          return;
+        }
 
         if (result.success) {
           const playlistData = result.data;

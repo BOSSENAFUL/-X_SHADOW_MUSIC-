@@ -90,6 +90,10 @@ export default function MusicPage() {
   const [communityLoading, setCommunityLoading] = useState(true);
   const [recentlyPlayed, setRecentlyPlayed] = useState([]);
   const [recentlyPlayedLoading, setRecentlyPlayedLoading] = useState(true);
+  const [recommendedMixes, setRecommendedMixes] = useState([]);
+  const [mixesLoading, setMixesLoading] = useState(true);
+  const [mixesRefreshing, setMixesRefreshing] = useState(false);
+  const [refreshCooldown, setRefreshCooldown] = useState(0);
   const [playlistColors, setPlaylistColors] = useState({});
   const [hoveredColor, setHoveredColor] = useState(null);
   const [playingId, setPlayingId] = useState(null);
@@ -518,6 +522,89 @@ export default function MusicPage() {
     return () => { isMounted = false; };
   }, []);
 
+  // Fetch recommended mixes (returns cached instantly, generates in background)
+  useEffect(() => {
+    if (sessionStatus === 'loading') return;
+    if (!session?.user?.id) {
+      setMixesLoading(false);
+      return;
+    }
+    let isMounted = true;
+    const fetchMixes = async () => {
+      if (isMounted) setMixesLoading(true);
+      try {
+        const res = await fetch('/api/recommendations');
+        const data = await res.json();
+        if (isMounted && data.success && data.data?.length > 0) {
+          // Shape each mix into the format PlaylistSection / PlaylistCard expects
+          const shaped = data.data.map((mix) => ({
+            id: `mix-${mix.mixIndex}`,
+            _mixId: mix._id,
+            name: mix.title,
+            songIds: mix.songIds || [],
+            source: 'mix',
+            // Use coverImages for collage (4 imgs) or single cover
+            image: mix.coverImage
+              ? [{ quality: '500x500', url: mix.coverImage }]
+              : [],
+            collageImages: null,
+            songCount: mix.songIds?.length || 0,
+            description: `${mix.songIds?.length || 0} songs`,
+          }));
+          setRecommendedMixes(shaped);
+        }
+      } catch (err) {
+        console.error('Error fetching recommended mixes:', err);
+      } finally {
+        if (isMounted) setMixesLoading(false);
+      }
+    };
+    fetchMixes();
+    return () => { isMounted = false; };
+  }, [session?.user?.id, sessionStatus]);
+
+  const shapeMixes = (rawMixes) => rawMixes.map((mix) => ({
+    id: `mix-${mix.mixIndex}`,
+    _mixId: mix._id,
+    name: mix.title,
+    songIds: mix.songIds || [],
+    source: 'mix',
+    // coverImage is stored in DB — same image every reload until regenerated
+    image: mix.coverImage
+      ? [{ quality: '500x500', url: mix.coverImage }]
+      : [],
+    collageImages: null,
+    songCount: mix.songIds?.length || 0,
+    description: `${mix.songIds?.length || 0} songs`,
+  }));
+
+  const handleRefreshMixes = async () => {
+    if (mixesRefreshing || refreshCooldown > 0) return;
+    setMixesRefreshing(true);
+    try {
+      const res = await fetch('/api/recommendations', { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success && data.data?.length > 0) {
+        setRecommendedMixes(shapeMixes(data.data));
+      } else if (data.rateLimited) {
+        setRefreshCooldown(data.retryAfter || 300);
+      }
+    } catch (err) {
+      console.error('Error refreshing mixes:', err);
+    } finally {
+      setMixesRefreshing(false);
+    }
+  };
+
+  // Cooldown countdown
+  useEffect(() => {
+    if (refreshCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setRefreshCooldown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [refreshCooldown]);
+
   const handlePlayClick = useCallback(async (item, type) => {
     if (type === 'liked-songs') {
       const pid = 'liked-songs';
@@ -563,7 +650,19 @@ export default function MusicPage() {
       const image = playlist.image || [];
       const songCount = playlist.songCount || 0;
 
-      if (source === 'user') {
+      if (source === 'mix') {
+        // Recommended mix — songIds are stored directly on the object
+        const ids = playlist.songIds || [];
+        if (ids.length > 0) {
+          const songsRes = await fetch(`${apiUrl}/api/songs?ids=${ids.slice(0, 50).join(',')}`);
+          const songsData = await songsRes.json();
+          if (songsData.success && songsData.data) {
+            const map = {};
+            songsData.data.forEach(s => { if (s) map[s.id] = s; });
+            songs = ids.map(id => map[id]).filter(Boolean);
+          }
+        }
+      } else if (source === 'user') {
         const res = await fetch(`/api/playlists/${pid}`);
         const result = await res.json();
         if (result.success && result.data?.songIds?.length) {
@@ -614,12 +713,14 @@ export default function MusicPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               playlistData: {
-                id: pid,
+                id: source === 'mix' ? playlist._mixId : pid,
                 name: name,
                 image: normalizedImage,
                 songCount: songs.length,
-                source: source,
-                owner: playlist.userName || playlist.owner || playlist.subtitle || (source === 'user' ? 'You' : source === 'spotify' ? 'Spotify' : 'JioSaavn')
+                source: source === 'mix' ? 'user' : source,
+                owner: source === 'mix'
+                  ? 'Your Mix'
+                  : (playlist.userName || playlist.owner || playlist.subtitle || (source === 'user' ? 'You' : source === 'spotify' ? 'Spotify' : 'JioSaavn'))
               }
             }),
           });
@@ -1080,6 +1181,31 @@ export default function MusicPage() {
                 </Link>
               ))}
           </div>
+
+          {/* Recommended Mixes — above Recently Played */}
+          {(mixesLoading || recommendedMixes.length > 0) && (
+            <PlaylistSection
+              title="Your Mixes"
+              playlists={recommendedMixes}
+              loading={mixesLoading || mixesRefreshing}
+              onPlaylistClick={(playlist) => {
+                router.push(`/music/playlists/${playlist._mixId}`);
+              }}
+              onPlayClick={handlePlaylistPlay}
+              playingId={playingId}
+              extraActions={
+                <button
+                  onClick={handleRefreshMixes}
+                  disabled={mixesRefreshing || refreshCooldown > 0}
+                  className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md hover:bg-muted/50 disabled:opacity-50"
+                  title={refreshCooldown > 0 ? `Cooldown: ${Math.ceil(refreshCooldown / 60)}m` : 'Regenerate mixes'}
+                >
+                  <Loader2 className={`w-3.5 h-3.5 ${mixesRefreshing ? 'animate-spin' : ''}`} />
+                  {mixesRefreshing ? 'Refreshing...' : refreshCooldown > 0 ? `${Math.ceil(refreshCooldown / 60)}m` : 'Refresh'}
+                </button>
+              }
+            />
+          )}
 
           {/* Recently Played Section */}
           {(recentlyPlayedLoading || recentlyPlayed.length > 0) && (

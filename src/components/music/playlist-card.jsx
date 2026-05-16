@@ -1,12 +1,80 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { IoMdPlay } from "react-icons/io";
 import { useSession } from "next-auth/react";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { trackRecentlyPlayed } from "@/lib/track-playlist";
+
+// Extract dominant color from an image URL using canvas sampling
+function useImageColor(imageUrl) {
+    const [color, setColor] = useState(null);
+
+    useEffect(() => {
+        if (!imageUrl) return;
+
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = 50;
+                canvas.height = 50;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, 50, 50);
+                const imageData = ctx.getImageData(0, 0, 50, 50).data;
+
+                let r = 0, g = 0, b = 0;
+                const count = imageData.length / 4;
+                for (let i = 0; i < imageData.length; i += 4) {
+                    r += imageData[i];
+                    g += imageData[i + 1];
+                    b += imageData[i + 2];
+                }
+                r = Math.round(r / count);
+                g = Math.round(g / count);
+                b = Math.round(b / count);
+
+                // Boost saturation for vibrancy
+                const max = Math.max(r, g, b);
+                const min = Math.min(r, g, b);
+                if (max - min < 40) {
+                    // Desaturated — shift toward a vibrant hue
+                    const hue = (r + g * 2 + b * 3) % 360;
+                    const s = 0.7, l = 0.55;
+                    const c = (1 - Math.abs(2 * l - 1)) * s;
+                    const x = c * (1 - Math.abs((hue / 60) % 2 - 1));
+                    const m = l - c / 2;
+                    let rr, gg, bb;
+                    if (hue < 60) { rr = c; gg = x; bb = 0; }
+                    else if (hue < 120) { rr = x; gg = c; bb = 0; }
+                    else if (hue < 180) { rr = 0; gg = c; bb = x; }
+                    else if (hue < 240) { rr = 0; gg = x; bb = c; }
+                    else if (hue < 300) { rr = x; gg = 0; bb = c; }
+                    else { rr = c; gg = 0; bb = x; }
+                    setColor(`rgb(${Math.round((rr + m) * 255)}, ${Math.round((gg + m) * 255)}, ${Math.round((bb + m) * 255)})`);
+                } else {
+                    setColor(`rgb(${r}, ${g}, ${b})`);
+                }
+            } catch {
+                // CORS or other error — use deterministic fallback
+                const hash = imageUrl.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+                const fallbacks = ['#2dd4bf', '#f472b6', '#818cf8', '#fbbf24', '#34d399', '#fb923c'];
+                setColor(fallbacks[hash % fallbacks.length]);
+            }
+        };
+        img.onerror = () => {
+            const hash = imageUrl.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+            const fallbacks = ['#2dd4bf', '#f472b6', '#818cf8', '#fbbf24', '#34d399', '#fb923c'];
+            setColor(fallbacks[hash % fallbacks.length]);
+        };
+        img.src = imageUrl;
+    }, [imageUrl]);
+
+    return color;
+}
 
 export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
     const [localPlayingId, setLocalPlayingId] = useState(null);
@@ -85,6 +153,15 @@ export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
         return '/default-playlist-image.png';
     };
 
+    // Get cover image URL for color extraction
+    const coverImageUrl = safeImageUrl(
+        playlist.image?.[2]?.url ||
+        playlist.image?.[1]?.url ||
+        playlist.image?.[0]?.url ||
+        (typeof playlist.image === 'string' ? playlist.image : null)
+    );
+    const mixColor = useImageColor(playlist.source === 'mix' ? coverImageUrl : null);
+
     return (
         <div
             className="group cursor-pointer hover:scale-105 transition-transform"
@@ -120,6 +197,33 @@ export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
                 )}
 
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                {/* Dark gradient overlay for mixes — bottom to center */}
+                {playlist.source === 'mix' && (
+                    <div className="absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-t from-black/80 via-black/50 to-transparent pointer-events-none" />
+                )}
+
+                {/* Spotify-style Daily Mix overlay with extracted color */}
+                {playlist.source === 'mix' && (() => {
+                    const num = (playlist.name || '').match(/\d+/)?.[0] || '1';
+                    const paddedNum = num.padStart(2, '0');
+                    const bgColor = mixColor || '#2dd4bf';
+                    const match = bgColor.match(/\d+/g);
+                    const brightness = match ? (parseInt(match[0]) * 0.299 + parseInt(match[1]) * 0.587 + parseInt(match[2]) * 0.114) : 128;
+                    const textColor = brightness > 140 ? 'text-black' : 'text-white';
+
+                    return (
+                        <div className="absolute bottom-1 w-full flex items-center justify-around pointer-events-none">
+                            <span className={`${textColor} font-bold text-[14px] sm:text-xs md:text-[16px] px-2 py-1 sm:px-2.5 sm:py-1.5 md:px-3 md:py-2  leading-none tracking-wide`} style={{ backgroundColor: bgColor }}>
+                                Daily Mix
+                            </span>
+                            <span className={`${textColor} font-bold text-2xl sm:text-2xl md:text-3xl px-1 py-1 sm:px-1 sm:py-1 md:px-1 md:py-1  leading-none`} style={{ backgroundColor: bgColor }}>
+                                {paddedNum}
+                            </span>
+                        </div>
+                    );
+                })()}
+
                 <div className={`absolute bottom-2 right-2 transition-all duration-300 z-20 hidden md:block ${currentPlayingId === id ? 'opacity-100 translate-y-0' : 'opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0'}`}>
                     <button
                         type="button"

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import connectDB from '@/lib/mongodb';
 import RecentlyPlayedPlaylist from '@/models/RecentlyPlayedPlaylist';
+import { markMixStale } from '@/lib/recommendations';
 
 /**
  * GET /api/recently-played-playlists
@@ -73,6 +74,9 @@ export async function POST(request) {
         await connectDB();
 
         const updated = await RecentlyPlayedPlaylist.track(session.user.id, playlistData);
+
+        // Mark the corresponding recently-played mix as stale
+        markMixStale(session.user.id, 'recently_played', playlistData.id).catch(() => { });
 
         return NextResponse.json({
             success: true,

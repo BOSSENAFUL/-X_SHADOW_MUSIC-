@@ -59,62 +59,66 @@ export default function ProfilePage() {
         const res = await fetch('/api/playlists');
         const data = await res.json();
         if (data.success) {
-          // BATCH OPTIMIZATION: Collect all song IDs for covers
-          const allSongIds = new Set();
-          data.data.forEach(p => {
-            if (p.songIds) p.songIds.slice(0, 4).forEach(id => allSongIds.add(id));
-          });
+          let playlists = data.data.map((p) => ({
+            ...p,
+            isUserPlaylist: true,
+          }));
 
-          const songCache = {};
-          if (allSongIds.size > 0) {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-            const idsArray = Array.from(allSongIds);
-            const chunkSize = 20;
+          // Build collages for playlists that already have an image stored in DB
+          // (the create/edit playlist flow saves image in MongoDB)
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+          const needsCovers = playlists.filter(
+            (p) => !p.image && p.songIds?.length > 0
+          );
 
-            for (let i = 0; i < idsArray.length; i += chunkSize) {
-              const chunk = idsArray.slice(i, i + chunkSize);
-              try {
-                const songRes = await fetch(`${apiUrl}/api/songs?ids=${chunk.join(',')}`);
-                const songData = await songRes.json();
-                if (songData.success && songData.data) {
-                  songData.data.forEach(song => {
-                    if (song) songCache[song.id] = song;
-                  });
+          if (needsCovers.length > 0) {
+            const allSongIds = new Set();
+            needsCovers.forEach((p) =>
+              p.songIds.slice(0, 4).forEach((id) => allSongIds.add(id))
+            );
+
+            try {
+              const idsArray = Array.from(allSongIds);
+              const songRes = await fetch(
+                `${apiUrl}/api/songs?ids=${idsArray.join(',')}`,
+                { signal: AbortSignal.timeout(10000) }
+              );
+              const songData = await songRes.json();
+              const imageCache = {};
+
+              if (songData.success && songData.data) {
+                songData.data.forEach((song) => {
+                  if (song?.image) {
+                    imageCache[song.id] =
+                      song.image.find((i) => i.quality === '150x150')?.url ||
+                      song.image[0]?.url;
+                  }
+                });
+              }
+
+              playlists = playlists.map((p) => {
+                if (p.image || !p.songIds?.length) return p;
+                const images = p.songIds
+                  .slice(0, 4)
+                  .map((id) => imageCache[id])
+                  .filter(Boolean);
+                if (images.length > 0) {
+                  return {
+                    ...p,
+                    collageImages: images.length >= 4 ? images : null,
+                    isCollage: images.length >= 4,
+                    image: images.length < 4 ? images[0] : null,
+                  };
                 }
-              } catch (e) { console.error("Batch song fetch error", e); }
+                return p;
+              });
+            } catch (e) {
+              // Timeout or fetch error — proceed without collages
             }
           }
 
-          const playlistsWithCovers = data.data.map((playlist) => {
-            if (playlist.image || playlist.collageImages) return { ...playlist, isUserPlaylist: true };
-
-            if (playlist.songIds && playlist.songIds.length > 0) {
-              const songsToFetch = playlist.songIds.slice(0, 4);
-              const validImages = songsToFetch
-                .map(id => {
-                  const song = songCache[id];
-                  if (song && song.image) {
-                    return song.image.find(i => i.quality === '150x150')?.url || song.image[0]?.url;
-                  }
-                  return null;
-                })
-                .filter(Boolean);
-
-              if (validImages.length > 0) {
-                return {
-                  ...playlist,
-                  collageImages: validImages,
-                  isCollage: validImages.length >= 4,
-                  image: validImages.length < 4 ? validImages[0] : null,
-                  isUserPlaylist: true
-                };
-              }
-            }
-            return { ...playlist, isUserPlaylist: true };
-          });
-
-          setCreatedPlaylists(playlistsWithCovers);
-          sessionStorage.setItem(cacheKey, JSON.stringify(playlistsWithCovers));
+          setCreatedPlaylists(playlists);
+          sessionStorage.setItem(cacheKey, JSON.stringify(playlists));
         }
       } catch (error) {
         console.error("Failed to fetch created playlists", error);
@@ -138,7 +142,7 @@ export default function ProfilePage() {
   // Filter liked playlists to exclude those already shown in Created Playlists
   const uniqueLikedPlaylists = likedPlaylists?.filter(lp => !createdPlaylists.some(cp => cp._id === lp.playlistId)) || [];
 
-  const loading = status === "loading" || loadingPlaylists || loadingSongs || loadingCreated;
+  const showSkeleton = status === "loading";
 
   const ProfileSkeleton = () => (
     <div className="flex flex-col h-full">
@@ -179,8 +183,7 @@ export default function ProfilePage() {
   };
 
   const PlaylistImage = ({ playlist }) => {
-    // Priority 1: Collage
-    if (playlist.isCollage && playlist.collageImages && playlist.collageImages.length >= 4) {
+    if (playlist.isCollage && playlist.collageImages?.length >= 4) {
       return (
         <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
           {playlist.collageImages.slice(0, 4).map((src, idx) => (
@@ -190,16 +193,14 @@ export default function ProfilePage() {
       );
     }
 
-    // Priority 2: Single image (from array or string)
     const src = getImageSrc(playlist.image) || (playlist.collageImages?.[0]);
     if (src) {
       return <img src={src} className="w-full h-full object-cover" alt={playlist.name || playlist.playlistName} />;
     }
 
-    // Priority 3: Fallback
     return (
-      <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
-        <Music className="w-12 h-12" />
+      <div className="w-full h-full flex items-center justify-center bg-muted">
+        <Music className="w-8 h-8 text-muted-foreground/50" />
       </div>
     );
   };
@@ -237,11 +238,11 @@ export default function ProfilePage() {
           </Button>
         </header>
 
-        {loading ? (
+        {status === "loading" ? (
           <ProfileSkeleton />
         ) : (
           <div className="flex-1 overflow-y-auto pb-24">
-            {/* Profile Header */}
+            {/* Profile Header — always visible once session resolves */}
             <div className="flex flex-col md:flex-row items-center md:items-end gap-6 p-6 pb-8 bg-gradient-to-b from-muted/50 via-muted/20 to-background pt-20">
               <Avatar className="w-32 h-32 md:w-52 md:h-52 shadow-2xl">
                 <AvatarImage src={session?.user?.image} alt={session?.user?.name} className="object-cover" />
@@ -299,7 +300,17 @@ export default function ProfilePage() {
               {/* Created Playlists */}
               <section>
                 <h2 className="text-2xl font-bold mb-4">Created Playlists</h2>
-                {enrichedCreatedPlaylists.length > 0 ? (
+                {loadingCreated ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-x-3 gap-y-6 md:gap-x-4 md:gap-y-8">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div key={i} className="space-y-3">
+                        <Skeleton className="aspect-square w-full rounded-md" />
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-3 w-1/2" />
+                      </div>
+                    ))}
+                  </div>
+                ) : enrichedCreatedPlaylists.length > 0 ? (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-x-3 gap-y-6 md:gap-x-4 md:gap-y-8">
                     {enrichedCreatedPlaylists.map((playlist) => (
                       <div
@@ -325,24 +336,36 @@ export default function ProfilePage() {
               </section>
 
               {/* Liked Playlists */}
-              {uniqueLikedPlaylists.length > 0 && (
+              {(loadingPlaylists || uniqueLikedPlaylists.length > 0) && (
                 <section>
                   <h2 className="text-2xl font-bold mb-4">Liked Playlists</h2>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-x-3 gap-y-6 md:gap-x-4 md:gap-y-8">
-                    {uniqueLikedPlaylists.map((playlist) => (
-                      <div
-                        key={playlist.playlistId}
-                        onClick={() => router.push(playlist.isUserPlaylist ? `/music/playlists/${playlist.playlistId}` : `/music/playlist/${playlist.playlistId}`)}
-                        className="group md:p-3 rounded-md bg-card/40 md:hover:bg-accent transition-all duration-300 cursor-pointer"
-                      >
-                        <div className="aspect-square w-full relative mb-4 shadow-lg rounded-md overflow-hidden bg-muted">
-                          <PlaylistImage playlist={playlist} />
+                  {loadingPlaylists ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-x-3 gap-y-6 md:gap-x-4 md:gap-y-8">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} className="space-y-3">
+                          <Skeleton className="aspect-square w-full rounded-md" />
+                          <Skeleton className="h-4 w-3/4" />
+                          <Skeleton className="h-3 w-1/2" />
                         </div>
-                        <h3 className="md:font-bold truncate text-foreground mb-1 decoration-1 text-sm md:text-base">{playlist.playlistName}</h3>
-                        <p className="text-xs md:text-sm text-muted-foreground truncate">By {playlist.owner || playlist.subtitle || 'Jammify'}</p>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-x-3 gap-y-6 md:gap-x-4 md:gap-y-8">
+                      {uniqueLikedPlaylists.map((playlist) => (
+                        <div
+                          key={playlist.playlistId}
+                          onClick={() => router.push(playlist.isUserPlaylist ? `/music/playlists/${playlist.playlistId}` : `/music/playlist/${playlist.playlistId}`)}
+                          className="group md:p-3 rounded-md bg-card/40 md:hover:bg-accent transition-all duration-300 cursor-pointer"
+                        >
+                          <div className="aspect-square w-full relative mb-4 shadow-lg rounded-md overflow-hidden bg-muted">
+                            <PlaylistImage playlist={playlist} />
+                          </div>
+                          <h3 className="md:font-bold truncate text-foreground mb-1 decoration-1 text-sm md:text-base">{playlist.playlistName}</h3>
+                          <p className="text-xs md:text-sm text-muted-foreground truncate">By {playlist.owner || playlist.subtitle || 'Jammify'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </section>
               )}
             </div>
