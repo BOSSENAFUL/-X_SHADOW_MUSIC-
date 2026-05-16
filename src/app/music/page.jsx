@@ -85,6 +85,7 @@ export default function MusicPage() {
     englishTopHits: { playlists: [], sectionId: null, loading: true },
     englishTrending: { playlists: [], sectionId: null, loading: true },
     popEssentials: { playlists: [], sectionId: null, loading: true },
+    danceHits: { playlists: [], sectionId: null, loading: true },
   });
   const [communityPlaylists, setCommunityPlaylists] = useState([]);
   const [communityLoading, setCommunityLoading] = useState(true);
@@ -265,9 +266,10 @@ export default function MusicPage() {
       englishTopHits: '6a04071717b699631f905913',
       englishTrending: '6a047203f2b5dded647a6dcf',
       popEssentials: '6a0680775b5c126be7357acc',
+      danceHits: '6a08919dc1eb7a1d81d81ca0',
     };
 
-    const CACHE_KEY = 'db_sections_data_v2';
+    const CACHE_KEY = 'db_sections_data_v3';
     const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
     const fetchDbSections = async () => {
@@ -286,6 +288,7 @@ export default function MusicPage() {
                 englishTopHits: { playlists: data.englishTopHits || [], sectionId: data.englishTopHitsId || null, loading: false },
                 englishTrending: { playlists: data.englishTrending || [], sectionId: data.englishTrendingId || null, loading: false },
                 popEssentials: { playlists: data.popEssentials || [], sectionId: data.popEssentialsId || null, loading: false },
+                danceHits: { playlists: data.danceHits || [], sectionId: data.danceHitsId || null, loading: false },
               });
             }
             return;
@@ -336,6 +339,7 @@ export default function MusicPage() {
           englishTopHitsPlaylists,
           englishTrendingPlaylists,
           popEssentialsPlaylists,
+          danceHitsPlaylists,
         ] = await Promise.all([
           fetchSection(matched.newTrending),
           fetchSection(matched.bollywoodRomance),
@@ -344,6 +348,7 @@ export default function MusicPage() {
           fetchSection(matched.englishTopHits),
           fetchSection(matched.englishTrending),
           fetchSection(matched.popEssentials),
+          fetchSection(matched.danceHits),
         ]);
 
         if (!isMounted) return;
@@ -356,6 +361,7 @@ export default function MusicPage() {
           englishTopHits: { playlists: englishTopHitsPlaylists, sectionId: matched.englishTopHits, loading: false },
           englishTrending: { playlists: englishTrendingPlaylists, sectionId: matched.englishTrending, loading: false },
           popEssentials: { playlists: popEssentialsPlaylists, sectionId: matched.popEssentials, loading: false },
+          danceHits: { playlists: danceHitsPlaylists, sectionId: matched.danceHits, loading: false },
         };
 
         setDbSections(newState);
@@ -379,6 +385,8 @@ export default function MusicPage() {
               englishTrendingId: matched.englishTrending,
               popEssentials: popEssentialsPlaylists,
               popEssentialsId: matched.popEssentials,
+              danceHits: danceHitsPlaylists,
+              danceHitsId: matched.danceHits,
             },
           }));
         } catch { /* storage full */ }
@@ -394,6 +402,7 @@ export default function MusicPage() {
             englishTopHits: { ...prev.englishTopHits, loading: false },
             englishTrending: { ...prev.englishTrending, loading: false },
             popEssentials: { ...prev.popEssentials, loading: false },
+            danceHits: { ...prev.danceHits, loading: false },
           }));
         }
       }
@@ -1345,6 +1354,19 @@ export default function MusicPage() {
               playlists={dbSections.popEssentials.playlists}
               loading={dbSections.popEssentials.loading}
               onShowAll={() => dbSections.popEssentials.sectionId && router.push(`/music/section/${dbSections.popEssentials.sectionId}`)}
+              onPlaylistClick={(playlist) => { router.push(`/music/playlists/${playlist.id}`); }}
+              onPlayClick={handlePlaylistPlay}
+              playingId={playingId}
+            />
+          )}
+
+          {/* Dance Hits */}
+          {showGlobal && (dbSections.danceHits.loading || dbSections.danceHits.playlists.length > 0) && (
+            <PlaylistSection
+              title="Dance Hits"
+              playlists={dbSections.danceHits.playlists}
+              loading={dbSections.danceHits.loading}
+              onShowAll={() => dbSections.danceHits.sectionId && router.push(`/music/section/${dbSections.danceHits.sectionId}`)}
               onPlaylistClick={(playlist) => { router.push(`/music/playlists/${playlist.id}`); }}
               onPlayClick={handlePlaylistPlay}
               playingId={playingId}
