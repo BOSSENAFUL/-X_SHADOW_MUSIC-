@@ -2,7 +2,7 @@
 /* eslint-disable react/no-unescaped-entities */
 "use client";
 
-import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, Suspense } from "react";
+import React, { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Input } from "@/components/ui/input";
@@ -275,6 +275,8 @@ function SearchPageContent() {
   const { data: session } = useSession();
   const initialQuery = searchParams.get('q') || '';
 
+  // All state initializes to server-safe defaults (no sessionStorage access here).
+  // Restoration happens in a useEffect after hydration.
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [searchResults, setSearchResults] = useState(null);
   const [lyricsResults, setLyricsResults] = useState(null);
@@ -307,27 +309,78 @@ function SearchPageContent() {
   const { playSong, currentSong, isPlaying, togglePlayPause } = useMusicPlayer();
   const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
 
-  // Ref to track if we're restoring from sessionStorage (to prevent re-searching)
+  // Blocks the search effect from firing while we are restoring saved state
   const isRestoringFromStorage = useRef(false);
 
-  // Ref to track if we're currently switching tabs (to prevent overwriting scroll position)
-  const isSwitchingTab = useRef(false);
+  // Hide content from the very first render if we have saved state to restore.
+  // This prevents a flash: instead of showing content at scroll=0 and then hiding it,
+  // we start hidden and only become visible after scroll position is restored.
+  const [isInitialRestore, setIsInitialRestore] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const raw = sessionStorage.getItem('searchPageState');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return !!parsed?.query;
+      }
+    } catch { /* ignore */ }
+    return false;
+  });
 
-
-  // State to control visibility during initial scroll restoration from storage
-  // Default to true (hidden) to prevent flash of wrong scroll position
-  const [isInitialRestore, setIsInitialRestore] = useState(true);
   // Ref for the scrollable container
   const scrollContainerRef = useRef(null);
 
-  // Refs to store scroll positions for each tab
-  const tabScrollPositions = useRef({
-    all: 0,
-    songs: 0,
-    albums: 0,
-    artists: 0,
-    playlists: 0
-  });
+  // Per-tab scroll positions — updated by the scroll listener
+  const tabScrollPositions = useRef({ all: 0, songs: 0, albums: 0, artists: 0, playlists: 0 });
+
+  // ─── Restore saved state after hydration ────────────────────────────────────
+  // Runs once on mount (client only). Reads sessionStorage, restores all state,
+  // then scrolls to the saved position.
+  useEffect(() => {
+    let saved = null;
+    try {
+      const raw = sessionStorage.getItem('searchPageState');
+      if (raw) saved = JSON.parse(raw);
+    } catch { /* ignore */ }
+
+    if (!saved?.query) {
+      return; // nothing to restore, content already visible
+    }
+
+    // Hide content while we restore + scroll, to prevent position flash
+    setIsInitialRestore(true);
+
+    // Block the search effect while we batch-apply saved state
+    isRestoringFromStorage.current = true;
+
+    // Restore tab scroll positions into the ref first
+    if (saved.tabScrollPositions) {
+      tabScrollPositions.current = { ...tabScrollPositions.current, ...saved.tabScrollPositions };
+    }
+
+    // Batch all state updates together
+    setSearchQuery(saved.query);
+    if (saved.results) setSearchResults(saved.results);
+    if (saved.lyricsRes) setLyricsResults(saved.lyricsRes);
+    if (saved.publicPlaylists) setPublicPlaylists(saved.publicPlaylists);
+    if (saved.tab) setActiveTab(saved.tab);
+    if (saved.categoryState) setCategoryData(saved.categoryState);
+    if (saved.query) setLoadedSearchQuery(saved.query);
+
+    // Scroll to saved position after React has painted the restored content.
+    // Two rAFs ensure the layout is fully settled before we set scrollTop.
+    const scrollTarget = saved.tabScrollPositions?.[saved.tab] ?? saved.scrollPosition ?? 0;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.current && scrollTarget > 0) {
+          scrollContainerRef.current.scrollTop = scrollTarget;
+        }
+        setIsInitialRestore(false);
+        isRestoringFromStorage.current = false;
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally empty — runs once after first render
 
   // --- Utility Functions ---
   const decodeHtmlEntities = (text) => {
@@ -366,199 +419,115 @@ function SearchPageContent() {
     return decodeHtmlEntities(result);
   };
 
-  // Save current tab's scroll position before switching tabs
-  const saveCurrentTabScroll = useCallback(() => {
-    if (scrollContainerRef.current) {
-      tabScrollPositions.current[activeTab] = scrollContainerRef.current.scrollTop;
-    }
-  }, [activeTab]);
-
-  // Effect to save scroll position when tab changes
-  useEffect(() => {
-    return () => {
-      saveCurrentTabScroll();
-    };
-  }, [activeTab, saveCurrentTabScroll]);
-
-  // Restore search state from sessionStorage on mount
-  useEffect(() => {
-    const savedSearchState = sessionStorage.getItem('searchPageState');
-    if (savedSearchState) {
-      try {
-        const {
-          query,
-          results,
-          lyricsRes,
-          publicPlaylists: savedPublicPlaylists,
-          tab,
-          categoryState,
-          scrollPosition,
-          tabScrollPositions: savedTabScrollPositions
-        } = JSON.parse(savedSearchState);
-        if (query) {
-          isRestoringFromStorage.current = true;
-          setSearchQuery(query);
-          if (results) setSearchResults(results);
-          if (lyricsRes) setLyricsResults(lyricsRes);
-          if (savedPublicPlaylists) setPublicPlaylists(savedPublicPlaylists);
-          if (tab) setActiveTab(tab);
-          if (categoryState) setCategoryData(categoryState);
-
-          // Restore tab-specific scroll positions
-          if (savedTabScrollPositions) {
-            tabScrollPositions.current = savedTabScrollPositions;
-          }
-
-          // Restore scroll position for the active tab after a short delay to ensure content is rendered
-          const scrollToRestore = savedTabScrollPositions?.[tab] ?? scrollPosition ?? 0;
-          if (scrollToRestore !== undefined) {
-
-
-            setTimeout(() => {
-              if (scrollContainerRef.current) {
-                scrollContainerRef.current.scrollTop = scrollToRestore;
-                // Reveal content after scroll is restored
-                requestAnimationFrame(() => {
-                  setIsInitialRestore(false);
-                });
-              } else {
-                setIsInitialRestore(false);
-              }
-            }, 50);
-          } else {
-            setIsInitialRestore(false);
-          }
-
-          // Reset the flag after a short delay to allow the state updates to complete
-          setTimeout(() => {
-            isRestoringFromStorage.current = false;
-          }, 200);
-        } else {
-          setIsInitialRestore(false);
-        }
-      } catch (error) {
-        console.error('Error restoring search state:', error);
-        isRestoringFromStorage.current = false;
-        setIsInitialRestore(false);
-      }
-    } else {
-      setIsInitialRestore(false);
-    }
-  }, []);
-
-  // Add scroll event listener to continuously save scroll position
+  // --- Scroll position management ---
+  // Single scroll listener — always tracks the active tab's current position.
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) return;
 
     const handleScroll = () => {
-      if (!isRestoringFromStorage.current && !isSwitchingTab.current) {
-        tabScrollPositions.current[activeTab] = scrollContainer.scrollTop;
-      }
+      if (isRestoringFromStorage.current) return;
+      tabScrollPositions.current[activeTab] = scrollContainer.scrollTop;
     };
 
-    // Add scroll listener with passive option for better performance
     scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
-
-    return () => {
-      scrollContainer.removeEventListener('scroll', handleScroll);
-    };
+    return () => scrollContainer.removeEventListener('scroll', handleScroll);
   }, [activeTab]);
 
-  // Restore scroll position when switching tabs
+  // When the active tab changes:
+  //   1. The scroll listener above already saved the leaving tab's position.
+  //   2. Reset the new tab to the top (tab switches always start fresh).
+  //   3. Clear the new tab's stored position so a future back-navigation
+  //      doesn't accidentally restore a stale offset.
+  const prevTabRef = useRef(activeTab);
   useEffect(() => {
-    // Disable scroll tracking immediately when tab changes
-    isSwitchingTab.current = true;
+    if (prevTabRef.current === activeTab) return; // first render, nothing to do
+    prevTabRef.current = activeTab;
 
-    if (scrollContainerRef.current && !isRestoringFromStorage.current) {
-      const targetScrollPosition = tabScrollPositions.current[activeTab] || 0;
-
-      // Use requestAnimationFrame to ensure the tab content is rendered before scrolling
-      requestAnimationFrame(() => {
-        if (scrollContainerRef.current) {
-          scrollContainerRef.current.scrollTop = targetScrollPosition;
-
-          // Re-enable scroll tracking after a short delay
-          // This ensures we don't capture the scroll event from the restoration itself
-          // or any immediate layout shifts
-          setTimeout(() => {
-            isSwitchingTab.current = false;
-          }, 100);
-        } else {
-          isSwitchingTab.current = false;
-        }
-      });
-    } else {
-      isSwitchingTab.current = false;
+    // Reset new tab scroll to top
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
     }
+    tabScrollPositions.current[activeTab] = 0;
   }, [activeTab]);
 
-  // Save search state to sessionStorage whenever it changes
+  // When the search query is cleared, reset ALL tab scroll positions and
+  // scroll the container back to the top.
+  const prevQueryRef = useRef(searchQuery);
   useEffect(() => {
-    if (searchQuery || searchResults) {
+    const wasNonEmpty = prevQueryRef.current.trim().length > 0;
+    const isNowEmpty = !searchQuery.trim();
+    prevQueryRef.current = searchQuery;
+
+    if (wasNonEmpty && isNowEmpty) {
+      // Reset every tab's stored position
+      tabScrollPositions.current = { all: 0, songs: 0, albums: 0, artists: 0, playlists: 0 };
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = 0;
+      }
+      sessionStorage.removeItem('searchPageState');
+    }
+  }, [searchQuery]);
+
+  // Keep a ref that always holds the latest state so the unmount cleanup can read it
+  // without needing to be in the dependency array.
+  const latestStateRef = useRef({});
+  useEffect(() => {
+    latestStateRef.current = {
+      searchQuery, searchResults, lyricsResults, publicPlaylists,
+      activeTab, categoryData,
+    };
+  });
+
+  // Save state to sessionStorage on unmount (covers all navigation away from this page).
+  // This is the single source of truth — no need for beforeunload or per-action saves.
+  useEffect(() => {
+    return () => {
+      const {
+        searchQuery: q, searchResults: res, lyricsResults: lyr,
+        publicPlaylists: pp, activeTab: tab, categoryData: cat,
+      } = latestStateRef.current;
+
+      if (!q && !res) return; // nothing worth saving
+
+      // Capture current scroll before unmount
+      if (scrollContainerRef.current) {
+        tabScrollPositions.current[tab] = scrollContainerRef.current.scrollTop;
+      }
+
       try {
-        // Strip downloadUrl arrays to keep storage size small
-        const slimResults = searchResults ? {
-          ...searchResults,
-          songs: searchResults.songs?.slice(0, 50).map(s => ({ ...s, downloadUrl: undefined })),
-          albums: searchResults.albums?.slice(0, 20),
-          artists: searchResults.artists?.slice(0, 20),
-          playlists: searchResults.playlists?.slice(0, 20),
+        const slimResults = res ? {
+          ...res,
+          songs: res.songs?.results
+            ? { ...res.songs, results: res.songs.results.slice(0, 50).map(s => ({ ...s, downloadUrl: undefined })) }
+            : res.songs,
+          albums: res.albums?.results
+            ? { ...res.albums, results: res.albums.results.slice(0, 20) }
+            : res.albums,
+          artists: res.artists?.results
+            ? { ...res.artists, results: res.artists.results.slice(0, 20) }
+            : res.artists,
+          playlists: res.playlists?.results
+            ? { ...res.playlists, results: res.playlists.results.slice(0, 20) }
+            : res.playlists,
         } : null;
-        const searchState = {
-          query: searchQuery,
+
+        sessionStorage.setItem('searchPageState', JSON.stringify({
+          query: q,
           results: slimResults,
-          lyricsRes: lyricsResults?.slice(0, 20),
-          publicPlaylists: publicPlaylists?.slice(0, 20),
-          tab: activeTab,
-          categoryState: categoryData,
-          scrollPosition: tabScrollPositions.current[activeTab] || 0,
-          tabScrollPositions: tabScrollPositions.current
-        };
-        sessionStorage.setItem('searchPageState', JSON.stringify(searchState));
-      } catch (e) {
-        // Quota exceeded - clear and skip saving
+          lyricsRes: lyr?.slice(0, 20),
+          publicPlaylists: pp?.slice(0, 20),
+          tab,
+          categoryState: cat,
+          scrollPosition: tabScrollPositions.current[tab] || 0,
+          tabScrollPositions: { ...tabScrollPositions.current },
+        }));
+      } catch {
         sessionStorage.removeItem('searchPageState');
       }
-    }
-  }, [searchQuery, searchResults, lyricsResults, publicPlaylists, activeTab, categoryData]);
-
-  // Save scroll position before page unload (when navigating away)
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (scrollContainerRef.current) {
-        tabScrollPositions.current[activeTab] = scrollContainerRef.current.scrollTop;
-        try {
-          const slimResults = searchResults ? {
-            ...searchResults,
-            songs: searchResults.songs?.slice(0, 50).map(s => ({ ...s, downloadUrl: undefined })),
-            albums: searchResults.albums?.slice(0, 20),
-            artists: searchResults.artists?.slice(0, 20),
-            playlists: searchResults.playlists?.slice(0, 20),
-          } : null;
-          const searchState = {
-            query: searchQuery,
-            results: slimResults,
-            lyricsRes: lyricsResults?.slice(0, 20),
-            publicPlaylists: publicPlaylists?.slice(0, 20),
-            tab: activeTab,
-            categoryState: categoryData,
-            scrollPosition: tabScrollPositions.current[activeTab] || 0,
-            tabScrollPositions: tabScrollPositions.current
-          };
-          sessionStorage.setItem('searchPageState', JSON.stringify(searchState));
-        } catch (e) {
-          sessionStorage.removeItem('searchPageState');
-        }
-      }
     };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [searchQuery, searchResults, lyricsResults, publicPlaylists, activeTab, categoryData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally empty — runs only on unmount
 
   // Debounced search function
   const debounce = useCallback((func, delay) => {
@@ -1135,22 +1104,17 @@ function SearchPageContent() {
     }
   };
 
-  // Auto-focus the search input when the page loads
+  // Auto-focus the search input only when arriving fresh (no saved state)
   useEffect(() => {
-    // Check if we're restoring from sessionStorage (prevent focus on back navigation)
-    const savedSearchState = sessionStorage.getItem('searchPageState');
-    if (savedSearchState) {
-      try {
-        const { query } = JSON.parse(savedSearchState);
-        if (query && query.trim()) {
-          return;
-        }
-      } catch (error) {
-        // Ignore parsing errors
+    // Don't steal focus on back-navigation — check sessionStorage directly
+    try {
+      const raw = sessionStorage.getItem('searchPageState');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.query) return;
       }
-    }
+    } catch { /* ignore */ }
 
-    // Small delay to ensure the component is fully mounted
     const timer = setTimeout(() => {
       if (searchInputRef.current) {
         searchInputRef.current.focus();
@@ -1158,6 +1122,7 @@ function SearchPageContent() {
     }, 100);
 
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Handle initial query from URL parameters
@@ -1425,39 +1390,11 @@ function SearchPageContent() {
     router.push(`/music/artist/${artistId}`);
   };
 
-  const saveSearchState = () => {
-    if (!scrollContainerRef.current) return;
-    tabScrollPositions.current[activeTab] = scrollContainerRef.current.scrollTop;
-    try {
-      const slimResults = searchResults ? {
-        ...searchResults,
-        songs: searchResults.songs?.slice(0, 50).map(s => ({ ...s, downloadUrl: undefined })),
-        albums: searchResults.albums?.slice(0, 20),
-        artists: searchResults.artists?.slice(0, 20),
-        playlists: searchResults.playlists?.slice(0, 20),
-      } : null;
-      sessionStorage.setItem('searchPageState', JSON.stringify({
-        query: searchQuery,
-        results: slimResults,
-        lyricsRes: lyricsResults?.slice(0, 20),
-        publicPlaylists: publicPlaylists?.slice(0, 20),
-        tab: activeTab,
-        categoryState: categoryData,
-        scrollPosition: tabScrollPositions.current[activeTab] || 0,
-        tabScrollPositions: tabScrollPositions.current
-      }));
-    } catch (e) {
-      sessionStorage.removeItem('searchPageState');
-    }
-  };
-
   const handleAlbumClick = (albumId) => {
-    saveSearchState();
     router.push(`/music/album/${albumId}`);
   };
 
   const handlePlaylistClick = (playlistId) => {
-    saveSearchState();
     router.push(`/music/playlist/${playlistId}`);
   };
 
@@ -1674,7 +1611,7 @@ function SearchPageContent() {
   return (
     <SidebarProvider>
       <AppSidebar className="hidden md:flex" />
-      <SidebarInset className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col">
+      <SidebarInset className="md:ml-0 overflow-x-hidden h-svh relative flex flex-col">
         <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1 hidden md:flex" />
@@ -1697,7 +1634,7 @@ function SearchPageContent() {
 
         <div
           ref={scrollContainerRef}
-          className="flex flex-1 flex-col pb-32 md:pb-6 overflow-y-auto transition-opacity duration-150 mb-24"
+          className="flex flex-1 min-h-0 flex-col pb-32 md:pb-6 overflow-y-auto transition-opacity duration-150"
           style={{ opacity: isInitialRestore ? 0 : 1 }}
         >
           {/* Search Input */}
