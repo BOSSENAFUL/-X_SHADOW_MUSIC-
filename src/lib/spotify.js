@@ -70,7 +70,7 @@ export async function getPlaylistData(playlistId) {
 
         const details = {
             name: decodeEntities(data.playlist.name || 'Imported Playlist'),
-            description: decodeEntities(data.playlist.owner ? `By ${data.playlist.owner}` : ''),
+            description: decodeEntities(data.playlist.description || (data.playlist.owner ? `By ${data.playlist.owner}` : '')),
             images: data.playlist.images || []
         };
 

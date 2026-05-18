@@ -245,6 +245,8 @@ export function FullscreenMusicPlayer({
   const router = useRouter();
   const [showLyrics, setShowLyrics] = useState(false);
   const [shuffledPlaylist, setShuffledPlaylist] = useState([]);
+  const shuffledIndexRef = useRef(0);
+  const internalNavRef = useRef(false);
   const [lyrics, setLyrics] = useState(null);
   const [lyricsLoading, setLyricsLoading] = useState(false);
   // True from the moment we decide to fetch until the result lands —
@@ -1084,23 +1086,21 @@ export function FullscreenMusicPlayer({
   // Create shuffled playlist when shuffle is enabled
   useEffect(() => {
     if (isShuffle && playlist.length > 0) {
-      // Create shuffled playlist but keep current song at the beginning
       const otherSongs = playlist.filter((song) => song.id !== currentSong?.id);
       const shuffledOthers = shuffleArray(otherSongs);
 
-      // If current song exists, put it first, otherwise just shuffle all
       const shuffled = currentSong
         ? [currentSong, ...shuffledOthers]
         : shuffleArray(playlist);
 
       setShuffledPlaylist(shuffled);
-      // Update context index to match the new position (always 0)
+      shuffledIndexRef.current = 0;
       if (currentSong) {
         onSongChange?.(currentSong, 0, shuffled);
       }
     } else {
       setShuffledPlaylist([]);
-      // When shuffle is turned off, find where current song is in localPlaylist and update context
+      shuffledIndexRef.current = 0;
       if (currentSong && localPlaylist.length > 0) {
         const originalIndex = localPlaylist.findIndex(s => s.id === currentSong.id);
         if (originalIndex !== -1) {
@@ -1108,7 +1108,21 @@ export function FullscreenMusicPlayer({
         }
       }
     }
-  }, [isShuffle, playlist, currentSong?.id]);
+  }, [isShuffle, playlist]);
+
+  // Realign shuffle position when currentSong changes externally (e.g. user clicks a song)
+  useEffect(() => {
+    if (!isShuffle || playlist.length === 0 || !currentSong) return;
+    if (internalNavRef.current) {
+      internalNavRef.current = false;
+      return;
+    }
+    // External song change — rebuild shuffled playlist around the new current song
+    const otherSongs = playlist.filter((song) => song.id !== currentSong.id);
+    const shuffledOthers = shuffleArray(otherSongs);
+    setShuffledPlaylist([currentSong, ...shuffledOthers]);
+    shuffledIndexRef.current = 0;
+  }, [currentSong?.id]);
 
   const getCurrentPlaylist = () => {
     return isShuffle && shuffledPlaylist.length > 0 ? shuffledPlaylist : localPlaylist;
@@ -1116,8 +1130,36 @@ export function FullscreenMusicPlayer({
 
   // Enhanced next/previous functions with shuffle and repeat support
   const handleNext = () => {
-    // Use localPlaylist (reordered) if shuffle is off, otherwise use shuffled playlist
-    const currentPlaylist = isShuffle ? shuffledPlaylist : localPlaylist;
+    if (isShuffle && shuffledPlaylist.length > 0) {
+      const nextPos = shuffledIndexRef.current + 1;
+      if (nextPos >= shuffledPlaylist.length) {
+        const otherSongs = playlist.filter((song) => song.id !== currentSong?.id);
+        const shuffledOthers = shuffleArray(otherSongs);
+        const shuffled = currentSong
+          ? [currentSong, ...shuffledOthers]
+          : shuffleArray(playlist);
+        setShuffledPlaylist(shuffled);
+        shuffledIndexRef.current = 0;
+        const nextSong = shuffled[0];
+        if (nextSong) {
+          internalNavRef.current = true;
+          onSongChange?.(nextSong, 0, shuffled);
+          setIsPlaying(true);
+        }
+        return;
+      } else {
+        shuffledIndexRef.current = nextPos;
+      }
+      const nextSong = shuffledPlaylist[shuffledIndexRef.current];
+      if (nextSong) {
+        internalNavRef.current = true;
+        onSongChange?.(nextSong, shuffledIndexRef.current, shuffledPlaylist);
+        setIsPlaying(true);
+      }
+      return;
+    }
+
+    const currentPlaylist = localPlaylist;
     if (currentPlaylist.length === 0) return;
 
     const currentIndex = currentPlaylist.findIndex(
@@ -1126,16 +1168,12 @@ export function FullscreenMusicPlayer({
     let nextIndex;
 
     if (repeatMode === "one") {
-      // Repeat current song
       nextIndex = currentIndex;
     } else if (currentIndex < currentPlaylist.length - 1) {
-      // Next song in playlist
       nextIndex = currentIndex + 1;
     } else if (repeatMode === "all") {
-      // Loop back to first song
       nextIndex = 0;
     } else {
-      // End of playlist, stop playing
       setIsPlaying(false);
       return;
     }
@@ -1143,13 +1181,26 @@ export function FullscreenMusicPlayer({
     const nextSong = currentPlaylist[nextIndex];
     if (nextSong) {
       onSongChange?.(nextSong, nextIndex, currentPlaylist);
-      setIsPlaying(true); // Ensure auto-play
+      setIsPlaying(true);
     }
   };
 
   const handlePrevious = () => {
-    // Use localPlaylist (reordered) if shuffle is off, otherwise use shuffled playlist
-    const currentPlaylist = isShuffle ? shuffledPlaylist : localPlaylist;
+    if (isShuffle && shuffledPlaylist.length > 0) {
+      const prevPos = shuffledIndexRef.current > 0
+        ? shuffledIndexRef.current - 1
+        : shuffledPlaylist.length - 1;
+      shuffledIndexRef.current = prevPos;
+      const prevSong = shuffledPlaylist[prevPos];
+      if (prevSong) {
+        internalNavRef.current = true;
+        onSongChange?.(prevSong, prevPos, shuffledPlaylist);
+        setIsPlaying(true);
+      }
+      return;
+    }
+
+    const currentPlaylist = localPlaylist;
     if (currentPlaylist.length === 0) return;
 
     const currentIndex = currentPlaylist.findIndex(
@@ -1158,23 +1209,19 @@ export function FullscreenMusicPlayer({
     let prevIndex;
 
     if (repeatMode === "one") {
-      // Repeat current song
       prevIndex = currentIndex;
     } else if (currentIndex > 0) {
-      // Previous song in playlist
       prevIndex = currentIndex - 1;
     } else if (repeatMode === "all") {
-      // Loop to last song
       prevIndex = currentPlaylist.length - 1;
     } else {
-      // Beginning of playlist, go to first song
       prevIndex = 0;
     }
 
     const prevSong = currentPlaylist[prevIndex];
     if (prevSong) {
       onSongChange?.(prevSong, prevIndex, currentPlaylist);
-      setIsPlaying(true); // Ensure auto-play
+      setIsPlaying(true);
     }
   };
 
@@ -1184,9 +1231,36 @@ export function FullscreenMusicPlayer({
     if (!audio) return;
 
     const handleSongEnd = () => {
-      console.log("Song ended, playing next...");
-      // Use localPlaylist (reordered) if shuffle is off, otherwise use shuffled playlist
-      const currentPlaylist = isShuffle ? shuffledPlaylist : localPlaylist;
+      if (isShuffle && shuffledPlaylist.length > 0) {
+        const nextPos = shuffledIndexRef.current + 1;
+        if (nextPos >= shuffledPlaylist.length) {
+          const otherSongs = playlist.filter((song) => song.id !== currentSong?.id);
+          const shuffledOthers = shuffleArray(otherSongs);
+          const shuffled = currentSong
+            ? [currentSong, ...shuffledOthers]
+            : shuffleArray(playlist);
+          setShuffledPlaylist(shuffled);
+          shuffledIndexRef.current = 0;
+          const nextSong = shuffled[0];
+          if (nextSong) {
+            internalNavRef.current = true;
+            onSongChange?.(nextSong, 0, shuffled);
+            setIsPlaying(true);
+          }
+          return;
+        } else {
+          shuffledIndexRef.current = nextPos;
+        }
+        const nextSong = shuffledPlaylist[shuffledIndexRef.current];
+        if (nextSong) {
+          internalNavRef.current = true;
+          onSongChange?.(nextSong, shuffledIndexRef.current, shuffledPlaylist);
+          setIsPlaying(true);
+        }
+        return;
+      }
+
+      const currentPlaylist = localPlaylist;
       if (currentPlaylist.length === 0) return;
 
       const currentIndex = currentPlaylist.findIndex(
@@ -1195,16 +1269,12 @@ export function FullscreenMusicPlayer({
       let nextIndex;
 
       if (repeatMode === "one") {
-        // Repeat current song
         nextIndex = currentIndex;
       } else if (currentIndex < currentPlaylist.length - 1) {
-        // Next song in playlist
         nextIndex = currentIndex + 1;
       } else if (repeatMode === "all") {
-        // Loop back to first song
         nextIndex = 0;
       } else {
-        // End of playlist, stop playing
         setIsPlaying(false);
         return;
       }
@@ -1212,7 +1282,7 @@ export function FullscreenMusicPlayer({
       const nextSong = currentPlaylist[nextIndex];
       if (nextSong) {
         onSongChange?.(nextSong, nextIndex, currentPlaylist);
-        setIsPlaying(true); // Ensure auto-play
+        setIsPlaying(true);
       }
     };
 

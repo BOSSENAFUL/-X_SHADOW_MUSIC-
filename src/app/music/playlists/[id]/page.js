@@ -2418,7 +2418,7 @@ export default function PlaylistDetailPage({ params }) {
                     {playlist.name}
                   </h1>
                   {playlist.description && (
-                    <p className="text-base text-muted-foreground mb-4 line-clamp-2 max-w-2xl">
+                    <p className="text-base text-muted-foreground mb-4 xl:line-clamp-none line-clamp-2 max-w-6xl">
                       {decodeHtmlEntities(playlist.description)}
                     </p>
                   )}

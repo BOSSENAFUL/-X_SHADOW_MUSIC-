@@ -49,6 +49,9 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   const [wasPlayingBeforeScrub, setWasPlayingBeforeScrub] = useState(false);
   const audioRef = useRef(null);
   const isScrubbingRef = useRef(false);
+  const shuffleOrderRef = useRef([]);
+  const shuffleIndexRef = useRef(0);
+  const isInternalNavRef = useRef(false);
 
   // Use currentIndex from context if available, fallback to findIndex
   const currentIndex = playerCurrentIndex ?? (playlist.findIndex((song) => song.id === currentSong?.id) || 0);
@@ -68,6 +71,26 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     return textarea.value;
   };
 
+  function shuffleArray(arr) {
+    const shuffled = [...arr];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+
+  function buildShuffleOrder(pl, currentId) {
+    if (!pl || pl.length === 0) return [];
+    const indices = Array.from({ length: pl.length }, (_, i) => i);
+    const shuffled = shuffleArray(indices);
+    const curIdx = shuffled.findIndex(i => pl[i]?.id === currentId);
+    if (curIdx > 0) {
+      [shuffled[0], shuffled[curIdx]] = [shuffled[curIdx], shuffled[0]];
+    }
+    return shuffled;
+  }
+
   const togglePlayPause = () => {
     if (!audioRef.current || !currentSong) return;
 
@@ -83,8 +106,15 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     if (playlist.length === 0) return;
 
     if (isShuffle) {
-      const randomIndex = Math.floor(Math.random() * playlist.length);
-      onSongChange?.(playlist[randomIndex], randomIndex);
+      const order = shuffleOrderRef.current;
+      if (order.length < 2) return;
+      const prevPos = shuffleIndexRef.current > 0
+        ? shuffleIndexRef.current - 1
+        : order.length - 1;
+      shuffleIndexRef.current = prevPos;
+      const idx = order[prevPos];
+      isInternalNavRef.current = true;
+      onSongChange?.(playlist[idx], idx);
       return;
     }
 
@@ -102,8 +132,23 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     }
 
     if (isShuffle) {
-      const randomIndex = Math.floor(Math.random() * playlist.length);
-      onSongChange?.(playlist[randomIndex], randomIndex);
+      const order = shuffleOrderRef.current;
+      if (order.length < 2) return;
+      const nextPos = shuffleIndexRef.current + 1;
+      if (nextPos >= order.length) {
+        const newOrder = buildShuffleOrder(playlist, currentSong?.id);
+        shuffleOrderRef.current = newOrder;
+        shuffleIndexRef.current = 0;
+        const idx = newOrder[0];
+        isInternalNavRef.current = true;
+        onSongChange?.(playlist[idx], idx);
+        return;
+      } else {
+        shuffleIndexRef.current = nextPos;
+      }
+      const idx = shuffleOrderRef.current[shuffleIndexRef.current];
+      isInternalNavRef.current = true;
+      onSongChange?.(playlist[idx], idx);
       return;
     }
 
@@ -574,6 +619,28 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       audio.removeEventListener("ended", handleEnded);
     };
   }, [currentSong]);
+
+  // Build shuffled order when shuffle is toggled on or playlist changes
+  useEffect(() => {
+    if (isShuffle && playlist.length > 0) {
+      shuffleOrderRef.current = buildShuffleOrder(playlist, currentSong?.id);
+      shuffleIndexRef.current = 0;
+    } else {
+      shuffleOrderRef.current = [];
+      shuffleIndexRef.current = 0;
+    }
+  }, [isShuffle, playlist]);
+
+  // Realign shuffled order when currentSong changes externally (e.g. user clicks a song)
+  useEffect(() => {
+    if (!isShuffle || playlist.length === 0 || !currentSong) return;
+    if (isInternalNavRef.current) {
+      isInternalNavRef.current = false;
+      return;
+    }
+    shuffleOrderRef.current = buildShuffleOrder(playlist, currentSong.id);
+    shuffleIndexRef.current = 0;
+  }, [currentSong?.id]);
 
   // Auto-play when isPlaying becomes true or song changes
   useEffect(() => {
