@@ -27,7 +27,7 @@ const CONCURRENCY = 5;
 const MAX_ARTIST_SONGS = 8;
 const MIN_SEEDS = 3;
 const MIN_MIX_SIZE = 15;
-const RATE_LIMIT_MS = 6 * 60 * 60 * 1000; // 6 hours
+const RATE_LIMIT_MS = 24 * 60 * 60 * 1000; // 24 hours
 const CACHE_DAYS = 3;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

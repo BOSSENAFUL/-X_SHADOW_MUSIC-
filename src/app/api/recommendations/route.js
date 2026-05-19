@@ -7,7 +7,6 @@ import mongoose from 'mongoose';
 import {
     getMixesForUser,
     generateMixesForUser,
-    needsRegeneration,
     fixMissingCoverImages,
 } from '@/lib/recommendations';
 
@@ -27,21 +26,8 @@ export async function GET() {
         const userObjId = new mongoose.Types.ObjectId(userId);
         const mixes = await getMixesForUser(userId);
 
-        // Background tasks — never block the response
-        (async () => {
-            try {
-                // 1. First try to fix missing cover images (lightweight — no API rate limit)
-                await fixMissingCoverImages(userObjId);
-
-                // 2. Only do a full regeneration if really needed
-                const shouldRefresh = mixes.length === 0 || (await needsRegeneration(userId));
-                if (shouldRefresh) {
-                    await generateMixesForUser(userId);
-                }
-            } catch (err) {
-                console.error('[Recommendations] Background refresh error:', err);
-            }
-        })();
+        // Lightweight background task — fix missing cover images (no suggestion API calls)
+        fixMissingCoverImages(userObjId).catch(() => {});
 
         return NextResponse.json({ success: true, data: mixes });
     } catch (error) {
@@ -70,12 +56,12 @@ export async function DELETE() {
         // Check rate limit BEFORE deleting
         const recentAttempt = await RecommendedMix.findOne({
             userId: userObjId,
-            lastGenerationAttempt: { $gt: new Date(Date.now() - 6 * 60 * 60 * 1000) },
+            lastGenerationAttempt: { $gt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
         }).lean();
 
         if (recentAttempt) {
             const retryAfter = Math.ceil(
-                (recentAttempt.lastGenerationAttempt.getTime() + 6 * 60 * 60 * 1000 - Date.now()) / 1000
+                (recentAttempt.lastGenerationAttempt.getTime() + 24 * 60 * 60 * 1000 - Date.now()) / 1000
             );
             return NextResponse.json(
                 {
