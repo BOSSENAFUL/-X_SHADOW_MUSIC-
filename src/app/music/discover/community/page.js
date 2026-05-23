@@ -250,7 +250,7 @@ export default function CommunityPlaylistsPage() {
               )}
             </div>
 
-            {!loading && playlists.length === 0 && (
+            {!isInitialLoad.current && !loading && playlists.length === 0 && (
               <div className="text-center py-12">
                 <p className="text-muted-foreground">No community playlists found yet. Be the first to share one!</p>
               </div>
