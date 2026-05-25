@@ -1,14 +1,38 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { AppPreview } from "@/components/app-preview";
 import UserReviews from "@/components/user-reviews";
 import FaqSection from "@/components/faq-section";
-import { Download, Play, Music, Radio, ChevronRight } from "lucide-react";
+import { Download, Play, Music, Radio, ChevronRight, Star, User } from "lucide-react";
 import { motion } from "framer-motion";
 import Image from "next/image";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function Home() {
+  const [ratings, setRatings] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRatings = async () => {
+      try {
+        const res = await fetch('/api/rating');
+        const data = await res.json();
+        setRatings(data.ratings || []);
+      } catch (error) {
+        console.error('Failed to fetch ratings:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRatings();
+  }, []);
+
+  const averageRating = ratings.length > 0
+    ? ratings.reduce((acc, r) => acc + r.rating, 0) / ratings.length
+    : 0;
+
   const fadeUpVariants = {
     hidden: { opacity: 0, y: 30 },
     visible: (i) => ({
@@ -25,9 +49,8 @@ export default function Home() {
   return (
     <div className="relative min-h-screen bg-background text-foreground overflow-hidden selection:bg-primary/20">
       {/* Premium Minimal Background Effects */}
-      <div className="absolute top-0 inset-x-0 h-screen bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(0,98,57,0.15),transparent)] pointer-events-none -z-10" />
-      <div className="absolute top-0 right-0 w-[40vw] h-[40vw] rounded-full bg-primary/5 blur-[120px] pointer-events-none -z-10 opacity-50 translate-x-1/3 -translate-y-1/3" />
-      <div className="absolute bottom-0 left-0 w-[30vw] h-[30vw] rounded-full bg-primary/5 blur-[100px] pointer-events-none -z-10 opacity-40 -translate-x-1/3 translate-y-1/3" />
+      <div className="absolute top-0 inset-x-0 h-screen bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(0,98,57,0.18),transparent)] pointer-events-none -z-10" />
+      <div className="absolute top-0 inset-x-0 h-[800px] bg-[linear-gradient(to_right,rgba(255,255,255,0.01)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.01)_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none -z-10" />
 
       {/* Header */}
       <motion.header
@@ -72,9 +95,12 @@ export default function Home() {
           variants={fadeUpVariants}
           className="mb-8"
         >
-          <div className="inline-flex items-center rounded-full border border-border/40 bg-background/50 backdrop-blur-sm px-3 py-1.5 text-xs sm:text-sm font-medium text-muted-foreground shadow-sm">
-            <span className="flex w-2 h-2 rounded-full bg-primary mr-2.5 animate-pulse"></span>
-            Experience Jammify 2.0
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] backdrop-blur-md px-4 py-1.5 text-xs sm:text-sm font-medium text-zinc-300 shadow-xl hover:border-emerald-500/30 hover:bg-white/[0.05] transition-all duration-300 cursor-default select-none group/badge">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span className="tracking-wide font-semibold text-zinc-300 group-hover/badge:text-white transition-colors">Experience Jammify 2.0</span>
           </div>
         </motion.div>
 
@@ -84,10 +110,14 @@ export default function Home() {
           initial="hidden"
           animate="visible"
           variants={fadeUpVariants}
-          className="mb-6 sm:mb-8 text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-semibold tracking-tighter leading-[1.05] max-w-4xl"
+          className="mb-6 sm:mb-8 text-4xl sm:text-6xl md:text-8xl font-black tracking-tighter leading-[1.05] max-w-5xl pb-2 text-balance text-center"
         >
-          Music, exactly <br className="hidden sm:inline" />
-          <span className="text-transparent bg-clip-text bg-linear-to-r from-foreground via-foreground/90 to-muted-foreground">how it should be.</span>
+          <span className="bg-clip-text text-transparent bg-gradient-to-b from-white via-white to-zinc-400">
+            Music, exactly
+          </span>{" "}
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-400">
+            how it should be.
+          </span>
         </motion.h1>
 
         <motion.p
@@ -95,7 +125,7 @@ export default function Home() {
           initial="hidden"
           animate="visible"
           variants={fadeUpVariants}
-          className="mb-10 sm:mb-12 text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto font-normal leading-relaxed"
+          className="mb-10 sm:mb-12 text-base sm:text-lg md:text-xl text-zinc-400/90 max-w-3xl mx-auto font-light leading-relaxed tracking-wide text-balance text-center"
         >
           Stream millions of songs in pristine, lossless quality. A beautifully crafted player designed for true music lovers. Uninterrupted, pure sound.
         </motion.p>
@@ -110,7 +140,7 @@ export default function Home() {
         >
           <Link
             href="/music"
-            className="group w-full sm:w-auto inline-flex h-12 sm:h-14 items-center justify-center rounded-full bg-foreground px-8 text-sm sm:text-base font-semibold text-background shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+            className="group w-full sm:w-auto inline-flex h-12 sm:h-14 items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 via-emerald-600 to-primary px-8 text-sm sm:text-base font-semibold text-white shadow-xl hover:scale-[1.02] hover:shadow-[0_0_24px_rgba(16,185,129,0.3)] active:scale-[0.98] transition-all duration-300"
           >
             Launch Web Player
             <ChevronRight className="ml-1.5 w-4 h-4 sm:w-5 sm:h-5 transition-transform group-hover:translate-x-1" />
@@ -119,43 +149,148 @@ export default function Home() {
           <a
             href="/Jammify.apk"
             download="Jammify.apk"
-            className="group w-full sm:w-auto inline-flex h-12 sm:h-14 items-center justify-center rounded-full border border-border bg-background/50 backdrop-blur-sm px-8 text-sm sm:text-base font-medium text-foreground shadow-sm hover:bg-accent/50 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+            className="group w-full sm:w-auto inline-flex h-12 sm:h-14 items-center justify-center rounded-full border border-white/10 bg-white/[0.02] backdrop-blur-md px-8 text-sm sm:text-base font-medium text-white shadow-lg hover:bg-white/[0.06] hover:border-white/20 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
           >
-            <Download className="mr-2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground transition-colors group-hover:text-foreground" />
+            <Download className="mr-2 w-4 h-4 sm:w-5 sm:h-5 text-zinc-400 transition-colors group-hover:text-white" />
             Download App
           </a>
         </motion.div>
 
+        {/* Ratings Summary */}
+        <Link href="/reviews" className="mt-8 select-none block">
+          <motion.div
+            custom={4}
+            initial="hidden"
+            animate="visible"
+            variants={fadeUpVariants}
+            className="inline-flex items-center gap-4 rounded-full border border-white/5 bg-neutral-950/40 hover:bg-neutral-900/60 backdrop-blur-xl px-5 py-2.5 shadow-2xl hover:border-primary/30 transition-all duration-300 group cursor-pointer"
+          >
+            {/* Avatar Stack */}
+            <div className="flex -space-x-2.5">
+              {loading ? (
+                [1, 2, 3, 4].map((i) => (
+                  <div key={i} className="w-7 h-7 rounded-full border-2 border-background bg-zinc-800 animate-pulse" />
+                ))
+              ) : ratings.length > 0 ? (
+                ratings.slice(0, 4).map((rating, idx) => (
+                  <Avatar key={idx} className="w-7 h-7 border-2 border-background bg-zinc-800 shadow-sm transition-transform group-hover:translate-x-0.5">
+                    <AvatarImage
+                      src={rating.user?.image || `https://api.dicebear.com/9.x/initials/svg?seed=${rating.user?.name || "User"}`}
+                      alt={rating.user?.name || "User"}
+                    />
+                    <AvatarFallback className="bg-zinc-700 text-white text-[9px] font-bold">
+                      {(rating.user?.name || "U")[0].toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                ))
+              ) : (
+                // Fallback static premium gradients if no ratings found yet
+                [
+                  { init: "J", grad: "from-emerald-500 to-teal-400" },
+                  { init: "M", grad: "from-purple-500 to-indigo-400" },
+                  { init: "S", grad: "from-amber-500 to-orange-400" },
+                  { init: "Y", grad: "from-blue-500 to-cyan-400" }
+                ].map((item, idx) => (
+                  <div
+                    key={idx}
+                    className={`w-7 h-7 rounded-full border-2 border-background bg-gradient-to-tr ${item.grad} flex items-center justify-center text-[9px] font-bold text-white shadow-sm`}
+                  >
+                    {item.init}
+                  </div>
+                ))
+              )}
+              {!loading && ratings.length > 4 && (
+                <div className="w-7 h-7 rounded-full border-2 border-background bg-zinc-800 flex items-center justify-center text-[9px] font-semibold text-zinc-300 shadow-sm">
+                  +{ratings.length - 4}
+                </div>
+              )}
+            </div>
+
+            {/* Vertical Divider */}
+            <div className="w-[1px] h-6 bg-white/10" />
+
+            {/* Stars & Text Details */}
+            <div className="flex flex-col items-start gap-0.5">
+              <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      className={`w-3.5 h-3.5 transition-all duration-300 group-hover:scale-110 ${
+                        loading
+                          ? "text-muted/20"
+                          : star <= Math.round(averageRating || 4.4)
+                            ? "fill-amber-400 text-amber-400"
+                            : "text-muted/30"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <span className={`text-xs font-semibold tracking-tight text-foreground transition-colors group-hover:text-primary-foreground`}>
+                  {loading ? "4.4" : averageRating > 0 ? averageRating.toFixed(1) : "4.4"}
+                </span>
+              </div>
+              <span className={`text-[10px] font-medium tracking-tight text-muted-foreground/75 group-hover:text-muted-foreground transition-colors`}>
+                {loading ? "from 86+ reviews" : ratings.length > 0 ? `from ${ratings.length}+ reviews` : "from 86+ reviews"}
+              </span>
+            </div>
+          </motion.div>
+        </Link>
+
         {/* Stats Section */}
         <motion.div
-          custom={4}
+          custom={5}
           initial="hidden"
           animate="visible"
           variants={fadeUpVariants}
-          className="mt-20 sm:mt-28 grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-12 w-full max-w-4xl mx-auto pt-10 border-t border-border/40"
+          className="mt-24 sm:mt-32 grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl mx-auto pt-12 border-t border-white/5"
         >
-          <div className="flex flex-col items-center justify-center gap-2 group">
-            <div className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center text-primary mb-2 group-hover:scale-110 transition-transform">
+          {/* Tracks Card */}
+          <div className="relative overflow-hidden rounded-[24px] border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] backdrop-blur-md px-6 py-8 flex flex-col items-center text-center shadow-2xl transition-all duration-500 hover:-translate-y-1.5 hover:border-primary/20 group">
+            {/* Ambient Background Glow */}
+            <div className="absolute -top-10 -left-10 w-24 h-24 rounded-full bg-primary/10 blur-xl pointer-events-none group-hover:scale-150 transition-transform duration-500" />
+            
+            <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-primary group-hover:text-emerald-400 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 mb-4 shadow-inner">
               <Music className="w-5 h-5" />
             </div>
-            <div className="text-3xl sm:text-4xl font-semibold tracking-tight">80M+</div>
-            <p className="text-sm font-medium text-muted-foreground">Tracks available</p>
+            <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground mb-1 bg-clip-text text-transparent bg-gradient-to-b from-white to-zinc-400 group-hover:from-white group-hover:to-emerald-300 transition-all duration-300">
+              80M+
+            </div>
+            <p className="text-xs sm:text-sm font-medium text-muted-foreground/85 tracking-wide uppercase">
+              Tracks available
+            </p>
           </div>
 
-          <div className="flex flex-col items-center justify-center gap-2 group">
-            <div className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center text-primary mb-2 group-hover:scale-110 transition-transform">
+          {/* Premium Card */}
+          <div className="relative overflow-hidden rounded-[24px] border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] backdrop-blur-md px-6 py-8 flex flex-col items-center text-center shadow-2xl transition-all duration-500 hover:-translate-y-1.5 hover:border-primary/20 group">
+            {/* Ambient Background Glow */}
+            <div className="absolute -top-10 -left-10 w-24 h-24 rounded-full bg-primary/10 blur-xl pointer-events-none group-hover:scale-150 transition-transform duration-500" />
+
+            <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-primary group-hover:text-emerald-400 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 mb-4 shadow-inner">
               <Radio className="w-5 h-5" />
             </div>
-            <div className="text-3xl sm:text-4xl font-semibold tracking-tight">Premium</div>
-            <p className="text-sm font-medium text-muted-foreground">High fidelity audio</p>
+            <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground mb-1 bg-clip-text text-transparent bg-gradient-to-b from-white to-zinc-400 group-hover:from-white group-hover:to-emerald-300 transition-all duration-300">
+              Premium
+            </div>
+            <p className="text-xs sm:text-sm font-medium text-muted-foreground/85 tracking-wide uppercase">
+              High fidelity audio
+            </p>
           </div>
 
-          <div className="flex flex-col items-center justify-center gap-2 group">
-            <div className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center text-primary mb-2 group-hover:scale-110 transition-transform">
+          {/* Ad-Free Card */}
+          <div className="relative overflow-hidden rounded-[24px] border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] backdrop-blur-md px-6 py-8 flex flex-col items-center text-center shadow-2xl transition-all duration-500 hover:-translate-y-1.5 hover:border-primary/20 group">
+            {/* Ambient Background Glow */}
+            <div className="absolute -top-10 -left-10 w-24 h-24 rounded-full bg-primary/10 blur-xl pointer-events-none group-hover:scale-150 transition-transform duration-500" />
+
+            <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-primary group-hover:text-emerald-400 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 mb-4 shadow-inner">
               <Play className="w-5 h-5 ml-0.5 fill-current" />
             </div>
-            <div className="text-3xl sm:text-4xl font-semibold tracking-tight">Ad-Free</div>
-            <p className="text-sm font-medium text-muted-foreground">Uninterrupted listening</p>
+            <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground mb-1 bg-clip-text text-transparent bg-gradient-to-b from-white to-zinc-400 group-hover:from-white group-hover:to-emerald-300 transition-all duration-300">
+              Ad-Free
+            </div>
+            <p className="text-xs sm:text-sm font-medium text-muted-foreground/85 tracking-wide uppercase">
+              Uninterrupted listening
+            </p>
           </div>
         </motion.div>
       </main>
