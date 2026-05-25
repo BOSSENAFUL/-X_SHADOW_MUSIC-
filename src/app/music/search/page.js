@@ -278,6 +278,7 @@ function SearchPageContent() {
   // All state initializes to server-safe defaults (no sessionStorage access here).
   // Restoration happens in a useEffect after hydration.
   const [searchQuery, setSearchQuery] = useState(initialQuery);
+  const [activeSearchQuery, setActiveSearchQuery] = useState(initialQuery);
   const [searchResults, setSearchResults] = useState(null);
   const [lyricsResults, setLyricsResults] = useState(null);
   const [publicPlaylists, setPublicPlaylists] = useState(null);
@@ -286,6 +287,12 @@ function SearchPageContent() {
   const [publicPlaylistsLoading, setPublicPlaylistsLoading] = useState(false);
   const [loadedSearchQuery, setLoadedSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [focusedSuggestionIndex, setFocusedSuggestionIndex] = useState(-1);
+  const searchWrapperRef = useRef(null);
+  const suggestionsAbortControllerRef = useRef(null);
 
   // State for category-specific results with pagination
   const [categoryData, setCategoryData] = useState({
@@ -311,6 +318,7 @@ function SearchPageContent() {
 
   // Blocks the search effect from firing while we are restoring saved state
   const isRestoringFromStorage = useRef(false);
+  const isRestorationCompleted = useRef(false);
 
   // Hide content from the very first render if we have saved state to restore.
   // This prevents a flash: instead of showing content at scroll=0 and then hiding it,
@@ -343,7 +351,9 @@ function SearchPageContent() {
       if (raw) saved = JSON.parse(raw);
     } catch { /* ignore */ }
 
+
     if (!saved?.query) {
+      isRestorationCompleted.current = true;
       return; // nothing to restore, content already visible
     }
 
@@ -360,6 +370,7 @@ function SearchPageContent() {
 
     // Batch all state updates together
     setSearchQuery(saved.query);
+    setActiveSearchQuery(saved.query || "");
     if (saved.results) setSearchResults(saved.results);
     if (saved.lyricsRes) setLyricsResults(saved.lyricsRes);
     if (saved.publicPlaylists) setPublicPlaylists(saved.publicPlaylists);
@@ -377,6 +388,7 @@ function SearchPageContent() {
         }
         setIsInitialRestore(false);
         isRestoringFromStorage.current = false;
+        isRestorationCompleted.current = true;
       });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -444,6 +456,10 @@ function SearchPageContent() {
     if (prevTabRef.current === activeTab) return; // first render, nothing to do
     prevTabRef.current = activeTab;
 
+    if (isRestoringFromStorage.current) {
+      return; // Skip resetting scroll when restoring tab state from sessionStorage
+    }
+
     // Reset new tab scroll to top
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop = 0;
@@ -474,19 +490,25 @@ function SearchPageContent() {
   const latestStateRef = useRef({});
   useEffect(() => {
     latestStateRef.current = {
-      searchQuery, searchResults, lyricsResults, publicPlaylists,
+      searchQuery, activeSearchQuery, searchResults, lyricsResults, publicPlaylists,
       activeTab, categoryData,
     };
   });
+
 
   // Save state to sessionStorage on unmount (covers all navigation away from this page).
   // This is the single source of truth — no need for beforeunload or per-action saves.
   useEffect(() => {
     return () => {
+      if (!isRestorationCompleted.current) {
+        return;
+      }
+
       const {
         searchQuery: q, searchResults: res, lyricsResults: lyr,
         publicPlaylists: pp, activeTab: tab, categoryData: cat,
       } = latestStateRef.current;
+
 
       if (!q && !res) return; // nothing worth saving
 
@@ -667,192 +689,317 @@ function SearchPageContent() {
     }
   };
 
-  // Create a stable debounced search function
-  const debouncedSearchRef = useRef();
-
-  if (!debouncedSearchRef.current) {
-    debouncedSearchRef.current = debounce(async (query) => {
-      if (!query.trim()) {
-        setSearchResults(null);
-        setLyricsResults(null);
-        setPublicPlaylists(null);
-        setLoading(false);
-        setLyricsLoading(false);
-        setPublicPlaylistsLoading(false);
-        return;
-      }
-
-      // Increment search ID to track this search
-      const searchId = ++currentSearchId.current;
-
-      // Set loading states and clear previous results immediately
-      setLoading(true);
-      setLyricsLoading(true);
-      setPublicPlaylistsLoading(true);
+  // Reusable triggerSearch function
+  const triggerSearch = useCallback(async (query) => {
+    if (!query.trim()) {
       setSearchResults(null);
       setLyricsResults(null);
       setPublicPlaylists(null);
+      setLoading(false);
+      setLyricsLoading(false);
+      setPublicPlaylistsLoading(false);
+      return;
+    }
 
-      // Reset category data on new search
-      setCategoryData({
-        songs: { results: [], page: 0, hasMore: true, loading: false },
-        albums: { results: [], page: 0, hasMore: true, loading: false },
-        artists: { results: [], page: 0, hasMore: true, loading: false },
-        playlists: { results: [], page: 0, hasMore: true, loading: false }
-      });
+    // Increment search ID to track this search
+    const searchId = ++currentSearchId.current;
 
+    // Set loading states and clear previous results immediately
+    setLoading(true);
+    setLyricsLoading(true);
+    setPublicPlaylistsLoading(true);
+    setSearchResults(null);
+    setLyricsResults(null);
+    setPublicPlaylists(null);
+
+    // Reset category data on new search
+    setCategoryData({
+      songs: { results: [], page: 0, hasMore: true, loading: false },
+      albums: { results: [], page: 0, hasMore: true, loading: false },
+      artists: { results: [], page: 0, hasMore: true, loading: false },
+      playlists: { results: [], page: 0, hasMore: true, loading: false }
+    });
+
+    try {
+      // Perform all searches in parallel and wait for all to complete
+      await Promise.allSettled([
+        performSearch(query, searchId),
+        performLyricsSearch(query, searchId),
+        performPublicPlaylistsSearch(query, searchId),
+        // Also fetch full playlists data for the "All" tab
+        (async () => {
+          try {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/playlists?query=${encodeURIComponent(query)}&page=1&limit=20`);
+            const data = await response.json();
+
+            if (searchId === currentSearchId.current && data.success && data.data) {
+              // Calculate hasMore using the same logic as fetchCategoryResults
+              let hasMore = false;
+              if (typeof data.data.total === 'number' && typeof data.data.start === 'number') {
+                hasMore = (data.data.start + data.data.results.length) < data.data.total;
+              } else {
+                hasMore = data.data.results.length === 20;
+              }
+
+              // Update both searchResults.playlists and categoryData.playlists
+              setSearchResults(prev => prev ? {
+                ...prev,
+                playlists: data.data
+              } : prev);
+
+              setCategoryData(prev => ({
+                ...prev,
+                playlists: {
+                  results: data.data.results || [],
+                  page: 1,
+                  hasMore: hasMore,
+                  loading: false
+                }
+              }));
+            }
+          } catch (error) {
+            console.error('Error fetching playlists:', error);
+          }
+        })(),
+        // Also fetch full albums data for the "All" tab
+        (async () => {
+          try {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/albums?query=${encodeURIComponent(query)}&page=1&limit=40`);
+            const data = await response.json();
+
+            if (searchId === currentSearchId.current && data.success && data.data) {
+              // Calculate hasMore using the same logic as fetchCategoryResults
+              let hasMore = false;
+              if (typeof data.data.total === 'number' && typeof data.data.start === 'number') {
+                hasMore = (data.data.start + data.data.results.length) < data.data.total;
+              } else {
+                hasMore = data.data.results.length === 40;
+              }
+
+              // Update both searchResults.albums and categoryData.albums
+              setSearchResults(prev => prev ? {
+                ...prev,
+                albums: data.data
+              } : prev);
+
+              setCategoryData(prev => ({
+                ...prev,
+                albums: {
+                  results: data.data.results || [],
+                  page: 1,
+                  hasMore: hasMore,
+                  loading: false
+                }
+              }));
+            }
+          } catch (error) {
+            console.error('Error fetching albums:', error);
+          }
+        })(),
+        // Also fetch full songs data for the "Songs" tab
+        (async () => {
+          try {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/songs?query=${encodeURIComponent(query)}&page=1&limit=40`);
+            const data = await response.json();
+
+            if (searchId === currentSearchId.current && data.success && data.data) {
+              // Calculate hasMore using the same logic as fetchCategoryResults
+              let hasMore = false;
+              if (typeof data.data.total === 'number' && typeof data.data.start === 'number') {
+                hasMore = (data.data.start + data.data.results.length) < data.data.total;
+              } else {
+                hasMore = data.data.results.length === 40;
+              }
+
+              setCategoryData(prev => ({
+                ...prev,
+                songs: {
+                  results: data.data.results || [],
+                  page: 1,
+                  hasMore: hasMore,
+                  loading: false
+                }
+              }));
+            }
+          } catch (error) {
+            console.error('Error fetching songs:', error);
+          }
+        })(),
+        // Also fetch full artists data for the "Artists" tab
+        (async () => {
+          try {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/artists?query=${encodeURIComponent(query)}&page=1&limit=40`);
+            const data = await response.json();
+
+            if (searchId === currentSearchId.current && data.success && data.data) {
+              // Calculate hasMore using the same logic as fetchCategoryResults
+              let hasMore = false;
+              if (typeof data.data.total === 'number' && typeof data.data.start === 'number') {
+                hasMore = (data.data.start + data.data.results.length) < data.data.total;
+              } else {
+                hasMore = data.data.results.length === 40;
+              }
+
+              setCategoryData(prev => ({
+                ...prev,
+                artists: {
+                  results: data.data.results || [],
+                  page: 1,
+                  hasMore: hasMore,
+                  loading: false
+                }
+              }));
+            }
+          } catch (error) {
+            console.error('Error fetching artists:', error);
+          }
+        })()
+      ]);
+    } catch (error) {
+      console.error('Search error:', error);
+    } finally {
+      // Only set loading to false after ALL searches are complete
+      // Check if this is still the current search before updating loading state
+      if (searchId === currentSearchId.current) {
+        setLoading(false);
+        setLyricsLoading(false);
+        setPublicPlaylistsLoading(false);
+      }
+    }
+  }, []);
+
+  // Debounced fetchSuggestions with AbortController
+  const debouncedFetchSuggestions = useRef(null);
+  if (!debouncedFetchSuggestions.current) {
+    debouncedFetchSuggestions.current = debounce(async (query) => {
+      if (!query.trim()) {
+        setSuggestions([]);
+        return;
+      }
+
+      // Abort any in-flight suggestions requests
+      if (suggestionsAbortControllerRef.current) {
+        suggestionsAbortControllerRef.current.abort();
+      }
+
+      const controller = new AbortController();
+      suggestionsAbortControllerRef.current = controller;
+
+      setSuggestionsLoading(true);
       try {
-        // Perform all searches in parallel and wait for all to complete
-        await Promise.allSettled([
-          performSearch(query, searchId),
-          performLyricsSearch(query, searchId),
-          performPublicPlaylistsSearch(query, searchId),
-          // Also fetch full playlists data for the "All" tab
-          (async () => {
-            try {
-              const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/playlists?query=${encodeURIComponent(query)}&page=1&limit=20`);
-              const data = await response.json();
-
-              if (searchId === currentSearchId.current && data.success && data.data) {
-                // Calculate hasMore using the same logic as fetchCategoryResults
-                let hasMore = false;
-                if (typeof data.data.total === 'number' && typeof data.data.start === 'number') {
-                  hasMore = (data.data.start + data.data.results.length) < data.data.total;
-                } else {
-                  hasMore = data.data.results.length === 20;
-                }
-
-                // Update both searchResults.playlists and categoryData.playlists
-                setSearchResults(prev => prev ? {
-                  ...prev,
-                  playlists: data.data
-                } : prev);
-
-                setCategoryData(prev => ({
-                  ...prev,
-                  playlists: {
-                    results: data.data.results || [],
-                    page: 1,
-                    hasMore: hasMore,
-                    loading: false
-                  }
-                }));
-              }
-            } catch (error) {
-              console.error('Error fetching playlists:', error);
-            }
-          })(),
-          // Also fetch full albums data for the "All" tab
-          (async () => {
-            try {
-              const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/albums?query=${encodeURIComponent(query)}&page=1&limit=40`);
-              const data = await response.json();
-
-              if (searchId === currentSearchId.current && data.success && data.data) {
-                // Calculate hasMore using the same logic as fetchCategoryResults
-                let hasMore = false;
-                if (typeof data.data.total === 'number' && typeof data.data.start === 'number') {
-                  hasMore = (data.data.start + data.data.results.length) < data.data.total;
-                } else {
-                  hasMore = data.data.results.length === 40;
-                }
-
-                // Update both searchResults.albums and categoryData.albums
-                setSearchResults(prev => prev ? {
-                  ...prev,
-                  albums: data.data
-                } : prev);
-
-                setCategoryData(prev => ({
-                  ...prev,
-                  albums: {
-                    results: data.data.results || [],
-                    page: 1,
-                    hasMore: hasMore,
-                    loading: false
-                  }
-                }));
-              }
-            } catch (error) {
-              console.error('Error fetching albums:', error);
-            }
-          })(),
-          // Also fetch full songs data for the "Songs" tab
-          (async () => {
-            try {
-              const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/songs?query=${encodeURIComponent(query)}&page=1&limit=40`);
-              const data = await response.json();
-
-              if (searchId === currentSearchId.current && data.success && data.data) {
-                // Calculate hasMore using the same logic as fetchCategoryResults
-                let hasMore = false;
-                if (typeof data.data.total === 'number' && typeof data.data.start === 'number') {
-                  hasMore = (data.data.start + data.data.results.length) < data.data.total;
-                } else {
-                  hasMore = data.data.results.length === 40;
-                }
-
-                setCategoryData(prev => ({
-                  ...prev,
-                  songs: {
-                    results: data.data.results || [],
-                    page: 1,
-                    hasMore: hasMore,
-                    loading: false
-                  }
-                }));
-              }
-            } catch (error) {
-              console.error('Error fetching songs:', error);
-            }
-          })(),
-          // Also fetch full artists data for the "Artists" tab
-          (async () => {
-            try {
-              const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/artists?query=${encodeURIComponent(query)}&page=1&limit=40`);
-              const data = await response.json();
-
-              if (searchId === currentSearchId.current && data.success && data.data) {
-                // Calculate hasMore using the same logic as fetchCategoryResults
-                let hasMore = false;
-                if (typeof data.data.total === 'number' && typeof data.data.start === 'number') {
-                  hasMore = (data.data.start + data.data.results.length) < data.data.total;
-                } else {
-                  hasMore = data.data.results.length === 40;
-                }
-
-                setCategoryData(prev => ({
-                  ...prev,
-                  artists: {
-                    results: data.data.results || [],
-                    page: 1,
-                    hasMore: hasMore,
-                    loading: false
-                  }
-                }));
-              }
-            } catch (error) {
-              console.error('Error fetching artists:', error);
-            }
-          })()
+        const [searchRes, lyricsRes] = await Promise.all([
+          fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/search?query=${encodeURIComponent(query)}&limit=8`,
+            { signal: controller.signal }
+          ).then(r => r.json()).catch(() => null),
+          fetch(
+            `/api/search-lyrics?q=${encodeURIComponent(query)}`,
+            { signal: controller.signal }
+          ).then(r => r.json()).catch(() => null)
         ]);
+
+        // Check if query is still matching current input
+        if (controller.signal.aborted) return;
+
+        const results = [];
+
+        // 1. Process regular search results
+        if (searchRes && searchRes.success && searchRes.data) {
+          const payload = searchRes.data;
+          
+          if (payload.topQuery?.results?.[0]) {
+            const top = payload.topQuery.results[0];
+            const type = top.type || 'song';
+            let subtitle = 'Unknown Artist';
+            if (type === 'artist') {
+              subtitle = 'Artist';
+            } else if (type === 'album') {
+              const artistVal = getArtistNames(top);
+              subtitle = artistVal && artistVal !== 'Unknown Artist' ? `Album • ${artistVal}` : 'Album';
+            } else {
+              subtitle = getArtistNames(top);
+            }
+            results.push({
+              type: type,
+              text: decodeHtmlEntities(top.title || top.name),
+              subtitle: subtitle,
+              id: top.id,
+              item: top
+            });
+          }
+
+          if (payload.songs?.results) {
+            payload.songs.results.slice(0, 4).forEach(song => {
+              if (results.some(r => r.id === song.id)) return;
+              results.push({
+                type: 'song',
+                text: decodeHtmlEntities(song.title || song.name),
+                subtitle: getArtistNames(song),
+                id: song.id,
+                item: song
+              });
+            });
+          }
+
+          if (payload.artists?.results) {
+            payload.artists.results.slice(0, 2).forEach(artist => {
+              if (results.some(r => r.id === artist.id)) return;
+              results.push({
+                type: 'artist',
+                text: decodeHtmlEntities(artist.title || artist.name),
+                subtitle: 'Artist',
+                id: artist.id,
+                item: artist
+              });
+            });
+          }
+
+          if (payload.albums?.results) {
+            payload.albums.results.slice(0, 2).forEach(album => {
+              if (results.some(r => r.id === album.id)) return;
+              results.push({
+                type: 'album',
+                text: decodeHtmlEntities(album.title || album.name),
+                subtitle: `Album • ${getArtistNames(album)}`,
+                id: album.id,
+                item: album
+              });
+            });
+          }
+        }
+
+        // 2. Process lyrics search results (Genius matching)
+        if (lyricsRes && lyricsRes.success && Array.isArray(lyricsRes.data)) {
+          lyricsRes.data.slice(0, 3).forEach(hit => {
+            const song = hit.jiosaavn;
+            if (!song || results.some(r => r.id === song.id)) return;
+            results.push({
+              type: 'song',
+              text: decodeHtmlEntities(song.title || song.name),
+              subtitle: `Genius Lyrics Match • ${getArtistNames(song)}`,
+              id: song.id,
+              item: song
+            });
+          });
+        }
+
+        setSuggestions(results);
       } catch (error) {
-        console.error('Search error:', error);
+        if (error.name !== 'AbortError') {
+          console.error('Error fetching suggestions:', error);
+          setSuggestions([]);
+        }
       } finally {
-        // Only set loading to false after ALL searches are complete
-        // Check if this is still the current search before updating loading state
-        if (searchId === currentSearchId.current) {
-          setLoading(false);
-          setLyricsLoading(false);
-          setPublicPlaylistsLoading(false);
+        if (!controller.signal.aborted) {
+          setSuggestionsLoading(false);
         }
       }
-    }, 600);
+    }, 200);
   }
 
   // Fetch category results
   const fetchCategoryResults = useCallback(async (category, page = 1) => {
-    if (!searchQuery.trim()) return;
+    if (!activeSearchQuery.trim()) return;
 
     setCategoryData(prev => ({
       ...prev,
@@ -862,7 +1009,7 @@ function SearchPageContent() {
     try {
       // Use the plural endpoint
       // Add p and n parameters for compatibility with different API versions
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/${category}?query=${encodeURIComponent(searchQuery)}&page=${page}&p=${page}&limit=40&n=40`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search/${category}?query=${encodeURIComponent(activeSearchQuery)}&page=${page}&p=${page}&limit=40&n=40`);
       const data = await response.json();
 
       if (data.success && data.data) {
@@ -916,7 +1063,7 @@ function SearchPageContent() {
         [category]: { ...prev[category], loading: false }
       }));
     }
-  }, [searchQuery]);
+  }, [activeSearchQuery]);
 
   // Effect to fetch initial category data when switching tabs
   useEffect(() => {
@@ -1127,36 +1274,118 @@ function SearchPageContent() {
 
   // Handle initial query from URL parameters
   useEffect(() => {
-    if (initialQuery && initialQuery !== searchQuery) {
-      // Only set the search query, let the other useEffect handle the actual search
+    if (initialQuery) {
       setSearchQuery(initialQuery);
+      
+      // Skip initial search if we are restoring state from storage
+      if (isRestoringFromStorage.current) {
+        console.log('Skipping initial search - restoring from sessionStorage');
+        return;
+      }
+      
+      setActiveSearchQuery(initialQuery);
+      triggerSearch(initialQuery);
     }
-  }, [initialQuery]);
+  }, [initialQuery, triggerSearch]);
 
-  // Handle search query changes (both from user input and initial URL query)
+  // Handle typing suggestions and clearing query
   useEffect(() => {
-    // Skip search if we're restoring from sessionStorage
+    // Skip if we're restoring from sessionStorage
     if (isRestoringFromStorage.current) {
-      console.log('Skipping search - restoring from sessionStorage');
       return;
     }
 
-    if (searchQuery.trim()) {
-      // Clear results immediately when starting a new search
+    const query = searchQuery.trim();
+
+    if (!query) {
+      // Input cleared, reset results and suggestions
       setSearchResults(null);
       setLyricsResults(null);
       setPublicPlaylists(null);
-      debouncedSearchRef.current(searchQuery);
-    } else {
-      // Clear results when search query is empty
-      setSearchResults(null);
-      setLyricsResults(null);
-      setPublicPlaylists(null);
+      setSuggestions([]);
+      setActiveSearchQuery("");
+      setLoadedSearchQuery("");
       setLoading(false);
       setLyricsLoading(false);
       setPublicPlaylistsLoading(false);
+      router.push('/music/search', { scroll: false });
+      return;
     }
-  }, [searchQuery]);
+
+    // If query is different from the active search query, fetch suggestions
+    if (query !== activeSearchQuery) {
+      setShowSuggestions(true);
+      setFocusedSuggestionIndex(-1);
+      debouncedFetchSuggestions.current(query);
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  }, [searchQuery, activeSearchQuery, router]);
+
+  // Handle select/search action
+  const executeSelectSearch = useCallback((query) => {
+    const trimmed = query.trim();
+    if (trimmed) {
+      setActiveSearchQuery(trimmed);
+      setSearchQuery(trimmed);
+      setShowSuggestions(false);
+      setFocusedSuggestionIndex(-1);
+      triggerSearch(trimmed);
+      router.push(`/music/search?q=${encodeURIComponent(trimmed)}`, { scroll: false });
+    }
+  }, [router, triggerSearch]);
+
+  // Handle keyboard events on the input field
+  const handleKeyDown = (e) => {
+    if (!showSuggestions || suggestions.length === 0) {
+      if (e.key === 'Enter') {
+        executeSelectSearch(searchQuery);
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setFocusedSuggestionIndex(prev => (prev < suggestions.length - 1 ? prev + 1 : -1));
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setFocusedSuggestionIndex(prev => (prev >= 0 ? prev - 1 : suggestions.length - 1));
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (focusedSuggestionIndex >= 0 && focusedSuggestionIndex < suggestions.length) {
+          executeSelectSearch(suggestions[focusedSuggestionIndex].text);
+        } else {
+          executeSelectSearch(searchQuery);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setShowSuggestions(false);
+        setFocusedSuggestionIndex(-1);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handleSuggestionClick = (suggestionText) => {
+    executeSelectSearch(suggestionText);
+  };
+
+  // Close suggestions on clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchWrapperRef.current && !searchWrapperRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Combine and rank search results from all sources (Direct, Lyrics, Category-specific)
   const combinedSearchResults = React.useMemo(() => {
@@ -1166,7 +1395,7 @@ function SearchPageContent() {
       return null;
     }
 
-    const searchTerm = (searchQuery || "").toLowerCase().trim();
+    const searchTerm = (activeSearchQuery || "").toLowerCase().trim();
     if (!searchTerm) return searchResults;
 
     // 1. Initial State: Start with a clone of regular search results
@@ -1311,7 +1540,7 @@ function SearchPageContent() {
     }
 
     return combined;
-  }, [searchResults, lyricsResults, categoryData, searchQuery, loading, lyricsLoading]);
+  }, [searchResults, lyricsResults, categoryData, activeSearchQuery, loading, lyricsLoading]);
 
   const handlePlayClick = async (song, playlist = []) => {
     try {
@@ -1639,26 +1868,79 @@ function SearchPageContent() {
         >
           {/* Search Input */}
           <div className="p-4 sm:p-6 pb-4">
-            <div className="relative w-full max-w-2xl mx-auto">
-              <Search className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 transition-colors ${(loading || lyricsLoading || publicPlaylistsLoading || (searchQuery.trim() && !combinedSearchResults))
+            <div ref={searchWrapperRef} className="relative w-full max-w-2xl mx-auto">
+              <Search className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 transition-colors ${(loading || lyricsLoading || publicPlaylistsLoading || (activeSearchQuery.trim() && !combinedSearchResults))
                 ? 'text-primary animate-pulse'
                 : 'text-muted-foreground'
                 }`} />
               <Input
                 ref={searchInputRef}
+                role="combobox"
+                aria-expanded={showSuggestions && suggestions.length > 0}
+                aria-autocomplete="list"
+                aria-controls="search-suggestions-listbox"
+                aria-activedescendant={focusedSuggestionIndex >= 0 ? `suggestion-item-${focusedSuggestionIndex}` : undefined}
                 placeholder="What do you want to listen to?"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onFocus={() => setShowSuggestions(true)}
                 className="pl-12 pr-4 bg-muted/50 border-0 h-12 sm:h-14 text-base sm:text-lg rounded-full focus:bg-muted/70 transition-colors"
               />
-              {(loading || lyricsLoading || publicPlaylistsLoading || (searchQuery.trim() && !combinedSearchResults)) && (
+              {(loading || lyricsLoading || publicPlaylistsLoading || (activeSearchQuery.trim() && !combinedSearchResults)) && (
                 <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
                   <div className="animate-spin rounded-full h-5 w-5 border-2 border-primary border-t-transparent"></div>
                 </div>
               )}
+
+              {/* Suggestions Dropdown */}
+              {showSuggestions && searchQuery.trim() && (suggestions.length > 0 || suggestionsLoading) && (
+                <div
+                  id="search-suggestions-listbox"
+                  role="listbox"
+                  className="absolute top-full left-0 right-0 mt-2 bg-[#121212]/95 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 py-2 max-h-[380px] overflow-y-auto"
+                >
+                  {suggestionsLoading && suggestions.length === 0 && (
+                    <div className="flex items-center justify-center py-6 text-muted-foreground text-sm gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent"></div>
+                      <span>Loading suggestions...</span>
+                    </div>
+                  )}
+
+                  {suggestions.map((suggestion, index) => {
+                    const isHighlighted = focusedSuggestionIndex === index;
+                    return (
+                      <div
+                        key={`suggestion-${index}-${suggestion.id || suggestion.text}`}
+                        id={`suggestion-item-${index}`}
+                        role="option"
+                        aria-selected={isHighlighted}
+                        onClick={() => handleSuggestionClick(suggestion.text)}
+                        onMouseEnter={() => setFocusedSuggestionIndex(index)}
+                        className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors text-left ${
+                          isHighlighted ? 'bg-white/10 text-white' : 'hover:bg-white/5 text-muted-foreground hover:text-white'
+                        }`}
+                      >
+                        <div className="shrink-0">
+                          {suggestion.type === 'song' && <Music2 className="w-4 h-4 text-green-400" />}
+                          {suggestion.type === 'artist' && <User className="w-4 h-4 text-blue-400" />}
+                          {suggestion.type === 'album' && <Disc className="w-4 h-4 text-purple-400" />}
+                          {suggestion.type !== 'song' && suggestion.type !== 'artist' && suggestion.type !== 'album' && (
+                            <Search className="w-4 h-4 text-gray-400" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{suggestion.text}</p>
+                          {suggestion.subtitle && (
+                            <p className="text-xs text-muted-foreground truncate mt-0.5">{suggestion.subtitle}</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-
-
           </div>
 
 
@@ -2586,13 +2868,13 @@ function SearchPageContent() {
             </div>
           )}
 
-          {searchQuery && combinedSearchResults && !loading && (
+          {activeSearchQuery && combinedSearchResults && !loading && (
             !combinedSearchResults.songs?.results?.length &&
             !combinedSearchResults.albums?.results?.length &&
             !combinedSearchResults.artists?.results?.length &&
             !combinedSearchResults.playlists?.results?.length && (
               <div className="text-center py-12">
-                <p className="text-muted-foreground">No results found for "{searchQuery}"</p>
+                <p className="text-muted-foreground">No results found for "{activeSearchQuery}"</p>
               </div>
             )
           )}

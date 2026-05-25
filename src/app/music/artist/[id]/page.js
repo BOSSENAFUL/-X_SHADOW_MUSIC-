@@ -1360,103 +1360,185 @@ export default function ArtistPage() {
                     {songs.slice(0, showAllTopSongs ? undefined : 10).map((song, index) => {
                       const isCurrentSong = currentSong?.id === song.id;
                       return (
-                        <div
-                          key={song.id || index}
-                          className={`flex items-center gap-2 md:gap-4 pl-1 pr-0 py-2 rounded hover:bg-muted/50 group cursor-pointer`}
-                          onClick={() => handlePlayClick(song, index)}
-                        >
-                          {/* Play indicator column */}
-                          <div className="w-6 md:w-8 text-center shrink-0">
-                            {isCurrentSong && isPlaying ? (
-                              <div className="flex items-center justify-center">
-                                <div className="flex items-end justify-center gap-0.5 h-3">
-                                  <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
-                                  <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
-                                  <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
-                                  <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
-                                </div>
-                              </div>
-                            ) : isCurrentSong ? (
-                              <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
-                            ) : (
-                              <>
-                                <span className="text-muted-foreground group-hover:hidden text-sm">
-                                  {index + 1}
-                                </span>
-                                <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
-                              </>
-                            )}
-                          </div>
-
-                          {/* Thumbnail */}
-                          <div className="w-12 h-12 md:w-12 md:h-12 rounded bg-muted shrink-0 overflow-hidden">
-                            {song.image?.length > 0 ? (
-                              <img
-                                src={song.image.find(img => img.quality === '500x500')?.url ||
-                                  song.image.find(img => img.quality === '150x150')?.url ||
-                                  song.image[song.image.length - 1]?.url}
-                                alt={song.name}
-                                className="w-full h-full object-cover rounded"
-                                loading="lazy"
-                                onError={(e) => {
-                                  e.target.src = '/default-playlist-image.png';
-                                }}
-                              />
-                            ) : (
-                              <img
-                                src="/default-playlist-image.png"
-                                alt={song.name}
-                                className="w-full h-full object-cover rounded"
-                              />
-                            )}
-                          </div>
-
-                          {/* Song name + album subtitle */}
-                          <div className="flex-1 min-w-0">
-                            <p className={`font-medium truncate text-sm md:text-base ${isCurrentSong ? 'text-green-500' : ''}`}>
-                              {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
-                            </p>
-                            <p
-                              className={`text-xs md:text-sm truncate cursor-pointer ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'}`}
-                              onClick={() => handlePlayClick(song, index)}
-                            >
-                              {song.album?.name || 'Unknown Album'}
-                            </p>
-                          </div>
-
+                        <div key={song.id || index}>
+                          {/* Mobile Layout */}
                           <div
-                            className="w-24 lg:w-32 text-right text-sm text-muted-foreground hidden md:block pr-4 cursor-pointer"
+                            className="flex md:hidden items-center gap-2 pl-1 pr-0 py-2 rounded hover:bg-muted/50 group cursor-pointer"
                             onClick={() => handlePlayClick(song, index)}
                           >
-                            {song.playCount ? Number(song.playCount).toLocaleString() : ''}
+                            {/* Play indicator column */}
+                            <div className="w-6 text-center shrink-0">
+                              {isCurrentSong && isPlaying ? (
+                                <div className="flex items-center justify-center">
+                                  <div className="flex items-end justify-center gap-0.5 h-3">
+                                    <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
+                                    <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
+                                    <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
+                                    <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
+                                  </div>
+                                </div>
+                              ) : isCurrentSong ? (
+                                <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
+                              ) : (
+                                <>
+                                  <span className="text-muted-foreground group-hover:hidden text-sm">
+                                    {index + 1}
+                                  </span>
+                                  <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
+                                </>
+                              )}
+                            </div>
+
+                            {/* Thumbnail */}
+                            <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
+                              {song.image?.length > 0 ? (
+                                <img
+                                  src={song.image.find(img => img.quality === '500x500')?.url ||
+                                    song.image.find(img => img.quality === '150x150')?.url ||
+                                    song.image[song.image.length - 1]?.url}
+                                  alt={song.name}
+                                  className="w-full h-full object-cover rounded"
+                                  loading="lazy"
+                                  onError={(e) => {
+                                    e.target.src = '/default-playlist-image.png';
+                                  }}
+                                />
+                              ) : (
+                                <img
+                                  src="/default-playlist-image.png"
+                                  alt={song.name}
+                                  className="w-full h-full object-cover rounded"
+                                />
+                              )}
+                            </div>
+
+                            {/* Song name + album subtitle */}
+                            <div className="flex-1 min-w-0">
+                              <p className={`font-medium truncate text-sm ${isCurrentSong ? 'text-green-500' : ''}`}>
+                                {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
+                              </p>
+                              <p className={`text-xs truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'}`}>
+                                {song.album?.name || 'Unknown Album'}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <SongActionMenu
+                                song={song}
+                                onAddToPlaylist={handleAddToPlaylist}
+                                onGoToAlbum={handleGoToAlbum}
+                                onDownload={handleDownload}
+                                toggleLike={toggleLike}
+                                isLiked={isLiked}
+                                decodeHtmlEntities={decodeHtmlEntities}
+                              />
+                            </div>
                           </div>
 
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={`h-8 w-8 hidden md:inline-flex shrink-0 p-0 opacity-0 group-hover:opacity-100 transition-opacity ${isLiked(song.id) ? 'text-green-500 hover:text-green-600' : 'text-muted-foreground hover:text-foreground'}`}
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              await toggleLike(song);
-                            }}
+                          {/* Desktop Layout */}
+                          <div
+                            className="hidden md:flex items-center gap-4 pl-1 pr-0 py-2 rounded hover:bg-muted/50 group cursor-pointer"
+                            onClick={() => handlePlayClick(song, index)}
                           >
-                            <Heart className={`w-4 h-4 ${isLiked(song.id) ? 'fill-current' : ''}`} />
-                          </Button>
+                            {/* Play indicator column */}
+                            <div className="w-8 text-center shrink-0">
+                              {isCurrentSong && isPlaying ? (
+                                <div className="flex items-center justify-center">
+                                  <div className="flex items-end justify-center gap-0.5 h-3">
+                                    <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
+                                    <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
+                                    <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
+                                    <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
+                                  </div>
+                                </div>
+                              ) : isCurrentSong ? (
+                                <IoMdPlay className="w-4 h-4 mx-auto text-green-500" />
+                              ) : (
+                                <>
+                                  <span className="text-muted-foreground group-hover:hidden text-sm">
+                                    {index + 1}
+                                  </span>
+                                  <IoMdPlay className="w-4 h-4 mx-auto hidden group-hover:block" />
+                                </>
+                              )}
+                            </div>
 
-                          <div className="w-12 text-center text-sm text-muted-foreground hidden md:block">
-                            {formatDuration(song.duration)}
-                          </div>
+                            {/* Thumbnail */}
+                            <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
+                              {song.image?.length > 0 ? (
+                                <img
+                                  src={song.image.find(img => img.quality === '500x500')?.url ||
+                                    song.image.find(img => img.quality === '150x150')?.url ||
+                                    song.image[song.image.length - 1]?.url}
+                                  alt={song.name}
+                                  className="w-full h-full object-cover rounded"
+                                  loading="lazy"
+                                  onError={(e) => {
+                                    e.target.src = '/default-playlist-image.png';
+                                  }}
+                                />
+                              ) : (
+                                <img
+                                  src="/default-playlist-image.png"
+                                  alt={song.name}
+                                  className="w-full h-full object-cover rounded"
+                                />
+                              )}
+                            </div>
 
-                          <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-                            <SongActionMenu
-                              song={song}
-                              onAddToPlaylist={handleAddToPlaylist}
-                              onGoToAlbum={handleGoToAlbum}
-                              onDownload={handleDownload}
-                              toggleLike={toggleLike}
-                              isLiked={isLiked}
-                              decodeHtmlEntities={decodeHtmlEntities}
-                            />
+                            {/* Song name + album subtitle */}
+                            <div className="flex-1 min-w-0">
+                              <p className={`font-medium truncate text-base ${isCurrentSong ? 'text-green-500' : ''}`}>
+                                <Link
+                                  href={`/music/song/${song.id}`}
+                                  className="hover:underline"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
+                                </Link>
+                              </p>
+                              <p
+                                className={`text-sm truncate cursor-pointer ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'}`}
+                                onClick={() => handlePlayClick(song, index)}
+                              >
+                                {song.album?.name || 'Unknown Album'}
+                              </p>
+                            </div>
+
+                            <div
+                              className="w-24 lg:w-32 text-right text-sm text-muted-foreground pr-4 cursor-pointer"
+                              onClick={() => handlePlayClick(song, index)}
+                            >
+                              {song.playCount ? Number(song.playCount).toLocaleString() : ''}
+                            </div>
+
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={`h-8 w-8 shrink-0 p-0 opacity-0 group-hover:opacity-100 transition-opacity ${isLiked(song.id) ? 'text-green-500 hover:text-green-600' : 'text-muted-foreground hover:text-foreground'}`}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                await toggleLike(song);
+                              }}
+                            >
+                              <Heart className={`w-4 h-4 ${isLiked(song.id) ? 'fill-current' : ''}`} />
+                            </Button>
+
+                            <div className="w-12 text-center text-sm text-muted-foreground">
+                              {formatDuration(song.duration)}
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <SongActionMenu
+                                song={song}
+                                onAddToPlaylist={handleAddToPlaylist}
+                                onGoToAlbum={handleGoToAlbum}
+                                onDownload={handleDownload}
+                                toggleLike={toggleLike}
+                                isLiked={isLiked}
+                                decodeHtmlEntities={decodeHtmlEntities}
+                              />
+                            </div>
                           </div>
                         </div>
                       );

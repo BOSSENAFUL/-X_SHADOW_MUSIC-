@@ -71,17 +71,17 @@ export async function GET(request) {
     // OPTIMIZATION 1: Reduce spell-corrected queries from 8 to 3
     const searchQueries = generateSpellCorrectedQueries(trimmedQuery).slice(0, 3);
 
-    // OPTIMIZATION 2: Search Genius with timeout and limit results
+    // OPTIMIZATION 2: Search Genius multi-search endpoint (including lyrics) with timeout
     const geniusPromises = searchQueries.map(async (searchQuery) => {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1000); // Reduced to 1s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 1200);
 
         const response = await fetch(
-          `https://api.genius.com/search?q=${encodeURIComponent(searchQuery)}&per_page=3`, // Reduced to 3 results
+          `https://genius.com/api/search/multi?q=${encodeURIComponent(searchQuery)}`,
           {
             headers: {
-              'Authorization': `Bearer ${process.env.GENIUS_CLIENT_ACCESS_TOKEN}`,
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             },
             signal: controller.signal
           }
@@ -91,10 +91,39 @@ export async function GET(request) {
 
         if (response.ok) {
           const data = await response.json();
-          return { query: searchQuery, data, isOriginal: searchQuery === trimmedQuery };
+
+          // Parse sections format to standard hits format
+          const hits = [];
+          if (data?.response?.sections) {
+            for (const section of data.response.sections) {
+              if (['top_hit', 'lyric', 'song'].includes(section.type) && section.hits) {
+                for (const hit of section.hits) {
+                  if (hit.type === 'song' && hit.result) {
+                    hits.push(hit);
+                  }
+                }
+              }
+            }
+          }
+
+          // Deduplicate hits by song ID
+          const seen = new Set();
+          const uniqueHits = hits.filter(hit => {
+            if (!hit.result?.id) return false;
+            const id = hit.result.id;
+            if (seen.has(id)) return false;
+            seen.add(id);
+            return true;
+          });
+
+          return {
+            query: searchQuery,
+            data: { response: { hits: uniqueHits } },
+            isOriginal: searchQuery === trimmedQuery
+          };
         }
       } catch (error) {
-        // Silent error handling
+        console.error('Error fetching Genius multi search:', error);
       }
       return null;
     });

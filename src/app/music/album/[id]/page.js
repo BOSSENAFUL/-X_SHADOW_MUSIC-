@@ -1171,13 +1171,7 @@ export default function AlbumPage() {
                         <div className="min-w-0 flex-1">
                           <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''
                             }`}>
-                            <Link
-                              href={`/music/song/${song.id}`}
-                              className="hover:underline"
-                              onClick={e => e.stopPropagation()}
-                            >
-                              {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
-                            </Link>
+                            {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
                           </p>
                           <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
                             }`}>
@@ -1271,7 +1265,13 @@ export default function AlbumPage() {
                           <div className="min-w-0">
                             <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''
                               }`}>
-                              {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
+                              <Link
+                                href={`/music/song/${song.id}`}
+                                className="hover:underline"
+                                onClick={e => e.stopPropagation()}
+                              >
+                                {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
+                              </Link>
                             </p>
                             <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
                               }`}>
