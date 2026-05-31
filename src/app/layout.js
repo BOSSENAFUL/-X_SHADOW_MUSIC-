@@ -14,6 +14,7 @@ import AppRating from "@/components/app-rating";
 import { RouteChangeHandler } from "@/components/analytics/RouteChangeHandler";
 import { Toaster } from "@/components/ui/sonner";
 import JsonLd from "@/components/json-ld";
+import Script from "next/script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -152,6 +153,13 @@ export default function RootLayout({ children }) {
         className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-x-hidden`}
         suppressHydrationWarning
       >
+        {/* Umami Analytics */}
+        <Script
+          defer
+          src="https://cloud.umami.is/script.js"
+          data-website-id="d2f0f415-eae0-419d-932f-aace6c3d22e8"
+          strategy="afterInteractive"
+        />
         {/* Sitewide structured data — WebApplication schema */}
         <JsonLd data={webAppSchema} />
         <AuthProvider>
