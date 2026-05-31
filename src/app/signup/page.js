@@ -2,13 +2,20 @@ import SignupForm from "@/components/signup-form";
 
 
 export const metadata = {
-  title: "Sign Up - Jammify",
-  description: "Create your Jammify account",
+  alternates: {
+    canonical: "/signup",
+  },
+  title: "Create Free Account — Start Streaming Music",
+  description: "Create your free Jammify account and start streaming 80M+ songs with no ads. Import Spotify playlists, build your library, and enjoy high-fidelity audio.",
+  openGraph: {
+    title: "Create Free Account | Jammify",
+    description: "Join Jammify for free and stream 80M+ songs — no ads, Spotify import, live lyrics, and lossless audio.",
+  },
 };
 
 export default function SignupPage() {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 font-editorial">
 
 
       <div className="w-full max-w-md">

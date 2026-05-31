@@ -5,6 +5,7 @@ import { Star, User, ArrowLeft, MessageSquareQuote } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { getOptimizedAvatar } from '@/lib/utils';
 
 export default function ReviewsPage() {
     const [ratings, setRatings] = useState([]);
@@ -52,7 +53,7 @@ export default function ReviewsPage() {
     };
 
     return (
-        <div className="min-h-svh bg-background text-foreground selection:bg-primary/20 pt-20 pb-16 px-4 sm:px-6 md:px-12">
+        <div className="min-h-svh bg-background text-foreground selection:bg-primary/20 pt-20 pb-16 px-4 sm:px-6 md:px-12 font-editorial">
             <div className="max-w-7xl mx-auto">
                 <div className="mb-10 sm:mb-16">
                     <Link href="/" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors mb-6 group">
@@ -101,14 +102,14 @@ export default function ReviewsPage() {
                     <>
                         {/* Short Reviews Grid - Now horizontal and perfectly aligned since huge items are removed */}
                         {shortReviews.length > 0 && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8">
+                            <div className="columns-1 md:columns-2 lg:columns-3 xl:columns-4 gap-6 sm:gap-8 [column-fill:balance]">
                                 {shortReviews.map((rating, index) => (
                                     <motion.div
                                         key={`short-${rating._id || index}`}
                                         initial={{ opacity: 0, scale: 0.98, y: 15 }}
                                         animate={{ opacity: 1, scale: 1, y: 0 }}
                                         transition={{ duration: 0.5, delay: index * 0.05, ease: [0.16, 1, 0.3, 1] }}
-                                        className="bg-foreground/2 border border-foreground/10 rounded-[28px] p-6 flex flex-col hover:bg-foreground/5 transition-colors duration-300 shadow-sm h-full"
+                                        className="break-inside-avoid mb-6 sm:mb-8 w-full bg-foreground/2 border border-foreground/10 rounded-[28px] p-6 flex flex-col hover:bg-foreground/5 transition-colors duration-300 shadow-sm"
                                     >
                                         <div className="flex-1 space-y-5">
                                             <div className="flex gap-1 mb-2">
@@ -127,7 +128,7 @@ export default function ReviewsPage() {
                                         <div className="flex items-center gap-3 mt-6">
                                             <Avatar className="w-10 h-10 border border-border/10 bg-background/50">
                                                 <AvatarImage
-                                                    src={rating.user?.image || `https://api.dicebear.com/9.x/initials/svg?seed=${rating.user?.name || "User"}`}
+                                                    src={getOptimizedAvatar(rating.user?.image || `https://api.dicebear.com/9.x/initials/svg?seed=${rating.user?.name || "User"}`, 48)}
                                                     alt={rating.user?.name || "User"}
                                                     className="object-cover"
                                                 />
@@ -164,7 +165,7 @@ export default function ReviewsPage() {
                                             <div className="flex flex-row md:flex-col items-center md:items-start gap-4 md:gap-3 md:min-w-[140px] md:pr-6 md:border-r border-border/10">
                                                 <Avatar className="w-12 h-12 md:w-16 md:h-16 border border-border/20 bg-background shadow-sm">
                                                     <AvatarImage
-                                                        src={rating.user?.image || `https://api.dicebear.com/9.x/initials/svg?seed=${rating.user?.name || "User"}`}
+                                                        src={getOptimizedAvatar(rating.user?.image || `https://api.dicebear.com/9.x/initials/svg?seed=${rating.user?.name || "User"}`, 64)}
                                                         alt={rating.user?.name || "User"}
                                                         className="object-cover"
                                                     />

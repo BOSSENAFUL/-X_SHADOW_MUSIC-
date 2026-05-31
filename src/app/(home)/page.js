@@ -9,6 +9,7 @@ import { Download, Play, Music, Radio, ChevronRight, Star, User } from "lucide-r
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getOptimizedAvatar } from "@/lib/utils";
 
 export default function Home() {
   const [ratings, setRatings] = useState([]);
@@ -47,10 +48,10 @@ export default function Home() {
   };
 
   return (
-    <div className="relative min-h-screen bg-background text-foreground overflow-hidden selection:bg-primary/20">
+    <div className="relative min-h-screen bg-background text-foreground overflow-hidden selection:bg-primary/20 font-editorial">
       {/* Premium Minimal Background Effects */}
       <div className="absolute top-0 inset-x-0 h-screen bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(0,98,57,0.18),transparent)] pointer-events-none -z-10" />
-      <div className="absolute top-0 inset-x-0 h-[800px] bg-[linear-gradient(to_right,rgba(255,255,255,0.01)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.01)_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none -z-10" />
+      <div className="absolute top-0 inset-x-0 h-[800px] bg-[linear-gradient(to_right,rgba(255,255,255,0.01)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.01)_1px,transparent_1px)] bg-size-[3.5rem_3.5rem] mask-[radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none -z-10" />
 
       {/* Header */}
       <motion.header
@@ -67,16 +68,22 @@ export default function Home() {
             <span className="text-xl font-semibold tracking-tight">Jammify</span>
           </Link>
 
-          <nav className="flex items-center gap-2 sm:gap-6">
+          <nav className="flex items-center gap-1.5 sm:gap-6">
             <Link
               href="/features"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-2 py-2"
+              className="text-xs sm:text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-1.5 sm:px-2 py-2"
             >
               Features
             </Link>
             <Link
+              href="/blog"
+              className="text-xs sm:text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-1.5 sm:px-2 py-2"
+            >
+              Blog
+            </Link>
+            <Link
               href="/music"
-              className="inline-flex h-9 sm:h-10 items-center justify-center rounded-full bg-primary/10 px-4 sm:px-6 text-sm font-medium text-primary transition-colors hover:bg-primary/20"
+              className="inline-flex h-8 sm:h-10 items-center justify-center rounded-full bg-primary/10 px-3 sm:px-6 text-xs sm:text-sm font-medium text-primary transition-colors hover:bg-primary/20"
             >
               Web Player
             </Link>
@@ -95,16 +102,16 @@ export default function Home() {
           variants={fadeUpVariants}
           className="mb-8"
         >
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] backdrop-blur-md px-4 py-1.5 text-xs sm:text-sm font-medium text-zinc-300 shadow-xl hover:border-emerald-500/30 hover:bg-white/[0.05] transition-all duration-300 cursor-default select-none group/badge">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/3 backdrop-blur-md px-4 py-1.5 text-xs sm:text-sm font-medium text-zinc-300 shadow-xl hover:border-emerald-500/30 hover:bg-white/5 transition-all duration-300 cursor-default select-none group/badge">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span className="tracking-wide font-semibold text-zinc-300 group-hover/badge:text-white transition-colors">Experience Jammify 2.0</span>
+            <span className="tracking-wide font-semibold text-zinc-300 group-hover/badge:text-white transition-colors">Free Music Streaming &mdash; No Ads, Ever</span>
           </div>
         </motion.div>
 
-        {/* Hero Text */}
+        {/* Hero Text — keyword-targeted H1 */}
         <motion.h1
           custom={1}
           initial="hidden"
@@ -112,11 +119,11 @@ export default function Home() {
           variants={fadeUpVariants}
           className="mb-6 sm:mb-8 text-4xl sm:text-6xl md:text-8xl font-black tracking-tighter leading-[1.05] max-w-5xl pb-2 text-balance text-center"
         >
-          <span className="bg-clip-text text-transparent bg-gradient-to-b from-white via-white to-zinc-400">
-            Music, exactly
+          <span className="bg-clip-text text-transparent bg-linear-to-b from-white via-white to-zinc-400">
+            Stream Music Free
           </span>{" "}
-          <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-400">
-            how it should be.
+          <span className="bg-clip-text text-transparent bg-linear-to-r from-emerald-400 via-emerald-500 to-teal-400">
+            80M+ Songs, No Ads.
           </span>
         </motion.h1>
 
@@ -127,7 +134,7 @@ export default function Home() {
           variants={fadeUpVariants}
           className="mb-10 sm:mb-12 text-base sm:text-lg md:text-xl text-zinc-400/90 max-w-3xl mx-auto font-light leading-relaxed tracking-wide text-balance text-center"
         >
-          Stream millions of songs in pristine, lossless quality. A beautifully crafted player designed for true music lovers. Uninterrupted, pure sound.
+          The cleanest free music streaming app online. Import Spotify playlists, enjoy lossless 320kbps audio, and get live synchronized lyrics &mdash; completely ad-free.
         </motion.p>
 
         {/* CTA Buttons */}
@@ -140,19 +147,21 @@ export default function Home() {
         >
           <Link
             href="/music"
-            className="group w-full sm:w-auto inline-flex h-12 sm:h-14 items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 via-emerald-600 to-primary px-8 text-sm sm:text-base font-semibold text-white shadow-xl hover:scale-[1.02] hover:shadow-[0_0_24px_rgba(16,185,129,0.3)] active:scale-[0.98] transition-all duration-300"
+            className="group w-full sm:w-auto inline-flex h-12 sm:h-14 items-center justify-center rounded-full bg-linear-to-r from-emerald-500 via-emerald-600 to-primary px-8 text-sm sm:text-base font-semibold text-white shadow-xl hover:scale-[1.02] hover:shadow-[0_0_24px_rgba(16,185,129,0.3)] active:scale-[0.98] transition-all duration-300"
+            aria-label="Listen to music online free — open Jammify web player"
           >
-            Launch Web Player
+            Listen Free Now
             <ChevronRight className="ml-1.5 w-4 h-4 sm:w-5 sm:h-5 transition-transform group-hover:translate-x-1" />
           </Link>
 
           <a
             href="/Jammify.apk"
             download="Jammify.apk"
-            className="group w-full sm:w-auto inline-flex h-12 sm:h-14 items-center justify-center rounded-full border border-white/10 bg-white/[0.02] backdrop-blur-md px-8 text-sm sm:text-base font-medium text-white shadow-lg hover:bg-white/[0.06] hover:border-white/20 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+            className="group w-full sm:w-auto inline-flex h-12 sm:h-14 items-center justify-center rounded-full border border-white/10 bg-white/2 backdrop-blur-md px-8 text-sm sm:text-base font-medium text-white shadow-lg hover:bg-white/6 hover:border-white/20 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+            aria-label="Download Jammify Android app free"
           >
             <Download className="mr-2 w-4 h-4 sm:w-5 sm:h-5 text-zinc-400 transition-colors group-hover:text-white" />
-            Download App
+            Download Free App
           </a>
         </motion.div>
 
@@ -175,7 +184,7 @@ export default function Home() {
                 ratings.slice(0, 4).map((rating, idx) => (
                   <Avatar key={idx} className="w-7 h-7 border-2 border-background bg-zinc-800 shadow-sm transition-transform group-hover:translate-x-0.5">
                     <AvatarImage
-                      src={rating.user?.image || `https://api.dicebear.com/9.x/initials/svg?seed=${rating.user?.name || "User"}`}
+                      src={getOptimizedAvatar(rating.user?.image || `https://api.dicebear.com/9.x/initials/svg?seed=${rating.user?.name || "User"}`, 48)}
                       alt={rating.user?.name || "User"}
                     />
                     <AvatarFallback className="bg-zinc-700 text-white text-[9px] font-bold">
@@ -193,7 +202,7 @@ export default function Home() {
                 ].map((item, idx) => (
                   <div
                     key={idx}
-                    className={`w-7 h-7 rounded-full border-2 border-background bg-gradient-to-tr ${item.grad} flex items-center justify-center text-[9px] font-bold text-white shadow-sm`}
+                    className={`w-7 h-7 rounded-full border-2 border-background bg-linear-to-tr ${item.grad} flex items-center justify-center text-[9px] font-bold text-white shadow-sm`}
                   >
                     {item.init}
                   </div>
@@ -207,7 +216,7 @@ export default function Home() {
             </div>
 
             {/* Vertical Divider */}
-            <div className="w-[1px] h-6 bg-white/10" />
+            <div className="w-px h-6 bg-white/10" />
 
             {/* Stars & Text Details */}
             <div className="flex flex-col items-start gap-0.5">
@@ -245,58 +254,52 @@ export default function Home() {
           variants={fadeUpVariants}
           className="mt-24 sm:mt-32 grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl mx-auto pt-12 border-t border-white/5"
         >
-          {/* Tracks Card */}
-          <div className="relative overflow-hidden rounded-[24px] border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] backdrop-blur-md px-6 py-8 flex flex-col items-center text-center shadow-2xl transition-all duration-500 hover:-translate-y-1.5 hover:border-primary/20 group">
-            {/* Ambient Background Glow */}
+          {/* Songs Card */}
+          <div className="relative overflow-hidden rounded-3xl border border-white/5 bg-white/1 hover:bg-white/3 backdrop-blur-md px-6 py-8 flex flex-col items-center text-center shadow-2xl transition-all duration-500 hover:-translate-y-1.5 hover:border-primary/20 group">
             <div className="absolute -top-10 -left-10 w-24 h-24 rounded-full bg-primary/10 blur-xl pointer-events-none group-hover:scale-150 transition-transform duration-500" />
-            
-            <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-primary group-hover:text-emerald-400 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 mb-4 shadow-inner">
+            <div className="w-12 h-12 rounded-2xl bg-white/3 border border-white/10 flex items-center justify-center text-primary group-hover:text-emerald-400 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 mb-4 shadow-inner">
               <Music className="w-5 h-5" />
             </div>
-            <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground mb-1 bg-clip-text text-transparent bg-gradient-to-b from-white to-zinc-400 group-hover:from-white group-hover:to-emerald-300 transition-all duration-300">
+            <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground mb-1 bg-clip-text bg-linear-to-b from-white to-zinc-400 group-hover:from-white group-hover:to-emerald-300 transition-all duration-300">
               80M+
             </div>
             <p className="text-xs sm:text-sm font-medium text-muted-foreground/85 tracking-wide uppercase">
-              Tracks available
+              Songs to stream free
             </p>
           </div>
 
-          {/* Premium Card */}
-          <div className="relative overflow-hidden rounded-[24px] border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] backdrop-blur-md px-6 py-8 flex flex-col items-center text-center shadow-2xl transition-all duration-500 hover:-translate-y-1.5 hover:border-primary/20 group">
-            {/* Ambient Background Glow */}
+          {/* Lossless Audio Card */}
+          <div className="relative overflow-hidden rounded-3xl border border-white/5 bg-white/1 hover:bg-white/3 backdrop-blur-md px-6 py-8 flex flex-col items-center text-center shadow-2xl transition-all duration-500 hover:-translate-y-1.5 hover:border-primary/20 group">
             <div className="absolute -top-10 -left-10 w-24 h-24 rounded-full bg-primary/10 blur-xl pointer-events-none group-hover:scale-150 transition-transform duration-500" />
-
-            <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-primary group-hover:text-emerald-400 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 mb-4 shadow-inner">
+            <div className="w-12 h-12 rounded-2xl bg-white/3 border border-white/10 flex items-center justify-center text-primary group-hover:text-emerald-400 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 mb-4 shadow-inner">
               <Radio className="w-5 h-5" />
             </div>
-            <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground mb-1 bg-clip-text text-transparent bg-gradient-to-b from-white to-zinc-400 group-hover:from-white group-hover:to-emerald-300 transition-all duration-300">
-              Premium
+            <div className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-1 bg-clip-text text-transparent bg-linear-to-b from-white to-zinc-400 group-hover:from-white group-hover:to-emerald-300 transition-all duration-300">
+              320kbps
             </div>
             <p className="text-xs sm:text-sm font-medium text-muted-foreground/85 tracking-wide uppercase">
-              High fidelity audio
+              Lossless audio, free
             </p>
           </div>
 
           {/* Ad-Free Card */}
-          <div className="relative overflow-hidden rounded-[24px] border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] backdrop-blur-md px-6 py-8 flex flex-col items-center text-center shadow-2xl transition-all duration-500 hover:-translate-y-1.5 hover:border-primary/20 group">
-            {/* Ambient Background Glow */}
+          <div className="relative overflow-hidden rounded-3xl border border-white/5 bg-white/1 hover:bg-white/3 backdrop-blur-md px-6 py-8 flex flex-col items-center text-center shadow-2xl transition-all duration-500 hover:-translate-y-1.5 hover:border-primary/20 group">
             <div className="absolute -top-10 -left-10 w-24 h-24 rounded-full bg-primary/10 blur-xl pointer-events-none group-hover:scale-150 transition-transform duration-500" />
-
-            <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-primary group-hover:text-emerald-400 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 mb-4 shadow-inner">
+            <div className="w-12 h-12 rounded-2xl bg-white/3 border border-white/10 flex items-center justify-center text-primary group-hover:text-emerald-400 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 mb-4 shadow-inner">
               <Play className="w-5 h-5 ml-0.5 fill-current" />
             </div>
-            <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground mb-1 bg-clip-text text-transparent bg-gradient-to-b from-white to-zinc-400 group-hover:from-white group-hover:to-emerald-300 transition-all duration-300">
-              Ad-Free
+            <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground mb-1 bg-clip-text bg-linear-to-b from-white to-zinc-400 group-hover:from-white group-hover:to-emerald-300 transition-all duration-300">
+              Zero Ads
             </div>
             <p className="text-xs sm:text-sm font-medium text-muted-foreground/85 tracking-wide uppercase">
-              Uninterrupted listening
+              No ads, ever. 100% free.
             </p>
           </div>
         </motion.div>
       </main>
 
       {/* Additional Features / Lower Fold */}
-      <div className="relative z-10 bg-background pt-10 pb-20 border-t border-border/20">
+      <div className="relative z-10 bg-background pt-10 pb-20">
         <UserReviews />
         <AppPreview />
         <FaqSection />

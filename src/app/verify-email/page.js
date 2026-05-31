@@ -2,13 +2,16 @@ import VerifyEmailForm from "@/components/verify-email-form";
 
 
 export const metadata = {
+    alternates: {
+        canonical: "/verify-email",
+    },
     title: "Verify Email - Jammify",
     description: "Verify your email address",
 };
 
 export default function VerifyEmailPage() {
     return (
-        <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="min-h-screen bg-background flex items-center justify-center p-4 font-editorial">
 
 
             <div className="w-full max-w-md">

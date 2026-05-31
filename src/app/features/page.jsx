@@ -43,54 +43,63 @@ const FeaturesPage = () => {
     {
       title: "Premium Audio",
       description: "Stream over 80 million songs in crystal-clear 320kbps high-quality audio fetching.",
+      details: "Unlike compressed audio on most free apps, Jammify fetches high-fidelity streams directly via the JioSaavn API, giving you lossless-quality listening at no cost.",
       icon: <Music className="w-6 h-6 transition-transform" />,
       badge: "High Fidelity"
     },
     {
       title: "Smart Discovery",
       description: "Fuzzy search with intelligent ranking for exact names, lyrics matches, and artist patterns.",
+      details: "By indexing tracks with custom client-side heuristics, our search parses typos, phonetics, and local regional languages instantly to connect you with the exact audio tracks you want.",
       icon: <Search className="w-6 h-6 transition-transform" />,
       badge: "Intuitive"
     },
     {
       title: "Spotify Import",
       description: "Seamlessly migrate your favorite Spotify playlists into Jammify with a single click or link.",
+      details: "No need to manually rebuild your playlists. Our migration pipeline queries the Spotify Web API to resolve track mappings instantly, populating your personal Jammify database in seconds.",
       icon: <Radio className="w-6 h-6 transition-transform" />,
       badge: "Migration"
     },
     {
       title: "Ambient Visuals",
       description: "A gorgeous UI with ambient gradient backgrounds that adapt dynamically to your music.",
+      details: "Enjoy a truly sensory music experience. The UI reads album art data in real-time to generate vibrant background mesh gradients, turning audio sessions into dynamic visual showcases.",
       icon: <Layers className="w-6 h-6 transition-transform" />,
       badge: "Adaptive"
     },
     {
       title: "Universal Access",
       description: "Full PWA support. Install Jammify on your desktop or mobile for a seamless app-like experience.",
+      details: "Built using Progressive Web App (PWA) standards, Jammify runs on Windows, macOS, iOS, and Android. Run it straight from your browser or pin it to your home screen for full app performance.",
       icon: <Smartphone className="w-6 h-6 transition-transform" />,
       badge: "PWA"
     },
     {
       title: "Personal Library",
       description: "Save your favorite tracks, create custom playlists, and track your listening history effortlessly.",
+      details: "All your playlists and favorites are preserved across sessions. We organize your curated tracks locally and back them up in our database, making your library portable and secure.",
       icon: <Heart className="w-6 h-6 transition-transform" />,
       badge: "Personalized"
     },
     {
       title: "Live Lyrics",
       description: "Get synchronized, real-time lyrics for millions of tracks to sing along with your favorite artists.",
+      details: "Follow along with temporal synchronized LRC format lyrics. Our playback system syncs with the current audio timestamp to show line-by-line lyrics so you can read, sing, and learn.",
       icon: <History className="w-6 h-6 transition-transform" />,
       badge: "Synchronized"
     },
     {
       title: "Social Sharing",
       description: "Share your favorite tracks or entire playlists with friends instantly via uniquely generated links.",
+      details: "Generate direct-play links for any track or public playlist. Recipients can load your shared tracks instantly on mobile or desktop without needing a registration or login.",
       icon: <Sparkles className="w-6 h-6 transition-transform" />,
       badge: "Community"
     },
     {
       title: "Global Radio",
       description: "Tune into live radio stations from across the globe, bringing world music to your fingertips.",
+      details: "Explore live streaming directories from around the world. Stream international regional broadcasts directly over standard HTTP protocols, bringing global audio cultures to your device.",
       icon: <Globe className="w-6 h-6 transition-transform" />,
       badge: "Worldwide"
     }
@@ -120,7 +129,7 @@ const FeaturesPage = () => {
   ];
 
   return (
-    <div className="min-h-svh bg-background text-foreground pb-20 md:pb-32 selection:bg-primary/20 relative overflow-hidden">
+    <div className="min-h-svh bg-background text-foreground pb-20 md:pb-32 selection:bg-primary/20 relative overflow-hidden font-editorial">
       {/* Background Ambient Effect */}
       <div className="absolute top-0 inset-x-0 h-screen bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(0,98,57,0.18),transparent)] pointer-events-none z-0" />
       <div className="absolute top-0 inset-x-0 h-[800px] bg-[linear-gradient(to_right,rgba(255,255,255,0.01)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.01)_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none z-0" />
@@ -137,21 +146,20 @@ const FeaturesPage = () => {
           >
             <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-emerald-500/10 bg-emerald-500/5 px-4 py-1.5 text-xs sm:text-sm font-semibold tracking-wide text-emerald-400 select-none">
               <Sparkles className="w-4 h-4" />
-              <span>What's New in Jammify</span>
+              <span>Free Music Streaming App &mdash; No Ads</span>
             </div>
             
             <h1 className="text-4xl sm:text-7xl md:text-8xl font-black tracking-tighter mb-8 leading-[1.05] pb-2 text-balance text-center">
               <span className="bg-clip-text text-transparent bg-gradient-to-b from-white via-white to-zinc-400">
-                Music Experience,
+                Free Music Streaming
               </span>{" "}
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-400">
-                Redefined.
+                Without the Ads.
               </span>
             </h1>
             
             <p className="text-base sm:text-lg md:text-xl text-zinc-400/90 font-light max-w-3xl mx-auto mb-12 leading-relaxed tracking-wide text-balance text-center">
-              Discover the perfect blend of aesthetic design and powerful performance.
-              Jammify isn't just a music player; it's a statement.
+              Import Spotify playlists in one click, stream lossless 320kbps music free, get synchronized live lyrics &mdash; and zero ads, always. Jammify is the Spotify alternative that doesn&apos;t cost a thing.
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto">
@@ -173,8 +181,8 @@ const FeaturesPage = () => {
         {/* Features Grid */}
         <section className="mb-32">
           <div className="mb-12">
-            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-3 text-foreground">Platform Features</h2>
-            <p className="text-zinc-400/95 text-lg font-light">Everything you need for a premium streaming experience.</p>
+            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-3 text-foreground">Everything You Get &mdash; 100% Free</h2>
+            <p className="text-zinc-400/95 text-lg font-light">Lossless audio, Spotify import, live lyrics, no ads &mdash; all included at zero cost.</p>
           </div>
 
           <motion.div
@@ -204,6 +212,11 @@ const FeaturesPage = () => {
                     <p className="text-base text-zinc-400/90 leading-relaxed font-light z-10">
                       {feature.description}
                     </p>
+                    {feature.details && (
+                      <p className="mt-4 text-sm text-zinc-500 leading-relaxed font-light z-10 border-t border-white/5 pt-4">
+                        {feature.details}
+                      </p>
+                    )}
                 </div>
               </motion.div>
             ))}
@@ -216,10 +229,9 @@ const FeaturesPage = () => {
           
           <div className="max-w-4xl mx-auto relative z-10">
             <div className="text-center mb-16 sm:mb-20">
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-b from-white to-zinc-400 pb-2">Our Core Values</h2>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-b from-white to-zinc-400 pb-2">Why Choose Jammify Over Spotify?</h2>
               <p className="text-lg sm:text-xl text-zinc-400/90 font-light leading-relaxed max-w-2xl mx-auto">
-                We believe that great software is built at the intersection of extreme performance,
-                beautiful aesthetics, and deep user respect.
+                No subscription, no ads, no compromises. We built Jammify because great music streaming should be free &mdash; forever.
               </p>
             </div>
 
@@ -249,13 +261,13 @@ const FeaturesPage = () => {
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
             viewport={{ once: true, margin: "-50px" }}
           >
-            <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tighter mb-6 bg-clip-text text-transparent bg-gradient-to-b from-white to-zinc-400 pb-2">Ready to tune in?</h2>
+            <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tighter mb-6 bg-clip-text text-transparent bg-gradient-to-b from-white to-zinc-400 pb-2">Start Streaming Free — No Ads, No Sign‑up</h2>
             <p className="text-lg text-zinc-400/90 font-light mb-10 max-w-lg mx-auto leading-relaxed">
-              Join thousands of users enjoying a cleaner, faster, and more beautiful way to stream music.
+              Join thousands of listeners streaming 80M+ songs free with lossless audio, Spotify import, and live lyrics &mdash; on any device, zero cost.
             </p>
-            <Link href="/music">
+            <Link href="/music" aria-label="Listen to music online free on Jammify">
               <button className="group inline-flex h-14 items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 via-emerald-600 to-primary px-10 text-lg font-semibold text-white shadow-xl hover:scale-[1.02] hover:shadow-[0_0_24px_rgba(16,185,129,0.3)] active:scale-[0.98] transition-all duration-300">
-                Explore Music Now
+                Listen Free Now
               </button>
             </Link>
           </motion.div>

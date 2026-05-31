@@ -2,13 +2,16 @@ import ForgotPasswordForm from "@/components/forgot-password-form";
 
 
 export const metadata = {
+  alternates: {
+    canonical: "/forgot-password",
+  },
   title: "Forgot Password - Jammify",
   description: "Reset your Jammify password",
 };
 
 export default function ForgotPasswordPage() {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 font-editorial">
 
 
       <div className="w-full max-w-md">

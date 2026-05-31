@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Star, User } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Link from 'next/link';
+import { getOptimizedAvatar } from '@/lib/utils';
 
 const UserReviews = () => {
     const [ratings, setRatings] = useState([]);
@@ -96,7 +97,7 @@ const UserReviews = () => {
                                 <div className="flex items-center gap-3 pt-4 border-t border-white/5">
                                     <Avatar className="w-10 h-10 border border-white/10 bg-background/50">
                                         <AvatarImage
-                                            src={rating.user?.image || `https://api.dicebear.com/9.x/initials/svg?seed=${rating.user?.name || "User"}`}
+                                            src={getOptimizedAvatar(rating.user?.image || `https://api.dicebear.com/9.x/initials/svg?seed=${rating.user?.name || "User"}`, 48)}
                                             alt={rating.user?.name || "User"}
                                             className="object-cover"
                                         />
