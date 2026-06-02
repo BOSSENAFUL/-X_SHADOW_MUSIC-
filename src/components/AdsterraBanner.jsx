@@ -45,7 +45,7 @@ export default function AdsterraBanner({ width, height, adKey }) {
             'params' : {}
           };
         </script>
-        <script type="text/javascript" src="//www.highperformanceformat.com/${adKey}/invoke.js"></script>
+        <script type="text/javascript" src="//www.assistedtogether.com/${adKey}/invoke.js"></script>
       </body>
     </html>
   `;
