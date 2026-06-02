@@ -3,6 +3,7 @@
 import { useSession, signOut } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
+import AdsterraBanner from "@/components/AdsterraBanner";
 import {
   SidebarInset,
   SidebarProvider,
@@ -296,6 +297,9 @@ export default function ProfilePage() {
 
             {/* Content Section */}
             <div className="px-6 py-6 space-y-8">
+              
+              {/* Adsterra 300x250 Box Banner */}
+              <AdsterraBanner width={300} height={250} adKey="cf722b4afa051a8fa9446f062dccfa49" />
 
               {/* Created Playlists */}
               <section>

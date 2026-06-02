@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { AppSidebar } from "@/components/app-sidebar"
+import AdsterraBanner from "@/components/AdsterraBanner"
 import {
   SidebarInset,
   SidebarProvider,
@@ -435,6 +436,9 @@ export default function LibraryPage() {
               </Button>
             ))}
           </div>
+
+          {/* Adsterra 300x250 Box Banner */}
+          <AdsterraBanner width={300} height={250} adKey="cf722b4afa051a8fa9446f062dccfa49" />
 
           {/* Grid Layout or Skeleton */}
           {isAnyLoading ? (

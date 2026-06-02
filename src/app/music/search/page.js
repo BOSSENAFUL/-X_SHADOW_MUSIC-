@@ -18,6 +18,7 @@ import {
 import { Search, Heart, Pause, MoreVertical, Plus, User, Disc, Share, Download, Clock, ChevronLeft, ChevronRight, Music2 } from "lucide-react";
 import { IoMdPlay } from "react-icons/io";
 import { AppSidebar } from "@/components/app-sidebar";
+import AdsterraBanner from "@/components/AdsterraBanner";
 import { Separator } from "@/components/ui/separator";
 import {
   SidebarInset,
@@ -2828,6 +2829,8 @@ function SearchPageContent() {
 
           {!searchQuery && !loading && (
             <div className="flex flex-col items-center justify-center py-10 md:py-16">
+              <AdsterraBanner width={300} height={250} adKey="cf722b4afa051a8fa9446f062dccfa49" />
+
               <div className="flex flex-col items-center mb-12">
                 <Search className="w-16 h-16 text-muted-foreground mb-4" />
                 <h3 className="text-xl font-semibold mb-2">Search for music</h3>
@@ -2877,6 +2880,11 @@ function SearchPageContent() {
                 <p className="text-muted-foreground">No results found for "{activeSearchQuery}"</p>
               </div>
             )
+          )}
+
+          {/* Adsterra 300x250 Box Banner - Only show at bottom of search results */}
+          {searchQuery && (
+            <AdsterraBanner width={300} height={250} adKey="cf722b4afa051a8fa9446f062dccfa49" />
           )}
         </div>
       </SidebarInset>

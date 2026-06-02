@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
+import AdsterraBanner from "@/components/AdsterraBanner";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -1352,7 +1353,11 @@ export default function ArtistPage() {
               </div>
             </div>
 
-            <div className="pl-2 pr-1 md:px-6 pb-32 md:pb-24 space-y-6 md:space-y-8">              {/* Popular Songs */}
+            <div className="pl-2 pr-1 md:px-6 pb-32 md:pb-24 space-y-6 md:space-y-8">
+              {/* Adsterra 300x250 Box Banner */}
+              <AdsterraBanner width={300} height={250} adKey="cf722b4afa051a8fa9446f062dccfa49" />
+
+              {/* Popular Songs */}
               {songs && songs.length > 0 && (
                 <div>
                   <h2 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">Popular</h2>

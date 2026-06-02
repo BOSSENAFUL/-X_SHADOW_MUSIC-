@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
+import AdsterraBanner from "@/components/AdsterraBanner";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -2543,6 +2544,11 @@ export default function PlaylistDetailPage({ params }) {
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* Adsterra 300x250 Box Banner */}
+            <div className="px-4 md:px-8 mb-4">
+              <AdsterraBanner width={300} height={250} adKey="cf722b4afa051a8fa9446f062dccfa49" />
             </div>
 
             {/* Songs List */}

@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
+import AdsterraBanner from "@/components/AdsterraBanner";
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -603,6 +604,11 @@ export default function SongPage() {
                                     decodeHtmlEntities={decodeHtmlEntities}
                                 />
                             </div>
+                        </div>
+
+                        {/* Adsterra 300x250 Box Banner */}
+                        <div className="px-4 md:px-8 mb-4">
+                            <AdsterraBanner width={300} height={250} adKey="cf722b4afa051a8fa9446f062dccfa49" />
                         </div>
 
                         {/* Details */}
