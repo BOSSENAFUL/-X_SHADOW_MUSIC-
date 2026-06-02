@@ -37,6 +37,7 @@ export default function AdsterraBanner({ width, height, adKey }) {
       </head>
       <body>
         <script type="text/javascript">
+          // Set ad options
           var atOptions = {
             'key' : '${adKey}',
             'format' : 'iframe',
@@ -44,8 +45,22 @@ export default function AdsterraBanner({ width, height, adKey }) {
             'width' : ${width},
             'params' : {}
           };
+
+          // Dynamically inject the ad script so we can detect if it is blocked
+          (function() {
+            var s = document.createElement('script');
+            s.type = 'text/javascript';
+            s.src = 'https://www.assistedtogether.com/${adKey}/invoke.js';
+            s.onload = function() {
+              try { window.parent.postMessage({ type: 'jammify_ad_loaded', adKey: '${adKey}' }, '*'); } catch(e) {}
+            };
+            s.onerror = function() {
+              // Script was blocked by an ad blocker — notify the parent page
+              try { window.parent.postMessage({ type: 'jammify_ad_blocked', adKey: '${adKey}' }, '*'); } catch(e) {}
+            };
+            document.body.appendChild(s);
+          })();
         </script>
-        <script type="text/javascript" src="//www.assistedtogether.com/${adKey}/invoke.js"></script>
       </body>
     </html>
   `;

@@ -547,8 +547,8 @@ export default function MusicPage() {
         const data = await res.json();
         if (isMounted && data.success && data.data?.length > 0) {
           // Shape each mix into the format PlaylistSection / PlaylistCard expects
-          const shaped = data.data.map((mix) => ({
-            id: `mix-${mix.mixIndex}`,
+          const shaped = data.data.map((mix, i) => ({
+            id: mix._id ? `mix-${mix._id}` : `mix-${mix.mixIndex}-${i}`,
             _mixId: mix._id,
             name: mix.title,
             songIds: mix.songIds || [],
@@ -573,8 +573,8 @@ export default function MusicPage() {
     return () => { isMounted = false; };
   }, [session?.user?.id, sessionStatus]);
 
-  const shapeMixes = (rawMixes) => rawMixes.map((mix) => ({
-    id: `mix-${mix.mixIndex}`,
+  const shapeMixes = (rawMixes) => rawMixes.map((mix, i) => ({
+    id: mix._id ? `mix-${mix._id}` : `mix-${mix.mixIndex}-${i}`,
     _mixId: mix._id,
     name: mix.title,
     songIds: mix.songIds || [],
