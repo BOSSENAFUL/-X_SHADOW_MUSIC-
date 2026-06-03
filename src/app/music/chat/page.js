@@ -144,7 +144,7 @@ export default function ChatPage() {
           </Button>
         </header>
 
-        <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full p-4 md:p-6 pb-28 space-y-4 md:space-y-6">
+        <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full p-4 md:p-6 pb-36 md:pb-28 space-y-4 md:space-y-6">
 
           {/* Create Post Form */}
           {showForm && (

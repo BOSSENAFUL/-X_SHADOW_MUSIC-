@@ -243,7 +243,7 @@ export default function PostDetailPage({ params }) {
           </div>
         </header>
 
-        <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full p-4 md:p-6 pb-24 space-y-8">
+        <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full p-4 md:p-6 pb-36 md:pb-24 space-y-8">
 
           {/* Post Content */}
           <div className="space-y-4">
