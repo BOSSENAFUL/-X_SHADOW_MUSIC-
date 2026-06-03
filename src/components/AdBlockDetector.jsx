@@ -49,6 +49,7 @@ function detectViaCSS() {
 
 export default function AdBlockDetector() {
   const [adBlockDetected, setAdBlockDetected] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     let detected = false;
@@ -84,7 +85,7 @@ export default function AdBlockDetector() {
     };
   }, []);
 
-  if (!adBlockDetected) return null;
+  if (!adBlockDetected || dismissed) return null;
 
   return (
     <>
@@ -297,7 +298,30 @@ export default function AdBlockDetector() {
               ✅ I&apos;ve whitelisted — Reload Page
             </button>
 
-
+            <button
+              onClick={() => setDismissed(true)}
+              style={{
+                width: "100%",
+                padding: "0.75rem",
+                borderRadius: "12px",
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                color: "rgba(255,255,255,0.45)",
+                fontSize: "0.85rem",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.09)";
+                e.currentTarget.style.color = "rgba(255,255,255,0.65)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                e.currentTarget.style.color = "rgba(255,255,255,0.45)";
+              }}
+            >
+              Dismiss for now
+            </button>
           </div>
         </div>
       </div>
