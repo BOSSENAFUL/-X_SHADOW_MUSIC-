@@ -19,6 +19,7 @@
         }
         #status {
             text-align: center;
+            padding: 10px;
         }
     </style>
 </head>
@@ -33,6 +34,10 @@
             'params' : {}
         };
     </script>
-    <script type="text/javascript" src="https://assistedtogether.com/cf722b4afa051a8fa9446f062dccfa49/invoke.js" onload="document.getElementById('status').style.display='none';"></script>
+    <script type="text/javascript" 
+            src="https://assistedtogether.com/cf722b4afa051a8fa9446f062dccfa49/invoke.js" 
+            onload="document.getElementById('status').style.display='none';"
+            onerror="document.getElementById('status').innerHTML = 'Failed to load ad script (possibly blocked by DNS/carrier ad-blocker)!'; console.error('Adsterra script failed to load.');">
+    </script>
 </body>
 </html>
