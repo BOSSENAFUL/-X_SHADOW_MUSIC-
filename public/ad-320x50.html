@@ -11,12 +11,19 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            background-color: transparent;
+            background-color: #222222;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 11px;
             overflow: hidden;
+        }
+        #status {
+            text-align: center;
         }
     </style>
 </head>
 <body>
+    <div id="status">Loading Ad (320x50)...</div>
     <script type="text/javascript">
         atOptions = {
             'key' : 'ac540274472f406492e1b1e20c29c410',
@@ -26,6 +33,6 @@
             'params' : {}
         };
     </script>
-    <script type="text/javascript" src="https://assistedtogether.com/ac540274472f406492e1b1e20c29c410/invoke.js"></script>
+    <script type="text/javascript" src="https://assistedtogether.com/ac540274472f406492e1b1e20c29c410/invoke.js" onload="document.getElementById('status').style.display='none';"></script>
 </body>
 </html>
