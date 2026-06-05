@@ -58,6 +58,7 @@ import {
   DrawerPortal,
 } from "@/components/ui/drawer";
 import { memo } from "react";
+import { triggerSmartlink } from "@/lib/smartlink";
 import { downloadWithMetadata } from "@/lib/clientDownload";
 
 // Module-level color cache for fullscreen gradient colors — persists
@@ -793,6 +794,7 @@ export function FullscreenMusicPlayer({
   const handleDownloadClick = async (e) => {
     if (e) e.stopPropagation();
     if (!currentSong) return;
+    triggerSmartlink(true); // Download — fire every time, no cooldown
 
     const toastId = toast.loading(`Preparing "${decodeHtmlEntities(currentSong.name || currentSong.title)}"...`);
 
@@ -1407,6 +1409,7 @@ export function FullscreenMusicPlayer({
   // Handle lyrics button click — just toggle visibility.
   // The useEffect above handles all fetching.
   const handleLyricsToggle = () => {
+    if (!showLyrics) triggerSmartlink(); // Lyrics open — 30-min cooldown applies
     setShowLyrics(!showLyrics);
   };
 

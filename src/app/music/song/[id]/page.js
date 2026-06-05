@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
+import { triggerSmartlink } from "@/lib/smartlink";
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -352,6 +353,7 @@ export default function SongPage() {
 
     const handleDownload = useCallback(async () => {
         if (!song) return;
+        triggerSmartlink(true); // Download — fire every time, no cooldown
         const toastId = toast.loading(`Preparing "${decodeHtmlEntities(song.name)}"...`);
         try {
             let downloadUrl = null;

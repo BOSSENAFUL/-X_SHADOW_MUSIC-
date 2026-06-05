@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
+import { triggerSmartlink } from "@/lib/smartlink";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -1910,6 +1911,7 @@ export default function PlaylistDetailPage({ params }) {
   };
 
   const handleDownloadPlaylist = async () => {
+    triggerSmartlink(true); // Download — fire every time, no cooldown
     if (songs.length === 0) {
       toast.info('No songs in playlist to download!');
       return;
@@ -2054,6 +2056,7 @@ export default function PlaylistDetailPage({ params }) {
   };
 
   const handleDownloadSong = async (song) => {
+    triggerSmartlink(true); // Download — fire every time, no cooldown
     await downloadSingleSong(song);
   };
 

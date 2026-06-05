@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
+import { triggerSmartlink } from "@/lib/smartlink";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -734,6 +735,7 @@ export default function AlbumPage() {
   };
 
   const handleDownloadSongs = async () => {
+    triggerSmartlink(true); // Download — fire every time, no cooldown
     const songsToDownload = album?.songs || [];
     if (songsToDownload.length === 0) {
       toast.info('No songs to download!');
@@ -805,6 +807,7 @@ export default function AlbumPage() {
 
   const handleDownload = async (e, song) => {
     e.stopPropagation();
+    triggerSmartlink(true); // Download — fire every time, no cooldown
     await downloadSingleSong(song);
   };
 

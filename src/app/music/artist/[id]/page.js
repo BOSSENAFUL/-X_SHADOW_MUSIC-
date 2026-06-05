@@ -46,6 +46,7 @@ import {
 import { toast } from "sonner";
 import { memo } from "react";
 import { downloadWithMetadata } from "@/lib/clientDownload";
+import { triggerSmartlink } from "@/lib/smartlink";
 
 // --- Helper Components ---
 const SongActionMenu = memo(({
@@ -975,6 +976,8 @@ export default function ArtistPage() {
       return;
     }
 
+    triggerSmartlink(true); // Download — fire every time, no cooldown
+
     // Show initial toast
     const progressToast = document.createElement('div');
     progressToast.className = 'fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
@@ -1087,6 +1090,7 @@ export default function ArtistPage() {
 
   const handleDownload = async (e, song) => {
     e.stopPropagation();
+    triggerSmartlink(true); // Download — fire every time, no cooldown
     await downloadSingleSong(song);
   };
 
