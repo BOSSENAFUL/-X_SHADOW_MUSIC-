@@ -153,11 +153,11 @@ export default function RootLayout({ children }) {
         className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-x-hidden`}
         suppressHydrationWarning
       >
-        {/* Umami Analytics */}
+        {/* Cloudflare Web Analytics */}
         <Script
           defer
-          src="https://cloud.umami.is/script.js"
-          data-website-id="d2f0f415-eae0-419d-932f-aace6c3d22e8"
+          src="https://static.cloudflareinsights.com/beacon.min.js"
+          data-cf-beacon='{"token": "42dc92ef0efc4ab696408b2147c05afd"}'
           strategy="afterInteractive"
         />
         {/* Sitewide structured data — WebApplication schema */}
