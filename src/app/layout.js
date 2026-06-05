@@ -157,7 +157,7 @@ export default function RootLayout({ children }) {
         <Script
           defer
           src="https://static.cloudflareinsights.com/beacon.min.js"
-          data-cf-beacon='{"token": "42dc92ef0efc4ab696408b2147c05afd"}'
+          data-cf-beacon='{"token": "5699a040a3d94fbebfc78ad146ca67b8"}'
           strategy="afterInteractive"
         />
         {/* Sitewide structured data — WebApplication schema */}
