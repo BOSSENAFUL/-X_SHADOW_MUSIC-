@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
-import AdsterraBanner from "@/components/AdsterraBanner";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -1373,9 +1372,6 @@ export default function MusicPage() {
               playingId={playingId}
             />
           )}
-
-          {/* Adsterra 300x250 Box Banner */}
-          <AdsterraBanner width={300} height={250} adKey="cf722b4afa051a8fa9446f062dccfa49" />
 
           {/* Bottom padding to prevent content being hidden behind music player */}
           <div className="pb-24" />

@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar"
-import AdsterraBanner from "@/components/AdsterraBanner"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -850,7 +849,6 @@ export default function PlaylistsPage() {
           </div>
         </header>
         <div className="flex-1 p-4 md:p-6 pb-24">
-          <AdsterraBanner width={300} height={250} adKey="cf722b4afa051a8fa9446f062dccfa49" />
 
           {loading ? (
             <PlaylistSkeleton />
