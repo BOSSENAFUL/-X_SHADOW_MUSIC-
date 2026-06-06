@@ -65,6 +65,12 @@ export default function sitemap() {
       changeFrequency: "monthly",
       priority: 0.8,
     },
+    {
+      url: `${base}/blog/how-to-skip-ads-on-spotify`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
 
     // ─── Tier 2: Core app pages ─────────────────────────────────────────────
     {
