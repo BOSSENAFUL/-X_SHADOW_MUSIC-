@@ -50,6 +50,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { memo } from "react";
 import { downloadWithMetadata } from "@/lib/clientDownload";
+import NativeAdRow from "@/components/NativeAdRow";
 
 // --- Action Menu ---
 const SongDetailActionMenu = memo(({
@@ -145,7 +146,7 @@ const SongDetailActionMenu = memo(({
                         </div>
                     </DrawerHeader>
                     <div className="px-2 py-4 pb-8 space-y-1">
-                        <ActionItems onItemClick={() => setOpen(false)} />
+                        {ActionItems({ onItemClick: () => setOpen(false) })}
                     </div>
                 </DrawerContent>
             </Drawer>
@@ -608,7 +609,7 @@ export default function SongPage() {
                         </div>
 
                         {/* Details */}
-                        <div className="px-4 md:px-8 pb-32 md:pb-24 space-y-6">
+                        <div className="px-4 md:px-8 pb-8 space-y-6">
 
                             {/* Track row — Spotify style */}
                             <div>
@@ -786,6 +787,11 @@ export default function SongPage() {
                                     </div>
                                 </div>
                             )}
+                        </div>
+
+                        {/* Native Banner Ad */}
+                        <div className="px-4 md:px-8 pb-32 md:pb-24">
+                            <NativeAdRow />
                         </div>
                     </div>
                 </div>

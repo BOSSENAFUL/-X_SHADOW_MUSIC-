@@ -186,7 +186,7 @@ const SongActionMenu = memo(({
               </div>
             </DrawerHeader>
             <div className="px-2 py-4 pb-8 space-y-1">
-              <ActionItems onItemClick={() => setOpen(false)} />
+              {ActionItems({ onItemClick: () => setOpen(false) })}
             </div>
           </DrawerContent>
         </div>

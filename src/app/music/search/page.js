@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/drawer";
 import { memo } from "react";
 import { genres } from "@/data/genres";
+import NativeAdRow from "@/components/NativeAdRow";
 import { PlaylistCover } from "@/components/ui/playlist-cover";
 import { downloadWithMetadata } from "@/lib/clientDownload";
 
@@ -187,7 +188,7 @@ const SongActionMenu = memo(({
               </div>
             </DrawerHeader>
             <div className="px-2 py-4 pb-8 space-y-1">
-              <ActionItems onItemClick={() => setOpen(false)} />
+              {ActionItems({ onItemClick: () => setOpen(false) })}
             </div>
           </DrawerContent>
         </div>
@@ -1863,7 +1864,9 @@ function SearchPageContent() {
 
         <div
           ref={scrollContainerRef}
-          className="flex flex-1 min-h-0 flex-col pb-32 md:pb-6 overflow-y-auto transition-opacity duration-150"
+          className={`flex flex-1 min-h-0 flex-col overflow-y-auto transition-opacity duration-150 ${
+            activeSearchQuery ? "pb-8" : "pb-32 md:pb-12"
+          }`}
           style={{ opacity: isInitialRestore ? 0 : 1 }}
         >
           {/* Search Input */}
@@ -2837,6 +2840,11 @@ function SearchPageContent() {
                 </p>
               </div>
 
+              {/* Native Banner Ad */}
+              <div className="w-full max-w-6xl px-4 md:px-6 mb-12">
+                <NativeAdRow />
+              </div>
+
               {/* Popular Genres Section */}
               <div className="w-full max-w-6xl px-4 md:px-6">
                 <div className="flex items-center justify-between mb-6">
@@ -2878,6 +2886,13 @@ function SearchPageContent() {
                 <p className="text-muted-foreground">No results found for "{activeSearchQuery}"</p>
               </div>
             )
+          )}
+
+          {/* Native Banner Ad */}
+          {activeSearchQuery && (
+            <div className="px-4 md:px-8 pb-32 md:pb-12">
+              <NativeAdRow />
+            </div>
           )}
 
         </div>

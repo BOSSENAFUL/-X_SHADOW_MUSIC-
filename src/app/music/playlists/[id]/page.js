@@ -93,6 +93,7 @@ import { HiPause } from "react-icons/hi2";
 import { IoMdPlay } from "react-icons/io";
 import { ShareStoryPreview } from "@/components/share-story-preview";
 import { downloadWithMetadata } from "@/lib/clientDownload";
+import NativeAdRow from "@/components/NativeAdRow";
 
 // --- In-Memory Global Color Cache ---
 const globalColorCache = typeof window !== 'undefined' ? new Map() : null;
@@ -241,7 +242,7 @@ const SongActionMenu = memo(({
               </div>
             </DrawerHeader>
             <div className="px-2 py-4 pb-8 space-y-1">
-              <ActionItems onItemClick={() => setOpen(false)} />
+              {ActionItems({ onItemClick: () => setOpen(false) })}
             </div>
           </DrawerContent>
         </div>
@@ -495,7 +496,7 @@ const PlaylistActionMenu = memo(({
               </div>
             </DrawerHeader>
             <div className="px-2 py-4 pb-8 space-y-1">
-              <ActionItems onItemClick={() => setOpen(false)} />
+              {ActionItems({ onItemClick: () => setOpen(false) })}
             </div>
           </DrawerContent>
         </div>
@@ -650,7 +651,7 @@ const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }
               <DrawerTitle>Sort and View Options</DrawerTitle>
               <DrawerDescription>Select sorting order and view mode for the current playlist</DrawerDescription>
             </DrawerHeader>
-            <Content closeOnSelect={() => setSortDrawerOpen(false)} />
+            {Content({ closeOnSelect: () => setSortDrawerOpen(false) })}
             <div className="h-6" />
           </DrawerContent>
         </DrawerPortal>
@@ -667,7 +668,7 @@ const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64 bg-popover border-none text-foreground p-0 shadow-xl ring-1 ring-black/20">
-        <Content />
+        {Content({})}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -2163,7 +2164,7 @@ export default function PlaylistDetailPage({ params }) {
           <div className="flex-1 p-4 md:p-6">
             <div className="text-center py-12">
               <h3 className="text-xl font-semibold mb-2">Playlist not found</h3>
-              <p className="text-muted-foreground mb-4">The playlist you're looking for doesn't exist.</p>
+              <p className="text-muted-foreground mb-4">The playlist you&apos;re looking for doesn&apos;t exist.</p>
               <Button onClick={() => router.push('/music/playlists')}>
                 Back to Playlists
               </Button>
@@ -2549,7 +2550,7 @@ export default function PlaylistDetailPage({ params }) {
             </div>
 
             {/* Songs List */}
-            <div className="pl-2 pr-1 md:px-6 pb-32 md:pb-24">
+            <div className="pl-2 pr-1 md:px-6 pb-8">
               {songs.length > 0 ? (
                 <>
                   {/* Desktop Table Header */}
@@ -2652,6 +2653,11 @@ export default function PlaylistDetailPage({ params }) {
                 </div>
               )}
             </div>
+
+            {/* Native Banner Ad */}
+            <div className="px-4 md:px-8 pb-32 md:pb-24">
+              <NativeAdRow />
+            </div>
           </div>
         </div>
       </SidebarInset>
@@ -2662,7 +2668,7 @@ export default function PlaylistDetailPage({ params }) {
           <DialogHeader>
             <DialogTitle>Edit playlist</DialogTitle>
             <DialogDescription>
-              Make changes to your playlist details here. Click save when you're done.
+              Make changes to your playlist details here. Click save when you&apos;re done.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -2721,7 +2727,7 @@ export default function PlaylistDetailPage({ params }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete playlist</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{playlist?.name}"? This action cannot be undone.
+              Are you sure you want to delete &quot;{playlist?.name}&quot;? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

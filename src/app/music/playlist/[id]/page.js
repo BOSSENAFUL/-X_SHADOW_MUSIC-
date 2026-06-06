@@ -50,6 +50,7 @@ import { memo } from "react";
 import { Share, Search, Check, List, LayoutList } from "lucide-react";
 import { downloadWithMetadata } from "@/lib/clientDownload";
 import { triggerSmartlink } from "@/lib/smartlink";
+import NativeAdRow from "@/components/NativeAdRow";
 
 // --- Helper Components ---
 const SongActionMenu = memo(({
@@ -196,7 +197,7 @@ const SongActionMenu = memo(({
               </div>
             </DrawerHeader>
             <div className="px-2 py-4 pb-8 space-y-1">
-              <ActionItems onItemClick={() => setOpen(false)} />
+              {ActionItems({ onItemClick: () => setOpen(false) })}
             </div>
           </DrawerContent>
         </div>
@@ -348,7 +349,7 @@ const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }
               <DrawerTitle>Sort and View Options</DrawerTitle>
               <DrawerDescription>Select sorting order and view mode for the current playlist</DrawerDescription>
             </DrawerHeader>
-            <Content closeOnSelect={() => setOpen(false)} />
+            {Content({ closeOnSelect: () => setOpen(false) })}
             <div className="h-6" />
           </DrawerContent>
         </DrawerPortal>
@@ -365,7 +366,7 @@ const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64 bg-popover border-none text-foreground p-0 shadow-xl ring-1 ring-border">
-        <Content />
+        {Content({})}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -458,7 +459,7 @@ const PlaylistActionMenu = memo(({
               </div>
             </DrawerHeader>
             <div className="px-2 py-4 pb-8 space-y-1">
-              <ActionItems onItemClick={() => setOpen(false)} />
+              {ActionItems({ onItemClick: () => setOpen(false) })}
             </div>
           </DrawerContent>
         </div>
@@ -1421,7 +1422,7 @@ function PlaylistPageContent() {
             </div>
 
             {/* Songs List */}
-            <div className="pl-2 pr-1 md:px-6 pb-32 md:pb-24">
+            <div className="pl-2 pr-1 md:px-6 pb-8">
 
               {/* Desktop Table Header */}
               <div className="hidden md:grid grid-cols-[40px_1fr_1fr_120px_100px] gap-4 items-center text-sm text-muted-foreground border-b pb-2 mb-4">
@@ -1678,6 +1679,11 @@ function PlaylistPageContent() {
                   <p className="text-muted-foreground">No songs available in this playlist</p>
                 </div>
               )}
+            </div>
+
+            {/* Native Banner Ad */}
+            <div className="px-4 md:px-8 pb-32 md:pb-24">
+              <NativeAdRow />
             </div>
           </div>
         </div>

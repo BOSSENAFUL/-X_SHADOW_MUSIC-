@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { triggerSmartlink } from "@/lib/smartlink";
+import NativeAdRow from "@/components/NativeAdRow";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -182,7 +183,7 @@ const SongActionMenu = memo(({
               </div>
             </DrawerHeader>
             <div className="px-2 py-4 pb-8 space-y-1">
-              <ActionItems onItemClick={() => setOpen(false)} />
+              {ActionItems({ onItemClick: () => setOpen(false) })}
             </div>
           </DrawerContent>
         </div>
@@ -343,7 +344,7 @@ const AlbumActionMenu = memo(({
               </div>
             </DrawerHeader>
             <div className="px-2 py-4 pb-8 space-y-1">
-              <ActionItems onItemClick={() => setOpen(false)} />
+              {ActionItems({ onItemClick: () => setOpen(false) })}
             </div>
           </DrawerContent>
         </div>
@@ -1337,6 +1338,11 @@ export default function AlbumPage() {
                   <p className="text-muted-foreground">No songs available in this album</p>
                 </div>
               )}
+            </div>
+
+            {/* Native Banner Ad */}
+            <div className="px-4 md:px-8 pb-16">
+              <NativeAdRow />
             </div>
           </div>
         </div>

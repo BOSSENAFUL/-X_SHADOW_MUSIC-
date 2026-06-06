@@ -25,6 +25,7 @@ import { Heart, Search, MessageSquare, Radio } from "lucide-react";
 
 import { PlaylistSection } from "@/components/music/playlist-section";
 import { PWAInstallBanner } from "@/components/music/pwa-install-banner";
+import NativeAdRow from "@/components/NativeAdRow";
 import { IoMdPlay } from "react-icons/io";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { Loader2 } from "lucide-react";
@@ -1239,6 +1240,9 @@ export default function MusicPage() {
               playingId={playingId}
             />
           )}
+
+          {/* Native Banner Ad */}
+          <NativeAdRow />
 
           {/* Community Playlists Section */}
           {(communityLoading || communityPlaylists.length > 0) && (
