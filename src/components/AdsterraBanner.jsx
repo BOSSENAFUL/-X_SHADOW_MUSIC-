@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useMusicPlayer } from "@/contexts/music-player-context";
 
 export default function AdsterraBanner({ width, height, adKey }) {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -65,11 +66,23 @@ export default function AdsterraBanner({ width, height, adKey }) {
     </html>
   `;
 
+  const { isPlayerVisible, currentSong } = useMusicPlayer();
+  const isPlayerOnScreen = isPlayerVisible && currentSong;
+
+  const mobileBottom = "calc(64px + env(safe-area-inset-bottom))";
+
   if (isSticky) {
     return (
       <div
-        className="fixed bottom-[74px] md:bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:right-6 z-40 bg-background/95 backdrop-blur-md border border-white/10 rounded-xl p-1.5 flex justify-center items-center shadow-[0_10px_30px_rgba(0,0,0,0.8)] transition-all duration-300 pointer-events-auto overflow-hidden style-isolate"
-        style={{ width: `${width + 12}px`, height: `${height + 12}px`, isolation: "isolate" }}
+        className={`fixed bottom-[var(--mobile-ad-bottom)] md:bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:right-6 z-40 bg-background/95 backdrop-blur-md border border-white/10 rounded-xl p-1.5 flex justify-center items-center shadow-[0_10px_30px_rgba(0,0,0,0.8)] transition-all duration-300 pointer-events-auto overflow-hidden style-isolate ${
+          isPlayerOnScreen ? "max-md:opacity-0 max-md:pointer-events-none" : ""
+        }`}
+        style={{
+          width: `${width + 12}px`,
+          height: `${height + 12}px`,
+          isolation: "isolate",
+          "--mobile-ad-bottom": mobileBottom
+        }}
       >
         <iframe
           key={refreshKey}

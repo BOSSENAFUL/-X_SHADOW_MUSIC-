@@ -3,7 +3,6 @@
 import { MobileBottomNav } from "@/components/mobile-bottom-nav"
 import AdsterraBanner from "@/components/AdsterraBanner"
 import AdBlockDetector from "@/components/AdBlockDetector"
-import PopunderAd from "@/components/PopunderAd"
 import SocialBarAd from "@/components/SocialBarAd"
 
 export default function MusicLayoutClient({ children }) {
@@ -13,7 +12,6 @@ export default function MusicLayoutClient({ children }) {
       <MobileBottomNav />
       <AdsterraBanner width={320} height={50} adKey="ac540274472f406492e1b1e20c29c410" />
       <AdBlockDetector />
-      <PopunderAd />
       <SocialBarAd />
     </>
   )
