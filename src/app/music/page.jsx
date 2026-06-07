@@ -21,7 +21,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Heart, Search, MessageSquare, Radio } from "lucide-react";
+import { Heart, Search, MessageSquare, Radio, Sparkles } from "lucide-react";
 
 import { PlaylistSection } from "@/components/music/playlist-section";
 import { PWAInstallBanner } from "@/components/music/pwa-install-banner";
@@ -1190,6 +1190,27 @@ export default function MusicPage() {
                   </div>
                 </Link>
               ))}
+          </div>
+
+          {/* Support the Dev Banner */}
+          <div className="bg-[#282828] rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md z-10 relative">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-amber-400 fill-amber-400/20" />
+                <h3 className="font-bold text-white text-[16px] md:text-[18px]">
+                  Keep the music playing
+                </h3>
+              </div>
+              <p className="text-sm text-gray-400">
+                Help cover database & hosting costs
+              </p>
+            </div>
+            <Link
+              href="/support"
+              className="bg-white hover:bg-gray-100 text-black font-bold rounded-full px-5 py-2.5 text-sm transition-all duration-200 shrink-0 self-start sm:self-center text-center shadow-md cursor-pointer hover:scale-105"
+            >
+              Support
+            </Link>
           </div>
 
           {/* Recommended Mixes — above Recently Played */}
