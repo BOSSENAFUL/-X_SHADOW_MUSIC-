@@ -19,6 +19,7 @@ import { useLikedSongs } from "@/hooks/useLikedSongs"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbPage } from "@/components/ui/breadcrumb"
+import NativeAdRow from "@/components/NativeAdRow";
 const TABS = ["Playlists", "Albums", "Artists"]
 
 const PlaylistCollage = memo(({ images }) => {
@@ -435,6 +436,9 @@ export default function LibraryPage() {
               </Button>
             ))}
           </div>
+
+          {/* Native Sponsored Banner */}
+          <NativeAdRow />
 
           {/* Grid Layout or Skeleton */}
           {isAnyLoading ? (

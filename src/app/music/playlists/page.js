@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Plus, Loader2, Music, Lock, Unlock, Search, Download } from "lucide-react"
+import NativeAdRow from "@/components/NativeAdRow";
 import {
   Dialog,
   DialogContent,
@@ -849,6 +850,8 @@ export default function PlaylistsPage() {
           </div>
         </header>
         <div className="flex-1 p-4 md:p-6 pb-24">
+          {/* Native Sponsored Banner */}
+          <NativeAdRow />
 
           {loading ? (
             <PlaylistSkeleton />

@@ -27,6 +27,7 @@ import { useRouter } from "next/navigation";
 import { Music, Disc, LogOut, Edit2, MessageCircle, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeSelector } from "@/components/theme-selector";
+import NativeAdRow from "@/components/NativeAdRow";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -38,6 +39,82 @@ export default function ProfilePage() {
 
   const [createdPlaylists, setCreatedPlaylists] = useState([]);
   const [loadingCreated, setLoadingCreated] = useState(true);
+  const [dominantColor, setDominantColor] = useState("rgb(40, 40, 40)");
+
+  const extractDominantColor = (imageUrl) => {
+    const finalUrl = imageUrl.startsWith('http')
+      ? `/api/proxy/image?url=${encodeURIComponent(imageUrl)}`
+      : imageUrl;
+
+    return new Promise((resolve) => {
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+
+          canvas.width = img.width;
+          canvas.height = img.height;
+
+          ctx.drawImage(img, 0, 0);
+
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imageData.data;
+
+          const colorCounts = {};
+
+          for (let i = 0; i < data.length; i += 40) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+
+            const brightness = (r + g + b) / 3;
+            if (brightness < 40 || brightness > 220) continue;
+
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            const saturation = max - min;
+
+            if (saturation < 30) continue;
+
+            const color = `${Math.floor(r / 10) * 10},${Math.floor(g / 10) * 10},${Math.floor(b / 10) * 10}`;
+            colorCounts[color] = (colorCounts[color] || 0) + (1 + saturation / 50);
+          }
+
+          let domColor = '40,40,40';
+          let maxWeight = 0;
+
+          for (const [color, weight] of Object.entries(colorCounts)) {
+            if (weight > maxWeight) {
+              maxWeight = weight;
+              domColor = color;
+            }
+          }
+
+          resolve(`rgb(${domColor})`);
+        } catch (error) {
+          console.error('Error extracting color:', error);
+          resolve('rgb(40, 40, 40)');
+        }
+      };
+
+      img.onerror = () => {
+        resolve('rgb(40, 40, 40)');
+      };
+
+      img.src = finalUrl;
+    });
+  };
+
+  useEffect(() => {
+    if (session?.user?.image) {
+      extractDominantColor(session.user.image).then((color) => {
+        setDominantColor(color);
+      });
+    }
+  }, [session?.user?.image]);
 
   useEffect(() => {
     if (!userId) {
@@ -242,8 +319,15 @@ export default function ProfilePage() {
           <ProfileSkeleton />
         ) : (
           <div className="flex-1 overflow-y-auto pb-24">
-            {/* Profile Header — always visible once session resolves */}
-            <div className="flex flex-col md:flex-row items-center md:items-end gap-6 p-6 pb-8 bg-gradient-to-b from-muted/50 via-muted/20 to-background pt-20">
+            <div
+              className="flex flex-col md:flex-row items-center md:items-end gap-6 p-6 pb-8 pt-20 transition-all duration-1000"
+              style={{
+                background: `linear-gradient(to bottom, 
+                  ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.45)')} 0%, 
+                  ${dominantColor.replace('rgb', 'rgba').replace(')', ', 0.15)')} 60%, 
+                  var(--background) 100%)`
+              }}
+            >
               <Avatar className="w-32 h-32 md:w-52 md:h-52 shadow-2xl">
                 <AvatarImage src={session?.user?.image} alt={session?.user?.name} className="object-cover" />
                 <AvatarFallback className="text-6xl md:text-8xl font-black bg-muted text-muted-foreground">
@@ -296,6 +380,8 @@ export default function ProfilePage() {
 
             {/* Content Section */}
             <div className="px-6 py-6 space-y-8">
+              {/* Native Sponsored Banner */}
+              <NativeAdRow />
 
               {/* Created Playlists */}
               <section>

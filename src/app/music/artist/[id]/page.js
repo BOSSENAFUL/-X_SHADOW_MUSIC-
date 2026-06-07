@@ -47,6 +47,7 @@ import { toast } from "sonner";
 import { memo } from "react";
 import { downloadWithMetadata } from "@/lib/clientDownload";
 import { triggerSmartlink } from "@/lib/smartlink";
+import NativeAdRow from "@/components/NativeAdRow";
 
 // --- Helper Components ---
 const SongActionMenu = memo(({
@@ -1581,6 +1582,9 @@ export default function ArtistPage() {
                   </div>
                 </div>
               )}
+
+              {/* Native Sponsored Banner */}
+              <NativeAdRow />
 
               {/* Latest Releases — tabbed: Songs | Albums */}
               {(latestLoading || latestSongs.length > 0 || latestAlbums.length > 0) && (

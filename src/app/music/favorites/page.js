@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/drawer";
 import { downloadWithMetadata } from "@/lib/clientDownload";
 import { triggerSmartlink } from "@/lib/smartlink";
+import NativeAdRow from "@/components/NativeAdRow";
 
 // --- Helper Components ---
 const SongActionMenu = memo(({
@@ -777,7 +778,7 @@ export default function FavoritesPage() {
           </div>
 
           {/* Songs List */}
-          <div className="pl-2 pr-1 md:px-6 pb-32 md:pb-24">
+          <div className="pl-2 pr-1 md:px-6">
             {loading ? (
               <div className="space-y-2">
                 {Array.from({ length: 5 }).map((_, index) => (
@@ -1051,6 +1052,11 @@ export default function FavoritesPage() {
                 </Button>
               </div>
             )}
+          </div>
+
+          {/* Native Sponsored Banner */}
+          <div className="pl-2 pr-1 md:px-6 pb-32 md:pb-24 ">
+            <NativeAdRow />
           </div>
         </div>
       </SidebarInset>
