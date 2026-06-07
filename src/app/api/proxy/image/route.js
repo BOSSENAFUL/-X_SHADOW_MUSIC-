@@ -30,14 +30,18 @@ export async function GET(request) {
         });
 
         if (!response.ok) {
-            throw new Error(`Failed to fetch image: ${response.statusText}`);
+            console.warn(`Image proxy: upstream returned status ${response.status} for URL:`, imageUrl);
+            return NextResponse.json(
+                { error: `Upstream image fetch failed: ${response.statusText}` },
+                { status: response.status >= 400 && response.status < 600 ? response.status : 502 }
+            );
         }
 
         const contentType = response.headers.get('content-type') || '';
 
         // Reject if the upstream returned non-image content (HTML error pages, JSON, etc.)
         if (!contentType.startsWith('image/') && !contentType.startsWith('video/') && contentType !== 'application/octet-stream') {
-            console.error('Image proxy: upstream returned non-image content-type:', contentType, 'for URL:', imageUrl);
+            console.warn('Image proxy: upstream returned non-image content-type:', contentType, 'for URL:', imageUrl);
             return NextResponse.json({ error: 'Upstream returned non-image content' }, { status: 502 });
         }
 
@@ -53,7 +57,7 @@ export async function GET(request) {
             },
         });
     } catch (error) {
-        console.error('Image proxy error:', error);
-        return NextResponse.json({ error: 'Failed to proxy image' }, { status: 500 });
+        console.warn('Image proxy fetch failed for URL:', imageUrl, 'Error:', error.message);
+        return NextResponse.json({ error: 'Failed to proxy image' }, { status: 502 });
     }
 }

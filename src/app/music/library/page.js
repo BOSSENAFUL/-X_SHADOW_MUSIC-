@@ -32,6 +32,7 @@ const PlaylistCollage = memo(({ images }) => {
         src={displayImages[0]}
         alt="Playlist Cover"
         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+        onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
       />
     );
   }
@@ -45,6 +46,7 @@ const PlaylistCollage = memo(({ images }) => {
             alt={`Collage ${idx}`}
             className="w-full h-full object-cover"
             loading="lazy"
+            onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
           />
         </div>
       ))}
@@ -470,6 +472,7 @@ export default function LibraryPage() {
                           alt={item.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           loading="lazy"
+                          onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
                         />
                       ) : (
                         <div className="w-full h-full bg-muted flex items-center justify-center">

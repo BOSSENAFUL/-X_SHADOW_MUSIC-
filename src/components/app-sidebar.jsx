@@ -32,7 +32,7 @@ const data = {
   user: {
     name: "Music Lover",
     email: "user@jammify.com",
-    avatar: "/avatars/user.jpg",
+    avatar: "/user-avatar.png",
   },
   teams: [
     {

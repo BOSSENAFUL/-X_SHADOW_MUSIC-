@@ -264,7 +264,13 @@ export default function ProfilePage() {
       return (
         <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
           {playlist.collageImages.slice(0, 4).map((src, idx) => (
-            <img key={idx} src={src} className="w-full h-full object-cover" alt="" />
+            <img
+              key={idx}
+              src={src}
+              className="w-full h-full object-cover"
+              alt=""
+              onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
+            />
           ))}
         </div>
       );
@@ -272,7 +278,14 @@ export default function ProfilePage() {
 
     const src = getImageSrc(playlist.image) || (playlist.collageImages?.[0]);
     if (src) {
-      return <img src={src} className="w-full h-full object-cover" alt={playlist.name || playlist.playlistName} />;
+      return (
+        <img
+          src={src}
+          className="w-full h-full object-cover"
+          alt={playlist.name || playlist.playlistName}
+          onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
+        />
+      );
     }
 
     return (
