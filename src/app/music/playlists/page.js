@@ -432,9 +432,6 @@ export default function PlaylistsPage() {
         // Wait a bit to show success state, then close dialog and re-fetch
         setTimeout(() => {
           setShowImportDialog(false);
-          setImportUrl("");
-          setImportStage(0);
-          setImportSource("");
           // Trigger a fresh fetch by bumping the refresh key (cache was already cleared above)
           setRefreshKey(k => k + 1);
         }, 2000);
@@ -454,7 +451,6 @@ export default function PlaylistsPage() {
   // Handle simulated import progress
   useEffect(() => {
     if (!isImporting) {
-      setImportStage(0);
       setImportMessage("");
       return;
     }
@@ -572,9 +568,9 @@ export default function PlaylistsPage() {
                       <div className="flex items-center gap-3 sm:gap-4">
                         <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#1DB954] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-lg shadow-[#1DB954]/20">
                           <img
-                            src="/icon-512.png"
+                            src="/spotify-logo.png"
                             alt="Spotify"
-                            className="w-10 h-10 sm:w-11 sm:h-11"
+                            className="w-10 h-10 sm:w-11 sm:h-11 object-contain"
                           />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -629,13 +625,12 @@ export default function PlaylistsPage() {
               <Dialog open={showImportDialog} onOpenChange={(val) => {
                 if (!isImporting) {
                   if (!val) {
-                    // Reset states immediately when closing
-                    setImportUrl("");
-                    setImportStage(0);
-                    // Use setTimeout to prevent flash of wrong content
+                    // Reset all states after the dialog has finished closing/animating out
                     setTimeout(() => {
+                      setImportUrl("");
+                      setImportStage(0);
                       setImportSource("");
-                    }, 200);
+                    }, 300);
                   }
                   setShowImportDialog(val);
                 }
@@ -651,9 +646,9 @@ export default function PlaylistsPage() {
                             }`}>
                             {importSource === "spotify" ? (
                               <img
-                                src="/icon-512.png"
+                                src="/spotify-logo.png"
                                 alt="Spotify"
-                                className="w-7 h-7 sm:w-8 sm:h-8"
+                                className="w-7 h-7 sm:w-8 sm:h-8 object-contain"
                               />
                             ) : (
                               <img
