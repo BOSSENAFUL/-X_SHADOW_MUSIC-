@@ -15,6 +15,8 @@ import { RouteChangeHandler } from "@/components/analytics/RouteChangeHandler";
 import { Toaster } from "@/components/ui/sonner";
 import JsonLd from "@/components/json-ld";
 import Script from "next/script";
+import { AdFreeProvider } from "@/contexts/ad-free-context";
+import AdFreeModal from "@/components/AdFreeModal";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -171,15 +173,18 @@ export default function RootLayout({ children }) {
           >
             <JammifyThemeProvider>
               <MusicPlayerProvider>
-                <GlobalOnlineTracker />
-                <UserActivityTracker />
-                <AppRating />
-                <RouteChangeHandler />
-                {children}
-                <Toaster theme="dark" position="bottom-right" />
-                <Analytics />
-                <SpeedInsights />
-                <MusicPlayerWrapper />
+                <AdFreeProvider>
+                  <GlobalOnlineTracker />
+                  <UserActivityTracker />
+                  <AppRating />
+                  <RouteChangeHandler />
+                  {children}
+                  <AdFreeModal />
+                  <Toaster theme="dark" position="bottom-right" />
+                  <Analytics />
+                  <SpeedInsights />
+                  <MusicPlayerWrapper />
+                </AdFreeProvider>
               </MusicPlayerProvider>
             </JammifyThemeProvider>
           </ThemeProvider>

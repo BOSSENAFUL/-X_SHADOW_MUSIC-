@@ -1,10 +1,13 @@
 "use client";
 import { useEffect, useRef } from "react";
+import { useAdFree } from "@/contexts/ad-free-context";
 
 export default function NativeAdRow() {
+  const { isAdFree, isLoaded } = useAdFree();
   const adRef = useRef(null);
 
   useEffect(() => {
+    if (!isLoaded || isAdFree) return;
     // Only load the script if it hasn't been appended yet
     if (adRef.current && !adRef.current.querySelector("script")) {
       const script = document.createElement("script");
@@ -13,7 +16,9 @@ export default function NativeAdRow() {
       script.dataset.cfasync = "false";
       adRef.current.appendChild(script);
     }
-  }, []);
+  }, [isAdFree, isLoaded]);
+
+  if (!isLoaded || isAdFree) return null;
 
   return (
     <div className="w-full mb-6">

@@ -30,6 +30,7 @@ import { IoMdPlay } from "react-icons/io";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAdFree } from "@/contexts/ad-free-context";
 
 const PlaylistCollage = memo(({ images }) => {
   if (!images || images.length === 0) return null;
@@ -73,6 +74,7 @@ AmbientGradient.displayName = "AmbientGradient";
 
 export default function MusicPage() {
   const router = useRouter();
+  const { isAdFree, setIsAdFreeModalOpen, isLoaded } = useAdFree();
   const { data: session, status: sessionStatus } = useSession();
   const [popularHindiPlaylists, setPopularHindiPlaylists] = useState([]);
   const [popularHindiLoading, setPopularHindiLoading] = useState(true);
@@ -1018,6 +1020,19 @@ export default function MusicPage() {
 
             {/* Right Actions */}
             <div className="flex items-center gap-2">
+              {/* Remove Ads button */}
+              {isLoaded && !isAdFree && (
+                <Button
+                  variant="ghost"
+                  onClick={() => setIsAdFreeModalOpen(true)}
+                  className="flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300 border border-amber-500/20 hover:border-amber-500/30 rounded-full h-9 px-3 text-xs md:text-sm font-semibold transition-all duration-200 cursor-pointer"
+                  title="Remove Ads"
+                >
+                  <span className="text-sm">🎁</span>
+                  <span className="hidden sm:inline">Remove Ads</span>
+                </Button>
+              )}
+
               {/* Search Bar - Hidden on mobile */}
               <div className="relative hidden sm:block">
                 <Button
@@ -1193,25 +1208,27 @@ export default function MusicPage() {
           </div>
 
           {/* Support the Dev Banner */}
-          <div className="bg-[#282828] rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md z-10 relative">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-amber-400 fill-amber-400/20" />
-                <h3 className="font-bold text-white text-[16px] md:text-[18px]">
-                  Keep the music playing
-                </h3>
+          {isLoaded && !isAdFree && (
+            <div className="bg-[#282828] rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md z-10 relative">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-amber-400 fill-amber-400/20" />
+                  <h3 className="font-bold text-white text-[16px] md:text-[18px]">
+                    Keep the music playing
+                  </h3>
+                </div>
+                <p className="text-sm text-gray-400">
+                  Help cover database & hosting costs
+                </p>
               </div>
-              <p className="text-sm text-gray-400">
-                Help cover database & hosting costs
-              </p>
+              <Link
+                href="/support"
+                className="bg-white hover:bg-gray-100 text-black font-bold rounded-full px-5 py-2.5 text-sm transition-all duration-200 shrink-0 self-start sm:self-center text-center shadow-md cursor-pointer hover:scale-105"
+              >
+                Support
+              </Link>
             </div>
-            <Link
-              href="/support"
-              className="bg-white hover:bg-gray-100 text-black font-bold rounded-full px-5 py-2.5 text-sm transition-all duration-200 shrink-0 self-start sm:self-center text-center shadow-md cursor-pointer hover:scale-105"
-            >
-              Support
-            </Link>
-          </div>
+          )}
 
           {/* Recommended Mixes — above Recently Played */}
           {(mixesLoading || recommendedMixes.length > 0) && (
