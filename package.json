@@ -10,6 +10,8 @@
     "create-indexes": "node scripts/create-search-indexes.js  # Run once after setup or DB migration"
   },
   "dependencies": {
+    "@applemusic-like-lyrics/lyric": "^1.0.1",
+    "@applemusic-like-lyrics/react": "^0.5.1",
     "@auth/mongodb-adapter": "^3.11.1",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "^1.2.12",

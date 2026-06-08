@@ -4,8 +4,44 @@
 // Key: songId, Value: lyrics data (or null if not found).
 const lyricsCache = new Map();
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, Component } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+import { parseLrc } from "@applemusic-like-lyrics/lyric";
+import "@applemusic-like-lyrics/core/style.css";
+
+const LyricPlayer = dynamic(
+  () => import("@applemusic-like-lyrics/react").then((mod) => mod.LyricPlayer),
+  { ssr: false }
+);
+
+const BackgroundRender = dynamic(
+  () => import("@applemusic-like-lyrics/react").then((mod) => mod.BackgroundRender),
+  { ssr: false }
+);
+
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("Component crash caught by ErrorBoundary:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || null;
+    }
+    return this.props.children;
+  }
+}
+
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -256,9 +292,88 @@ export function FullscreenMusicPlayer({
 
   // Parse synced lyrics once — only re-runs when lyrics data changes, not every render tick
   const parsedLyrics = useMemo(
-    () => (lyrics?.syncedLyrics ? parseSyncedLyrics(lyrics.syncedLyrics) : []),
+    () => {
+      if (!lyrics?.syncedLyrics) return [];
+      try {
+        const result = parseLrc(lyrics.syncedLyrics);
+        console.log("Jammify Fullscreen: parsed lyrics count:", result?.length, result);
+        return result;
+      } catch (err) {
+        console.error("AMLL lyric parse error:", err);
+        return [];
+      }
+    },
     [lyrics?.syncedLyrics]
   );
+
+  useEffect(() => {
+    console.log("Jammify Fullscreen: lyrics state changed:", lyrics);
+  }, [lyrics]);
+
+  // Helper to extract current song artwork URL
+  const currentSongImageUrl = useMemo(() => {
+    if (!currentSong?.image?.length) return '/default-playlist-image.png';
+    return (
+      currentSong.image.find((img) => img.quality === "500x500")?.url ||
+      currentSong.image.find((img) => img.quality === "150x150")?.url ||
+      currentSong.image[currentSong.image.length - 1]?.url ||
+      '/default-playlist-image.png'
+    );
+  }, [currentSong]);
+
+  const currentSongImageUrlProxied = useMemo(() => {
+    if (!currentSongImageUrl) return '/default-playlist-image.png';
+    if (currentSongImageUrl.startsWith('http://') || currentSongImageUrl.startsWith('https://')) {
+      return `/api/proxy/image?url=${encodeURIComponent(currentSongImageUrl)}`;
+    }
+    return currentSongImageUrl;
+  }, [currentSongImageUrl]);
+
+  const handleLyricLineClick = useCallback((event) => {
+    console.log("Jammify Fullscreen: lyric line click event received:", event);
+    if (!event) return;
+    
+    let startTimeMs = null;
+    if (event.line?.getLine) {
+      try {
+        startTimeMs = event.line.getLine()?.startTime;
+        console.log("Jammify Fullscreen: got startTimeMs from event.line.getLine():", startTimeMs);
+      } catch (e) {
+        console.error("Jammify Fullscreen: error calling event.line.getLine():", e);
+      }
+    }
+    
+    if (startTimeMs === null || startTimeMs === undefined) {
+      if (event.line?.lyricLine?.startTime !== undefined) {
+        startTimeMs = event.line.lyricLine.startTime;
+        console.log("Jammify Fullscreen: got startTimeMs from event.line.lyricLine.startTime:", startTimeMs);
+      } else if (event.line?.startTime !== undefined) {
+        startTimeMs = event.line.startTime;
+        console.log("Jammify Fullscreen: got startTimeMs from event.line.startTime:", startTimeMs);
+      } else if (typeof event.lineIndex === 'number' && parsedLyrics[event.lineIndex]) {
+        startTimeMs = parsedLyrics[event.lineIndex].startTime;
+        console.log("Jammify Fullscreen: got startTimeMs from event.lineIndex & parsedLyrics:", startTimeMs);
+      } else if (event.detail?.line?.startTime !== undefined) {
+        startTimeMs = event.detail.line.startTime;
+        console.log("Jammify Fullscreen: got startTimeMs from event.detail.line.startTime:", startTimeMs);
+      } else if (typeof event.detail?.lineIndex === 'number' && parsedLyrics[event.detail.lineIndex]) {
+        startTimeMs = parsedLyrics[event.detail.lineIndex].startTime;
+        console.log("Jammify Fullscreen: got startTimeMs from event.detail.lineIndex & parsedLyrics:", startTimeMs);
+      }
+    }
+
+    if (typeof startTimeMs === 'number') {
+      const seekTime = startTimeMs / 1000;
+      console.log("Jammify Fullscreen: seeking to:", seekTime, "seconds");
+      if (typeof onDirectSeek === 'function') {
+        onDirectSeek([seekTime]);
+      } else {
+        console.warn("Jammify Fullscreen: onDirectSeek is not a function:", onDirectSeek);
+      }
+    } else {
+      console.warn("Jammify Fullscreen: could not extract a valid startTimeMs from click event:", event);
+    }
+  }, [parsedLyrics, onDirectSeek]);
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState(null);
   const [openActionMenu, setOpenActionMenu] = useState(false);
@@ -616,13 +731,13 @@ export function FullscreenMusicPlayer({
       if (albumName) params.append("album_name", albumName);
       if (duration) params.append("duration", duration.toString());
 
-      const getApiUrl = `https://lrclib.net/api/get?${params.toString()}`;
+      const getApiUrl = `/api/proxy/lyrics?endpoint=get&${params.toString()}`;
       let response = await fetch(getApiUrl, { signal });
 
       // Method 2: search fallback on 404
       if (response.status === 404) {
         const query = `${artistName} ${trackName}`;
-        const searchApiUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(query)}`;
+        const searchApiUrl = `/api/proxy/lyrics?endpoint=search&q=${encodeURIComponent(query)}`;
 
         let searchResults = [];
         response = await fetch(searchApiUrl, { signal });
@@ -630,7 +745,7 @@ export function FullscreenMusicPlayer({
 
         // Method 3: track name only
         if (!searchResults?.length) {
-          const trackOnlyUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(trackName)}`;
+          const trackOnlyUrl = `/api/proxy/lyrics?endpoint=search&q=${encodeURIComponent(trackName)}`;
           const trackResponse = await fetch(trackOnlyUrl, { signal });
           if (trackResponse.ok) searchResults = await trackResponse.json();
         }
@@ -1433,6 +1548,13 @@ export function FullscreenMusicPlayer({
 
   return (
     <>
+      <style dangerouslySetInnerHTML={{ __html: `
+        .amll-lyric-player {
+          position: relative !important;
+          mix-blend-mode: normal !important;
+          contain: none !important;
+        }
+      ` }} />
       <div
         className="fixed inset-0 z-100 overflow-hidden transition-all duration-1000 ease-out"
         style={{
@@ -2315,41 +2437,11 @@ export function FullscreenMusicPlayer({
                 : '#121212',
             }}
           >
-            {/* Enhanced Ambient Background */}
-            <div className="absolute inset-0">
-              {/* Dynamic gradient overlay based on extracted colors */}
-              <div
-                className="absolute inset-0 transition-all duration-1000"
-                style={{
-                  background: `
-              radial-gradient(ellipse at top, ${dominantColors.primary.replace('rgb', 'rgba').replace(')', ', 0.4)')} 0%, transparent 70%),
-              radial-gradient(ellipse at bottom left, ${dominantColors.secondary.replace('rgb', 'rgba').replace(')', ', 0.3)')} 0%, transparent 60%),
-              radial-gradient(ellipse at bottom right, ${dominantColors.accent.replace('rgb', 'rgba').replace(')', ', 0.25)')} 0%, transparent 60%),
-              linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.75) 100%)
-            `,
-                }}
-              />
-
-              {/* Color wash overlay */}
-              <div
-                className="absolute inset-0 mix-blend-soft-light opacity-40 transition-all duration-1000"
-                style={{
-                  background: `
-              radial-gradient(circle at 30% 20%, ${dominantColors.primary.replace('rgb', 'rgba').replace(')', ', 0.3)')} 0%, transparent 40%),
-              radial-gradient(circle at 70% 80%, ${dominantColors.secondary.replace('rgb', 'rgba').replace(')', ', 0.25)')} 0%, transparent 40%),
-              radial-gradient(circle at 50% 50%, ${dominantColors.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')} 0%, transparent 60%)
-            `,
-                }}
-              />
-
-              {/* Subtle noise texture for depth */}
-              <div
-                className="absolute inset-0 opacity-[0.02] mix-blend-overlay"
-                style={{
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
-                  backgroundSize: "256px 256px",
-                }}
-              />
+            {/* AMLL WebGL Dynamic Background */}
+            <div className="absolute inset-0 pointer-events-none z-0">
+              <ErrorBoundary fallback={<div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/60" />}>
+                <BackgroundRender album={currentSongImageUrlProxied} />
+              </ErrorBoundary>
             </div>
 
             <div className="relative z-10 flex flex-col h-full">
@@ -2418,12 +2510,9 @@ export function FullscreenMusicPlayer({
                   {/* Lyrics Text */}
                   <div
                     ref={mobileLyricsContainerRef}
-                    className="flex-1 overflow-y-auto scrollbar-hide"
-                    style={{
-                      WebkitOverflowScrolling: "touch",
-                    }}
+                    className="flex-1 overflow-hidden"
                   >
-                    <div className="space-y-3 text-left max-w-2xl py-12 px-4">
+                    <div className="space-y-3 text-left max-w-2xl h-full py-6 px-4">
                       {lyricsLoading || lyricsFetching ? (
                         <div className="space-y-4 py-8 px-2">
                           {[80, 60, 90, 50, 75, 65, 85, 55].map((w, i) => (
@@ -2438,37 +2527,24 @@ export function FullscreenMusicPlayer({
                         <>
                           {/* Synced Lyrics - Apple Music Style */}
                           {lyrics.syncedLyrics ? (
-                            <div className="space-y-6 leading-tight">
-                              {(() => {
-                                const currentLyricIndex = getCurrentLyricIndex(parsedLyrics, currentTime);
-                                return parsedLyrics.map((line, index) => {
-                                  const isCurrentLine = index === currentLyricIndex;
-                                  return (
-                                    <p
-                                      key={index}
-                                      ref={(el) => (mobileLyricLineRefs.current[index] = el)}
-                                      className="text-3xl font-bold cursor-pointer"
-                                      style={{
-                                        fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
-                                        fontWeight: '700',
-                                        letterSpacing: '-0.01em',
-                                        lineHeight: '1.2',
-                                        color: isCurrentLine
-                                          ? "rgba(255,255,255,0.75)"
-                                          : "rgba(255,255,255,0.25)",
-                                        opacity: isCurrentLine ? 1 : 0.3,
-                                        filter: isCurrentLine
-                                          ? "blur(0px)"
-                                          : "blur(1.5px)",
-                                        transition: "color 400ms ease, opacity 400ms ease, filter 400ms ease",
-                                      }}
-                                      onClick={() => onDirectSeek([parsedLyrics[index]?.time || 0])}
-                                    >
-                                      {line.text}
-                                    </p>
-                                  );
-                                });
-                              })()}
+                            <div className="h-full w-full">
+                              <ErrorBoundary fallback={
+                                <div className="space-y-6 leading-relaxed overflow-y-auto h-full max-h-[70vh] pr-2">
+                                  {lyrics.plainLyrics ? (
+                                    lyrics.plainLyrics.split("\n").map((line, idx) => (
+                                      <p key={idx} className="text-2xl text-white/60 font-semibold">{line.trim()}</p>
+                                    ))
+                                  ) : (
+                                    parsedLyrics.map((line, idx) => (
+                                      <p key={idx} className="text-2xl text-white/60 font-semibold">
+                                        {line.text || (line.words ? line.words.map(w => w.word).join(' ') : '')}
+                                      </p>
+                                    ))
+                                  )}
+                                </div>
+                              }>
+                                <LyricPlayer lyricLines={parsedLyrics} currentTime={currentTime * 1000} onLyricLineClick={handleLyricLineClick} style={{ mixBlendMode: 'normal', contain: 'none', height: '100%', width: '100%' }} />
+                              </ErrorBoundary>
                             </div>
                           ) : lyrics.plainLyrics ? (
                             /* Plain Lyrics */
@@ -2635,12 +2711,9 @@ export function FullscreenMusicPlayer({
                     <div className="w-full max-w-4xl">
                       <div
                         ref={desktopLyricsContainerRef}
-                        className="h-[calc(100vh-10rem)] overflow-y-auto scrollbar-hide"
-                        style={{
-                          WebkitOverflowScrolling: "touch",
-                        }}
+                        className="h-[calc(100vh-10rem)] overflow-hidden"
                       >
-                        <div className="space-y-6 py-20 text-left">
+                        <div className="space-y-6 h-full py-20 text-left">
                           {lyricsLoading || lyricsFetching ? (
                             <div className="space-y-5 px-2">
                               {[70, 55, 85, 45, 80, 60, 90, 50, 75].map((w, i) => (
@@ -2655,39 +2728,42 @@ export function FullscreenMusicPlayer({
                             <>
                               {/* Synced Lyrics - Clean Custom Implementation */}
                               {lyrics.syncedLyrics ? (
-                                <div className="space-y-12 leading-tight">
-                                  {(() => {
-                                    const currentLyricIndex = getCurrentLyricIndex(parsedLyrics, currentTime);
-                                    return parsedLyrics.map((line, index) => {
-                                      const isCurrentLine = index === currentLyricIndex;
-                                      return (
-                                        <p
-                                          key={index}
-                                          ref={(el) => (desktopLyricLineRefs.current[index] = el)}
-                                          className="text-5xl xl:text-6xl font-bold cursor-pointer"
-                                          style={{
-                                            fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
-                                            fontWeight: '700',
-                                            letterSpacing: '-0.02em',
-                                            lineHeight: '1.15',
-                                            color: isCurrentLine
-                                              ? "rgba(255,255,255,0.85)"
-                                              : "rgba(255,255,255,0.2)",
-                                            opacity: isCurrentLine ? 1 : 0.25,
-                                            filter: isCurrentLine
-                                              ? "blur(0px)"
-                                              : "blur(1.5px)",
-                                            backfaceVisibility: "hidden",
-                                            WebkitFontSmoothing: "antialiased",
-                                            transition: "color 400ms ease, opacity 400ms ease, filter 400ms ease",
-                                          }}
-                                          onClick={() => onDirectSeek([parsedLyrics[index]?.time || 0])}
-                                        >
-                                          {line.text}
-                                        </p>
-                                      );
-                                    });
-                                  })()}
+                                <div className="h-full w-full">
+                                  <ErrorBoundary fallback={
+                                    <div className="space-y-6 leading-tight text-left overflow-y-auto h-full max-h-[70vh] pr-4">
+                                      {lyrics.plainLyrics ? (
+                                        lyrics.plainLyrics.split("\n").map((line, idx) => (
+                                          <p
+                                            key={idx}
+                                            className="text-5xl xl:text-6xl text-white/35 font-bold cursor-pointer hover:text-white/70 transition-all duration-200"
+                                            style={{
+                                              fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
+                                              letterSpacing: '-0.02em',
+                                              lineHeight: '1.15',
+                                            }}
+                                          >
+                                            {line.trim()}
+                                          </p>
+                                        ))
+                                      ) : (
+                                        parsedLyrics.map((line, idx) => (
+                                          <p
+                                            key={idx}
+                                            className="text-5xl xl:text-6xl text-white/35 font-bold cursor-pointer hover:text-white/70 transition-all duration-200"
+                                            style={{
+                                              fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
+                                              letterSpacing: '-0.02em',
+                                              lineHeight: '1.15',
+                                            }}
+                                          >
+                                            {line.text || (line.words ? line.words.map(w => w.word).join(' ') : '')}
+                                          </p>
+                                        ))
+                                      )}
+                                    </div>
+                                  }>
+                                    <LyricPlayer lyricLines={parsedLyrics} currentTime={currentTime * 1000} onLyricLineClick={handleLyricLineClick} style={{ mixBlendMode: 'normal', contain: 'none', height: '100%', width: '100%' }} />
+                                  </ErrorBoundary>
                                 </div>
                               ) : lyrics.plainLyrics ? (
                                 /* Plain Lyrics */
