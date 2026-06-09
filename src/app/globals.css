@@ -306,3 +306,54 @@
   --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-family: var(--font-sans);
 }
+
+/* Custom Lyrics Font Weight Override */
+.amll-lyric-player,
+.amll-lyric-player * {
+  font-weight: 700 !important;
+}
+
+/* Allow lyrics to overflow the player component to be masked correctly by the parent */
+.amll-lyric-player {
+  contain: none !important;
+  overflow: visible !important;
+}
+
+/* Smooth top and bottom fade for lyrics container */
+.lyrics-fade-mask {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0,0,0,0.08) 3%,
+    rgba(0,0,0,0.3) 8%,
+    rgba(0,0,0,0.7) 14%,
+    black 22%,
+    black 78%,
+    rgba(0,0,0,0.7) 86%,
+    rgba(0,0,0,0.3) 92%,
+    rgba(0,0,0,0.08) 97%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0,0,0,0.08) 3%,
+    rgba(0,0,0,0.3) 8%,
+    rgba(0,0,0,0.7) 14%,
+    black 22%,
+    black 78%,
+    rgba(0,0,0,0.7) 86%,
+    rgba(0,0,0,0.3) 92%,
+    rgba(0,0,0,0.08) 97%,
+    transparent 100%
+  );
+}
+
+/* iOS Safe Area Insets to support full-screen PWA overlay layout */
+.safe-area-inset {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+

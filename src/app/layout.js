@@ -96,6 +96,10 @@ export const metadata = {
     creator: "@jammifyapp",
   },
   manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export const viewport = {
@@ -104,6 +108,7 @@ export const viewport = {
   maximumScale: 1,
   viewportFit: "cover",
   userScalable: false,
+  themeColor: "#121212",
 };
 
 

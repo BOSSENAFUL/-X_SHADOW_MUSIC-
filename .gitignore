@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# temp directories
+/applemusic-like-lyrics-temp/
+/scratch/
+
