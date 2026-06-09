@@ -1695,9 +1695,10 @@ export function FullscreenMusicPlayer({
       >
         {/* Enhanced Ambient Background */}
         <div className="absolute inset-0">
-          {/* Multiple layered background images for better ambient effect */}
+          {/* Multiple layered background images for better ambient effect - desktop only */}
+          {/* Hidden on phones to avoid heavy GPU usage and animated background movement */}
           {currentSong.image?.[2]?.url && (
-            <>
+            <div className="hidden md:block">
               {/* Base blurred image */}
               <img
                 src={currentSong.image[2].url}
@@ -1725,7 +1726,7 @@ export function FullscreenMusicPlayer({
                   e.target.src = '/default-playlist-image.png';
                 }}
               />
-            </>
+            </div>
           )}
 
           {/* Dynamic gradient overlay based on extracted colors */}
@@ -2556,8 +2557,9 @@ export function FullscreenMusicPlayer({
                 : '#121212',
             }}
           >
-            {/* AMLL WebGL Dynamic Background */}
-            <div className="absolute inset-0 pointer-events-none z-0">
+            {/* AMLL WebGL Dynamic Background - desktop/tablet only */}
+            {/* Hidden on phones to keep a clean static gradient background */}
+            <div className="absolute inset-0 pointer-events-none z-0 hidden md:block">
               <ErrorBoundary fallback={<div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/60" />}>
                 <BackgroundRender album={currentSongImageUrlProxied} />
               </ErrorBoundary>
