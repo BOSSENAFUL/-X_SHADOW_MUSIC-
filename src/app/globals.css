@@ -313,10 +313,23 @@
   font-weight: 700 !important;
 }
 
-/* Allow lyrics to overflow the player component to be masked correctly by the parent */
-.amll-lyric-player {
-  contain: none !important;
-  overflow: visible !important;
+/* Allow lyrics to overflow the player component to be masked correctly by the parent on desktop */
+@media screen and (min-width: 769px) {
+  .amll-lyric-player {
+    contain: none !important;
+    overflow: visible !important;
+  }
+}
+
+/* Performance optimizations for mobile devices (phones) */
+@media screen and (max-width: 768px) {
+  /* Disable CPU/GPU-intensive CSS blur filters on mobile to prevent transition and scrolling lag */
+  .amll-lyric-player,
+  .amll-lyric-player *,
+  .FmKaba_lyricLineWrapper,
+  .FmKaba_lyricLine {
+    filter: none !important;
+  }
 }
 
 /* Smooth top and bottom fade for lyrics container */
