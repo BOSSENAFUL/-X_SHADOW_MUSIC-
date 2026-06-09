@@ -335,6 +335,12 @@
   .amll-lyric-player span {
     will-change: auto !important;
   }
+
+  /* Disable expensive mask-image on mobile to prevent paint storm lag */
+  .lyrics-fade-mask {
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+  }
 }
 
 /* Smooth top and bottom fade for lyrics container */

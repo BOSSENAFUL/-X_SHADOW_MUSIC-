@@ -2650,8 +2650,15 @@ export function FullscreenMusicPlayer({
                   {/* Lyrics Text */}
                   <div
                     ref={mobileLyricsContainerRef}
-                    className="flex-1 overflow-hidden lyrics-fade-mask"
+                    className="flex-1 overflow-hidden lyrics-fade-mask relative"
                   >
+                    {/* Top Overlay Fade (Mobile only) */}
+                    <div 
+                      className="absolute top-0 left-0 right-0 h-10 pointer-events-none z-20 md:hidden"
+                      style={{
+                        background: `linear-gradient(to bottom, var(--current-theme-color) 0%, transparent 100%)`
+                      }}
+                    />
                     <div className="space-y-3 text-left max-w-2xl h-full px-4">
                       {lyricsLoading || lyricsFetching ? (
                         <div className="space-y-4 py-8 px-2">
@@ -2733,6 +2740,13 @@ export function FullscreenMusicPlayer({
                         </div>
                       )}
                     </div>
+                    {/* Bottom Overlay Fade (Mobile only) */}
+                    <div 
+                      className="absolute bottom-0 left-0 right-0 h-14 pointer-events-none z-20 md:hidden"
+                      style={{
+                        background: `linear-gradient(to top, var(--current-theme-color) 0%, transparent 100%)`
+                      }}
+                    />
                   </div>
                 </div>
 
