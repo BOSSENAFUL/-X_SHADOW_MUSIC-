@@ -437,27 +437,10 @@ export function FullscreenMusicPlayer({
     return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
   };
 
-  // Darken a hex color by blending it with black to simulate the overlay layers
-  // that the gradient page applies on top of the raw dominant primary color.
-  // This makes the theme-color match the actual visible top-edge of the screen.
-  const darkenForStatusBar = (hexColor, amount = 0.45) => {
-    const hex = hexColor.replace("#", "");
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-    const dr = Math.round(r * (1 - amount));
-    const dg = Math.round(g * (1 - amount));
-    const db = Math.round(b * (1 - amount));
-    return "#" + ((1 << 24) + (dr << 16) + (dg << 8) + db).toString(16).slice(1);
-  };
-
   // Dynamic PWA status bar theme-color update
-  // Fixes two issues:
-  //   1. Color mismatch — raw dominant color is brighter than what the overlay layers show on screen,
-  //      so we darken it to simulate the actual visible gradient top edge.
-  //   2. Timing — CSS transition is 1000ms, but the meta tag update was instant (snapped before the
-  //      page gradient changed). Now we delay the color update when song changes to stay in sync.
-  const themeColorTimerRef = useRef(null);
+  // The theme-color MUST be the EXACT same color as the CSS gradient's 0% stop
+  // (dominantColors.primary). Any modification (darkening, brightening) creates
+  // a visible seam between the solid Android status bar and the gradient below.
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -476,25 +459,22 @@ export function FullscreenMusicPlayer({
     };
 
     if (!isOpen) {
-      // Clear any pending delayed update and immediately reset to default
-      if (themeColorTimerRef.current) clearTimeout(themeColorTimerRef.current);
       applyThemeColor(defaultThemeColor);
       return;
     }
 
-    // Convert and darken to simulate the gradient overlay's visible top-edge color
-    const rawHex = convertRgbToHex(dominantColors?.primary);
-    const targetColor = dominantColors?.primary ? darkenForStatusBar(rawHex, 0.45) : defaultThemeColor;
+    // Use the EXACT same color that the CSS gradient starts with at 0%
+    const targetColor = dominantColors?.primary
+      ? convertRgbToHex(dominantColors.primary)
+      : defaultThemeColor;
 
-    // Delay update to match the CSS background transition duration (1000ms)
-    // so the status bar color changes at the same time as the page gradient
-    if (themeColorTimerRef.current) clearTimeout(themeColorTimerRef.current);
-    themeColorTimerRef.current = setTimeout(() => {
-      applyThemeColor(targetColor);
-    }, 50); // Small 50ms delay syncs with the start of the CSS transition rather than lagging behind
+    applyThemeColor(targetColor);
 
     return () => {
-      if (themeColorTimerRef.current) clearTimeout(themeColorTimerRef.current);
+      const meta = document.querySelector("meta[name=theme-color]");
+      if (meta) {
+        meta.setAttribute("content", defaultThemeColor);
+      }
     };
   }, [isOpen, dominantColors?.primary]);
 
