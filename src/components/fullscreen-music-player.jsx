@@ -425,7 +425,7 @@ export function FullscreenMusicPlayer({
     setLocalPlaylist([...playlist]);
   }, [playlist]);
 
-  // Helper to convert rgb(r, g, b) to hex color code for maximum compatibility with Android/Chrome status bar
+  // Helper to convert rgb(r, g, b) to hex color code for Android/Chrome status bar compatibility
   const convertRgbToHex = (rgbStr) => {
     if (!rgbStr) return "#121212";
     if (rgbStr.startsWith("#")) return rgbStr;
@@ -437,31 +437,64 @@ export function FullscreenMusicPlayer({
     return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
   };
 
+  // Darken a hex color by blending it with black to simulate the overlay layers
+  // that the gradient page applies on top of the raw dominant primary color.
+  // This makes the theme-color match the actual visible top-edge of the screen.
+  const darkenForStatusBar = (hexColor, amount = 0.45) => {
+    const hex = hexColor.replace("#", "");
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    const dr = Math.round(r * (1 - amount));
+    const dg = Math.round(g * (1 - amount));
+    const db = Math.round(b * (1 - amount));
+    return "#" + ((1 << 24) + (dr << 16) + (dg << 8) + db).toString(16).slice(1);
+  };
+
   // Dynamic PWA status bar theme-color update
+  // Fixes two issues:
+  //   1. Color mismatch — raw dominant color is brighter than what the overlay layers show on screen,
+  //      so we darken it to simulate the actual visible gradient top edge.
+  //   2. Timing — CSS transition is 1000ms, but the meta tag update was instant (snapped before the
+  //      page gradient changed). Now we delay the color update when song changes to stay in sync.
+  const themeColorTimerRef = useRef(null);
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const defaultThemeColor = "#121212";
-    // For Android/Chrome: Set theme-color meta to match the exact dominant color (top of gradient) to blend seamlessly
-    const targetColor = isOpen
-      ? convertRgbToHex(dominantColors?.primary)
-      : defaultThemeColor;
 
-    let metaThemeColor = document.querySelector("meta[name=theme-color]");
-    if (metaThemeColor) {
-      metaThemeColor.setAttribute("content", targetColor);
-    } else {
-      metaThemeColor = document.createElement("meta");
-      metaThemeColor.name = "theme-color";
-      metaThemeColor.content = targetColor;
-      document.head.appendChild(metaThemeColor);
+    const applyThemeColor = (color) => {
+      let metaThemeColor = document.querySelector("meta[name=theme-color]");
+      if (metaThemeColor) {
+        metaThemeColor.setAttribute("content", color);
+      } else {
+        metaThemeColor = document.createElement("meta");
+        metaThemeColor.name = "theme-color";
+        metaThemeColor.content = color;
+        document.head.appendChild(metaThemeColor);
+      }
+    };
+
+    if (!isOpen) {
+      // Clear any pending delayed update and immediately reset to default
+      if (themeColorTimerRef.current) clearTimeout(themeColorTimerRef.current);
+      applyThemeColor(defaultThemeColor);
+      return;
     }
 
+    // Convert and darken to simulate the gradient overlay's visible top-edge color
+    const rawHex = convertRgbToHex(dominantColors?.primary);
+    const targetColor = dominantColors?.primary ? darkenForStatusBar(rawHex, 0.45) : defaultThemeColor;
+
+    // Delay update to match the CSS background transition duration (1000ms)
+    // so the status bar color changes at the same time as the page gradient
+    if (themeColorTimerRef.current) clearTimeout(themeColorTimerRef.current);
+    themeColorTimerRef.current = setTimeout(() => {
+      applyThemeColor(targetColor);
+    }, 50); // Small 50ms delay syncs with the start of the CSS transition rather than lagging behind
+
     return () => {
-      const meta = document.querySelector("meta[name=theme-color]");
-      if (meta) {
-        meta.setAttribute("content", defaultThemeColor);
-      }
+      if (themeColorTimerRef.current) clearTimeout(themeColorTimerRef.current);
     };
   }, [isOpen, dominantColors?.primary]);
 
