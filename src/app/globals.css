@@ -330,6 +330,11 @@
   .FmKaba_lyricLine {
     filter: none !important;
   }
+
+  /* Disable will-change on individual word spans to prevent mobile GPU layer explosion */
+  .amll-lyric-player span {
+    will-change: auto !important;
+  }
 }
 
 /* Smooth top and bottom fade for lyrics container */

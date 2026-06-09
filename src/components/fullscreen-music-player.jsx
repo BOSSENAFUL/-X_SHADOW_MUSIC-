@@ -2577,13 +2577,13 @@ export function FullscreenMusicPlayer({
             </div>
 
             <div className="relative z-10 flex flex-col h-full safe-area-inset">
-              {/* Lyrics Header - Minimal with just back button */}
-              <div className="flex items-center justify-start p-4 border-b border-white/10">
+              {/* Lyrics Header - Minimal with just back button (desktop only) */}
+              <div className="hidden md:flex items-center justify-start p-4 border-b border-white/10">
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={() => setShowLyrics(false)}
-                  className="text-white/60 hover:bg-white/10 rounded-full p-2"
+                  className="text-white/60 hover:bg-white/10 rounded-full"
                 >
                   <ChevronDown className="w-5 h-5" />
                 </Button>
@@ -2593,6 +2593,14 @@ export function FullscreenMusicPlayer({
               <div className="flex-1 overflow-hidden">
                 {/* Mobile Layout */}
                 <div className="md:hidden h-full flex flex-col">
+                  {/* Apple Music Style top grabber handle */}
+                  <div className="flex justify-center pt-3 pb-1 shrink-0">
+                    <button
+                      onClick={() => setShowLyrics(false)}
+                      className="w-10 h-1.5 rounded-full bg-white/25 hover:bg-white/35 transition-colors duration-200 cursor-pointer"
+                      aria-label="Dismiss lyrics"
+                    />
+                  </div>
                   {/* Album Art and Song Info */}
                   <div className="flex items-center gap-4 p-4 border-b border-white/5">
                     <div className="w-16 h-16 rounded-lg overflow-hidden bg-linear-to-br from-gray-800 to-gray-900 shrink-0">
