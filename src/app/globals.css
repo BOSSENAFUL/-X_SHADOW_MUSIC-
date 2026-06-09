@@ -341,6 +341,19 @@
     mask-image: none !important;
     -webkit-mask-image: none !important;
   }
+
+  /* Smooth color and shadow transitions for mobile lyric lines and their children */
+  .amll-lyric-player .FmKaba_lyricLine,
+  .amll-lyric-player .FmKaba_lyricLine * {
+    transition: color 0.4s ease, text-shadow 0.4s ease !important;
+  }
+
+  /* Target inactive background lines to hide text fill and render hardware-accelerated blurred text-shadow */
+  .amll-lyric-player .FmKaba_lyricLine:not(.FmKaba_active),
+  .amll-lyric-player .FmKaba_lyricLine:not(.FmKaba_active) * {
+    color: transparent !important;
+    text-shadow: 0 0 0.12em rgba(255, 255, 255, 0.8) !important;
+  }
 }
 
 /* Smooth top and bottom fade for lyrics container */
