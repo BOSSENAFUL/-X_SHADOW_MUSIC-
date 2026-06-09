@@ -5,6 +5,22 @@
 // Key: songId, Value: lyrics data (or null if not found).
 const lyricsCache = new Map();
 
+const parseRgbRaw = (rgbStr) => {
+  if (!rgbStr) return [0, 0, 0];
+  const match = rgbStr.match(/\d+/g);
+  if (!match || match.length < 3) return [0, 0, 0];
+  return [parseInt(match[0], 10), parseInt(match[1], 10), parseInt(match[2], 10)];
+};
+
+const interpolateRgbRaw = (color1Str, color2Str, t) => {
+  const [r1, g1, b1] = parseRgbRaw(color1Str);
+  const [r2, g2, b2] = parseRgbRaw(color2Str);
+  const r = Math.round(r1 + (r2 - r1) * t);
+  const g = Math.round(g1 + (g2 - g1) * t);
+  const b = Math.round(b1 + (b2 - b1) * t);
+  return `${r}, ${g}, ${b}`;
+};
+
 import { useState, useRef, useEffect, useCallback, useMemo, Component } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -408,6 +424,19 @@ export function FullscreenMusicPlayer({
     secondary: "rgb(139, 92, 246)",
     accent: "rgb(168, 85, 247)",
   });
+
+  const fadeColors = useMemo(() => {
+    const primary = dominantColors?.primary || "rgb(99, 102, 241)";
+    const accent = dominantColors?.accent || "rgb(168, 85, 247)";
+    const secondary = dominantColors?.secondary || "rgb(139, 92, 246)";
+
+    // Top is at ~15%
+    const topRgb = interpolateRgbRaw(primary, accent, 0.15 / 0.5);
+    // Bottom is at ~85%
+    const bottomRgb = interpolateRgbRaw(accent, secondary, (0.85 - 0.5) / 0.5);
+
+    return { topRgb, bottomRgb };
+  }, [dominantColors]);
 
   // Drag and drop state
   const [draggedIndex, setDraggedIndex] = useState(null);
@@ -2651,12 +2680,22 @@ export function FullscreenMusicPlayer({
                   <div
                     ref={mobileLyricsContainerRef}
                     className="flex-1 overflow-hidden lyrics-fade-mask relative"
+                    style={{
+                      '--lyrics-fade-top-rgb': fadeColors.topRgb,
+                      '--lyrics-fade-bottom-rgb': fadeColors.bottomRgb,
+                      '--current-theme-color': dominantColors.primary || '#121212',
+                    }}
                   >
                     {/* Top Overlay Fade (Mobile only) */}
                     <div 
-                      className="absolute top-0 left-0 right-0 h-10 pointer-events-none z-20 md:hidden"
+                      className="absolute top-0 left-0 right-0 h-34 pointer-events-none z-20 md:hidden"
                       style={{
-                        background: `linear-gradient(to bottom, var(--current-theme-color) 0%, transparent 100%)`
+                        background: `linear-gradient(to bottom, 
+                          rgb(var(--lyrics-fade-top-rgb)) 0%, 
+                          rgba(var(--lyrics-fade-top-rgb), 0.9) 20%, 
+                          rgba(var(--lyrics-fade-top-rgb), 0.6) 45%, 
+                          rgba(var(--lyrics-fade-top-rgb), 0.25) 75%, 
+                          transparent 100%)`
                       }}
                     />
                     <div className="space-y-3 text-left max-w-2xl h-full px-4">
@@ -2742,9 +2781,14 @@ export function FullscreenMusicPlayer({
                     </div>
                     {/* Bottom Overlay Fade (Mobile only) */}
                     <div 
-                      className="absolute bottom-0 left-0 right-0 h-14 pointer-events-none z-20 md:hidden"
+                      className="absolute bottom-0 left-0 right-0 h-38 pointer-events-none z-20 md:hidden"
                       style={{
-                        background: `linear-gradient(to top, var(--current-theme-color) 0%, transparent 100%)`
+                        background: `linear-gradient(to top, 
+                          rgb(var(--lyrics-fade-bottom-rgb)) 0%, 
+                          rgba(var(--lyrics-fade-bottom-rgb), 0.9) 20%, 
+                          rgba(var(--lyrics-fade-bottom-rgb), 0.6) 45%, 
+                          rgba(var(--lyrics-fade-bottom-rgb), 0.25) 75%, 
+                          transparent 100%)`
                       }}
                     />
                   </div>
