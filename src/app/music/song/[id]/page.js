@@ -51,6 +51,7 @@ import { toast } from "sonner";
 import { memo } from "react";
 import { downloadWithMetadata } from "@/lib/clientDownload";
 import NativeAdRow from "@/components/NativeAdRow";
+import { applyThemeColor, getThemeColorForScroll } from "@/lib/utils";
 
 // --- Action Menu ---
 const SongDetailActionMenu = memo(({
@@ -250,6 +251,49 @@ export default function SongPage() {
     const [loading, setLoading] = useState(true);
     const [dominantColor, setDominantColor] = useState("rgb(40,40,40)");
     const [showHeaderTitle, setShowHeaderTitle] = useState(false);
+
+    // Dynamic PWA status bar theme-color update
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+
+        const defaultThemeColor = "#121212";
+
+        const getThemeColor = (colorStr, showHeader) => {
+            if (!colorStr) return defaultThemeColor;
+            const match = colorStr.match(/\d+/g);
+            if (!match || match.length < 3) return defaultThemeColor;
+            const r = parseInt(match[0], 10);
+            const g = parseInt(match[1], 10);
+            const b = parseInt(match[2], 10);
+
+            // If header is shown: color is dominantColor * 0.4 (black mix 60%)
+            // If header is hidden: color is dominantColor * 0.85 + 18 * 0.15 (matching song page gradient opacity)
+            const opacity = showHeader ? 0.4 : 0.85;
+            const bgContrib = showHeader ? 0 : 2.7;
+
+            const mixedR = Math.max(0, Math.min(255, Math.round(r * opacity + bgContrib)));
+            const mixedG = Math.max(0, Math.min(255, Math.round(g * opacity + bgContrib)));
+            const mixedB = Math.max(0, Math.min(255, Math.round(b * opacity + bgContrib)));
+
+            const toHex = (c) => {
+                const hex = c.toString(16);
+                return hex.length === 1 ? "0" + hex : hex;
+            };
+            return `#${toHex(mixedR)}${toHex(mixedG)}${toHex(mixedB)}`;
+        };
+
+        window._getActivePageThemeColor = (progress) => {
+            return getThemeColor(dominantColor, progress > 0.8);
+        };
+
+        const targetColor = getThemeColor(dominantColor, showHeaderTitle);
+        applyThemeColor(targetColor);
+
+        return () => {
+            applyThemeColor(defaultThemeColor);
+            delete window._getActivePageThemeColor;
+        };
+    }, [dominantColor, showHeaderTitle]);
     const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false);
 
     const mobileTitleRef = useRef(null);
@@ -463,7 +507,7 @@ export default function SongPage() {
                             ? dominantColor ? `color-mix(in srgb, ${dominantColor}, black 60%)` : "#1D1046"
                             : undefined
                     }}
-                    className={`sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b transition-all duration-300 ${showHeaderTitle ? "border-border text-white" : "bg-background border-transparent"}`}
+                    className={`fixed md:sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b transition-all duration-300 w-full ${showHeaderTitle ? "border-border text-white" : "bg-transparent md:bg-background border-transparent"}`}
                 >
                     <div className="flex items-center justify-between w-full gap-2 px-3 md:px-4">
                         <div className="flex items-center gap-2">
@@ -478,7 +522,7 @@ export default function SongPage() {
                                         {song.name}
                                     </h2>
                                 ) : (
-                                    <Breadcrumb>
+                                    <Breadcrumb className="hidden md:block">
                                         <BreadcrumbList>
                                             <BreadcrumbItem className="hidden md:block">
                                                 <BreadcrumbLink href="/music">Music</BreadcrumbLink>

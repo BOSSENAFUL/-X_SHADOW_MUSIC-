@@ -49,6 +49,7 @@ import {
 import { toast } from "sonner";
 import { memo } from "react";
 import { downloadWithMetadata } from "@/lib/clientDownload";
+import { applyThemeColor, getThemeColorForScroll } from "@/lib/utils";
 
 
 // --- Helper Components ---
@@ -400,6 +401,50 @@ export default function AlbumPage() {
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState(null);
   const [showHeaderTitle, setShowHeaderTitle] = useState(false);
+
+  // Dynamic PWA status bar theme-color update
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const defaultThemeColor = "#121212";
+
+    // Helper to compute color
+    const getThemeColor = (colorStr, showHeader) => {
+      if (!colorStr) return defaultThemeColor;
+      const match = colorStr.match(/\d+/g);
+      if (!match || match.length < 3) return defaultThemeColor;
+      const r = parseInt(match[0], 10);
+      const g = parseInt(match[1], 10);
+      const b = parseInt(match[2], 10);
+
+      // If header is shown: color is dominantColor * 0.4 (black mix 60%)
+      // If header is hidden: color is dominantColor * 0.8 + 18 * 0.2
+      const opacity = showHeader ? 0.4 : 0.8;
+      const bgContrib = showHeader ? 0 : 3.6;
+
+      const mixedR = Math.max(0, Math.min(255, Math.round(r * opacity + bgContrib)));
+      const mixedG = Math.max(0, Math.min(255, Math.round(g * opacity + bgContrib)));
+      const mixedB = Math.max(0, Math.min(255, Math.round(b * opacity + bgContrib)));
+
+      const toHex = (c) => {
+        const hex = c.toString(16);
+        return hex.length === 1 ? "0" + hex : hex;
+      };
+      return `#${toHex(mixedR)}${toHex(mixedG)}${toHex(mixedB)}`;
+    };
+
+    window._getActivePageThemeColor = (progress) => {
+      return getThemeColor(dominantColor, progress > 0.8);
+    };
+
+    const targetColor = getThemeColor(dominantColor, showHeaderTitle);
+    applyThemeColor(targetColor);
+
+    return () => {
+      applyThemeColor(defaultThemeColor);
+      delete window._getActivePageThemeColor;
+    };
+  }, [dominantColor, showHeaderTitle]);
   const mobileTitleRef = useRef(null);
   const desktopTitleRef = useRef(null);
 
@@ -888,9 +933,9 @@ export default function AlbumPage() {
                 : '#1D1046'
               : undefined
           }}
-          className={`sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b transition-all duration-300 ${showHeaderTitle
+          className={`fixed md:sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b transition-all duration-300 w-full ${showHeaderTitle
             ? "border-border text-white"
-            : "bg-background border-transparent"
+            : "bg-transparent md:bg-background border-transparent"
             }`}
         >
           <div className="flex items-center justify-between w-full gap-2 px-3 md:px-4">
@@ -908,7 +953,7 @@ export default function AlbumPage() {
                     {album.name}
                   </h2>
                 ) : (
-                  <Breadcrumb>
+                  <Breadcrumb className="hidden md:block">
                     <BreadcrumbList>
                       <BreadcrumbItem className="hidden md:block">
                         <BreadcrumbLink href="/music">Music</BreadcrumbLink>

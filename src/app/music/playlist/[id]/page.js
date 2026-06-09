@@ -51,6 +51,7 @@ import { Share, Search, Check, List, LayoutList } from "lucide-react";
 import { downloadWithMetadata } from "@/lib/clientDownload";
 import { triggerSmartlink } from "@/lib/smartlink";
 import NativeAdRow from "@/components/NativeAdRow";
+import { applyThemeColor, getThemeColorForScroll } from "@/lib/utils";
 
 // --- Helper Components ---
 const SongActionMenu = memo(({
@@ -511,6 +512,30 @@ function PlaylistPageContent() {
   const [loading, setLoading] = useState(true);
   const [dominantColor, setDominantColor] = useState(null);
   const isMobile = useIsMobile();
+
+  // Dynamic PWA status bar theme-color update
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const defaultThemeColor = "#121212";
+
+    // Store helper globally for scroll access
+    window._getActivePageThemeColor = (progress) => getThemeColorForScroll(dominantColor, progress, defaultThemeColor);
+
+    if (!dominantColor) {
+      applyThemeColor(defaultThemeColor);
+      return;
+    }
+
+    // Set initial theme color for progress = 0
+    const initialColor = getThemeColorForScroll(dominantColor, 0, defaultThemeColor);
+    applyThemeColor(initialColor);
+
+    return () => {
+      applyThemeColor(defaultThemeColor);
+      delete window._getActivePageThemeColor;
+    };
+  }, [dominantColor]);
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState(null);
   const [showHeaderTitle, setShowHeaderTitle] = useState(false);
@@ -656,6 +681,15 @@ function PlaylistPageContent() {
 
             const progress = Math.max(0, Math.min(1, scrollTop / imageThreshold));
             scrollContainer.style.setProperty('--scroll-progress', progress.toString());
+
+            // Update theme-color meta tag for seamless status bar
+            if (window._getActivePageThemeColor) {
+              const currentThemeColor = window._getActivePageThemeColor(progress);
+              const metaThemeColor = document.querySelector("meta[name=theme-color]");
+              if (metaThemeColor) {
+                metaThemeColor.setAttribute("content", currentThemeColor);
+              }
+            }
 
             const shouldShow = scrollTop > headerToggleThreshold;
             setShowHeaderTitle(prev => {
@@ -1276,14 +1310,14 @@ function PlaylistPageContent() {
                         {playlist.subtitle || playlist.header_desc}
                       </p>
                     )}
-                    <div className="flex items-center justify-start gap-2 text-sm text-muted-foreground">
-                      <span className="font-semibold">JioSaavn</span>
-                      <span>•</span>
-                      <span>{playlist.songCount || songs.length} songs</span>
+                    <div className="flex flex-wrap items-center justify-start gap-x-2 gap-y-1 text-sm text-muted-foreground">
+                      <span className="font-semibold text-foreground whitespace-nowrap">JioSaavn</span>
+                      <span className="text-muted-foreground/60">•</span>
+                      <span className="whitespace-nowrap">{playlist.songCount || songs.length} songs</span>
                       {playlist.follower_count && (
                         <>
-                          <span>•</span>
-                          <span>{playlist.follower_count} saves</span>
+                          <span className="text-muted-foreground/60">•</span>
+                          <span className="whitespace-nowrap">{playlist.follower_count} saves</span>
                         </>
                       )}
                     </div>

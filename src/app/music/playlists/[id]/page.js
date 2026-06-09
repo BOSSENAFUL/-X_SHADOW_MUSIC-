@@ -94,6 +94,7 @@ import { IoMdPlay } from "react-icons/io";
 import { ShareStoryPreview } from "@/components/share-story-preview";
 import { downloadWithMetadata } from "@/lib/clientDownload";
 import NativeAdRow from "@/components/NativeAdRow";
+import { applyThemeColor, getThemeColorForScroll } from "@/lib/utils";
 
 // --- In-Memory Global Color Cache ---
 const globalColorCache = typeof window !== 'undefined' ? new Map() : null;
@@ -974,6 +975,30 @@ export default function PlaylistDetailPage({ params }) {
   const lastTrackedRef = useRef(0);
   const [sharePreviewOpen, setSharePreviewOpen] = useState(false);
 
+  // Dynamic PWA status bar theme-color update
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const defaultThemeColor = "#121212";
+
+    // Store helper globally for scroll access
+    window._getActivePageThemeColor = (progress) => getThemeColorForScroll(dominantColors, progress, defaultThemeColor);
+
+    if (!dominantColors) {
+      applyThemeColor(defaultThemeColor);
+      return;
+    }
+
+    // Set initial theme color for progress = 0
+    const initialColor = getThemeColorForScroll(dominantColors, 0, defaultThemeColor);
+    applyThemeColor(initialColor);
+
+    return () => {
+      applyThemeColor(defaultThemeColor);
+      delete window._getActivePageThemeColor;
+    };
+  }, [dominantColors]);
+
   // Initialize music player
   const { playSong, currentSong, currentIndex, isPlaying, togglePlayPause, currentPlaylistId: activePlaylistId, isShuffle, setIsShuffle } = useMusicPlayer();
 
@@ -1821,6 +1846,15 @@ export default function PlaylistDetailPage({ params }) {
             // Set the property directly - CSS will handle the interpolation
             scrollContainer.style.setProperty('--scroll-progress', progress.toString());
 
+            // Update theme-color meta tag for seamless status bar
+            if (window._getActivePageThemeColor) {
+              const currentThemeColor = window._getActivePageThemeColor(progress);
+              const metaThemeColor = document.querySelector("meta[name=theme-color]");
+              if (metaThemeColor) {
+                metaThemeColor.setAttribute("content", currentThemeColor);
+              }
+            }
+
             // Fast Header Toggle (bypasses Observer delay on mobile)
             const shouldShow = scrollTop > headerToggleThreshold;
             setShowHeaderTitle(prev => {
@@ -2345,23 +2379,25 @@ export default function PlaylistDetailPage({ params }) {
                         {decodeHtmlEntities(playlist.description)}
                       </p>
                     )}
-                    <div className="flex items-center justify-start gap-2 text-sm text-muted-foreground">
-                      {playlist.ownerImage ? (
-                        <img src={playlist.ownerImage} alt={playlist.ownerName} className="w-6 h-6 rounded-full object-cover" />
-                      ) : playlist.ownerName === 'Spotify' ? (
-                        <img src="https://i.postimg.cc/g25JqFyg/icon-192.png" alt="Jammify" className="w-6 h-6 rounded-full object-cover" />
-                      ) : (
-                        <div className="w-6 h-6 rounded-full bg-muted/30 flex items-center justify-center">
-                          <User className="w-3 h-3" />
-                        </div>
-                      )}
-                      <span className="font-semibold">{playlist.ownerName || 'Unknown User'}</span>
-                      <span>•</span>
-                      <span>{playlist.songIds?.length || 0} songs</span>
+                    <div className="flex flex-wrap items-center justify-start gap-x-2 gap-y-1 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {playlist.ownerImage ? (
+                          <img src={playlist.ownerImage} alt={playlist.ownerName} className="w-6 h-6 rounded-full object-cover" />
+                        ) : playlist.ownerName === 'Spotify' ? (
+                          <img src="https://i.postimg.cc/g25JqFyg/icon-192.png" alt="Jammify" className="w-6 h-6 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-muted/30 flex items-center justify-center">
+                            <User className="w-3 h-3" />
+                          </div>
+                        )}
+                        <span className="font-semibold text-foreground truncate max-w-[150px]">{playlist.ownerName || 'Unknown User'}</span>
+                      </div>
+                      <span className="text-muted-foreground/60">•</span>
+                      <span className="whitespace-nowrap">{playlist.songIds?.length || 0} songs</span>
                       {totalDuration && (
                         <>
-                          <span>•</span>
-                          <span>{totalDuration}</span>
+                          <span className="text-muted-foreground/60">•</span>
+                          <span className="whitespace-nowrap">{totalDuration}</span>
                         </>
                       )}
                     </div>

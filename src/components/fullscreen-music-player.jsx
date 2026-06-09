@@ -458,8 +458,22 @@ export function FullscreenMusicPlayer({
       }
     };
 
+    const getActivePageColor = () => {
+      if (window._getActivePageThemeColor) {
+        const scrollContainer = document.getElementById('user-playlist-scroll-container') ||
+                                document.getElementById('playlist-scroll-container') ||
+                                document.getElementById('album-scroll-container') ||
+                                document.getElementById('artist-scroll-container') ||
+                                document.getElementById('song-scroll-container');
+        const scrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+        const progress = Math.max(0, Math.min(1, scrollTop / 350));
+        return window._getActivePageThemeColor(progress);
+      }
+      return defaultThemeColor;
+    };
+
     if (!isOpen) {
-      applyThemeColor(defaultThemeColor);
+      applyThemeColor(getActivePageColor());
       return;
     }
 
@@ -471,10 +485,7 @@ export function FullscreenMusicPlayer({
     applyThemeColor(targetColor);
 
     return () => {
-      const meta = document.querySelector("meta[name=theme-color]");
-      if (meta) {
-        meta.setAttribute("content", defaultThemeColor);
-      }
+      applyThemeColor(getActivePageColor());
     };
   }, [isOpen, dominantColors?.primary]);
 
