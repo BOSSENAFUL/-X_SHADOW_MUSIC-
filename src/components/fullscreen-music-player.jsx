@@ -2600,7 +2600,7 @@ export function FullscreenMusicPlayer({
             {/* AMLL WebGL Dynamic Background - desktop/tablet only */}
             {/* Hidden on phones to keep a clean static gradient background */}
             <div className="absolute inset-0 pointer-events-none z-0 hidden md:block">
-              <ErrorBoundary fallback={<div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/60" />}>
+              <ErrorBoundary fallback={<div className="absolute inset-0 bg-linear-to-b from-black/40 to-black/60" />}>
                 <BackgroundRender album={currentSongImageUrlProxied} />
               </ErrorBoundary>
             </div>
@@ -2698,7 +2698,7 @@ export function FullscreenMusicPlayer({
                           transparent 100%)`
                       }}
                     />
-                    <div className="space-y-3 text-left max-w-2xl h-full px-4">
+                    <div className="space-y-3 text-left max-w-2xl h-full px-2">
                       {lyricsLoading || lyricsFetching ? (
                         <div className="space-y-4 py-8 px-2">
                           {[80, 60, 90, 50, 75, 65, 85, 55].map((w, i) => (
