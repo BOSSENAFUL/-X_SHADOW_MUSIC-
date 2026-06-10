@@ -67,6 +67,25 @@ const mapLyricsPlusToLyrics = (lyricsPlusLines) => {
   });
 };
 
+const cleanSongMetadata = (title, artist) => {
+  let cleanTitle = (title || "")
+    .replace(/\s*[\(\[][^)]*(official|video|audio|lyric|remix|edit|feat|ft|with|clip|slowed|reverb|speed|sped|version|remaster|mono|stereo)[^)]*[\)\]]/gi, "")
+    .replace(/\s*-\s*(official|video|audio|lyric|remix|edit|feat|ft|with|clip|slowed|reverb|speed|sped|version|remaster).*/gi, "")
+    .replace(/\s*[\(\[][^)]*film[^)]*[\)\]]/gi, "")
+    .trim();
+
+  if (!cleanTitle) cleanTitle = title || "";
+
+  let cleanArtist = (artist || "")
+    .split(/[&,]/)[0]
+    .replace(/\s*-\s*(topic|official|vevo|music).*/gi, "")
+    .trim();
+    
+  if (!cleanArtist) cleanArtist = artist || "";
+
+  return { cleanTitle, cleanArtist };
+};
+
 import { useState, useRef, useEffect, useCallback, useMemo, Component } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -897,37 +916,12 @@ export function FullscreenMusicPlayer({
       const albumName = song.album?.name ? decodeHtmlEntities(song.album.name) : "";
       const duration = song.duration || 0;
 
-      // Clean up track name and artist name for better matching on TTML API
-      const cleanTrackNameForTTML = (name) => {
-        return (name || "")
-          .replace(/\s*[\(\[][^)]*(official|video|audio|lyric|remix|edit|feat|ft|with|clip)[^)]*[\)\]]/gi, "")
-          .replace(/\s*-\s*(official|video|audio|lyric|remix|edit|feat|ft|with|clip).*/gi, "")
-          .replace(/\s*[\(\[][^)]*film[^)]*[\)\]]/gi, "")
-          .trim();
-      };
-
-      const getPrimaryArtistNameForTTML = (s) => {
-        if (!s) return "";
-        if (s.artists?.primary && Array.isArray(s.artists.primary) && s.artists.primary[0]) {
-          return s.artists.primary[0].name;
-        }
-        if (s.primaryArtists) {
-          return s.primaryArtists.split(/[&,]/)[0].trim();
-        }
-        const art = getArtistNames(s);
-        if (art && art !== "Unknown Artist") {
-          return art.split(/[&,]/)[0].trim();
-        }
-        return "";
-      };
-
-      const ttmlTrackName = cleanTrackNameForTTML(trackName);
-      const ttmlArtistName = getPrimaryArtistNameForTTML(song) || artistName;
+      const { cleanTitle, cleanArtist } = cleanSongMetadata(trackName, artistName);
 
       // Try TTML word-by-word synced lyrics API first
       try {
         const durationParam = duration ? `&d=${duration}` : '';
-        const ttmlUrl = `/api/proxy/ttml-lyrics?s=${encodeURIComponent(ttmlTrackName)}&a=${encodeURIComponent(ttmlArtistName)}${durationParam}`;
+        const ttmlUrl = `/api/proxy/ttml-lyrics?s=${encodeURIComponent(cleanTitle)}&a=${encodeURIComponent(cleanArtist)}${durationParam}`;
         const ttmlResponse = await fetch(ttmlUrl, { signal });
         if (ttmlResponse.ok) {
           const ttmlData = await ttmlResponse.json();
@@ -945,33 +939,50 @@ export function FullscreenMusicPlayer({
         console.warn("Could not fetch TTML lyrics, falling back to LRCLib:", err.message);
       }
 
-      // Method 1: exact match
+      // Prepare the three URLs for parallel fetching
       const params = new URLSearchParams();
-      params.append("artist_name", artistName);
-      params.append("track_name", trackName);
+      params.append("artist_name", cleanArtist);
+      params.append("track_name", cleanTitle);
       if (albumName) params.append("album_name", albumName);
       if (duration) params.append("duration", duration.toString());
 
       const getApiUrl = `/api/proxy/lyrics?endpoint=get&${params.toString()}`;
-      let response = await fetch(getApiUrl, { signal });
+      
+      const query1 = `${cleanArtist} ${cleanTitle}`;
+      const searchApiUrl1 = `/api/proxy/lyrics?endpoint=search&q=${encodeURIComponent(query1)}`;
+      
+      const searchApiUrl2 = `/api/proxy/lyrics?endpoint=search&q=${encodeURIComponent(cleanTitle)}`;
 
-      // Method 2: search fallback on 404
-      if (response.status === 404) {
-        const query = `${artistName} ${trackName}`;
-        const searchApiUrl = `/api/proxy/lyrics?endpoint=search&q=${encodeURIComponent(query)}`;
+      // Fetch all three concurrently!
+      try {
+        const [getRes, searchRes1, searchRes2] = await Promise.all([
+          fetch(getApiUrl, { signal }).catch(() => ({ ok: false, status: 500 })),
+          fetch(searchApiUrl1, { signal }).catch(() => ({ ok: false, status: 500 })),
+          fetch(searchApiUrl2, { signal }).catch(() => ({ ok: false, status: 500 }))
+        ]);
 
-        let searchResults = [];
-        response = await fetch(searchApiUrl, { signal });
-        if (response.ok) searchResults = await response.json();
-
-        // Method 3: track name only
-        if (!searchResults?.length) {
-          const trackOnlyUrl = `/api/proxy/lyrics?endpoint=search&q=${encodeURIComponent(trackName)}`;
-          const trackResponse = await fetch(trackOnlyUrl, { signal });
-          if (trackResponse.ok) searchResults = await trackResponse.json();
+        // 1. Check if exact match succeeded
+        if (getRes.ok) {
+          const exactData = await getRes.json();
+          if (exactData && (exactData.syncedLyrics || exactData.plainLyrics)) {
+            if (cacheKey) lyricsCache.set(cacheKey, exactData);
+            return exactData;
+          }
         }
 
-        if (searchResults?.length > 0) {
+        // 2. Check search result 1 (artist + title query)
+        let searchResults = [];
+        if (searchRes1.ok) {
+          searchResults = await searchRes1.json();
+        }
+
+        // 3. Check search result 2 (title only query) if search 1 had no results
+        if ((!searchResults || searchResults.length === 0) && searchRes2.ok) {
+          searchResults = await searchRes2.json();
+        }
+
+        if (searchResults && searchResults.length > 0) {
+          // Score and find the best match
           const matches = searchResults
             .filter(r => r.syncedLyrics || r.plainLyrics)
             .map(r => {
@@ -979,14 +990,14 @@ export function FullscreenMusicPlayer({
               const normalize = (str) =>
                 (str || "").toLowerCase().replace(/[^\w\s]/gi, " ").replace(/\s+/g, " ").trim();
               const rNameNorm = normalize(r.name || r.trackName);
-              const sNameNorm = normalize(trackName);
+              const sNameNorm = normalize(cleanTitle);
               const rName = (r.name || r.trackName || "").toLowerCase();
-              const sName = trackName.toLowerCase();
+              const sName = cleanTitle.toLowerCase();
               if (rName === sName || rNameNorm === sNameNorm) score += 15;
               else if (rName.includes(sName) || sName.includes(rName)) score += 8;
               else if (rNameNorm.includes(sNameNorm) || sNameNorm.includes(rNameNorm)) score += 5;
               const rArtist = (r.artistName || "").toLowerCase();
-              const sArtist = artistName.toLowerCase();
+              const sArtist = cleanArtist.toLowerCase();
               if (rArtist === sArtist) score += 10;
               else if (rArtist.includes(sArtist) || sArtist.includes(rArtist)) score += 5;
               const durationDiff = Math.abs((r.duration || 0) - duration);
@@ -1003,16 +1014,12 @@ export function FullscreenMusicPlayer({
             return bestMatch;
           }
         }
-
-        if (cacheKey) lyricsCache.set(cacheKey, null);
-        return null;
+      } catch (parallelErr) {
+        console.warn("Parallel lyrics fetch error:", parallelErr);
       }
 
-      if (!response.ok) return null;
-
-      const data = await response.json();
-      if (cacheKey) lyricsCache.set(cacheKey, data);
-      return data;
+      if (cacheKey) lyricsCache.set(cacheKey, null);
+      return null;
     } catch (error) {
       // AbortError is expected when the user closes lyrics — not a real error
       if (error.name === 'AbortError') return null;
