@@ -4,12 +4,16 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const trackName = searchParams.get('s');
     const artistName = searchParams.get('a');
+    const duration = searchParams.get('d');
 
     if (!trackName || !artistName) {
         return NextResponse.json({ error: 'Missing track name (s) or artist name (a)' }, { status: 400 });
     }
 
-    const ttmlUrl = `https://lyrics-api.boidu.dev/ttml/getLyrics?s=${encodeURIComponent(trackName)}&a=${encodeURIComponent(artistName)}`;
+    let ttmlUrl = `https://lyricsplus.prjktla.workers.dev/v2/lyrics/get?title=${encodeURIComponent(trackName)}&artist=${encodeURIComponent(artistName)}&source=apple,lyricsplus,musixmatch,spotify,musixmatch-word`;
+    if (duration) {
+        ttmlUrl += `&duration=${encodeURIComponent(duration)}`;
+    }
 
     try {
         const response = await fetch(ttmlUrl, {
@@ -34,3 +38,4 @@ export async function GET(request) {
         return NextResponse.json({ error: 'Failed to proxy TTML lyrics' }, { status: 502 });
     }
 }
+

@@ -21,6 +21,52 @@ const interpolateRgbRaw = (color1Str, color2Str, t) => {
   return `${r}, ${g}, ${b}`;
 };
 
+const mapLyricsPlusToLyrics = (lyricsPlusLines) => {
+  if (!Array.isArray(lyricsPlusLines)) return [];
+  
+  return lyricsPlusLines.map((line) => {
+    const startTime = line.time || 0;
+    const duration = line.duration || 0;
+    const endTime = startTime + duration;
+    
+    let words = [];
+    if (Array.isArray(line.syllabus) && line.syllabus.length > 0) {
+      words = line.syllabus.map((w) => {
+        const wStartTime = w.time || startTime;
+        const wDuration = w.duration || 0;
+        const wEndTime = wStartTime + wDuration;
+        return {
+          startTime: wStartTime,
+          endTime: wEndTime,
+          word: w.text || ""
+        };
+      });
+    } else {
+      words = [
+        {
+          startTime,
+          endTime,
+          word: line.text || ""
+        }
+      ];
+    }
+    
+    const singer = line.element?.singer || 'v1';
+    const isDuet = singer !== 'v1';
+    const isBG = line.element?.key?.includes('bg') || false;
+    
+    return {
+      words,
+      translatedLyric: "",
+      romanLyric: "",
+      isBG,
+      isDuet,
+      startTime,
+      endTime
+    };
+  });
+};
+
 import { useState, useRef, useEffect, useCallback, useMemo, Component } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -329,15 +375,23 @@ export function FullscreenMusicPlayer({
     () => {
       if (!lyrics?.syncedLyrics) return [];
       try {
-        if (lyrics.isTTML || lyrics.syncedLyrics.trim().startsWith("<")) {
-          const preprocessed = ensureTTMLKeys(lyrics.syncedLyrics);
-          const result = parseTTML(preprocessed);
-          console.log("Jammify Fullscreen: parsed TTML lyrics count:", result?.lines?.length, result);
-          return result.lines;
+        if (lyrics.isTTML) {
+          if (Array.isArray(lyrics.syncedLyrics)) {
+            return mapLyricsPlusToLyrics(lyrics.syncedLyrics);
+          }
+          if (typeof lyrics.syncedLyrics === "string" && lyrics.syncedLyrics.trim().startsWith("<")) {
+            const preprocessed = ensureTTMLKeys(lyrics.syncedLyrics);
+            const result = parseTTML(preprocessed);
+            console.log("Jammify Fullscreen: parsed TTML lyrics count:", result?.lines?.length, result);
+            return result.lines;
+          }
         }
-        const result = parseLrc(lyrics.syncedLyrics);
-        console.log("Jammify Fullscreen: parsed lyrics count:", result?.length, result);
-        return result;
+        if (typeof lyrics.syncedLyrics === "string") {
+          const result = parseLrc(lyrics.syncedLyrics);
+          console.log("Jammify Fullscreen: parsed lyrics count:", result?.length, result);
+          return result;
+        }
+        return [];
       } catch (err) {
         console.error("AMLL lyric parse error:", err);
         return [];
@@ -872,7 +926,8 @@ export function FullscreenMusicPlayer({
 
       // Try TTML word-by-word synced lyrics API first
       try {
-        const ttmlUrl = `/api/proxy/ttml-lyrics?s=${encodeURIComponent(ttmlTrackName)}&a=${encodeURIComponent(ttmlArtistName)}`;
+        const durationParam = duration ? `&d=${duration}` : '';
+        const ttmlUrl = `/api/proxy/ttml-lyrics?s=${encodeURIComponent(ttmlTrackName)}&a=${encodeURIComponent(ttmlArtistName)}${durationParam}`;
         const ttmlResponse = await fetch(ttmlUrl, { signal });
         if (ttmlResponse.ok) {
           const ttmlData = await ttmlResponse.json();
