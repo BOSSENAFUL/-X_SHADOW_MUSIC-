@@ -10,32 +10,73 @@ export async function GET(request) {
         return NextResponse.json({ error: 'Missing track name (s) or artist name (a)' }, { status: 400 });
     }
 
-    let ttmlUrl = `https://lyricsplus.prjktla.workers.dev/v2/lyrics/get?title=${encodeURIComponent(trackName)}&artist=${encodeURIComponent(artistName)}&source=apple,lyricsplus,musixmatch,spotify,musixmatch-word`;
-    if (duration) {
-        ttmlUrl += `&duration=${encodeURIComponent(duration)}`;
+    const userAgent = 'Jammify Music App (https://github.com/shreejaybhay/jammify)';
+
+    // Fallback list of endpoints to try in order
+    const apis = [
+        {
+            url: `https://lyricsplus.prjktla.my.id/v2/lyrics/get?title=${encodeURIComponent(trackName)}&artist=${encodeURIComponent(artistName)}${duration ? `&duration=${encodeURIComponent(duration)}` : ''}&source=apple,lyricsplus,musixmatch,spotify,musixmatch-word`,
+            type: 'lyricsplus'
+        },
+        {
+            url: `https://lyrics.geeked.wtf/v2/lyrics/get?title=${encodeURIComponent(trackName)}&artist=${encodeURIComponent(artistName)}${duration ? `&duration=${encodeURIComponent(duration)}` : ''}&source=apple,lyricsplus,musixmatch,spotify,musixmatch-word`,
+            type: 'lyricsplus'
+        },
+        {
+            url: `https://lyrics-api.boidu.dev/getLyrics?s=${encodeURIComponent(trackName)}&a=${encodeURIComponent(artistName)}${duration ? `&d=${encodeURIComponent(duration)}` : ''}`,
+            type: 'boidu'
+        }
+    ];
+
+    let lastError = null;
+
+    for (const api of apis) {
+        try {
+            console.log(`TTML Lyrics proxy: fetching from ${api.url}`);
+            const response = await fetch(api.url, {
+                headers: {
+                    'User-Agent': userAgent,
+                },
+                signal: AbortSignal.timeout(6000) // 6 second timeout per try
+            });
+
+            if (response.status === 404 || response.status === 401) {
+                console.log(`TTML Lyrics proxy: 404 from provider, checking next`);
+                lastError = { status: 404, message: 'Lyrics not found in source database' };
+                continue;
+            }
+
+            if (!response.ok) {
+                console.warn(`TTML Lyrics proxy: provider returned status ${response.status}`);
+                lastError = { status: response.status, message: `Lyrics provider status: ${response.status}` };
+                continue;
+            }
+
+            const data = await response.json();
+
+            if (api.type === 'boidu') {
+                if (data && data.ttml) {
+                    return NextResponse.json({
+                        lyrics: data.ttml
+                    });
+                }
+            } else {
+                if (data && data.lyrics) {
+                    return NextResponse.json(data);
+                }
+            }
+
+            console.warn(`TTML Lyrics proxy: invalid structure from provider`);
+            lastError = { status: 502, message: 'Invalid payload structure' };
+        } catch (error) {
+            console.error(`TTML Lyrics proxy failed for ${api.url}:`, error.message);
+            lastError = { status: 502, message: error.message };
+        }
     }
 
-    try {
-        const response = await fetch(ttmlUrl, {
-            headers: {
-                'User-Agent': 'Jammify Music App (https://github.com/shreejaybhay/jammify)',
-            },
-        });
-
-        if (response.status === 404 || response.status === 401) {
-            return NextResponse.json({ error: 'Lyrics not found in TTML database' }, { status: 404 });
-        }
-
-        if (!response.ok) {
-            console.warn(`TTML Lyrics proxy: API returned status ${response.status}`);
-            return NextResponse.json({ error: `Lyrics fetch failed: ${response.statusText}` }, { status: response.status });
-        }
-
-        const data = await response.json();
-        return NextResponse.json(data);
-    } catch (error) {
-        console.error('TTML Lyrics proxy fetch failed:', error.message);
-        return NextResponse.json({ error: 'Failed to proxy TTML lyrics' }, { status: 502 });
-    }
+    const finalStatus = lastError?.status || 404;
+    const finalMessage = lastError?.message || 'Lyrics not found';
+    return NextResponse.json({ error: finalMessage }, { status: finalStatus });
 }
+
 
