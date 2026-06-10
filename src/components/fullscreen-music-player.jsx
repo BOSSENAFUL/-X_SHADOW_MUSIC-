@@ -936,6 +936,10 @@ export function FullscreenMusicPlayer({
           }
         }
       } catch (err) {
+        // Re-throw AbortError so the outer handler catches it cleanly
+        // and doesn't fall through to the parallel fetches (which would
+        // wrongly cache null for a song whose request was just aborted).
+        if (err.name === 'AbortError') throw err;
         console.warn("Could not fetch TTML lyrics, falling back to LRCLib:", err.message);
       }
 
@@ -1018,7 +1022,11 @@ export function FullscreenMusicPlayer({
         console.warn("Parallel lyrics fetch error:", parallelErr);
       }
 
-      if (cacheKey) lyricsCache.set(cacheKey, null);
+      // Only cache a negative result when the request completed normally.
+      // If it was aborted mid-flight we leave the cache empty so the next
+      // visit to this song triggers a fresh fetch instead of immediately
+      // showing "No lyrics found".
+      if (cacheKey && !signal?.aborted) lyricsCache.set(cacheKey, null);
       return null;
     } catch (error) {
       // AbortError is expected when the user closes lyrics — not a real error
