@@ -148,6 +148,7 @@ import {
   Download,
   ArrowUpDown,
   Music2,
+  Video,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -363,11 +364,140 @@ export function FullscreenMusicPlayer({
   } = useMusicPlayer();
   const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
   const router = useRouter();
-  const [showLyrics, setShowLyrics] = useState(false);
+  const [showLyrics,    setShowLyrics   ] = useState(false);
+  const [showVideoMode, setShowVideoMode] = useState(false);
+  const [ytVideoId,     setYtVideoId    ] = useState(null);
+  const [ytLoading,     setYtLoading    ] = useState(false);
+  const [ytError,       setYtError      ] = useState(null);
+  const [ytCurrentTime, setYtCurrentTime] = useState(0);
+  const [ytDuration,    setYtDuration   ] = useState(0);
+  const [ytIsPlaying,   setYtIsPlaying  ] = useState(false);
+  const [ytWaiting,     setYtWaiting    ] = useState(true);
+  const ytVideoRef   = useRef(null);
+  const ytCanvasRef  = useRef(null);
+  const wasPlayingRef = useRef(false);
   const [shuffledPlaylist, setShuffledPlaylist] = useState([]);
   const shuffledIndexRef = useRef(0);
   const internalNavRef = useRef(false);
   const [lyrics, setLyrics] = useState(null);
+
+  /* ── Video mode: fetch YT video when toggled on ─────────────────── */
+  useEffect(() => {
+    // Reset video controller states immediately on song/mode change
+    setYtCurrentTime(0);
+    setYtDuration(0);
+    setYtIsPlaying(false);
+    setYtWaiting(true);
+
+    if (!showVideoMode) {
+      // Switching back to audio — restore playback if it was playing
+      if (wasPlayingRef.current && !isPlaying) {
+        onTogglePlayPause();
+      }
+      setYtVideoId(null);
+      setYtError(null);
+      return;
+    }
+
+    // Remember if audio was playing before we mute it
+    wasPlayingRef.current = isPlaying;
+    if (isPlaying) onTogglePlayPause(); // pause the main player
+
+    const songName   = decodeHtmlEntities(currentSong?.name || currentSong?.title || '');
+    const artistName = getArtistNames(currentSong);
+    if (!songName) return;
+
+    const query = encodeURIComponent(`${songName} ${artistName}`);
+    setYtLoading(true);
+    setYtError(null);
+    setYtVideoId(null);
+
+    const parseViews = (viewsStr) => {
+      if (!viewsStr) return 0;
+      const clean = viewsStr.toLowerCase().replace(/,/g, '').trim();
+      const match = clean.match(/([\d.]+)\s*([bmk]?)/);
+      if (!match) return 0;
+      const value = parseFloat(match[1]);
+      const unit = match[2];
+      if (isNaN(value)) return 0;
+      switch (unit) {
+        case 'b': return value * 1000000000;
+        case 'm': return value * 1000000;
+        case 'k': return value * 1000;
+        default: return value;
+      }
+    };
+
+    fetch(`https://ytmusic-api-v1.vercel.app/api/search?q=${query}&type=video`)
+      .then(r => r.json())
+      .then(data => {
+        const results = data?.results || [];
+        if (results.length > 0) {
+          // Sort results by view count descending to ensure we get the official video/song
+          const sorted = [...results].sort((a, b) => parseViews(b.views) - parseViews(a.views));
+          const first = sorted[0];
+          if (first?.id) {
+            setYtVideoId(first.id);
+          } else {
+            setYtError('No video found');
+          }
+        } else {
+          setYtError('No video found');
+        }
+      })
+      .catch(() => setYtError('Failed to load video'))
+      .finally(() => setYtLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showVideoMode, currentSong?.id]);
+  /* ─────────────────────────────────────────────────────────────────── */
+
+  // Helper to draw a video frame onto the ambient background canvas
+  const drawVideoFrame = (videoEl) => {
+    if (!videoEl) return;
+    const canvas = ytCanvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        try {
+          ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+        } catch (e) {
+          // ignore temporary drawing errors
+        }
+      }
+    }
+  };
+
+  /* ── Video control handlers ──────────────────────────────────────── */
+  // Play/pause: in video mode controls the <video> el, otherwise the audio
+  const handlePlayPause = () => {
+    if (showVideoMode && ytVideoRef.current) {
+      if (ytVideoRef.current.paused) {
+        ytVideoRef.current.play().catch(() => {});
+      } else {
+        ytVideoRef.current.pause();
+      }
+    } else {
+      onTogglePlayPause();
+    }
+  };
+
+  // Seek bar: in video mode scrubs the <video> el
+  const handleSeek = (val) => {
+    if (showVideoMode && ytVideoRef.current) {
+      ytVideoRef.current.currentTime = val[0];
+      setYtCurrentTime(val[0]);
+    } else {
+      onSeek(val);
+    }
+  };
+  const handleSeekCommit = (val) => {
+    if (showVideoMode && ytVideoRef.current) {
+      ytVideoRef.current.currentTime = val[0];
+    } else {
+      onSeekCommit(val);
+    }
+  };
+  /* ─────────────────────────────────────────────────────────────────── */
   const [lyricsLoading, setLyricsLoading] = useState(false);
   // True from the moment we decide to fetch until the result lands —
   // prevents the "No lyrics found" flash while the request is in-flight
@@ -1805,9 +1935,30 @@ export function FullscreenMusicPlayer({
       >
         {/* Enhanced Ambient Background */}
         <div className="absolute inset-0">
+          {/* Ambient Video Glow */}
+          {showVideoMode && ytVideoId && (
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              <canvas
+                ref={ytCanvasRef}
+                width={64}
+                height={36}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  filter: 'blur(80px) saturate(1.8) contrast(1.15)',
+                  opacity: 0.6,
+                  transform: 'scale(1.3)',
+                  pointerEvents: 'none',
+                }}
+              />
+            </div>
+          )}
           {/* Multiple layered background images for better ambient effect - desktop only */}
           {/* Hidden on phones to avoid heavy GPU usage and animated background movement */}
-          {currentSong.image?.[2]?.url && (
+          {currentSong.image?.[2]?.url && !showVideoMode && (
             <div className="hidden md:block">
               {/* Base blurred image */}
               <img
@@ -1840,29 +1991,43 @@ export function FullscreenMusicPlayer({
           )}
 
           {/* Dynamic gradient overlay based on extracted colors */}
-          <div
-            className="absolute inset-0 transition-all duration-1000"
-            style={{
-              background: `
-              radial-gradient(ellipse at top, ${dominantColors.primary.replace('rgb', 'rgba').replace(')', ', 0.4)')} 0%, transparent 70%),
-              radial-gradient(ellipse at bottom left, ${dominantColors.secondary.replace('rgb', 'rgba').replace(')', ', 0.3)')} 0%, transparent 60%),
-              radial-gradient(ellipse at bottom right, ${dominantColors.accent.replace('rgb', 'rgba').replace(')', ', 0.25)')} 0%, transparent 60%),
-              linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.75) 100%)
-            `,
-            }}
-          />
+          {!showVideoMode && (
+            <div
+              className="absolute inset-0 transition-all duration-1000"
+              style={{
+                background: `
+                radial-gradient(ellipse at top, ${dominantColors.primary.replace('rgb', 'rgba').replace(')', ', 0.4)')} 0%, transparent 70%),
+                radial-gradient(ellipse at bottom left, ${dominantColors.secondary.replace('rgb', 'rgba').replace(')', ', 0.3)')} 0%, transparent 60%),
+                radial-gradient(ellipse at bottom right, ${dominantColors.accent.replace('rgb', 'rgba').replace(')', ', 0.25)')} 0%, transparent 60%),
+                linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.75) 100%)
+              `,
+              }}
+            />
+          )}
 
           {/* Color wash overlay */}
-          <div
-            className="absolute inset-0 mix-blend-soft-light opacity-40 transition-all duration-1000"
-            style={{
-              background: `
-              radial-gradient(circle at 30% 20%, ${dominantColors.primary.replace('rgb', 'rgba').replace(')', ', 0.3)')} 0%, transparent 40%),
-              radial-gradient(circle at 70% 80%, ${dominantColors.secondary.replace('rgb', 'rgba').replace(')', ', 0.25)')} 0%, transparent 40%),
-              radial-gradient(circle at 50% 50%, ${dominantColors.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')} 0%, transparent 60%)
-            `,
-            }}
-          />
+          {!showVideoMode && (
+            <div
+              className="absolute inset-0 mix-blend-soft-light opacity-40 transition-all duration-1000"
+              style={{
+                background: `
+                radial-gradient(circle at 30% 20%, ${dominantColors.primary.replace('rgb', 'rgba').replace(')', ', 0.3)')} 0%, transparent 40%),
+                radial-gradient(circle at 70% 80%, ${dominantColors.secondary.replace('rgb', 'rgba').replace(')', ', 0.25)')} 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, ${dominantColors.accent.replace('rgb', 'rgba').replace(')', ', 0.2)')} 0%, transparent 60%)
+              `,
+              }}
+            />
+          )}
+
+          {/* Dynamic gradient overlay for video mode - keeps control areas dark for readability */}
+          {showVideoMode && (
+            <div
+              className="absolute inset-0 transition-all duration-1000"
+              style={{
+                background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.45) 55%, rgba(0,0,0,0.85) 100%)',
+              }}
+            />
+          )}
 
           {/* Subtle noise texture for depth */}
           <div
@@ -2015,28 +2180,112 @@ export function FullscreenMusicPlayer({
           <div className="flex-1 flex flex-col px-4 sm:px-6 lg:px-12 pb-4 sm:pb-6 min-h-0 overflow-hidden">
             {/* Mobile Layout */}
             <div className="md:hidden flex-1 flex flex-col min-h-0">
-              {/* Album Art Container - Responsive sizing */}
+              {/* Album Art OR YouTube Video */}
               <div className="flex-1 flex items-center justify-center py-4 sm:py-8 min-h-0">
-                <div className="w-full max-w-[380px] min-[400px]:max-w-[340px] min-[430px]:max-w-[380px] sm:max-w-[85%] md:max-w-[90%] lg:max-w-[500px] px-2 sm:px-4">
-                  <div className="aspect-square overflow-hidden shadow-2xl bg-linear-to-br from-gray-800 to-gray-900">
-                    {currentSong.image?.[2]?.url ? (
-                      <img
-                        src={currentSong.image[2].url}
-                        alt={currentSong.name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.src = '/default-playlist-image.png';
-                        }}
-                      />
-                    ) : (
-                      <img
-                        src="/default-playlist-image.png"
-                        alt={currentSong.name}
-                        className="w-full h-full object-cover"
-                      />
-                    )}
+                {showVideoMode ? (
+                  /* ── Video player ── */
+                  <div className="w-[calc(100%+2rem)] -mx-4 sm:w-[calc(100%+3rem)] sm:-mx-6">
+                    <div className="w-full aspect-video overflow-hidden shadow-2xl bg-black relative">
+                      {(ytLoading || (ytVideoId && ytWaiting)) && (
+                        <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-black/80 absolute inset-0 z-20">
+                          <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+                          <span className="text-white/50 text-xs">
+                            {ytLoading ? 'Finding video…' : 'Loading stream…'}
+                          </span>
+                        </div>
+                      )}
+                      {ytError && !ytLoading && (
+                        <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-black/80 absolute inset-0 z-20">
+                          <Video style={{ width: 32, height: 32, color: 'rgba(255,255,255,0.3)' }} />
+                          <span className="text-white/40 text-xs">{ytError}</span>
+                          <button
+                            onClick={() => { setShowVideoMode(false); setShowVideoMode(true); }}
+                            className="text-white/60 text-xs underline mt-1"
+                          >Retry</button>
+                        </div>
+                      )}
+                      {ytVideoId && !ytLoading && (
+                        <video
+                          key={ytVideoId}
+                          ref={ytVideoRef}
+                          src={`https://ytmusic-api-production.up.railway.app/api/stream?id=${ytVideoId}`}
+                          playsInline
+                          autoPlay
+                          onCanPlay={(e) => {
+                            setYtWaiting(false);
+                            if (wasPlayingRef.current) {
+                              e.target.play().catch((err) => {
+                                console.log("Play on canplay failed:", err);
+                              });
+                            }
+                          }}
+                          onPlaying={() => setYtWaiting(false)}
+                          onWaiting={() => setYtWaiting(true)}
+                          onPlay={(e) => {
+                            setYtIsPlaying(true);
+                            drawVideoFrame(e.target);
+                          }}
+                          onPause={(e) => {
+                            setYtIsPlaying(false);
+                            drawVideoFrame(e.target);
+                          }}
+                          onSeeked={(e) => {
+                            drawVideoFrame(e.target);
+                          }}
+                          onTimeUpdate={(e) => {
+                            setYtCurrentTime(e.target.currentTime);
+                            drawVideoFrame(e.target);
+                          }}
+                          onLoadedMetadata={(e) => setYtDuration(e.target.duration)}
+                          onEnded={handleNext}
+                          style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
+                        />
+                      )}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  /* ── Album Art ── */
+                  <div className="w-full max-w-[380px] min-[400px]:max-w-[340px] min-[430px]:max-w-[380px] sm:max-w-[85%] md:max-w-[90%] lg:max-w-[500px] px-2 sm:px-4">
+                    <div className="w-full aspect-square overflow-hidden shadow-2xl bg-linear-to-br from-gray-800 to-gray-900">
+                      {currentSong.image?.[2]?.url ? (
+                        <img
+                          src={currentSong.image[2].url}
+                          alt={currentSong.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
+                        />
+                      ) : (
+                        <img
+                          src="/default-playlist-image.png"
+                          alt={currentSong.name}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+
+              {/* Switch to video / audio — above the song title, Spotify-style */}
+              <div className="flex justify-start px-1 sm:px-2 mb-2">
+                <button
+                  onClick={() => setShowVideoMode(v => !v)}
+                  className="flex items-center gap-2 px-3.5 py-1.5 rounded-full active:scale-95 transition-all duration-200 select-none"
+                  style={{
+                    background: 'rgba(0,0,0,0.30)',
+                    border: '1px solid rgba(255,255,255,0.13)',
+                  }}
+                >
+                  {showVideoMode ? (
+                    <Music2 style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
+                  ) : (
+                    <Video style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
+                  )}
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.90)', letterSpacing: '0.01em' }}>
+                    {showVideoMode ? 'Switch to audio' : 'Switch to video'}
+                  </span>
+                </button>
               </div>
 
               {/* Song Info - Compact for small screens */}
@@ -2078,16 +2327,16 @@ export function FullscreenMusicPlayer({
                 {/* Progress Bar */}
                 <div className="mb-4 sm:mb-6">
                   <Slider
-                    value={[currentTime]}
-                    max={duration || 100}
+                    value={[showVideoMode ? ytCurrentTime : currentTime]}
+                    max={(showVideoMode ? ytDuration : duration) || 100}
                     step={1}
-                    onValueChange={onSeek}
-                    onValueCommit={onSeekCommit}
+                    onValueChange={handleSeek}
+                    onValueCommit={handleSeekCommit}
                     className="w-full **:data-[slot=slider-thumb]:opacity-100 **:data-[slot=slider-thumb]:bg-white **:data-[slot=slider-thumb]:w-2.5 **:data-[slot=slider-thumb]:h-2.5 **:data-[slot=slider-range]:bg-white **:data-[slot=slider-track]:bg-white/20"
                   />
                   <div className="flex justify-between text-xs sm:text-sm text-white/60 mt-2">
-                    <span>{formatTime(currentTime)}</span>
-                    <span>{formatTime(duration)}</span>
+                    <span>{formatTime(showVideoMode ? ytCurrentTime : currentTime)}</span>
+                    <span>{formatTime(showVideoMode ? ytDuration : duration)}</span>
                   </div>
                 </div>
 
@@ -2115,10 +2364,10 @@ export function FullscreenMusicPlayer({
                   <Button
                     variant="default"
                     size="lg"
-                    onClick={onTogglePlayPause}
+                    onClick={handlePlayPause}
                     className="rounded-full w-16 h-16 sm:w-20 sm:h-20 bg-white text-black hover:bg-white/90"
                   >
-                    {isPlaying ? (
+                    {(showVideoMode ? ytIsPlaying : isPlaying) ? (
                       <HiPause style={{ width: '30px', height: '30px' }} />
                     ) : (
                       <IoMdPlay style={{ width: '30px', height: '30px', marginLeft: '4px' }} />
@@ -2150,7 +2399,7 @@ export function FullscreenMusicPlayer({
                   </Button>
                 </div>
 
-                {/* Bottom Actions - Always visible with proper spacing */}
+
                 <div className="flex items-center justify-between ">
                   <Button
                     variant="ghost"
