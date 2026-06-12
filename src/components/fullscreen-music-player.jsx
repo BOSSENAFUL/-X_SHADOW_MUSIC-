@@ -187,7 +187,6 @@ import { BiSkipNext, BiSkipPrevious } from "react-icons/bi";
 import { RxShuffle } from "react-icons/rx";
 import { BsRepeat } from "react-icons/bs";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useSmartFullscreen } from "@/hooks/use-smart-fullscreen";
 import {
   Drawer,
   DrawerContent,
@@ -407,13 +406,7 @@ export function FullscreenMusicPlayer({
   const [localPlaylist, setLocalPlaylist] = useState([]);
   const shuffledIndexRef = useRef(0);
   const internalNavRef = useRef(false);
-  const {
-    fullscreenType,
-    isCssFallback,
-    toggleFullscreen,
-    setFullscreenType,
-    setIsCssFallback
-  } = useSmartFullscreen();
+  const [fullscreenType, setFullscreenType] = useState(null); // 'mobile' | 'desktop' | 'split' | null
   const [showHud, setShowHud] = useState(false);
   const mobileVideoContainerRef = useRef(null);
   const desktopVideoContainerRef = useRef(null);
@@ -462,6 +455,28 @@ export function FullscreenMusicPlayer({
     };
   }, []);
 
+  // Handle native fullscreen changes to keep state synced (e.g. user presses Esc key)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isNativeFs = !!document.fullscreenElement;
+      if (!isNativeFs) {
+        setFullscreenType(null);
+      }
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
+    document.addEventListener("MSFullscreenChange", handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("MSFullscreenChange", handleFullscreenChange);
+    };
+  }, []);
+
   // Toggle HUD visibility on fullscreen container click (excluding interactive controls)
   const handleFullscreenClick = useCallback((e) => {
     if (fullscreenType === null) return;
@@ -480,9 +495,71 @@ export function FullscreenMusicPlayer({
     }
   }, [fullscreenType]);
 
+  // Toggle fullscreen mode with native fullscreen first and simulated fallback for iOS / restricted browsers
+  const handleToggleFullscreen = async (containerEl, type) => {
+    if (!containerEl) return;
+
+    const isNativeFs = !!document.fullscreenElement;
+
+    if (isNativeFs || fullscreenType !== null) {
+      // Exit Fullscreen
+      if (isNativeFs) {
+        try {
+          if (document.exitFullscreen) {
+            await document.exitFullscreen();
+          } else if (document.webkitExitFullscreen) {
+            await document.webkitExitFullscreen();
+          } else if (document.msExitFullscreen) {
+            await document.msExitFullscreen();
+          }
+        } catch (err) {
+          console.warn("Native exit fullscreen failed, falling back to state reset:", err);
+          setFullscreenType(null);
+        }
+      } else {
+        setFullscreenType(null);
+      }
+
+      // Unlock Screen Orientation on mobile exit
+      try {
+        if (screen.orientation && screen.orientation.unlock) {
+          screen.orientation.unlock();
+        }
+      } catch (err) {
+        console.warn("Screen orientation unlock failed:", err);
+      }
+    } else {
+      // Enter Fullscreen
+      setFullscreenType(type);
+      try {
+        if (containerEl.requestFullscreen) {
+          await containerEl.requestFullscreen();
+        } else if (containerEl.webkitRequestFullscreen) {
+          await containerEl.webkitRequestFullscreen();
+        } else if (containerEl.msRequestFullscreen) {
+          await containerEl.msRequestFullscreen();
+        } else {
+          throw new Error("Native fullscreen not supported on this browser.");
+        }
+
+        // Lock mobile screen orientation to landscape
+        try {
+          if (screen.orientation && screen.orientation.lock) {
+            await screen.orientation.lock('landscape');
+          }
+        } catch (orientErr) {
+          console.log("Orientation lock not allowed or supported on desktop:", orientErr);
+        }
+      } catch (err) {
+        console.log("Native fullscreen failed, falling back to simulated CSS fullscreen:", err);
+        // Fallback simulated CSS fullscreen is active since fullscreenType is already set to type
+      }
+    }
+  };
+
   const getContainerStyle = (type) => {
     if (fullscreenType !== type) return {};
-    const isNativeFs = typeof document !== 'undefined' && !isCssFallback;
+    const isNativeFs = typeof document !== 'undefined' && !!document.fullscreenElement;
     if (isNativeFs) {
       return {
         width: '100%',
@@ -508,14 +585,14 @@ export function FullscreenMusicPlayer({
   };
 
   const renderFullscreenButton = (type, containerRef) => {
-    if (fullscreenType !== null) return null;
+    if (fullscreenType !== null || isMobile) return null;
 
     return (
       <button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          toggleFullscreen(containerRef.current, type);
+          handleToggleFullscreen(containerRef.current, type);
         }}
         className="absolute right-3 bottom-3 z-30 p-2 rounded-lg bg-black/60 hover:bg-black/80 active:scale-95 text-white border border-white/10 hover:scale-105 transition-all cursor-pointer shadow-md flex items-center justify-center"
         title="Horizontal Fullscreen"
@@ -548,7 +625,7 @@ export function FullscreenMusicPlayer({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              toggleFullscreen(containerRef.current, type);
+              handleToggleFullscreen(containerRef.current, type);
             }}
             className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white transition-all cursor-pointer flex items-center justify-center"
             title="Exit Fullscreen"
