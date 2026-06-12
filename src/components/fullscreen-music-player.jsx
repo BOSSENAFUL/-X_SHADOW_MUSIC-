@@ -86,6 +86,22 @@ const cleanSongMetadata = (title, artist) => {
   return { cleanTitle, cleanArtist };
 };
 
+const parseViews = (viewsStr) => {
+  if (!viewsStr) return 0;
+  const clean = viewsStr.toLowerCase().replace(/,/g, '').trim();
+  const match = clean.match(/([\d.]+)\s*([bmk]?)/);
+  if (!match) return 0;
+  const value = parseFloat(match[1]);
+  const unit = match[2];
+  if (isNaN(value)) return 0;
+  switch (unit) {
+    case 'b': return value * 1000000000;
+    case 'm': return value * 1000000;
+    case 'k': return value * 1000;
+    default: return value;
+  }
+};
+
 import { useState, useRef, useEffect, useCallback, useMemo, Component } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -376,9 +392,16 @@ export function FullscreenMusicPlayer({
   const ytVideoRef   = useRef(null);
   const ytCanvasRef  = useRef(null);
   const wasPlayingRef = useRef(false);
+  const videoCacheRef = useRef({});
   const [shuffledPlaylist, setShuffledPlaylist] = useState([]);
+  const [localPlaylist, setLocalPlaylist] = useState([]);
   const shuffledIndexRef = useRef(0);
   const internalNavRef = useRef(false);
+
+  // Initialize local playlist when playlist changes
+  useEffect(() => {
+    setLocalPlaylist([...playlist]);
+  }, [playlist]);
   const [lyrics, setLyrics] = useState(null);
 
   /* ── Video mode: fetch YT video when toggled on ─────────────────── */
@@ -403,6 +426,13 @@ export function FullscreenMusicPlayer({
     wasPlayingRef.current = isPlaying;
     if (isPlaying) onTogglePlayPause(); // pause the main player
 
+    const songId = currentSong?.id;
+    if (songId && videoCacheRef.current[songId]) {
+      setYtVideoId(videoCacheRef.current[songId]);
+      setYtLoading(false);
+      return;
+    }
+
     const songName   = decodeHtmlEntities(currentSong?.name || currentSong?.title || '');
     const artistName = getArtistNames(currentSong);
     if (!songName) return;
@@ -412,32 +442,22 @@ export function FullscreenMusicPlayer({
     setYtError(null);
     setYtVideoId(null);
 
-    const parseViews = (viewsStr) => {
-      if (!viewsStr) return 0;
-      const clean = viewsStr.toLowerCase().replace(/,/g, '').trim();
-      const match = clean.match(/([\d.]+)\s*([bmk]?)/);
-      if (!match) return 0;
-      const value = parseFloat(match[1]);
-      const unit = match[2];
-      if (isNaN(value)) return 0;
-      switch (unit) {
-        case 'b': return value * 1000000000;
-        case 'm': return value * 1000000;
-        case 'k': return value * 1000;
-        default: return value;
-      }
-    };
-
-    fetch(`https://ytmusic-api-v1.vercel.app/api/search?q=${query}&type=video`)
+    fetch(`https://inv.thepixora.com/api/v1/search?q=${query}&type=video`)
       .then(r => r.json())
       .then(data => {
-        const results = data?.results || [];
+        const results = Array.isArray(data) ? data : (data?.results || []);
         if (results.length > 0) {
           // Sort results by view count descending to ensure we get the official video/song
-          const sorted = [...results].sort((a, b) => parseViews(b.views) - parseViews(a.views));
+          const sorted = [...results].sort((a, b) => {
+            const viewsA = typeof a.viewCount === 'number' ? a.viewCount : parseViews(a.views || a.viewCountText);
+            const viewsB = typeof b.viewCount === 'number' ? b.viewCount : parseViews(b.views || b.viewCountText);
+            return viewsB - viewsA;
+          });
           const first = sorted[0];
-          if (first?.id) {
-            setYtVideoId(first.id);
+          const resolvedId = first?.videoId || first?.id;
+          if (resolvedId) {
+            if (songId) videoCacheRef.current[songId] = resolvedId;
+            setYtVideoId(resolvedId);
           } else {
             setYtError('No video found');
           }
@@ -449,6 +469,66 @@ export function FullscreenMusicPlayer({
       .finally(() => setYtLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showVideoMode, currentSong?.id]);
+
+  // Background prefetch for next song's video ID to enable instant transition/streaming
+  useEffect(() => {
+    if (!showVideoMode || !currentSong) return;
+
+    const currentPlaylist = getCurrentPlaylist();
+    if (!currentPlaylist || currentPlaylist.length === 0) return;
+    
+    const currentIndex = currentPlaylist.findIndex(s => s.id === currentSong.id);
+    if (currentIndex === -1) return;
+
+    let nextIndex = -1;
+    if (repeatMode === "one") {
+      nextIndex = currentIndex;
+    } else if (currentIndex < currentPlaylist.length - 1) {
+      nextIndex = currentIndex + 1;
+    } else if (repeatMode === "all") {
+      nextIndex = 0;
+    }
+
+    if (nextIndex === -1) return;
+    const nextSong = currentPlaylist[nextIndex];
+    if (!nextSong || !nextSong.id) return;
+
+    // Check if already cached
+    if (videoCacheRef.current[nextSong.id]) return;
+
+    const nextSongName = decodeHtmlEntities(nextSong.name || nextSong.title || '');
+    const nextArtistName = getArtistNames(nextSong);
+    if (!nextSongName) return;
+
+    const query = encodeURIComponent(`${nextSongName} ${nextArtistName}`);
+    const nextSongId = nextSong.id;
+
+    // Fetch in the background with a delay to not compete with active video loading bandwidth
+    const timeoutId = setTimeout(() => {
+      fetch(`https://inv.thepixora.com/api/v1/search?q=${query}&type=video`)
+        .then(r => r.json())
+        .then(data => {
+          const results = Array.isArray(data) ? data : (data?.results || []);
+          if (results.length > 0) {
+            const sorted = [...results].sort((a, b) => {
+              const viewsA = typeof a.viewCount === 'number' ? a.viewCount : parseViews(a.views || a.viewCountText);
+              const viewsB = typeof b.viewCount === 'number' ? b.viewCount : parseViews(b.views || b.viewCountText);
+              return viewsB - viewsA;
+            });
+            const first = sorted[0];
+            const resolvedId = first?.videoId || first?.id;
+            if (resolvedId) {
+              videoCacheRef.current[nextSongId] = resolvedId;
+            }
+          }
+        })
+        .catch(err => {
+          console.warn("Background prefetch failed:", err);
+        });
+    }, 2500); // 2.5s delay to let current video buffer first
+
+    return () => clearTimeout(timeoutId);
+  }, [currentSong?.id, showVideoMode, repeatMode, localPlaylist, shuffledPlaylist, isShuffle]);
   /* ─────────────────────────────────────────────────────────────────── */
 
   // Helper to draw a video frame onto the ambient background canvas
@@ -644,18 +724,12 @@ export function FullscreenMusicPlayer({
   // Drag and drop state
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
-  const [localPlaylist, setLocalPlaylist] = useState([]);
 
   // Touch drag state
   const [touchStartY, setTouchStartY] = useState(null);
   const [touchCurrentY, setTouchCurrentY] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [draggedElement, setDraggedElement] = useState(null);
-
-  // Initialize local playlist when playlist changes
-  useEffect(() => {
-    setLocalPlaylist([...playlist]);
-  }, [playlist]);
 
   // Helper to convert rgb(r, g, b) to hex color code for Android/Chrome status bar compatibility
   const convertRgbToHex = (rgbStr) => {
@@ -2219,6 +2293,7 @@ export function FullscreenMusicPlayer({
                               });
                             }
                           }}
+                          onCanPlayThrough={() => setYtWaiting(false)}
                           onPlaying={() => setYtWaiting(false)}
                           onWaiting={() => setYtWaiting(true)}
                           onPlay={(e) => {
@@ -2230,6 +2305,7 @@ export function FullscreenMusicPlayer({
                             drawVideoFrame(e.target);
                           }}
                           onSeeked={(e) => {
+                            setYtWaiting(false);
                             drawVideoFrame(e.target);
                           }}
                           onTimeUpdate={(e) => {
