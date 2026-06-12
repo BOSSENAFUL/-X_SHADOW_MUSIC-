@@ -52,6 +52,8 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   const shuffleOrderRef = useRef([]);
   const shuffleIndexRef = useRef(0);
   const isInternalNavRef = useRef(false);
+  const lastSeekTimeRef = useRef(null);
+  const lastSeekTimestampRef = useRef(0);
 
   // Use currentIndex from context if available, fallback to findIndex
   const currentIndex = playerCurrentIndex ?? (playlist.findIndex((song) => song.id === currentSong?.id) || 0);
@@ -174,8 +176,11 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     isScrubbingRef.current = false;
     setIsScrubbing(false);
     if (audioRef.current) {
-      audioRef.current.currentTime = value[0];
-      setCurrentTime(value[0]);
+      const targetTime = value[0];
+      lastSeekTimeRef.current = targetTime;
+      lastSeekTimestampRef.current = Date.now();
+      audioRef.current.currentTime = targetTime;
+      setCurrentTime(targetTime);
     }
   };
 
@@ -198,8 +203,11 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     isScrubbingRef.current = false;
     setIsScrubbing(false);
     if (audioRef.current) {
-      audioRef.current.currentTime = value[0];
-      setCurrentTime(value[0]);
+      const targetTime = value[0];
+      lastSeekTimeRef.current = targetTime;
+      lastSeekTimestampRef.current = Date.now();
+      audioRef.current.currentTime = targetTime;
+      setCurrentTime(targetTime);
       // Resume directly via audioRef — do NOT call setIsPlaying(true).
       if (wasPlayingBeforeScrub) {
         audioRef.current.play().catch(() => { });
@@ -542,6 +550,17 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       if (isScrubbingRef.current) return;
 
       const newTime = audio.currentTime;
+
+      // Filter out stale progress updates after a seek to prevent jumping
+      if (lastSeekTimeRef.current !== null) {
+        const timeSinceSeek = Date.now() - lastSeekTimestampRef.current;
+        const diff = Math.abs(newTime - lastSeekTimeRef.current);
+        if (timeSinceSeek < 1500 && diff > 1) {
+          return;
+        }
+        lastSeekTimeRef.current = null;
+      }
+
       setCurrentTime(newTime);
 
       // Immediately update media session position state

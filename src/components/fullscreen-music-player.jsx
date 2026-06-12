@@ -108,6 +108,7 @@ import dynamic from "next/dynamic";
 import { parseLrc } from "@applemusic-like-lyrics/lyric";
 import { parseTTML } from "@applemusic-like-lyrics/ttml";
 import "@applemusic-like-lyrics/core/style.css";
+import YouTube from "react-youtube";
 
 const LyricPlayer = dynamic(
   () => import("@applemusic-like-lyrics/react").then((mod) => mod.LyricPlayer),
@@ -165,6 +166,8 @@ import {
   ArrowUpDown,
   Music2,
   Video,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -390,19 +393,294 @@ export function FullscreenMusicPlayer({
   const [ytIsPlaying,   setYtIsPlaying  ] = useState(false);
   const [ytWaiting,     setYtWaiting    ] = useState(true);
   const ytVideoRef   = useRef(null);
+  const youtubePlayerRef = useRef(null);
+  const youtubePollIntervalRef = useRef(null);
   const ytCanvasRef  = useRef(null);
   const wasPlayingRef = useRef(false);
+  const isYtScrubbingRef = useRef(false);
+  const wasYtPlayingBeforeScrubRef = useRef(false);
   const videoCacheRef = useRef({});
+  const lastSeekTimeRef = useRef(null);
+  const lastSeekTimestampRef = useRef(0);
   const [shuffledPlaylist, setShuffledPlaylist] = useState([]);
   const [localPlaylist, setLocalPlaylist] = useState([]);
   const shuffledIndexRef = useRef(0);
   const internalNavRef = useRef(false);
+  const [fullscreenType, setFullscreenType] = useState(null); // 'mobile' | 'desktop' | 'split' | null
+  const [showHud, setShowHud] = useState(false);
+  const mobileVideoContainerRef = useRef(null);
+  const desktopVideoContainerRef = useRef(null);
+  const splitVideoContainerRef = useRef(null);
+  const hudTimeoutRef = useRef(null);
 
   // Initialize local playlist when playlist changes
   useEffect(() => {
     setLocalPlaylist([...playlist]);
   }, [playlist]);
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   const [lyrics, setLyrics] = useState(null);
+
+  const startTimePolling = () => {
+    stopTimePolling();
+    youtubePollIntervalRef.current = setInterval(() => {
+      if (isYtScrubbingRef.current) return;
+      if (youtubePlayerRef.current && typeof youtubePlayerRef.current.getCurrentTime === "function") {
+        const playerTime = youtubePlayerRef.current.getCurrentTime();
+        if (lastSeekTimeRef.current !== null) {
+          const timeSinceSeek = Date.now() - lastSeekTimestampRef.current;
+          const diff = Math.abs(playerTime - lastSeekTimeRef.current);
+          if (timeSinceSeek < 1500 && diff > 1) {
+            return; // Skip update to prevent progress bar jumping
+          }
+          lastSeekTimeRef.current = null;
+        }
+        setYtCurrentTime(playerTime);
+      }
+    }, 250);
+  };
+
+  const stopTimePolling = () => {
+    if (youtubePollIntervalRef.current) {
+      clearInterval(youtubePollIntervalRef.current);
+      youtubePollIntervalRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      stopTimePolling();
+    };
+  }, []);
+
+  // Handle native fullscreen changes to keep state synced (e.g. user presses Esc key)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isNativeFs = !!document.fullscreenElement;
+      if (!isNativeFs) {
+        setFullscreenType(null);
+      }
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
+    document.addEventListener("MSFullscreenChange", handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("MSFullscreenChange", handleFullscreenChange);
+    };
+  }, []);
+
+  // Toggle HUD visibility on fullscreen container click (excluding interactive controls)
+  const handleFullscreenClick = useCallback((e) => {
+    if (fullscreenType === null) return;
+    const isInteractive = e.target.closest('button, [role="slider"], input, a');
+    if (!isInteractive) {
+      setShowHud(prev => !prev);
+    }
+  }, [fullscreenType]);
+
+  // Sync HUD state when fullscreen changes
+  useEffect(() => {
+    if (fullscreenType === null) {
+      setShowHud(false);
+    } else {
+      setShowHud(true);
+    }
+  }, [fullscreenType]);
+
+  // Toggle fullscreen mode with native fullscreen first and simulated fallback for iOS / restricted browsers
+  const handleToggleFullscreen = async (containerEl, type) => {
+    if (!containerEl) return;
+
+    const isNativeFs = !!document.fullscreenElement;
+
+    if (isNativeFs || fullscreenType !== null) {
+      // Exit Fullscreen
+      if (isNativeFs) {
+        try {
+          if (document.exitFullscreen) {
+            await document.exitFullscreen();
+          } else if (document.webkitExitFullscreen) {
+            await document.webkitExitFullscreen();
+          } else if (document.msExitFullscreen) {
+            await document.msExitFullscreen();
+          }
+        } catch (err) {
+          console.warn("Native exit fullscreen failed, falling back to state reset:", err);
+          setFullscreenType(null);
+        }
+      } else {
+        setFullscreenType(null);
+      }
+
+      // Unlock Screen Orientation on mobile exit
+      try {
+        if (screen.orientation && screen.orientation.unlock) {
+          screen.orientation.unlock();
+        }
+      } catch (err) {
+        console.warn("Screen orientation unlock failed:", err);
+      }
+    } else {
+      // Enter Fullscreen
+      setFullscreenType(type);
+      try {
+        if (containerEl.requestFullscreen) {
+          await containerEl.requestFullscreen();
+        } else if (containerEl.webkitRequestFullscreen) {
+          await containerEl.webkitRequestFullscreen();
+        } else if (containerEl.msRequestFullscreen) {
+          await containerEl.msRequestFullscreen();
+        } else {
+          throw new Error("Native fullscreen not supported on this browser.");
+        }
+
+        // Lock mobile screen orientation to landscape
+        try {
+          if (screen.orientation && screen.orientation.lock) {
+            await screen.orientation.lock('landscape');
+          }
+        } catch (orientErr) {
+          console.log("Orientation lock not allowed or supported on desktop:", orientErr);
+        }
+      } catch (err) {
+        console.log("Native fullscreen failed, falling back to simulated CSS fullscreen:", err);
+        // Fallback simulated CSS fullscreen is active since fullscreenType is already set to type
+      }
+    }
+  };
+
+  const getContainerStyle = (type) => {
+    if (fullscreenType !== type) return {};
+    const isNativeFs = typeof document !== 'undefined' && !!document.fullscreenElement;
+    if (isNativeFs) {
+      return {
+        width: '100%',
+        height: '100%',
+        maxWidth: 'none',
+        maxHeight: 'none',
+        borderRadius: 0,
+      };
+    } else {
+      return {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 9999,
+        maxWidth: 'none',
+        maxHeight: 'none',
+        borderRadius: 0,
+        backgroundColor: '#000',
+      };
+    }
+  };
+
+  const renderFullscreenButton = (type, containerRef) => {
+    if (fullscreenType !== null) return null;
+
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          handleToggleFullscreen(containerRef.current, type);
+        }}
+        className="absolute right-3 bottom-3 z-30 p-2 rounded-lg bg-black/60 hover:bg-black/80 active:scale-95 text-white border border-white/10 hover:scale-105 transition-all cursor-pointer shadow-md flex items-center justify-center"
+        title="Horizontal Fullscreen"
+      >
+        <Maximize2 className="w-4 h-4" />
+      </button>
+    );
+  };
+
+  const renderFullscreenHud = (type, containerRef) => {
+    if (fullscreenType !== type) return null;
+
+    return (
+      <div
+        className={`absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/75 z-30 transition-opacity duration-300 flex flex-col justify-between p-6 sm:p-10 pointer-events-auto select-none ${
+          showHud ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      >
+        {/* Top Bar: Song Info & Exit Button */}
+        <div className="flex items-center justify-between w-full">
+          <div className="flex flex-col gap-1 text-left">
+            <span className="text-white text-base sm:text-xl font-bold tracking-tight">
+              {currentSong?.name || currentSong?.title || "Unknown Song"}
+            </span>
+            <span className="text-white/60 text-xs sm:text-sm">
+              {getArtistNames(currentSong)}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleToggleFullscreen(containerRef.current, type);
+            }}
+            className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white transition-all cursor-pointer flex items-center justify-center"
+            title="Exit Fullscreen"
+          >
+            <Minimize2 className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Center Play/Pause button */}
+        <div className="flex items-center justify-center flex-1">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePlayPause();
+            }}
+            className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white hover:bg-neutral-100 active:scale-95 text-black flex items-center justify-center transition-all shadow-2xl cursor-pointer"
+          >
+            {ytIsPlaying ? (
+              <Pause className="w-6 h-6 sm:w-8 sm:h-8 fill-black text-black" />
+            ) : (
+              <Play className="w-6 h-6 sm:w-8 sm:h-8 fill-black text-black ml-1" />
+            )}
+          </button>
+        </div>
+
+        {/* Bottom Bar: Slider & Timestamps */}
+        <div className="w-full max-w-3xl mx-auto flex flex-col gap-2 bg-black/40 backdrop-blur-md p-4 rounded-xl border border-white/5">
+          <div className="flex items-center gap-4">
+            <span className="text-xs text-white/70 font-medium tabular-nums min-w-[40px] text-left">
+              {formatTime(ytCurrentTime)}
+            </span>
+            <div className="flex-1">
+              <Slider
+                value={[ytCurrentTime]}
+                max={ytDuration || 100}
+                step={0.1}
+                onValueChange={handleSeek}
+                onValueCommit={handleSeekCommit}
+                className="w-full cursor-pointer **:data-[slot=slider-thumb]:opacity-100 **:data-[slot=slider-thumb]:bg-white **:data-[slot=slider-thumb]:w-3 **:data-[slot=slider-thumb]:h-3 **:data-[slot=slider-range]:bg-green-500 **:data-[slot=slider-track]:bg-white/20 **:data-[slot=slider-track]:h-1"
+              />
+            </div>
+            <span className="text-xs text-white/70 font-medium tabular-nums min-w-[40px] text-right">
+              {formatTime(ytDuration)}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Reset YouTube player ref when lyrics view is toggled to prevent stale/unmounted player references
+  useEffect(() => {
+    youtubePlayerRef.current = null;
+  }, [showLyrics]);
 
   /* ── Video mode: fetch YT video when toggled on ─────────────────── */
   useEffect(() => {
@@ -411,6 +689,7 @@ export function FullscreenMusicPlayer({
     setYtDuration(0);
     setYtIsPlaying(false);
     setYtWaiting(true);
+    youtubePlayerRef.current = null;
 
     if (!showVideoMode) {
       // Switching back to audio — restore playback if it was playing
@@ -425,6 +704,7 @@ export function FullscreenMusicPlayer({
     // Remember if audio was playing before we mute it
     wasPlayingRef.current = isPlaying;
     if (isPlaying) onTogglePlayPause(); // pause the main player
+    setShowLyrics(false); // Close lyrics view when switching to video mode
 
     const songId = currentSong?.id;
     if (songId && videoCacheRef.current[songId]) {
@@ -469,6 +749,44 @@ export function FullscreenMusicPlayer({
       .finally(() => setYtLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showVideoMode, currentSong?.id]);
+
+  // Sync volume to video and YouTube player elements
+  useEffect(() => {
+    if (ytVideoRef.current) {
+      ytVideoRef.current.volume = volume;
+    }
+    if (youtubePlayerRef.current && typeof youtubePlayerRef.current.setVolume === "function") {
+      youtubePlayerRef.current.setVolume(volume * 100);
+    }
+  }, [volume]);
+
+  // Pause and disable video mode when fullscreen player is closed
+  useEffect(() => {
+    if (!isOpen) {
+      setShowVideoMode(false);
+    }
+  }, [isOpen]);
+
+  // Prevent standard audio player from playing when video mode is active
+  useEffect(() => {
+    const audio = audioRef?.current;
+    if (!audio) return;
+
+    const handlePlayAttempt = () => {
+      if (showVideoMode) {
+        audio.pause();
+      }
+    };
+
+    if (showVideoMode && !audio.paused) {
+      audio.pause();
+    }
+
+    audio.addEventListener("play", handlePlayAttempt);
+    return () => {
+      audio.removeEventListener("play", handlePlayAttempt);
+    };
+  }, [showVideoMode, audioRef, currentSong?.id]);
 
   // Background prefetch for next song's video ID to enable instant transition/streaming
   useEffect(() => {
@@ -547,32 +865,80 @@ export function FullscreenMusicPlayer({
     }
   };
 
-  /* ── Video control handlers ──────────────────────────────────────── */
-  // Play/pause: in video mode controls the <video> el, otherwise the audio
+  // Smooth 60fps ambient video glow animation loop using requestAnimationFrame
+  useEffect(() => {
+    if (!showVideoMode || !ytIsPlaying || !ytVideoRef.current) return;
+
+    let animationFrameId;
+    const updateGlow = () => {
+      if (ytVideoRef.current) {
+        drawVideoFrame(ytVideoRef.current);
+        animationFrameId = requestAnimationFrame(updateGlow);
+      }
+    };
+
+    animationFrameId = requestAnimationFrame(updateGlow);
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [showVideoMode, ytIsPlaying]);
+
+  // Play/pause: in video mode controls the video element or YouTube player, otherwise the audio
   const handlePlayPause = () => {
-    if (showVideoMode && ytVideoRef.current) {
-      if (ytVideoRef.current.paused) {
-        ytVideoRef.current.play().catch(() => {});
-      } else {
-        ytVideoRef.current.pause();
+    if (showVideoMode) {
+      if (youtubePlayerRef.current) {
+        if (ytIsPlaying) {
+          youtubePlayerRef.current.pauseVideo();
+        } else {
+          youtubePlayerRef.current.playVideo();
+        }
+      } else if (ytVideoRef.current) {
+        if (ytVideoRef.current.paused) {
+          ytVideoRef.current.play().catch(() => {});
+        } else {
+          ytVideoRef.current.pause();
+        }
       }
     } else {
       onTogglePlayPause();
     }
   };
 
-  // Seek bar: in video mode scrubs the <video> el
+  // Seek bar: in video mode scrubs the video element or YouTube player
   const handleSeek = (val) => {
-    if (showVideoMode && ytVideoRef.current) {
-      ytVideoRef.current.currentTime = val[0];
+    if (showVideoMode) {
+      if (!isYtScrubbingRef.current) {
+        isYtScrubbingRef.current = true;
+        wasYtPlayingBeforeScrubRef.current = ytIsPlaying;
+        if (ytIsPlaying && youtubePlayerRef.current) {
+          youtubePlayerRef.current.pauseVideo();
+        } else if (ytVideoRef.current && !ytVideoRef.current.paused) {
+          ytVideoRef.current.pause();
+        }
+      }
       setYtCurrentTime(val[0]);
     } else {
       onSeek(val);
     }
   };
   const handleSeekCommit = (val) => {
-    if (showVideoMode && ytVideoRef.current) {
-      ytVideoRef.current.currentTime = val[0];
+    if (showVideoMode) {
+      isYtScrubbingRef.current = false;
+      const targetTime = val[0];
+      lastSeekTimeRef.current = targetTime;
+      lastSeekTimestampRef.current = Date.now();
+      if (youtubePlayerRef.current && typeof youtubePlayerRef.current.seekTo === "function") {
+        youtubePlayerRef.current.seekTo(targetTime, true);
+        if (wasYtPlayingBeforeScrubRef.current) {
+          youtubePlayerRef.current.playVideo();
+        }
+      } else if (ytVideoRef.current) {
+        ytVideoRef.current.currentTime = targetTime;
+        if (wasYtPlayingBeforeScrubRef.current) {
+          ytVideoRef.current.play().catch(() => {});
+        }
+      }
+      setYtCurrentTime(targetTime);
     } else {
       onSeekCommit(val);
     }
@@ -689,15 +1055,26 @@ export function FullscreenMusicPlayer({
     if (typeof startTimeMs === 'number') {
       const seekTime = startTimeMs / 1000;
       console.log("Jammify Fullscreen: seeking to:", seekTime, "seconds");
-      if (typeof onDirectSeek === 'function') {
-        onDirectSeek([seekTime]);
+      if (showVideoMode) {
+        lastSeekTimeRef.current = seekTime;
+        lastSeekTimestampRef.current = Date.now();
+        if (youtubePlayerRef.current && typeof youtubePlayerRef.current.seekTo === "function") {
+          youtubePlayerRef.current.seekTo(seekTime, true);
+        } else if (ytVideoRef.current) {
+          ytVideoRef.current.currentTime = seekTime;
+        }
+        setYtCurrentTime(seekTime);
       } else {
-        console.warn("Jammify Fullscreen: onDirectSeek is not a function:", onDirectSeek);
+        if (typeof onDirectSeek === 'function') {
+          onDirectSeek([seekTime]);
+        } else {
+          console.warn("Jammify Fullscreen: onDirectSeek is not a function:", onDirectSeek);
+        }
       }
     } else {
       console.warn("Jammify Fullscreen: could not extract a valid startTimeMs from click event:", event);
     }
-  }, [parsedLyrics, onDirectSeek]);
+  }, [parsedLyrics, onDirectSeek, showVideoMode]);
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState(null);
   const [openActionMenu, setOpenActionMenu] = useState(false);
@@ -1964,6 +2341,7 @@ export function FullscreenMusicPlayer({
   // Handle lyrics button click — just toggle visibility.
   // The useEffect above handles all fetching.
   const handleLyricsToggle = () => {
+    if (showVideoMode) return;
     if (!showLyrics) triggerSmartlink(); // Lyrics open — 30-min cooldown applies
     setShowLyrics(!showLyrics);
   };
@@ -2245,8 +2623,26 @@ export function FullscreenMusicPlayer({
                     </div>
                   </DrawerContent>
                 </Drawer>
-              ) : null /* Desktop: ··· menu is in the controls panel instead */
-              }
+              ) : (
+                /* Desktop/Tablet: Switch to video / audio toggle in header */
+                <button
+                  onClick={() => setShowVideoMode(v => !v)}
+                  className="flex items-center gap-2 px-3.5 py-1.5 rounded-full active:scale-95 transition-all duration-200 select-none cursor-pointer hover:bg-white/10"
+                  style={{
+                    background: 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(255,255,255,0.13)',
+                  }}
+                >
+                  {showVideoMode ? (
+                    <Music2 style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
+                  ) : (
+                    <Video style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
+                  )}
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.90)', letterSpacing: '0.01em' }}>
+                    {showVideoMode ? 'Switch to audio' : 'Switch to video'}
+                  </span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -2258,8 +2654,13 @@ export function FullscreenMusicPlayer({
               <div className="flex-1 flex items-center justify-center py-4 sm:py-8 min-h-0">
                 {showVideoMode ? (
                   /* ── Video player ── */
-                  <div className="w-[calc(100%+2rem)] -mx-4 sm:w-[calc(100%+3rem)] sm:-mx-6">
-                    <div className="w-full aspect-video overflow-hidden shadow-2xl bg-black relative">
+                  <div className="w-[calc(100%+2rem)] -mx-4 sm:w-[calc(100%+3rem)] sm:-mx-6" style={fullscreenType === 'mobile' ? { width: '100vw', margin: 0 } : {}}>
+                    <div
+                      ref={mobileVideoContainerRef}
+                      className="w-full aspect-video overflow-hidden shadow-2xl bg-black relative"
+                      style={getContainerStyle('mobile')}
+                      onClick={handleFullscreenClick}
+                    >
                       {(ytLoading || (ytVideoId && ytWaiting)) && (
                         <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-black/80 absolute inset-0 z-20">
                           <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white animate-spin" />
@@ -2278,45 +2679,61 @@ export function FullscreenMusicPlayer({
                           >Retry</button>
                         </div>
                       )}
-                      {ytVideoId && !ytLoading && (
-                        <video
-                          key={ytVideoId}
-                          ref={ytVideoRef}
-                          src={`https://ytmusic-api-production.up.railway.app/api/stream?id=${ytVideoId}`}
-                          playsInline
-                          autoPlay
-                          onCanPlay={(e) => {
-                            setYtWaiting(false);
-                            if (wasPlayingRef.current) {
-                              e.target.play().catch((err) => {
-                                console.log("Play on canplay failed:", err);
-                              });
-                            }
-                          }}
-                          onCanPlayThrough={() => setYtWaiting(false)}
-                          onPlaying={() => setYtWaiting(false)}
-                          onWaiting={() => setYtWaiting(true)}
-                          onPlay={(e) => {
-                            setYtIsPlaying(true);
-                            drawVideoFrame(e.target);
-                          }}
-                          onPause={(e) => {
-                            setYtIsPlaying(false);
-                            drawVideoFrame(e.target);
-                          }}
-                          onSeeked={(e) => {
-                            setYtWaiting(false);
-                            drawVideoFrame(e.target);
-                          }}
-                          onTimeUpdate={(e) => {
-                            setYtCurrentTime(e.target.currentTime);
-                            drawVideoFrame(e.target);
-                          }}
-                          onLoadedMetadata={(e) => setYtDuration(e.target.duration)}
-                          onEnded={handleNext}
-                          style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
-                        />
+                      {ytVideoId && !ytLoading && isMounted && isMobile && (
+                        <div style={{ width: '100%', height: '100%', overflow: 'hidden', position: 'relative' }}>
+                          <div style={{
+                            position: 'absolute',
+                            top: fullscreenType === 'mobile' ? '-8%' : '-30%',
+                            left: '0',
+                            width: '100%',
+                            height: fullscreenType === 'mobile' ? '116%' : '160%',
+                            pointerEvents: 'none'
+                          }}>
+                            <YouTube
+                              videoId={ytVideoId}
+                              opts={{
+                                width: '100%',
+                                height: '100%',
+                                playerVars: {
+                                  autoplay: 1,
+                                  controls: 0,
+                                  modestbranding: 1,
+                                  disablekb: 1,
+                                  rel: 0,
+                                  fs: 0,
+                                  playsinline: 1,
+                                  iv_load_policy: 3,
+                                }
+                              }}
+                              onReady={(e) => {
+                                youtubePlayerRef.current = e.target;
+                                setYtDuration(e.target.getDuration());
+                                e.target.setVolume(volume * 100);
+                                setYtWaiting(false);
+                              }}
+                              onStateChange={(e) => {
+                                const state = e.data;
+                                if (state === 1) { // Playing
+                                  setYtIsPlaying(true);
+                                  setYtWaiting(false);
+                                  startTimePolling();
+                                } else if (state === 2) { // Paused
+                                  setYtIsPlaying(false);
+                                  stopTimePolling();
+                                } else if (state === 0) { // Ended
+                                  stopTimePolling();
+                                  handleNext();
+                                }
+                              }}
+                              onError={() => setYtError('Failed to play YouTube video')}
+                              className="w-full h-full"
+                              iframeClassName="w-full h-full object-cover pointer-events-none"
+                            />
+                          </div>
+                        </div>
                       )}
+                      {renderFullscreenButton('mobile', mobileVideoContainerRef)}
+                      {renderFullscreenHud('mobile', mobileVideoContainerRef)}
                     </div>
                   </div>
                 ) : (
@@ -2489,8 +2906,11 @@ export function FullscreenMusicPlayer({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-white/60 hover:text-white p-3 rounded-full hover:bg-white/10"
+                    className={`text-white/60 hover:text-white p-3 rounded-full hover:bg-white/10 ${
+                      showVideoMode ? "opacity-20 pointer-events-none cursor-not-allowed" : ""
+                    }`}
                     onClick={handleLyricsToggle}
+                    disabled={showVideoMode}
                   >
                     <Mic style={{ width: '18px', height: '18px' }} />
                   </Button>
@@ -2500,35 +2920,139 @@ export function FullscreenMusicPlayer({
 
             {/* Desktop/Tablet Layout - Professional Design */}
             <div className="hidden md:flex items-center justify-center h-full">
-              <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 max-w-6xl w-full px-8">
-                {/* Left Side - Album Art */}
-                <div className="shrink-0">
-                  <div className="w-[350px] h-[350px] lg:w-[400px] lg:h-[400px] xl:w-[450px] xl:h-[450px] rounded-2xl overflow-hidden shadow-2xl bg-linear-to-br from-gray-800 to-gray-900">
-                    {currentSong.image?.[2]?.url ? (
-                      <img
-                        src={currentSong.image[2].url}
-                        alt={currentSong.name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.src = '/default-playlist-image.png';
-                        }}
-                      />
-                    ) : (
-                      <img
-                        src="/default-playlist-image.png"
-                        alt={currentSong.name}
-                        className="w-full h-full object-cover"
-                      />
-                    )}
-                  </div>
+              <div className={`flex items-center w-full px-8 transition-all duration-300 ${
+                showVideoMode 
+                  ? "flex-col gap-6 max-w-5xl" 
+                  : "flex-col lg:flex-row gap-12 lg:gap-16 max-w-6xl"
+              }`}>
+                {/* Left Side - Album Art / Video */}
+                <div className={`shrink-0 flex items-center justify-center ${showVideoMode ? "w-full" : ""}`}>
+                  {showVideoMode ? (
+                    <div
+                      ref={desktopVideoContainerRef}
+                      className="w-full max-w-[720px] lg:max-w-[860px] xl:max-w-[960px] aspect-video rounded-2xl overflow-hidden shadow-2xl bg-black relative shrink-0"
+                      style={getContainerStyle('desktop')}
+                      onClick={handleFullscreenClick}
+                    >
+                      {(ytLoading || (ytVideoId && ytWaiting)) && (
+                        <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-black/80 absolute inset-0 z-20">
+                          <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+                          <span className="text-white/50 text-xs">
+                            {ytLoading ? 'Finding video…' : 'Loading stream…'}
+                          </span>
+                        </div>
+                      )}
+                      {ytError && !ytLoading && (
+                        <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-black/80 absolute inset-0 z-20">
+                          <Video style={{ width: 32, height: 32, color: 'rgba(255,255,255,0.3)' }} />
+                          <span className="text-white/40 text-xs">{ytError}</span>
+                          <button
+                            onClick={() => { setShowVideoMode(false); setShowVideoMode(true); }}
+                            className="text-white/60 text-xs underline mt-1"
+                          >Retry</button>
+                        </div>
+                      )}
+                      {ytVideoId && !ytLoading && isMounted && !isMobile && !showLyrics && (
+                        <div style={{ width: '100%', height: '100%', overflow: 'hidden', position: 'relative' }}>
+                          <div style={{
+                            position: 'absolute',
+                            top: fullscreenType === 'desktop' ? '-8%' : '-30%',
+                            left: '0',
+                            width: '100%',
+                            height: fullscreenType === 'desktop' ? '116%' : '160%',
+                            pointerEvents: 'none'
+                          }}>
+                            <YouTube
+                              videoId={ytVideoId}
+                              opts={{
+                                width: '100%',
+                                height: '100%',
+                                playerVars: {
+                                  autoplay: 1,
+                                  controls: 0,
+                                  modestbranding: 1,
+                                  rel: 0,
+                                  playsinline: 1,
+                                }
+                              }}
+                              onReady={(e) => {
+                                youtubePlayerRef.current = e.target;
+                                setYtDuration(e.target.getDuration());
+                                e.target.setVolume(volume * 100);
+                                setYtWaiting(false);
+                              }}
+                              onStateChange={(e) => {
+                                const state = e.data;
+                                if (state === 1) { // Playing
+                                  setYtIsPlaying(true);
+                                  setYtWaiting(false);
+                                  startTimePolling();
+                                } else if (state === 2) { // Paused
+                                  setYtIsPlaying(false);
+                                  stopTimePolling();
+                                } else if (state === 0) { // Ended
+                                  stopTimePolling();
+                                  handleNext();
+                                }
+                              }}
+                              onError={() => setYtError('Failed to play YouTube video')}
+                              className="w-full h-full"
+                              iframeClassName="w-full h-full object-cover pointer-events-none"
+                            />
+                          </div>
+                        </div>
+                      )}
+                      {renderFullscreenButton('desktop', desktopVideoContainerRef)}
+                      {renderFullscreenHud('desktop', desktopVideoContainerRef)}
+                    </div>
+                  ) : (
+                    <div className="w-[350px] h-[350px] lg:w-[400px] lg:h-[400px] xl:w-[450px] xl:h-[450px] rounded-2xl overflow-hidden shadow-2xl bg-linear-to-br from-gray-800 to-gray-900">
+                      {currentSong.image?.[2]?.url ? (
+                        <img
+                          src={currentSong.image[2].url}
+                          alt={currentSong.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.src = '/default-playlist-image.png';
+                          }}
+                        />
+                      ) : (
+                        <img
+                          src="/default-playlist-image.png"
+                          alt={currentSong.name}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Right Side - Apple Music style controls panel */}
-                <div className="flex-1 flex flex-col justify-center" style={{ maxWidth: '520px', gap: '0px' }}>
+                <div className={`flex-1 flex flex-col justify-center w-full ${showVideoMode ? "mx-auto" : ""}`} style={{ maxWidth: '520px', gap: '0px' }}>
+                  {/* Switch to video / audio */}
+                  <div className="flex mb-3 justify-start">
+                    <button
+                      onClick={() => setShowVideoMode(v => !v)}
+                      className="flex items-center gap-2 px-3.5 py-1.5 rounded-full active:scale-95 transition-all duration-200 select-none cursor-pointer"
+                      style={{
+                        background: 'rgba(255,255,255,0.08)',
+                        border: '1px solid rgba(255,255,255,0.13)',
+                      }}
+                    >
+                      {showVideoMode ? (
+                        <Music2 style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
+                      ) : (
+                        <Video style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
+                      )}
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.90)', letterSpacing: '0.01em' }}>
+                        {showVideoMode ? 'Switch to audio' : 'Switch to video'}
+                      </span>
+                    </button>
+                  </div>
 
                   {/* Row 1: Song title/artist + like + menu */}
-                  <div className="flex items-start justify-between gap-3 mb-4">
-                    <div className="flex-1 min-w-0">
+                  <div className="flex gap-3 mb-4 items-start justify-between">
+                    <div className="flex-1 min-w-0 text-left">
                       <h1
                         className="font-bold text-white leading-tight truncate"
                         style={{ fontSize: '1.5rem', letterSpacing: '-0.02em' }}
@@ -2612,19 +3136,19 @@ export function FullscreenMusicPlayer({
                   {/* Row 2: Progress bar */}
                   <div className="mb-1">
                     <Slider
-                      value={[currentTime]}
-                      max={duration || 100}
+                      value={[showVideoMode ? ytCurrentTime : currentTime]}
+                      max={(showVideoMode ? ytDuration : duration) || 100}
                       step={1}
-                      onValueChange={onSeek}
-                      onValueCommit={onSeekCommit}
+                      onValueChange={handleSeek}
+                      onValueCommit={handleSeekCommit}
                       className="w-full hover:cursor-pointer **:data-[slot=slider-thumb]:opacity-0 hover:**:data-[slot=slider-thumb]:opacity-100 **:data-[slot=slider-thumb]:bg-white **:data-[slot=slider-thumb]:w-3 **:data-[slot=slider-thumb]:h-3 **:data-[slot=slider-range]:bg-white **:data-[slot=slider-track]:bg-white/25 **:data-[slot=slider-track]:h-[3px]"
                     />
                   </div>
 
                   {/* Row 3: Timestamps */}
                   <div className="flex justify-between mb-5">
-                    <span className="text-xs text-white/45 tabular-nums font-medium">{formatTime(currentTime)}</span>
-                    <span className="text-xs text-white/45 tabular-nums font-medium">-{formatTime(Math.max(0, duration - currentTime))}</span>
+                    <span className="text-xs text-white/45 tabular-nums font-medium">{formatTime(showVideoMode ? ytCurrentTime : currentTime)}</span>
+                    <span className="text-xs text-white/45 tabular-nums font-medium">-{formatTime(Math.max(0, (showVideoMode ? ytDuration : duration) - (showVideoMode ? ytCurrentTime : currentTime)))}</span>
                   </div>
 
                   {/* Row 4: Playback controls */}
@@ -2657,10 +3181,10 @@ export function FullscreenMusicPlayer({
 
                     {/* Play / Pause */}
                     <button
-                      onClick={onTogglePlayPause}
+                      onClick={handlePlayPause}
                       className="transition-all duration-200 hover:scale-105 active:scale-95 hover:cursor-pointer"
                     >
-                      {isPlaying ? (
+                      {(showVideoMode ? ytIsPlaying : isPlaying) ? (
                         <img src="/pause.png" alt="Pause" className="w-16 h-16 object-contain" style={{ filter: 'brightness(0) invert(1)' }} />
                       ) : (
                         <img src="/play.png" alt="Play" className="w-16 h-16 object-contain" style={{ filter: 'brightness(0) invert(1)' }} />
@@ -2726,13 +3250,16 @@ export function FullscreenMusicPlayer({
                   <div className="flex items-center gap-2.5 mt-8">
                     <button
                       onClick={handleLyricsToggle}
-                      className="flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 shrink-0 w-6 h-6"
-                      title="Lyrics"
+                      disabled={showVideoMode}
+                      className={`flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 shrink-0 w-6 h-6 ${
+                        showVideoMode ? "opacity-20 pointer-events-none cursor-not-allowed" : "hover:cursor-pointer"
+                      }`}
+                      title={showVideoMode ? "Lyrics (Unavailable in video mode)" : "Lyrics"}
                     >
                       <img
                         src="/lyrics.png"
                         alt="Lyrics"
-                        className="w-6 h-6 object-contain cursor-pointer"
+                        className="w-6 h-6 object-contain"
                         style={{
                           filter: showLyrics
                             ? "brightness(0) saturate(100%) invert(72%) sepia(60%) saturate(400%) hue-rotate(95deg) brightness(95%)"
@@ -3060,10 +3587,10 @@ export function FullscreenMusicPlayer({
                     <Button
                       variant="default"
                       size="sm"
-                      onClick={onTogglePlayPause}
+                      onClick={handlePlayPause}
                       className="shrink-0 rounded-full w-12 h-12 bg-white/20 hover:bg-white/30 text-white hover:scale-105 transition-all duration-200"
                     >
-                      {isPlaying ? (
+                      {(showVideoMode ? ytIsPlaying : isPlaying) ? (
                         <HiPause style={{ width: '20px', height: '20px' }} />
                       ) : (
                         <IoMdPlay style={{ width: '20px', height: '20px' }} className="ml-0.5" />
@@ -3193,27 +3720,131 @@ export function FullscreenMusicPlayer({
                 <div className="hidden md:flex h-full">
                   {/* Left Side - Apple Music style: album art + controls below */}
                   <div className="hidden lg:flex w-1/2 flex-col items-center justify-center shrink-0 px-6 lg:px-10 py-6 gap-5">
-                    {/* Album Art — clean, no hover overlay */}
-                    <div
-                      className="w-full aspect-square rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-gray-800 to-gray-900 shrink-0"
-                      style={{ maxWidth: "min(560px, 90vw)" }}
-                    >
-                      {currentSong.image?.length > 0 ? (
-                        <img
-                          src={
-                            currentSong.image.find((img) => img.quality === "500x500")?.url ||
-                            currentSong.image.find((img) => img.quality === "150x150")?.url ||
-                            currentSong.image[currentSong.image.length - 1]?.url
-                          }
-                          alt={currentSong.name}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Disc className="w-24 h-24 text-white/20" />
-                        </div>
-                      )}
+                    {/* Album Art / Video */}
+                    {showVideoMode ? (
+                      <div
+                        ref={splitVideoContainerRef}
+                        className="w-full aspect-video rounded-2xl overflow-hidden shadow-2xl bg-black relative shrink-0"
+                        style={{
+                          maxWidth: fullscreenType === 'split' ? "none" : "min(560px, 90vw)",
+                          ...getContainerStyle('split')
+                        }}
+                        onClick={handleFullscreenClick}
+                      >
+                        {(ytLoading || (ytVideoId && ytWaiting)) && (
+                          <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-black/80 absolute inset-0 z-20">
+                            <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+                            <span className="text-white/50 text-xs">
+                              {ytLoading ? 'Finding video…' : 'Loading stream…'}
+                            </span>
+                          </div>
+                        )}
+                        {ytError && !ytLoading && (
+                          <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-black/80 absolute inset-0 z-20">
+                            <Video style={{ width: 32, height: 32, color: 'rgba(255,255,255,0.3)' }} />
+                            <span className="text-white/40 text-xs">{ytError}</span>
+                            <button
+                              onClick={() => { setShowVideoMode(false); setShowVideoMode(true); }}
+                              className="text-white/60 text-xs underline mt-1"
+                            >Retry</button>
+                          </div>
+                        )}
+                        {ytVideoId && !ytLoading && isMounted && !isMobile && showLyrics && (
+                          <div style={{ width: '100%', height: '100%', overflow: 'hidden', position: 'relative' }}>
+                            <div style={{
+                              position: 'absolute',
+                              top: fullscreenType === 'split' ? '-8%' : '-30%',
+                              left: '0',
+                              width: '100%',
+                              height: fullscreenType === 'split' ? '116%' : '160%',
+                              pointerEvents: 'none'
+                            }}>
+                              <YouTube
+                                videoId={ytVideoId}
+                                opts={{
+                                  width: '100%',
+                                  height: '100%',
+                                  playerVars: {
+                                    autoplay: 1,
+                                    controls: 0,
+                                    modestbranding: 1,
+                                    rel: 0,
+                                    playsinline: 1,
+                                  }
+                                }}
+                                onReady={(e) => {
+                                  youtubePlayerRef.current = e.target;
+                                  setYtDuration(e.target.getDuration());
+                                  e.target.setVolume(volume * 100);
+                                  setYtWaiting(false);
+                                }}
+                                onStateChange={(e) => {
+                                  const state = e.data;
+                                  if (state === 1) { // Playing
+                                    setYtIsPlaying(true);
+                                    setYtWaiting(false);
+                                    startTimePolling();
+                                  } else if (state === 2) { // Paused
+                                    setYtIsPlaying(false);
+                                    stopTimePolling();
+                                  } else if (state === 0) { // Ended
+                                    stopTimePolling();
+                                    handleNext();
+                                  }
+                                }}
+                                onError={() => setYtError('Failed to play YouTube video')}
+                                className="w-full h-full"
+                                iframeClassName="w-full h-full object-cover pointer-events-none"
+                              />
+                            </div>
+                          </div>
+                        )}
+                        {renderFullscreenButton('split', splitVideoContainerRef)}
+                        {renderFullscreenHud('split', splitVideoContainerRef)}
+                      </div>
+                    ) : (
+                      <div
+                        className="w-full aspect-square rounded-2xl overflow-hidden shadow-2xl bg-linear-to-br from-gray-800 to-gray-900 shrink-0"
+                        style={{ maxWidth: "min(560px, 90vw)" }}
+                      >
+                        {currentSong.image?.length > 0 ? (
+                          <img
+                            src={
+                              currentSong.image.find((img) => img.quality === "500x500")?.url ||
+                              currentSong.image.find((img) => img.quality === "150x150")?.url ||
+                              currentSong.image[currentSong.image.length - 1]?.url
+                            }
+                            alt={currentSong.name}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Disc className="w-24 h-24 text-white/20" />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Switch to video / audio */}
+                    <div className="w-full flex justify-start mb-1" style={{ maxWidth: "min(560px, 90vw)" }}>
+                      <button
+                        onClick={() => setShowVideoMode(v => !v)}
+                        className="flex items-center gap-2 px-3.5 py-1.5 rounded-full active:scale-95 transition-all duration-200 select-none cursor-pointer"
+                        style={{
+                          background: 'rgba(255,255,255,0.08)',
+                          border: '1px solid rgba(255,255,255,0.13)',
+                        }}
+                      >
+                        {showVideoMode ? (
+                          <Music2 style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
+                        ) : (
+                          <Video style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
+                        )}
+                        <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.90)', letterSpacing: '0.01em' }}>
+                          {showVideoMode ? 'Switch to audio' : 'Switch to video'}
+                        </span>
+                      </button>
                     </div>
 
                     {/* Song info + like button */}
@@ -3298,19 +3929,19 @@ export function FullscreenMusicPlayer({
                     {/* Progress bar */}
                     <div className="w-full" style={{ maxWidth: "min(560px, 90vw)" }}>
                       <Slider
-                        value={[currentTime]}
-                        max={duration || 100}
+                        value={[showVideoMode ? ytCurrentTime : currentTime]}
+                        max={(showVideoMode ? ytDuration : duration) || 100}
                         step={0.1}
-                        onValueChange={onSeek}
-                        onValueCommit={onSeekCommit}
+                        onValueChange={handleSeek}
+                        onValueCommit={handleSeekCommit}
                         className="w-full cursor-pointer **:data-[slot=slider-thumb]:opacity-0 hover:**:data-[slot=slider-thumb]:opacity-100 **:data-[slot=slider-thumb]:bg-white **:data-[slot=slider-thumb]:w-3 **:data-[slot=slider-thumb]:h-3 **:data-[slot=slider-range]:bg-white **:data-[slot=slider-track]:bg-white/25 **:data-[slot=slider-track]:h-1"
                       />
                       <div className="flex items-center justify-between mt-1.5">
                         <span className="text-xs text-white/50 font-medium tabular-nums">
-                          {formatTime(currentTime)}
+                          {formatTime(showVideoMode ? ytCurrentTime : currentTime)}
                         </span>
                         <span className="text-xs text-white/50 font-medium tabular-nums">
-                          -{formatTime(Math.max(0, duration - currentTime))}
+                          -{formatTime(Math.max(0, (showVideoMode ? ytDuration : duration) - (showVideoMode ? ytCurrentTime : currentTime)))}
                         </span>
                       </div>
                     </div>
@@ -3344,10 +3975,10 @@ export function FullscreenMusicPlayer({
 
                       {/* Play / Pause — custom icons, no circle */}
                       <button
-                        onClick={onTogglePlayPause}
+                        onClick={handlePlayPause}
                         className="transition-all duration-200 hover:scale-110 active:scale-95 opacity-90 hover:opacity-100"
                       >
-                        {isPlaying ? (
+                        {(showVideoMode ? ytIsPlaying : isPlaying) ? (
                           <img src="/pause.png" alt="Pause" className="w-20 h-20 object-contain" style={{ filter: 'brightness(0) invert(1)' }} />
                         ) : (
                           <img src="/play.png" alt="Play" className="w-20 h-20 object-contain" style={{ filter: 'brightness(0) invert(1)' }} />
