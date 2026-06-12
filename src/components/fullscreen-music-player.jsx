@@ -67,11 +67,23 @@ const mapLyricsPlusToLyrics = (lyricsPlusLines) => {
   });
 };
 
-const cleanSongMetadata = (title, artist) => {
+const cleanSongMetadata = (title, artist, album) => {
   let cleanTitle = (title || "")
-    .replace(/\s*[\(\[][^)]*(official|video|audio|lyric|remix|edit|feat|ft|with|clip|slowed|reverb|speed|sped|version|remaster|mono|stereo)[^)]*[\)\]]/gi, "")
-    .replace(/\s*-\s*(official|video|audio|lyric|remix|edit|feat|ft|with|clip|slowed|reverb|speed|sped|version|remaster).*/gi, "")
+    .replace(/\s*[\(\[][^)]*(official|video|audio|lyric|lyrical|remix|edit|feat|ft|with|clip|slowed|reverb|speed|sped|version|remaster|mono|stereo|single|ep|album|ost)[^)]*[\)\]]/gi, "")
+    .replace(/\s*-\s*(official|video|audio|lyric|lyrical|remix|edit|feat|ft|with|clip|slowed|reverb|speed|sped|version|remaster|single|ep|album|ost).*/gi, "")
     .replace(/\s*[\(\[][^)]*film[^)]*[\)\]]/gi, "")
+    .trim();
+
+  // Extract project from (From "...") before removing it
+  let project = "";
+  const projectMatch = cleanTitle.match(/[\(\[][^)]*from\s+["']?([^"'\)\]]+)["']?[^\)]*[\)\]]/i);
+  if (projectMatch) {
+    project = projectMatch[1].trim();
+  }
+
+  // Now remove the (From "...") part from cleanTitle
+  cleanTitle = cleanTitle
+    .replace(/\s*[\(\[][^)]*from\s+[^)]*[\)\]]/gi, "")
     .trim();
 
   if (!cleanTitle) cleanTitle = title || "";
@@ -83,7 +95,34 @@ const cleanSongMetadata = (title, artist) => {
     
   if (!cleanArtist) cleanArtist = artist || "";
 
-  return { cleanTitle, cleanArtist };
+  let cleanAlbum = (album || "")
+    .replace(/\s*[\(\[][^)]*(official|video|audio|lyric|remix|edit|feat|ft|with|clip|slowed|reverb|speed|sped|version|remaster|mono|stereo|single|ep|album|ost)[^)]*[\)\]]/gi, "")
+    .replace(/\s*-\s*(official|video|audio|lyric|remix|edit|feat|ft|with|clip|slowed|reverb|speed|sped|version|remaster|single|ep|album|ost).*/gi, "")
+    .trim();
+
+  if (!project && cleanAlbum) {
+    project = cleanAlbum
+      .replace(/\s*(season|vol|volume|part|pt)\.?\s*\d+/gi, "")
+      .trim();
+  }
+
+  return { cleanTitle, cleanArtist, project };
+};
+
+const matchesProjectAuthor = (video, project) => {
+  if (!project) return false;
+  const authorLower = (video.author || video.channelName || '').toLowerCase();
+  const projectLower = project.toLowerCase().trim();
+  const regex = new RegExp(`\\b${escapeRegExp(projectLower)}\\b`, 'i');
+  return regex.test(authorLower);
+};
+
+const matchesProjectTitle = (video, project) => {
+  if (!project) return false;
+  const titleLower = (video.title || '').toLowerCase();
+  const projectLower = project.toLowerCase().trim();
+  const regex = new RegExp(`\\b${escapeRegExp(projectLower)}\\b`, 'i');
+  return regex.test(titleLower);
 };
 
 const parseViews = (viewsStr) => {
@@ -100,6 +139,264 @@ const parseViews = (viewsStr) => {
     case 'k': return value * 1000;
     default: return value;
   }
+};
+
+const blacklist = [
+  'cover', 'live', 'concert', 'karaoke', 'instrumental', '8d', 
+  'reaction', 'remix', 'reverb', 'slowed', 'mashup', 'interview', 
+  'podcast', 'lofi', 'unplugged',
+  'rock version', 'sad version', 'reprise', 'female version', 'male version',
+  'acoustic version', 'lofi version', 'cover version', 'unplugged version',
+  'metal version', 'chill version', 'wedding version'
+];
+
+const premiumKeywords = [
+  'official video', 
+  'official music video', 
+  'music video',
+  'full video',
+  'video song',
+  'mv', 
+  'm/v', 
+  'official release'
+];
+
+const secondaryKeywords = [
+  'official audio', 
+  'visualizer', 
+  'official lyric video', 
+  'lyric video',
+  'lyrics',
+  'studio version',
+  'original mix'
+];
+
+const majorLabels = [
+  'yrf', 'tseries', 'zeemusiccompany', 'sonymusicindia', 'speedrecords', 
+  'adityamusic', 'laharimusic', 'tipsindustries', 'tseriesapnapunjab', 'yrfmusic',
+  'saregama', 'whitehillmusic', 'geetmp3', 'jassrecords', 'vyrlofficial', 'timesmusic', 'desimusicfactory',
+  'cokestudio'
+];
+
+const cleanForMatching = (str) => {
+  return (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+};
+
+const escapeRegExp = (string) => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
+const normalizeTextForComparison = (str) => {
+  if (!str) return "";
+  return str.toLowerCase()
+    .replace(/aa+/g, 'a')
+    .replace(/ee+/g, 'e')
+    .replace(/oo+/g, 'o')
+    .replace(/ii+/g, 'i')
+    .replace(/uu+/g, 'u')
+    .replace(/y+/g, 'y');
+};
+
+const titleContainsSong = (videoTitle, songTitle) => {
+  if (!songTitle) return false;
+  const titleLower = videoTitle.toLowerCase();
+  const songLower = songTitle.toLowerCase().trim();
+
+  // 1. Check exact word boundary match for the full song title
+  const regex = new RegExp(`\\b${escapeRegExp(songLower)}\\b`, 'i');
+  if (regex.test(titleLower)) {
+    return true;
+  }
+
+  // 2. Check split-parts with word boundaries
+  const parts = songTitle.split(/[\-|()\[\]|]+/).map(p => p.trim()).filter(p => p.length > 2);
+  if (parts.length > 0) {
+    const matchedExact = parts.every(part => {
+      const partRegex = new RegExp(`\\b${escapeRegExp(part.toLowerCase())}\\b`, 'i');
+      return partRegex.test(titleLower);
+    });
+    if (matchedExact) return true;
+  }
+
+  // 3. Fallback to vowel-normalized comparison
+  const normTitle = normalizeTextForComparison(videoTitle);
+  const normSong = normalizeTextForComparison(songTitle);
+
+  const normRegex = new RegExp(`\\b${escapeRegExp(normSong)}\\b`, 'i');
+  if (normRegex.test(normTitle)) {
+    return true;
+  }
+
+  const normParts = normSong.split(/[\-|()\[\]|]+/).map(p => p.trim()).filter(p => p.length > 2);
+  if (normParts.length > 0) {
+    return normParts.every(part => {
+      const partRegex = new RegExp(`\\b${escapeRegExp(part)}\\b`, 'i');
+      return partRegex.test(normTitle);
+    });
+  }
+
+  return false;
+};
+
+const matchesArtistAuthor = (video, artist) => {
+  if (!artist) return false;
+  const authorClean = cleanForMatching(video.author || video.channelName);
+  const artistClean = cleanForMatching(artist);
+
+  if (authorClean.includes(artistClean)) {
+    return true;
+  }
+
+  const authorLower = (video.author || video.channelName || '').toLowerCase();
+  const artistLower = artist.toLowerCase().trim();
+  const parts = artistLower.split(/[\s,&]+/).map(p => p.trim()).filter(p => p.length > 2);
+  if (parts.length > 0) {
+    return parts.some(part => {
+      const partRegex = new RegExp(`\\b${escapeRegExp(part)}\\b`, 'i');
+      return partRegex.test(authorLower);
+    });
+  }
+
+  return false;
+};
+
+const matchesArtistTitle = (video, artist) => {
+  if (!artist) return false;
+  const titleClean = cleanForMatching(video.title);
+  const artistClean = cleanForMatching(artist);
+
+  if (titleClean.includes(artistClean)) {
+    return true;
+  }
+
+  const titleLower = (video.title || '').toLowerCase();
+  const artistLower = artist.toLowerCase().trim();
+  const parts = artistLower.split(/[\s,&]+/).map(p => p.trim()).filter(p => p.length > 2);
+  if (parts.length > 0) {
+    return parts.some(part => {
+      const partRegex = new RegExp(`\\b${escapeRegExp(part)}\\b`, 'i');
+      return partRegex.test(titleLower);
+    });
+  }
+
+  return false;
+};
+
+const matchesArtist = (video, artist) => {
+  return matchesArtistAuthor(video, artist) || matchesArtistTitle(video, artist);
+};
+
+const scoreVideoCandidate = (video, cleanTitle, cleanArtist, project) => {
+  const titleLower = (video.title || '').toLowerCase();
+  const titleClean = cleanForMatching(video.title);
+  const songClean = cleanForMatching(cleanTitle);
+
+  // 1. Blacklist check (ignore blacklist words if they are part of the song title itself)
+  const cleanTitleLower = (cleanTitle || '').toLowerCase();
+  const filteredBlacklist = blacklist.filter(word => !cleanTitleLower.includes(word));
+  const isBlacklisted = filteredBlacklist.some(word => titleLower.includes(word));
+  if (isBlacklisted) return -1;
+
+
+  // 2. Views base score: log scale
+  const views = typeof video.viewCount === 'number' 
+    ? video.viewCount 
+    : parseViews(video.views || video.viewCountText);
+  const viewsScore = views > 0 ? Math.log10(views) * 7 : 0;
+
+  let scoreBoost = 0;
+
+  // 3. Title contains song title check (+30 points)
+  if (titleContainsSong(video.title, cleanTitle)) {
+    scoreBoost += 30;
+  }
+
+  // 4. Premium keywords (Tier 1) - Massive point boost (+15 points)
+  // Exclude lyrics, audio, and visualizers from premium status
+  const isLyricsOrAudio = ['lyrics', 'lyric', 'audio', 'visualizer'].some(word => titleLower.includes(word));
+  const hasPremium = !isLyricsOrAudio && premiumKeywords.some(kw => {
+    if (kw === 'mv' || kw === 'm/v') {
+      const regex = new RegExp(`\\b${kw.replace('/', '\\/')}\\b`, 'i');
+      return regex.test(titleLower);
+    }
+    return titleLower.includes(kw);
+  });
+
+  if (hasPremium) {
+    scoreBoost += 15;
+  } else {
+    // 5. Secondary keywords (Tier 2) - Moderate point boost (+7 points)
+    const hasSecondary = secondaryKeywords.some(kw => {
+      if (kw === 'lyrics') {
+        return /\blyrics\b/i.test(titleLower);
+      }
+      return titleLower.includes(kw);
+    });
+    if (hasSecondary) {
+      scoreBoost += 7;
+    }
+  }
+
+  // 6. Artist & Project Matching:
+  // - Channel/Author matches artist or project: +50 points
+  // - Title matches artist or project (but not channel): +10 points
+  const matchesAuthor = matchesArtistAuthor(video, cleanArtist) || (project && matchesProjectAuthor(video, project));
+  const matchesTitle = matchesArtistTitle(video, cleanArtist) || (project && matchesProjectTitle(video, project));
+
+  if (matchesAuthor) {
+    scoreBoost += 50;
+  } else if (matchesTitle) {
+    scoreBoost += 10;
+  }
+
+  // 7. Verified channel boost (+20 points)
+  if (video.authorVerified) {
+    scoreBoost += 20;
+  }
+
+  // 8. Major label boost (+50 points)
+  const authorClean = cleanForMatching(video.author || video.channelName);
+  const isMajorLabel = majorLabels.some(label => authorClean.includes(label));
+  if (isMajorLabel) {
+    scoreBoost += 50;
+  }
+
+  return viewsScore + scoreBoost;
+};
+
+const searchPerfectVideo = async (songName, artistName, albumName) => {
+  const { cleanTitle, cleanArtist, project } = cleanSongMetadata(songName, artistName, albumName);
+  if (!cleanTitle) return null;
+
+  const query = encodeURIComponent(`${cleanTitle} ${cleanArtist}`);
+  try {
+    const response = await fetch(`https://inv.thepixora.com/api/v1/search?q=${query}&type=video`);
+    const data = await response.json();
+    const results = Array.isArray(data) ? data : (data?.results || []);
+
+    const candidates = results
+      .map(video => ({ video, score: scoreVideoCandidate(video, cleanTitle, cleanArtist, project) }))
+      .filter(c => c.score >= 0);
+
+    if (candidates.length > 0) {
+      // Prioritize candidates that match the artist or project
+      const artistMatchingCandidates = (cleanArtist || project)
+        ? candidates.filter(c => 
+            matchesArtist(c.video, cleanArtist) || 
+            (project && (matchesProjectAuthor(c.video, project) || matchesProjectTitle(c.video, project)))
+          )
+        : candidates;
+
+      if (artistMatchingCandidates.length > 0) {
+        artistMatchingCandidates.sort((a, b) => b.score - a.score);
+        return artistMatchingCandidates[0].video;
+      }
+    }
+  } catch (error) {
+    console.error("Perfect video search failed:", error);
+  }
+
+  return null;
 };
 
 import { useState, useRef, useEffect, useCallback, useMemo, Component } from "react";
@@ -385,6 +682,7 @@ export function FullscreenMusicPlayer({
   const router = useRouter();
   const [showLyrics,    setShowLyrics   ] = useState(false);
   const [showVideoMode, setShowVideoMode] = useState(false);
+  const [hasPerfectVideo, setHasPerfectVideo] = useState(false);
   const [ytVideoId,     setYtVideoId    ] = useState(null);
   const [ytLoading,     setYtLoading    ] = useState(false);
   const [ytError,       setYtError      ] = useState(null);
@@ -684,12 +982,13 @@ export function FullscreenMusicPlayer({
 
   /* ── Video mode: fetch YT video when toggled on ─────────────────── */
   useEffect(() => {
-    // Reset video controller states immediately on song/mode change
-    setYtCurrentTime(0);
-    setYtDuration(0);
-    setYtIsPlaying(false);
-    setYtWaiting(true);
-    youtubePlayerRef.current = null;
+    const songId = currentSong?.id;
+    if (!songId) {
+      setHasPerfectVideo(false);
+      setYtVideoId(null);
+      setYtError(null);
+      return;
+    }
 
     if (!showVideoMode) {
       // Switching back to audio — restore playback if it was playing
@@ -698,55 +997,80 @@ export function FullscreenMusicPlayer({
       }
       setYtVideoId(null);
       setYtError(null);
+
+      // Check cache first to set hasPerfectVideo immediately
+      if (videoCacheRef.current[songId] !== undefined) {
+        setHasPerfectVideo(videoCacheRef.current[songId] !== null);
+      } else {
+        const songName = decodeHtmlEntities(currentSong?.name || currentSong?.title || '');
+        const artistName = getArtistNames(currentSong);
+        const albumRaw = typeof currentSong?.album === 'string' ? currentSong.album : (currentSong?.album?.name || '');
+        const albumName = decodeHtmlEntities(albumRaw);
+        searchPerfectVideo(songName, artistName, albumName).then((video) => {
+          if (currentSong?.id !== songId) return; // Stale check
+          const resolvedId = video?.videoId || video?.id || null;
+          videoCacheRef.current[songId] = resolvedId;
+          setHasPerfectVideo(resolvedId !== null);
+        });
+      }
       return;
     }
+
+    // Reset video controller states immediately on song/mode change
+    setYtCurrentTime(0);
+    setYtDuration(0);
+    setYtIsPlaying(false);
+    setYtWaiting(true);
+    youtubePlayerRef.current = null;
 
     // Remember if audio was playing before we mute it
     wasPlayingRef.current = isPlaying;
     if (isPlaying) onTogglePlayPause(); // pause the main player
     setShowLyrics(false); // Close lyrics view when switching to video mode
 
-    const songId = currentSong?.id;
-    if (songId && videoCacheRef.current[songId]) {
-      setYtVideoId(videoCacheRef.current[songId]);
-      setYtLoading(false);
-      return;
-    }
+    if (videoCacheRef.current[songId] !== undefined) {
+      const cachedId = videoCacheRef.current[songId];
+      if (cachedId) {
+        setHasPerfectVideo(true);
+        setYtVideoId(cachedId);
+        setYtLoading(false);
+        setYtError(null);
+      } else {
+        setHasPerfectVideo(false);
+        setShowVideoMode(false); // Fallback to audio if no perfect video found
+      }
+    } else {
+      setYtLoading(true);
+      setYtError(null);
+      setYtVideoId(null);
 
-    const songName   = decodeHtmlEntities(currentSong?.name || currentSong?.title || '');
-    const artistName = getArtistNames(currentSong);
-    if (!songName) return;
+      const songName = decodeHtmlEntities(currentSong?.name || currentSong?.title || '');
+      const artistName = getArtistNames(currentSong);
+      const albumRaw = typeof currentSong?.album === 'string' ? currentSong.album : (currentSong?.album?.name || '');
+      const albumName = decodeHtmlEntities(albumRaw);
 
-    const query = encodeURIComponent(`${songName} ${artistName}`);
-    setYtLoading(true);
-    setYtError(null);
-    setYtVideoId(null);
-
-    fetch(`https://inv.thepixora.com/api/v1/search?q=${query}&type=video`)
-      .then(r => r.json())
-      .then(data => {
-        const results = Array.isArray(data) ? data : (data?.results || []);
-        if (results.length > 0) {
-          // Sort results by view count descending to ensure we get the official video/song
-          const sorted = [...results].sort((a, b) => {
-            const viewsA = typeof a.viewCount === 'number' ? a.viewCount : parseViews(a.views || a.viewCountText);
-            const viewsB = typeof b.viewCount === 'number' ? b.viewCount : parseViews(b.views || b.viewCountText);
-            return viewsB - viewsA;
-          });
-          const first = sorted[0];
-          const resolvedId = first?.videoId || first?.id;
+      searchPerfectVideo(songName, artistName, albumName)
+        .then(video => {
+          if (currentSong?.id !== songId) return; // Stale check
+          const resolvedId = video?.videoId || video?.id || null;
+          videoCacheRef.current[songId] = resolvedId;
           if (resolvedId) {
-            if (songId) videoCacheRef.current[songId] = resolvedId;
+            setHasPerfectVideo(true);
             setYtVideoId(resolvedId);
+            setYtLoading(false);
           } else {
-            setYtError('No video found');
+            setHasPerfectVideo(false);
+            setShowVideoMode(false);
+            setYtLoading(false);
           }
-        } else {
-          setYtError('No video found');
-        }
-      })
-      .catch(() => setYtError('Failed to load video'))
-      .finally(() => setYtLoading(false));
+        })
+        .catch(() => {
+          if (currentSong?.id !== songId) return;
+          setHasPerfectVideo(false);
+          setShowVideoMode(false);
+          setYtLoading(false);
+        });
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showVideoMode, currentSong?.id]);
 
@@ -812,33 +1136,22 @@ export function FullscreenMusicPlayer({
     if (!nextSong || !nextSong.id) return;
 
     // Check if already cached
-    if (videoCacheRef.current[nextSong.id]) return;
+    if (videoCacheRef.current[nextSong.id] !== undefined) return;
 
     const nextSongName = decodeHtmlEntities(nextSong.name || nextSong.title || '');
     const nextArtistName = getArtistNames(nextSong);
+    const nextAlbumRaw = typeof nextSong?.album === 'string' ? nextSong.album : (nextSong?.album?.name || '');
+    const nextAlbumName = decodeHtmlEntities(nextAlbumRaw);
     if (!nextSongName) return;
 
-    const query = encodeURIComponent(`${nextSongName} ${nextArtistName}`);
     const nextSongId = nextSong.id;
 
     // Fetch in the background with a delay to not compete with active video loading bandwidth
     const timeoutId = setTimeout(() => {
-      fetch(`https://inv.thepixora.com/api/v1/search?q=${query}&type=video`)
-        .then(r => r.json())
-        .then(data => {
-          const results = Array.isArray(data) ? data : (data?.results || []);
-          if (results.length > 0) {
-            const sorted = [...results].sort((a, b) => {
-              const viewsA = typeof a.viewCount === 'number' ? a.viewCount : parseViews(a.views || a.viewCountText);
-              const viewsB = typeof b.viewCount === 'number' ? b.viewCount : parseViews(b.views || b.viewCountText);
-              return viewsB - viewsA;
-            });
-            const first = sorted[0];
-            const resolvedId = first?.videoId || first?.id;
-            if (resolvedId) {
-              videoCacheRef.current[nextSongId] = resolvedId;
-            }
-          }
+      searchPerfectVideo(nextSongName, nextArtistName, nextAlbumName)
+        .then(video => {
+          const resolvedId = video?.videoId || video?.id || null;
+          videoCacheRef.current[nextSongId] = resolvedId;
         })
         .catch(err => {
           console.warn("Background prefetch failed:", err);
@@ -2625,23 +2938,25 @@ export function FullscreenMusicPlayer({
                 </Drawer>
               ) : (
                 /* Desktop/Tablet: Switch to video / audio toggle in header */
-                <button
-                  onClick={() => setShowVideoMode(v => !v)}
-                  className="flex items-center gap-2 px-3.5 py-1.5 rounded-full active:scale-95 transition-all duration-200 select-none cursor-pointer hover:bg-white/10"
-                  style={{
-                    background: 'rgba(255,255,255,0.08)',
-                    border: '1px solid rgba(255,255,255,0.13)',
-                  }}
-                >
-                  {showVideoMode ? (
-                    <Music2 style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
-                  ) : (
-                    <Video style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
-                  )}
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.90)', letterSpacing: '0.01em' }}>
-                    {showVideoMode ? 'Switch to audio' : 'Switch to video'}
-                  </span>
-                </button>
+                hasPerfectVideo && (
+                  <button
+                    onClick={() => setShowVideoMode(v => !v)}
+                    className="flex items-center gap-2 px-3.5 py-1.5 rounded-full active:scale-95 transition-all duration-200 select-none cursor-pointer hover:bg-white/10"
+                    style={{
+                      background: 'rgba(255,255,255,0.08)',
+                      border: '1px solid rgba(255,255,255,0.13)',
+                    }}
+                  >
+                    {showVideoMode ? (
+                      <Music2 style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
+                    ) : (
+                      <Video style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
+                    )}
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.90)', letterSpacing: '0.01em' }}>
+                      {showVideoMode ? 'Switch to audio' : 'Switch to video'}
+                    </span>
+                  </button>
+                )
               )}
             </div>
           </div>
@@ -2761,25 +3076,27 @@ export function FullscreenMusicPlayer({
 
 
               {/* Switch to video / audio — above the song title, Spotify-style */}
-              <div className="flex justify-start px-1 sm:px-2 mb-2">
-                <button
-                  onClick={() => setShowVideoMode(v => !v)}
-                  className="flex items-center gap-2 px-3.5 py-1.5 rounded-full active:scale-95 transition-all duration-200 select-none"
-                  style={{
-                    background: 'rgba(0,0,0,0.30)',
-                    border: '1px solid rgba(255,255,255,0.13)',
-                  }}
-                >
-                  {showVideoMode ? (
-                    <Music2 style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
-                  ) : (
-                    <Video style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
-                  )}
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.90)', letterSpacing: '0.01em' }}>
-                    {showVideoMode ? 'Switch to audio' : 'Switch to video'}
-                  </span>
-                </button>
-              </div>
+              {hasPerfectVideo && (
+                <div className="flex justify-start px-1 sm:px-2 mb-2">
+                  <button
+                    onClick={() => setShowVideoMode(v => !v)}
+                    className="flex items-center gap-2 px-3.5 py-1.5 rounded-full active:scale-95 transition-all duration-200 select-none"
+                    style={{
+                      background: 'rgba(0,0,0,0.30)',
+                      border: '1px solid rgba(255,255,255,0.13)',
+                    }}
+                  >
+                    {showVideoMode ? (
+                      <Music2 style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
+                    ) : (
+                      <Video style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
+                    )}
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.90)', letterSpacing: '0.01em' }}>
+                      {showVideoMode ? 'Switch to audio' : 'Switch to video'}
+                    </span>
+                  </button>
+                </div>
+              )}
 
               {/* Song Info - Compact for small screens */}
               <div className="px-1 sm:px-2 pb-4 shrink-0">
@@ -3030,25 +3347,27 @@ export function FullscreenMusicPlayer({
                 {/* Right Side - Apple Music style controls panel */}
                 <div className={`flex-1 flex flex-col justify-center w-full ${showVideoMode ? "mx-auto" : ""}`} style={{ maxWidth: '520px', gap: '0px' }}>
                   {/* Switch to video / audio */}
-                  <div className="flex mb-3 justify-start">
-                    <button
-                      onClick={() => setShowVideoMode(v => !v)}
-                      className="flex items-center gap-2 px-3.5 py-1.5 rounded-full active:scale-95 transition-all duration-200 select-none cursor-pointer"
-                      style={{
-                        background: 'rgba(255,255,255,0.08)',
-                        border: '1px solid rgba(255,255,255,0.13)',
-                      }}
-                    >
-                      {showVideoMode ? (
-                        <Music2 style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
-                      ) : (
-                        <Video style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
-                      )}
-                      <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.90)', letterSpacing: '0.01em' }}>
-                        {showVideoMode ? 'Switch to audio' : 'Switch to video'}
-                      </span>
-                    </button>
-                  </div>
+                  {hasPerfectVideo && (
+                    <div className="flex mb-3 justify-start">
+                      <button
+                        onClick={() => setShowVideoMode(v => !v)}
+                        className="flex items-center gap-2 px-3.5 py-1.5 rounded-full active:scale-95 transition-all duration-200 select-none cursor-pointer"
+                        style={{
+                          background: 'rgba(255,255,255,0.08)',
+                          border: '1px solid rgba(255,255,255,0.13)',
+                        }}
+                      >
+                        {showVideoMode ? (
+                          <Music2 style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
+                        ) : (
+                          <Video style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
+                        )}
+                        <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.90)', letterSpacing: '0.01em' }}>
+                          {showVideoMode ? 'Switch to audio' : 'Switch to video'}
+                        </span>
+                      </button>
+                    </div>
+                  )}
 
                   {/* Row 1: Song title/artist + like + menu */}
                   <div className="flex gap-3 mb-4 items-start justify-between">
