@@ -1761,16 +1761,17 @@ function SearchPageContent() {
 
   const handleShare = (e, song) => {
     e.stopPropagation();
+    const shareUrl = `${window.location.origin}/music/song/${song.id}`;
     if (navigator.share) {
       navigator.share({
         title: song.title || song.name,
         text: `Check out "${song.title || song.name}" by ${getArtistNames(song)}`,
-        url: window.location.href
+        url: shareUrl
       });
     } else {
       // Fallback: copy to clipboard
-      navigator.clipboard.writeText(window.location.href);
-      console.log('Link copied to clipboard');
+      navigator.clipboard.writeText(shareUrl);
+      toast.success('Link copied to clipboard');
     }
   };
 

@@ -2897,14 +2897,15 @@ export function FullscreenMusicPlayer({
                         className="flex items-center gap-4 p-3 hover:bg-white/5 cursor-pointer transition-colors"
                         onClick={() => {
                           setOpenActionMenu(false);
+                          const shareUrl = `${window.location.origin}/music/song/${currentSong.id}`;
                           if (navigator.share) {
                             navigator.share({
                               title: currentSong.name || currentSong.title,
                               text: `Check out "${currentSong.name || currentSong.title}" by ${getArtistNames(currentSong)}`,
-                              url: window.location.href
+                              url: shareUrl
                             });
                           } else {
-                            navigator.clipboard.writeText(window.location.href);
+                            navigator.clipboard.writeText(shareUrl);
                             toast.success('Link copied to clipboard');
                           }
                         }}
@@ -3436,6 +3437,27 @@ export function FullscreenMusicPlayer({
                               <DropdownMenuSeparator className="bg-white/5" />
                               <DropdownMenuItem onClick={() => { setOpenActionMenu(false); router.push(`/music/song/${currentSong.id}`); }} className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
                                 <Music2 className="w-4 h-4 mr-2" /> Song detail
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator className="bg-white/5" />
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenActionMenu(false);
+                                  const shareUrl = `${window.location.origin}/music/song/${currentSong.id}`;
+                                  if (navigator.share) {
+                                    navigator.share({
+                                      title: currentSong.name || currentSong.title,
+                                      text: `Check out "${currentSong.name || currentSong.title}" by ${getArtistNames(currentSong)}`,
+                                      url: shareUrl
+                                    });
+                                  } else {
+                                    navigator.clipboard.writeText(shareUrl);
+                                    toast.success('Link copied to clipboard');
+                                  }
+                                }}
+                                className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+                              >
+                                <Share className="w-4 h-4 mr-2" /> Share
                               </DropdownMenuItem>
                               <DropdownMenuSeparator className="bg-white/5" />
                               <DropdownMenuItem onClick={() => setShowPlaylist(!showPlaylist)} className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
@@ -4229,6 +4251,27 @@ export function FullscreenMusicPlayer({
                                 <DropdownMenuSeparator className="bg-white/5" />
                                 <DropdownMenuItem onClick={() => { setOpenLyricsActionMenu(false); router.push(`/music/song/${currentSong.id}`); }} className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
                                   <Music2 className="w-4 h-4 mr-2" /> Song detail
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator className="bg-white/5" />
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenLyricsActionMenu(false);
+                                    const shareUrl = `${window.location.origin}/music/song/${currentSong.id}`;
+                                    if (navigator.share) {
+                                      navigator.share({
+                                        title: currentSong.name || currentSong.title,
+                                        text: `Check out "${currentSong.name || currentSong.title}" by ${getArtistNames(currentSong)}`,
+                                        url: shareUrl
+                                      });
+                                    } else {
+                                      navigator.clipboard.writeText(shareUrl);
+                                      toast.success('Link copied to clipboard');
+                                    }
+                                  }}
+                                  className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+                                >
+                                  <Share className="w-4 h-4 mr-2" /> Share
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator className="bg-white/5" />
                                 <DropdownMenuItem onClick={() => setShowPlaylist(!showPlaylist)} className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">

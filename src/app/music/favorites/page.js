@@ -93,14 +93,15 @@ const SongActionMenu = memo(({
         className="flex items-center gap-4 p-3 hover:bg-accent cursor-pointer transition-colors"
         onClick={(e) => {
           onItemClick();
+          const shareUrl = `${window.location.origin}/music/song/${song.songId}`;
           if (navigator.share) {
             navigator.share({
               title: song.songName,
               text: `Check out "${song.songName}" by ${song.artists?.[0]?.name || 'Unknown Artist'}`,
-              url: window.location.href
+              url: shareUrl
             });
           } else {
-            navigator.clipboard.writeText(window.location.href);
+            navigator.clipboard.writeText(shareUrl);
             toast.success('Link copied to clipboard');
           }
         }}
@@ -222,6 +223,27 @@ const SongActionMenu = memo(({
         >
           <Music2 className="w-4 h-4 mr-2" />
           Song detail
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-border" />
+        <DropdownMenuItem
+          onClick={(e) => {
+            e.stopPropagation();
+            const shareUrl = `${window.location.origin}/music/song/${song.songId}`;
+            if (navigator.share) {
+              navigator.share({
+                title: song.songName,
+                text: `Check out "${song.songName}" by ${song.artists?.[0]?.name || 'Unknown Artist'}`,
+                url: shareUrl
+              });
+            } else {
+              navigator.clipboard.writeText(shareUrl);
+              toast.success('Link copied to clipboard');
+            }
+          }}
+          className="hover:bg-accent focus:bg-accent cursor-pointer"
+        >
+          <Share className="w-4 h-4 mr-2" />
+          Share
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem
