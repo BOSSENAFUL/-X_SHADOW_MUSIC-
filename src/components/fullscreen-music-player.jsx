@@ -369,31 +369,53 @@ const searchPerfectVideo = async (songName, artistName, albumName) => {
   if (!cleanTitle) return null;
 
   const query = encodeURIComponent(`${cleanTitle} ${cleanArtist}`);
-  try {
-    const response = await fetch(`https://inv.thepixora.com/api/v1/search?q=${query}&type=video`);
-    const data = await response.json();
-    const results = Array.isArray(data) ? data : (data?.results || []);
+  const instances = [
+    "https://yt.chocolatemoo53.com",
+    "https://yewtu.be",
+    "https://inv.nadeko.net",
+    "https://invidious.nerdvpn.de",
+    "https://inv.tux.im",
+    "https://inv.thepixora.com"
+  ];
 
-    const candidates = results
-      .map(video => ({ video, score: scoreVideoCandidate(video, cleanTitle, cleanArtist, project) }))
-      .filter(c => c.score >= 0);
+  for (const instance of instances) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
 
-    if (candidates.length > 0) {
-      // Prioritize candidates that match the artist or project
-      const artistMatchingCandidates = (cleanArtist || project)
-        ? candidates.filter(c => 
-            matchesArtist(c.video, cleanArtist) || 
-            (project && (matchesProjectAuthor(c.video, project) || matchesProjectTitle(c.video, project)))
-          )
-        : candidates;
+      const response = await fetch(`${instance}/api/v1/search?q=${query}&type=video`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
 
-      if (artistMatchingCandidates.length > 0) {
-        artistMatchingCandidates.sort((a, b) => b.score - a.score);
-        return artistMatchingCandidates[0].video;
+      if (!response.ok) {
+        throw new Error(`HTTP status ${response.status}`);
       }
+
+      const data = await response.json();
+      const results = Array.isArray(data) ? data : (data?.results || []);
+
+      const candidates = results
+        .map(video => ({ video, score: scoreVideoCandidate(video, cleanTitle, cleanArtist, project) }))
+        .filter(c => c.score >= 0);
+
+      if (candidates.length > 0) {
+        // Prioritize candidates that match the artist or project
+        const artistMatchingCandidates = (cleanArtist || project)
+          ? candidates.filter(c => 
+              matchesArtist(c.video, cleanArtist) || 
+              (project && (matchesProjectAuthor(c.video, project) || matchesProjectTitle(c.video, project)))
+            )
+          : candidates;
+
+        if (artistMatchingCandidates.length > 0) {
+          artistMatchingCandidates.sort((a, b) => b.score - a.score);
+          return artistMatchingCandidates[0].video;
+        }
+      }
+    } catch (error) {
+      console.warn(`Video search failed for instance ${instance}:`, error);
     }
-  } catch (error) {
-    console.error("Perfect video search failed:", error);
   }
 
   return null;
