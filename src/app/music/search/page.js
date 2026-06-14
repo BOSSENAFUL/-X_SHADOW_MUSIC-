@@ -270,6 +270,47 @@ const SongActionMenu = memo(({
 
 SongActionMenu.displayName = "SongActionMenu";
 
+function deduplicateSongs(songs) {
+  if (!Array.isArray(songs)) return [];
+  const seenIds = new Set();
+  const seenSignatures = new Set();
+  const uniqueSongs = [];
+
+  for (const song of songs) {
+    if (!song || !song.id) continue;
+    
+    // Check ID first
+    if (seenIds.has(song.id)) continue;
+
+    // Build a unique signature based on: Title + Artist + Duration
+    const title = (song.name || song.title || "").toLowerCase().trim();
+    
+    // Artist
+    let artistStr = "";
+    if (song.artists?.primary?.length > 0) {
+      artistStr = song.artists.primary.map(a => a.name).join(",");
+    } else if (Array.isArray(song.artists) && song.artists.length > 0) {
+      artistStr = song.artists.map(a => a.name).join(",");
+    } else if (song.primaryArtists) {
+      artistStr = song.primaryArtists;
+    }
+    const artist = artistStr.toLowerCase().trim();
+
+    // Duration (in seconds)
+    const duration = parseInt(song.duration, 10) || 0;
+
+    const signature = `${title}|${artist}|${duration}`;
+
+    if (seenSignatures.has(signature)) continue;
+
+    seenIds.add(song.id);
+    seenSignatures.add(signature);
+    uniqueSongs.push(song);
+  }
+
+  return uniqueSongs;
+}
+
 function SearchPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -579,19 +620,9 @@ function SearchPageContent() {
       }
 
       if (data.success) {
-        // Deduplicate songs from the API to prevent key collisions
+        // Deduplicate songs from the API to prevent key collisions and metadata duplicates
         if (data.data.songs?.results) {
-          const uniqueSongs = [];
-          const seenSongIds = new Set();
-
-          data.data.songs.results.forEach(song => {
-            if (song.id && !seenSongIds.has(song.id)) {
-              seenSongIds.add(song.id);
-              uniqueSongs.push(song);
-            }
-          });
-
-          data.data.songs.results = uniqueSongs;
+          data.data.songs.results = deduplicateSongs(data.data.songs.results);
         }
 
         // Transform the API response to match our expected structure
@@ -815,7 +846,7 @@ function SearchPageContent() {
               setCategoryData(prev => ({
                 ...prev,
                 songs: {
-                  results: data.data.results || [],
+                  results: deduplicateSongs(data.data.results || []),
                   page: 1,
                   hasMore: hasMore,
                   loading: false
@@ -1040,10 +1071,15 @@ function SearchPageContent() {
             console.log(`[Search] hasMore calculated using limit check: ${hasMore} (based on ${data.data.results.length} results)`);
           }
 
+          let finalResults = page === 1 ? data.data.results : [...prev[category].results, ...newResults];
+          if (category === 'songs') {
+            finalResults = deduplicateSongs(finalResults);
+          }
+
           return {
             ...prev,
             [category]: {
-              results: page === 1 ? data.data.results : [...prev[category].results, ...newResults],
+              results: finalResults,
               page: page,
               hasMore: hasMore,
               loading: false
@@ -1499,12 +1535,7 @@ function SearchPageContent() {
     combined.artists.results = uniqueArtists;
 
     // Deduplicate and sort songs
-    const seen = new Set();
-    const uniqueSongs = combined.songs.results.filter(s => {
-      if (!s.id || seen.has(s.id)) return false;
-      seen.add(s.id);
-      return true;
-    });
+    const uniqueSongs = deduplicateSongs(combined.songs.results);
 
     // Stability Fix for Infinite Scroll: 
     // We only perform the "Smart Ranking" on the "Hero" section (the initial results and lyrics matches).
@@ -1543,7 +1574,7 @@ function SearchPageContent() {
     return combined;
   }, [searchResults, lyricsResults, categoryData, activeSearchQuery, loading, lyricsLoading]);
 
-  const handlePlayClick = async (song, playlist = []) => {
+  const handlePlayClick = async (song, playlist = [], index = 0) => {
     try {
       // 1. Check if the song is already current - and toggle playback
       if (currentSong?.id === song.id) {
@@ -1572,12 +1603,12 @@ function SearchPageContent() {
       // 3. Start playback with high quality data
       // For the rest of the playlist, we can defer detailed fetching if needed,
       // but for the current song we MUST have the quality link now.
-      playSong(detailedCurrentSong, playlist);
+      playSong(detailedCurrentSong, playlist, null, index);
 
     } catch (error) {
       console.error('Error in handlePlayClick:', error);
       // Absolute fallback
-      playSong(song, playlist);
+      playSong(song, playlist, null, index);
     }
   };
 
@@ -1865,6 +1896,7 @@ function SearchPageContent() {
 
         <div
           ref={scrollContainerRef}
+          suppressHydrationWarning={true}
           className={`flex flex-1 min-h-0 flex-col overflow-y-auto transition-opacity duration-150 ${
             activeSearchQuery ? "pb-8" : "pb-32 md:pb-12"
           }`}
@@ -1998,7 +2030,9 @@ function SearchPageContent() {
                               className="bg-linear-to-br from-muted/40 to-muted/20 rounded-xl p-4 sm:p-6 relative overflow-hidden cursor-pointer group hover:from-muted/50 hover:to-muted/30 transition-all duration-300"
                               onClick={() => {
                                 if (resultType === 'song') {
-                                  handlePlayClick(topResult, searchResults.songs?.results || [topResult]);
+                                  const playlist = combinedSearchResults.songs?.results || [topResult];
+                                  const idx = playlist.findIndex(s => s.id === topResult.id);
+                                  handlePlayClick(topResult, playlist, idx >= 0 ? idx : 0);
                                 } else if (resultType === 'artist') {
                                   handleArtistClick(topResult.id);
                                 } else if (resultType === 'album') {
@@ -2054,7 +2088,9 @@ function SearchPageContent() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (resultType === 'song') {
-                                    handlePlayClick(topResult, combinedSearchResults.songs?.results || [topResult]);
+                                    const playlist = combinedSearchResults.songs?.results || [topResult];
+                                    const idx = playlist.findIndex(s => s.id === topResult.id);
+                                    handlePlayClick(topResult, playlist, idx >= 0 ? idx : 0);
                                   }
                                 }}
                               >
@@ -2081,7 +2117,7 @@ function SearchPageContent() {
                               <div
                                 key={`all-tab-song-${index}-${song.id || 'no-id'}-${song.isLyricsMatch ? 'lyrics' : 'regular'}`}
                                 className={`flex items-center gap-2 pl-1 pr-0 py-1.5 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150`}
-                                onClick={() => handlePlayClick(song, combinedSearchResults.songs.results)}
+                                onClick={() => handlePlayClick(song, combinedSearchResults.songs.results, index)}
                               >
                                 <div className="text-sm text-muted-foreground w-6 text-center shrink-0">
                                   {isCurrentSong && isPlaying ? (
@@ -2368,7 +2404,7 @@ function SearchPageContent() {
                             {/* Mobile Layout */}
                             <div
                               className={`md:hidden flex items-center gap-2 pl-1 pr-0 py-1.5 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150`}
-                              onClick={() => handlePlayClick(song, categoryData.songs.page > 0 ? categoryData.songs.results : combinedSearchResults.songs.results)}
+                              onClick={() => handlePlayClick(song, combinedSearchResults.songs.results, index)}
                             >
                               <div className="text-sm text-muted-foreground w-6 text-center shrink-0">
                                 {isCurrentSong && isPlaying ? (
@@ -2448,7 +2484,7 @@ function SearchPageContent() {
                             {/* Desktop Layout */}
                             <div
                               className={`hidden md:grid grid-cols-[auto_1fr_1fr_80px] gap-4 items-center p-1 py-1.5 rounded hover:bg-muted/50 group cursor-pointer`}
-                              onClick={() => handlePlayClick(song, categoryData.songs.page > 0 ? categoryData.songs.results : combinedSearchResults.songs.results)}
+                              onClick={() => handlePlayClick(song, combinedSearchResults.songs.results, index)}
                             >
                               <div className="w-8 text-center">
                                 {isCurrentSong && isPlaying ? (

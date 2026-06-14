@@ -180,7 +180,7 @@ export default function RootLayout({ children }) {
             <JammifyThemeProvider>
               <MusicPlayerProvider>
                 <AdFreeProvider>
-                  <DevToolsBlocker allowLocal={false} />
+                  <DevToolsBlocker allowLocal={true} />
                   <GlobalOnlineTracker />
                   <UserActivityTracker />
                   <AppRating />

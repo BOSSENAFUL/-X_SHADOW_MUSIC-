@@ -54,6 +54,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   const isInternalNavRef = useRef(false);
   const lastSeekTimeRef = useRef(null);
   const lastSeekTimestampRef = useRef(0);
+  const loadedSongIdRef = useRef(null);
 
   // Use currentIndex from context if available, fallback to findIndex
   const currentIndex = playerCurrentIndex ?? (playlist.findIndex((song) => song.id === currentSong?.id) || 0);
@@ -99,7 +100,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     if (isPlaying) {
       audioRef.current.pause();
     } else {
-      audioRef.current.play();
+      audioRef.current.play().catch(() => { });
     }
     setIsPlaying(!isPlaying);
   };
@@ -515,7 +516,36 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   }, [isFullscreenOpen, setIsFullscreenOpen]);
 
   useEffect(() => {
-    if (currentSong && audioRef.current) {
+    if (!currentSong) {
+      loadedSongIdRef.current = null;
+      return;
+    }
+
+    // Check if we need to fetch detailed song info (e.g. from search playlist)
+    const needsFetch = !currentSong.downloadUrl || !Array.isArray(currentSong.downloadUrl) || currentSong.downloadUrl.length < 5;
+
+    if (needsFetch) {
+      const songId = currentSong.id;
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      console.log(`Fetching detailed song info for play: ${songId}`);
+      fetch(`${apiUrl}/api/songs/${songId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.data && data.data.length > 0) {
+            const detailed = data.data[0];
+            // Only update context if currentSong has not changed in the meantime
+            if (currentSong?.id === songId) {
+              onSongChange?.(detailed, currentIndex);
+            }
+          }
+        })
+        .catch((error) => {
+          console.error("Error fetching detailed song info in player:", error);
+        });
+      return;
+    }
+
+    if (audioRef.current) {
       // Use only 320kbps quality audio URL
       let audioUrl = null;
 
@@ -532,14 +562,18 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       }
 
       if (audioUrl) {
-        console.log("Playing 320kbps quality:", audioUrl);
-        audioRef.current.src = audioUrl;
-        audioRef.current.load();
+        // ONLY assign src and load audio if the song ID has actually changed!
+        if (loadedSongIdRef.current !== currentSong.id) {
+          console.log("Playing 320kbps quality:", audioUrl);
+          audioRef.current.src = audioUrl;
+          audioRef.current.load();
+          loadedSongIdRef.current = currentSong.id;
+        }
       } else {
         console.warn("320kbps quality not available for this song");
       }
     }
-  }, [currentSong]);
+  }, [currentSong, currentIndex, onSongChange]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -772,6 +806,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
     const artistName =
       currentSong.artists?.primary?.[0]?.name ||
+      (Array.isArray(currentSong.artists) ? currentSong.artists[0]?.name : null) ||
       currentSong.primaryArtists ||
       "Unknown Artist";
     const albumName = currentSong.album?.name || "Unknown Album";
@@ -818,7 +853,10 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     } else if (currentPath.includes("/album/")) {
       return currentSong?.album?.name || "Album";
     } else if (currentPath.includes("/artist/")) {
-      const artistName = currentSong?.artists?.primary?.[0]?.name || "Artist";
+      const artistName = currentSong?.artists?.primary?.[0]?.name ||
+        (Array.isArray(currentSong?.artists) ? currentSong.artists[0]?.name : null) ||
+        currentSong?.primaryArtists ||
+        "Artist";
       return `${artistName}`;
     } else if (currentPath.includes("/playlist/")) {
       return "Playlist";
@@ -906,7 +944,12 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                       <p className="text-xs text-white/70 truncate drop-shadow-md leading-tight">
                         {currentSong.artists?.primary
                           ?.map((a) => a.name)
-                          .join(", ") || "Unknown Artist"}
+                          .join(", ") ||
+                          (Array.isArray(currentSong.artists)
+                            ? currentSong.artists.map((a) => a.name).join(", ")
+                            : null) ||
+                          currentSong.primaryArtists ||
+                          "Unknown Artist"}
                       </p>
                     </div>
                   </div>
@@ -1002,6 +1045,8 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                     </p>
                     <p className="text-xs text-muted-foreground truncate">
                       {currentSong.artists?.primary?.[0]?.name ||
+                        (Array.isArray(currentSong.artists) ? currentSong.artists[0]?.name : null) ||
+                        currentSong.primaryArtists ||
                         "Unknown Artist"}
                     </p>
                   </div>

@@ -836,7 +836,7 @@ function PlaylistPageContent() {
   };
 
   const handlePlayClick = (song, index) => {
-    playSong(song, songs, playlistId);
+    playSong(song, songs, playlistId, index);
     trackRecentlyPlayed();
   };
 

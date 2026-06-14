@@ -184,7 +184,7 @@ export default function GenreDetailPage() {
     };
 
     const handleSongClick = (song, index) => {
-        playSong(song, songs);
+        playSong(song, songs, null, index);
     };
 
     const handlePlaylistClick = (playlistId) => {
