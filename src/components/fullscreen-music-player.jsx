@@ -69,9 +69,9 @@ const mapLyricsPlusToLyrics = (lyricsPlusLines) => {
 
 const cleanSongMetadata = (title, artist, album) => {
   let cleanTitle = (title || "")
-    .replace(/\s*[\(\[][^)]*(official|video|audio|lyric|lyrical|remix|edit|feat|ft|with|clip|slowed|reverb|speed|sped|version|remaster|mono|stereo|single|ep|album|ost)[^)]*[\)\]]/gi, "")
-    .replace(/\s*-\s*(official|video|audio|lyric|lyrical|remix|edit|feat|ft|with|clip|slowed|reverb|speed|sped|version|remaster|single|ep|album|ost).*/gi, "")
-    .replace(/\s*[\(\[][^)]*film[^)]*[\)\]]/gi, "")
+    .replace(/\s*[\(\]][^)]*(official|video|audio|lyric|lyrical|edit|feat|ft|with|clip|remaster|mono|stereo|single|ep|album|ost)[^)]*[\)\]]/gi, "")
+    .replace(/\s*-\s*(official|video|audio|lyric|lyrical|edit|feat|ft|with|clip|remaster|single|ep|album|ost).*/gi, "")
+    .replace(/\s*[\(\]][^)]*film[^)]*[\)\]]/gi, "")
     .trim();
 
   // Extract project from (From "...") before removing it
@@ -83,7 +83,7 @@ const cleanSongMetadata = (title, artist, album) => {
 
   // Now remove the (From "...") part from cleanTitle
   cleanTitle = cleanTitle
-    .replace(/\s*[\(\[][^)]*from\s+[^)]*[\)\]]/gi, "")
+    .replace(/\s*[\(\]][^)]*from\s+[^)]*[\)\]]/gi, "")
     .trim();
 
   if (!cleanTitle) cleanTitle = title || "";
@@ -96,8 +96,8 @@ const cleanSongMetadata = (title, artist, album) => {
   if (!cleanArtist) cleanArtist = artist || "";
 
   let cleanAlbum = (album || "")
-    .replace(/\s*[\(\[][^)]*(official|video|audio|lyric|remix|edit|feat|ft|with|clip|slowed|reverb|speed|sped|version|remaster|mono|stereo|single|ep|album|ost)[^)]*[\)\]]/gi, "")
-    .replace(/\s*-\s*(official|video|audio|lyric|remix|edit|feat|ft|with|clip|slowed|reverb|speed|sped|version|remaster|single|ep|album|ost).*/gi, "")
+    .replace(/\s*[\(\]][^)]*(official|video|audio|lyric|edit|feat|ft|with|clip|remaster|mono|stereo|single|ep|album|ost)[^)]*[\)\]]/gi, "")
+    .replace(/\s*-\s*(official|video|audio|lyric|edit|feat|ft|with|clip|remaster|single|ep|album|ost).*/gi, "")
     .trim();
 
   if (!project && cleanAlbum) {
@@ -142,12 +142,22 @@ const parseViews = (viewsStr) => {
 };
 
 const blacklist = [
-  'cover', 'live', 'concert', 'karaoke', 'instrumental', '8d', 
-  'reaction', 'remix', 'reverb', 'slowed', 'mashup', 'interview', 
+  // User's requested negative keywords:
+  // Lyrics and Karaoke Content
+  'lyrics', 'lyric', 'synced lyrics', 'vocal reduction', 'vocal removal',
+  // Covers and AI Generations
+  'cover', 'ai cover', 'ai voice cover', 'vocal swap', 'vocal replacement',
+  // Modified Audio and Fan Content
+  'slowed', 'instrumental', 'fan music video', 'react', 'reaction', 'reactions',
+  'tutorial', 'how to', 'download', 'free',
+
+  // Existing blacklist:
+  'live', 'concert', 'karaoke', '8d', 'remix', 'reverb', 'mashup', 'interview', 
   'podcast', 'lofi', 'unplugged',
   'rock version', 'sad version', 'reprise', 'female version', 'male version',
   'acoustic version', 'lofi version', 'cover version', 'unplugged version',
-  'metal version', 'chill version', 'wedding version'
+  'metal version', 'chill version', 'wedding version',
+  'sped up', 'spedup', 'nightcore'
 ];
 
 const premiumKeywords = [
@@ -197,10 +207,20 @@ const normalizeTextForComparison = (str) => {
     .replace(/y+/g, 'y');
 };
 
+const normalizeQuotes = (str) => {
+  if (!str) return "";
+  return str
+    .replace(/[\u2018\u2019\u00b4`]/g, "'") // curly single quotes
+    .replace(/[\u201c\u201d]/g, '"')      // curly double quotes
+    .replace(/[\u2013\u2014]/g, '-');      // dashes
+};
+
 const titleContainsSong = (videoTitle, songTitle) => {
   if (!songTitle) return false;
-  const titleLower = videoTitle.toLowerCase();
-  const songLower = songTitle.toLowerCase().trim();
+  const titleNorm = normalizeQuotes(videoTitle);
+  const songNorm = normalizeQuotes(songTitle);
+  const titleLower = titleNorm.toLowerCase();
+  const songLower = songNorm.toLowerCase().trim();
 
   // 1. Check exact word boundary match for the full song title
   const regex = new RegExp(`\\b${escapeRegExp(songLower)}\\b`, 'i');
@@ -209,7 +229,7 @@ const titleContainsSong = (videoTitle, songTitle) => {
   }
 
   // 2. Check split-parts with word boundaries
-  const parts = songTitle.split(/[\-|()\[\]|]+/).map(p => p.trim()).filter(p => p.length > 2);
+  const parts = songNorm.split(/[\-|()\[\]|]+/).map(p => p.trim()).filter(p => p.length > 2);
   if (parts.length > 0) {
     const matchedExact = parts.every(part => {
       const partRegex = new RegExp(`\\b${escapeRegExp(part.toLowerCase())}\\b`, 'i');
@@ -219,8 +239,8 @@ const titleContainsSong = (videoTitle, songTitle) => {
   }
 
   // 3. Fallback to vowel-normalized comparison
-  const normTitle = normalizeTextForComparison(videoTitle);
-  const normSong = normalizeTextForComparison(songTitle);
+  const normTitle = normalizeTextForComparison(titleNorm);
+  const normSong = normalizeTextForComparison(songNorm);
 
   const normRegex = new RegExp(`\\b${escapeRegExp(normSong)}\\b`, 'i');
   if (normRegex.test(normTitle)) {
@@ -291,23 +311,37 @@ const scoreVideoCandidate = (video, cleanTitle, cleanArtist, project) => {
   const titleClean = cleanForMatching(video.title);
   const songClean = cleanForMatching(cleanTitle);
 
-  // 1. Blacklist check (ignore blacklist words if they are part of the song title itself)
+  // 1. Blacklist check (ignore blacklist words if they are part of the song title or artist name itself)
   const cleanTitleLower = (cleanTitle || '').toLowerCase();
-  const filteredBlacklist = blacklist.filter(word => !cleanTitleLower.includes(word));
+  const cleanArtistLower = (cleanArtist || '').toLowerCase();
+  const filteredBlacklist = blacklist.filter(word => 
+    !cleanTitleLower.includes(word) && !cleanArtistLower.includes(word)
+  );
   const isBlacklisted = filteredBlacklist.some(word => titleLower.includes(word));
   if (isBlacklisted) return -1;
-
 
   // 2. Views base score: log scale
   const views = typeof video.viewCount === 'number' 
     ? video.viewCount 
     : parseViews(video.views || video.viewCountText);
-  const viewsScore = views > 0 ? Math.log10(views) * 7 : 0;
+  const viewsScore = views > 0 ? Math.log10(views) * 10 : 0; // Increased multiplier from 7 to 10 for stronger views weight
 
   let scoreBoost = 0;
 
+  // View count tier boost to prioritize more popular/official videos
+  if (views >= 50000000) { // 50M+
+    scoreBoost += 40;
+  } else if (views >= 10000000) { // 10M+
+    scoreBoost += 25;
+  } else if (views >= 1000000) { // 1M+
+    scoreBoost += 15;
+  } else if (views >= 100000) { // 100k+
+    scoreBoost += 5;
+  }
+
   // 3. Title contains song title check (+30 points)
-  if (titleContainsSong(video.title, cleanTitle)) {
+  const hasSongTitle = titleContainsSong(video.title, cleanTitle);
+  if (hasSongTitle) {
     scoreBoost += 30;
   }
 
@@ -345,16 +379,31 @@ const scoreVideoCandidate = (video, cleanTitle, cleanArtist, project) => {
 
   if (matchesAuthor) {
     scoreBoost += 50;
+    
+    // Extra boost if channel matches artist exactly
+    const authorClean = cleanForMatching(video.author || video.channelName);
+    const artistClean = cleanForMatching(cleanArtist);
+    if (authorClean === artistClean) {
+      scoreBoost += 20; // Extra +20 for exact channel match
+    }
   } else if (matchesTitle) {
     scoreBoost += 10;
   }
 
-  // 7. Verified channel boost (+20 points)
+  // 7. Clean Official Video Boost (+30 points)
+  // If the channel matches the artist, the title contains the song title,
+  // and the title does NOT contain negative keyword indicators (lyric, audio, visualizer, live, etc.)
+  const hasNegativeIndicators = ['lyric', 'lyrics', 'audio', 'visualizer', 'live', 'remix', 'clean'].some(word => titleLower.includes(word));
+  if (matchesAuthor && hasSongTitle && !hasNegativeIndicators) {
+    scoreBoost += 30;
+  }
+
+  // 8. Verified channel boost (+20 points)
   if (video.authorVerified) {
     scoreBoost += 20;
   }
 
-  // 8. Major label boost (+50 points)
+  // 9. Major label boost (+50 points)
   const authorClean = cleanForMatching(video.author || video.channelName);
   const isMajorLabel = majorLabels.some(label => authorClean.includes(label));
   if (isMajorLabel) {
@@ -364,58 +413,92 @@ const scoreVideoCandidate = (video, cleanTitle, cleanArtist, project) => {
   return viewsScore + scoreBoost;
 };
 
-const searchPerfectVideo = async (songName, artistName, albumName) => {
+const searchPerfectVideo = async (songName, artistName, albumName, parentSignal = null) => {
   const { cleanTitle, cleanArtist, project } = cleanSongMetadata(songName, artistName, albumName);
   if (!cleanTitle) return null;
 
   const query = encodeURIComponent(`${cleanTitle} ${cleanArtist}`);
-  const instances = [
-    "https://yt.chocolatemoo53.com",
-    "https://yewtu.be",
-    "https://inv.nadeko.net",
-    "https://invidious.nerdvpn.de",
-    "https://inv.tux.im",
-    "https://inv.thepixora.com"
-  ];
 
-  for (const instance of instances) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+  const controller = new AbortController();
+  let onAbortListener = null;
 
-      const response = await fetch(`${instance}/api/v1/search?q=${query}&type=video`, {
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`HTTP status ${response.status}`);
-      }
-
-      const data = await response.json();
-      const results = Array.isArray(data) ? data : (data?.results || []);
-
-      const candidates = results
-        .map(video => ({ video, score: scoreVideoCandidate(video, cleanTitle, cleanArtist, project) }))
-        .filter(c => c.score >= 0);
-
-      if (candidates.length > 0) {
-        // Prioritize candidates that match the artist or project
-        const artistMatchingCandidates = (cleanArtist || project)
-          ? candidates.filter(c => 
-              matchesArtist(c.video, cleanArtist) || 
-              (project && (matchesProjectAuthor(c.video, project) || matchesProjectTitle(c.video, project)))
-            )
-          : candidates;
-
-        if (artistMatchingCandidates.length > 0) {
-          artistMatchingCandidates.sort((a, b) => b.score - a.score);
-          return artistMatchingCandidates[0].video;
-        }
-      }
-    } catch (error) {
-      console.warn(`Video search failed for instance ${instance}:`, error);
+  if (parentSignal) {
+    if (parentSignal.aborted) {
+      return null;
     }
+    onAbortListener = () => {
+      try {
+        controller.abort();
+      } catch (e) {
+        // Ignore any errors aborting internal controller
+      }
+    };
+    parentSignal.addEventListener('abort', onAbortListener);
+  }
+
+  const timeoutId = setTimeout(() => {
+    try {
+      controller.abort();
+    } catch (e) {
+      // Ignore
+    }
+  }, 10000); // 10s timeout for serverless response
+
+  try {
+    const response = await fetch(`/api/yt-search?q=${query}`, {
+      signal: controller.signal
+    });
+
+    if (parentSignal && onAbortListener) {
+      parentSignal.removeEventListener('abort', onAbortListener);
+      onAbortListener = null;
+    }
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`HTTP status ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.error || 'API search failed');
+    }
+
+    const results = data.results || [];
+
+    const candidates = results
+      .map(video => ({ video, score: scoreVideoCandidate(video, cleanTitle, cleanArtist, project) }))
+      .filter(c => c.score >= 0);
+
+    if (candidates.length > 0) {
+      // Prioritize candidates that match the artist or project
+      const artistMatchingCandidates = (cleanArtist || project)
+        ? candidates.filter(c => 
+            matchesArtist(c.video, cleanArtist) || 
+            (project && (matchesProjectAuthor(c.video, project) || matchesProjectTitle(c.video, project)))
+          )
+        : candidates;
+
+      if (artistMatchingCandidates.length > 0) {
+        artistMatchingCandidates.sort((a, b) => b.score - a.score);
+        return artistMatchingCandidates[0].video;
+      }
+    }
+  } catch (error) {
+    const isAbort = controller.signal.aborted || 
+                    (parentSignal && parentSignal.aborted) || 
+                    error.name === 'AbortError' || 
+                    error.message?.toLowerCase().includes('abort');
+    if (isAbort) {
+      console.warn('YouTube search request was aborted or timed out.');
+    } else {
+      console.error('Internal YouTube search failed:', error);
+    }
+  } finally {
+    if (parentSignal && onAbortListener) {
+      parentSignal.removeEventListener('abort', onAbortListener);
+    }
+    clearTimeout(timeoutId);
   }
 
   return null;
@@ -720,6 +803,7 @@ export function FullscreenMusicPlayer({
   const isYtScrubbingRef = useRef(false);
   const wasYtPlayingBeforeScrubRef = useRef(false);
   const videoCacheRef = useRef({});
+  const searchAbortControllerRef = useRef(null);
   const lastSeekTimeRef = useRef(null);
   const lastSeekTimestampRef = useRef(0);
   const [shuffledPlaylist, setShuffledPlaylist] = useState([]);
@@ -1004,6 +1088,13 @@ export function FullscreenMusicPlayer({
 
   /* ── Video mode: fetch YT video when toggled on ─────────────────── */
   useEffect(() => {
+    // Abort any in-flight video search requests
+    if (searchAbortControllerRef.current) {
+      searchAbortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    searchAbortControllerRef.current = controller;
+
     const songId = currentSong?.id;
     if (!songId) {
       setHasPerfectVideo(false);
@@ -1028,12 +1119,19 @@ export function FullscreenMusicPlayer({
         const artistName = getArtistNames(currentSong);
         const albumRaw = typeof currentSong?.album === 'string' ? currentSong.album : (currentSong?.album?.name || '');
         const albumName = decodeHtmlEntities(albumRaw);
-        searchPerfectVideo(songName, artistName, albumName).then((video) => {
-          if (currentSong?.id !== songId) return; // Stale check
-          const resolvedId = video?.videoId || video?.id || null;
-          videoCacheRef.current[songId] = resolvedId;
-          setHasPerfectVideo(resolvedId !== null);
-        });
+        searchPerfectVideo(songName, artistName, albumName, controller.signal)
+          .then((video) => {
+            if (controller.signal.aborted || currentSong?.id !== songId) return; // Stale check
+            const resolvedId = video?.videoId || video?.id || null;
+            videoCacheRef.current[songId] = resolvedId;
+            setHasPerfectVideo(resolvedId !== null);
+          })
+          .catch((err) => {
+            if (controller.signal.aborted || currentSong?.id !== songId) return;
+            if (err.name !== 'AbortError' && !err.message?.toLowerCase().includes('abort')) {
+              console.warn("Error prefetching video metadata:", err);
+            }
+          });
       }
       return;
     }
@@ -1071,9 +1169,9 @@ export function FullscreenMusicPlayer({
       const albumRaw = typeof currentSong?.album === 'string' ? currentSong.album : (currentSong?.album?.name || '');
       const albumName = decodeHtmlEntities(albumRaw);
 
-      searchPerfectVideo(songName, artistName, albumName)
+      searchPerfectVideo(songName, artistName, albumName, controller.signal)
         .then(video => {
-          if (currentSong?.id !== songId) return; // Stale check
+          if (controller.signal.aborted || currentSong?.id !== songId) return; // Stale check
           const resolvedId = video?.videoId || video?.id || null;
           videoCacheRef.current[songId] = resolvedId;
           if (resolvedId) {
@@ -1086,13 +1184,23 @@ export function FullscreenMusicPlayer({
             setYtLoading(false);
           }
         })
-        .catch(() => {
-          if (currentSong?.id !== songId) return;
+        .catch((err) => {
+          if (controller.signal.aborted || currentSong?.id !== songId) return;
           setHasPerfectVideo(false);
           setShowVideoMode(false);
           setYtLoading(false);
+          if (err.name !== 'AbortError' && !err.message?.toLowerCase().includes('abort')) {
+            console.warn("Error search perfect video:", err);
+          }
         });
     }
+
+    return () => {
+      controller.abort();
+      if (searchAbortControllerRef.current === controller) {
+        searchAbortControllerRef.current = null;
+      }
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showVideoMode, currentSong?.id]);
 
@@ -1855,7 +1963,8 @@ export function FullscreenMusicPlayer({
         // Re-throw AbortError so the outer handler catches it cleanly
         // and doesn't fall through to the parallel fetches (which would
         // wrongly cache null for a song whose request was just aborted).
-        if (err.name === 'AbortError') throw err;
+        const isAbort = signal?.aborted || err.name === 'AbortError' || err.message?.toLowerCase().includes('abort');
+        if (isAbort) throw err;
         console.warn("Could not fetch TTML lyrics, falling back to LRCLib:", err.message);
       }
 
@@ -1946,7 +2055,8 @@ export function FullscreenMusicPlayer({
       return null;
     } catch (error) {
       // AbortError is expected when the user closes lyrics — not a real error
-      if (error.name === 'AbortError') return null;
+      const isAbort = signal?.aborted || error.name === 'AbortError' || error.message?.toLowerCase().includes('abort');
+      if (isAbort) return null;
       console.warn("Could not fetch lyrics:", error.message);
       return null;
     } finally {
@@ -2659,6 +2769,9 @@ export function FullscreenMusicPlayer({
         setLyrics(lyricsData);
         setLyricsFetching(false);
       }
+    }).catch((err) => {
+      if (controller.signal.aborted || err.name === 'AbortError' || err.message?.toLowerCase().includes('abort')) return;
+      console.warn("Lyrics loading promise error:", err);
     }).finally(() => {
       if (cacheKey) lyricsInFlight.current.delete(cacheKey);
     });

@@ -706,7 +706,8 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       if (playPromise !== undefined) {
         playPromise.catch((error) => {
           // Handle the AbortError gracefully
-          if (error.name !== "AbortError") {
+          const isAbort = error.name === "AbortError" || error.message?.toLowerCase().includes("abort");
+          if (!isAbort) {
             console.error("Audio play error:", error);
           }
         });

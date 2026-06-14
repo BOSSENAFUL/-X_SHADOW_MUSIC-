@@ -1017,7 +1017,8 @@ function SearchPageContent() {
 
         setSuggestions(results);
       } catch (error) {
-        if (error.name !== 'AbortError') {
+        const isAbort = controller.signal.aborted || error.name === 'AbortError' || error.message?.toLowerCase().includes('abort');
+        if (!isAbort) {
           console.error('Error fetching suggestions:', error);
           setSuggestions([]);
         }
