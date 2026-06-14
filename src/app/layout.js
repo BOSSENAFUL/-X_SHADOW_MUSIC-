@@ -17,6 +17,7 @@ import JsonLd from "@/components/json-ld";
 import Script from "next/script";
 import { AdFreeProvider } from "@/contexts/ad-free-context";
 import AdFreeModal from "@/components/AdFreeModal";
+import { DevToolsBlocker } from "@/components/dev-tools-blocker";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -179,6 +180,7 @@ export default function RootLayout({ children }) {
             <JammifyThemeProvider>
               <MusicPlayerProvider>
                 <AdFreeProvider>
+                  <DevToolsBlocker allowLocal={false} />
                   <GlobalOnlineTracker />
                   <UserActivityTracker />
                   <AppRating />
