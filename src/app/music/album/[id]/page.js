@@ -477,7 +477,7 @@ export default function AlbumPage() {
   const { toggleLike: toggleAlbumLike, isLiked: isAlbumLiked } = useLikedAlbums(session?.user?.id);
 
   // Initialize music player
-  const { playSong, currentSong, currentIndex, isPlaying, togglePlayPause, currentPlaylistId, isShuffle, setIsShuffle } = useMusicPlayer();
+  const { playSong, currentSong, currentIndex, isPlaying, togglePlayPause, currentPlaylistId, isShuffle, setIsShuffle, showTrackNumbersMobile } = useMusicPlayer();
 
   useEffect(() => {
     let isMounted = true;
@@ -1195,7 +1195,7 @@ export default function AlbumPage() {
                         className="md:hidden flex items-center gap-2 pl-1 pr-0 py-2 rounded hover:bg-muted/50 group cursor-pointer"
                         onClick={() => handlePlayClick(song, index)}
                       >
-                        <div className="w-6 text-center shrink-0">
+                        <div className={`w-6 text-center shrink-0 ${!showTrackNumbersMobile ? 'hidden' : ''}`}>
                           {isCurrentSong && isPlaying ? (
                             <div className="flex items-center justify-center">
                               <div className="flex items-end justify-center gap-0.5 h-3">
@@ -1217,7 +1217,7 @@ export default function AlbumPage() {
                           )}
                         </div>
 
-                        <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
+                        <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden relative">
                           {song.image?.length > 0 ? (
                             <img
                               src={song.image.find(img => img.quality === '500x500')?.url ||
@@ -1235,6 +1235,9 @@ export default function AlbumPage() {
                               src="/def playlist image.jpg"
                               alt={song.name}
                               className="w-full h-full object-cover rounded"
+                              onError={(e) => {
+                                e.target.src = '/default-playlist-image.png';
+                              }}
                             />
                           )}
                         </div>
@@ -1244,8 +1247,7 @@ export default function AlbumPage() {
                             }`}>
                             {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
                           </p>
-                          <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
-                            }`}>
+                          <p className="text-sm truncate text-muted-foreground">
                             {song.artists?.primary?.length > 0 ? (
                               song.artists.primary.map((artist, artistIndex) => (
                                 <span key={artist.id || artistIndex}>

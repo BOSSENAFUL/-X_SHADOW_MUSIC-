@@ -62,7 +62,7 @@ export default function GenreDetailPage() {
 
     // Initialize hooks
     const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
-    const { playSong, currentSong, isPlaying } = useMusicPlayer();
+    const { playSong, currentSong, isPlaying, showTrackNumbersMobile } = useMusicPlayer();
 
     useEffect(() => {
         const fetchGenreContent = async () => {
@@ -603,7 +603,7 @@ export default function GenreDetailPage() {
                                                             className="md:hidden flex items-center gap-2 p-1 py-2 rounded hover:bg-muted/50 group cursor-pointer"
                                                             onClick={() => handleSongClick(song, index)}
                                                         >
-                                                            <div className="w-6 text-center shrink-0">
+                                                            <div className={`w-6 text-center shrink-0 ${!showTrackNumbersMobile ? 'hidden' : ''}`}>
                                                                 {isCurrentSong && isPlaying ? (
                                                                     <div className="flex items-center justify-center">
                                                                         <div className="flex items-end justify-center gap-0.5 h-3">
@@ -625,7 +625,7 @@ export default function GenreDetailPage() {
                                                                 )}
                                                             </div>
 
-                                                            <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
+                                                            <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden relative">
                                                                 {song.image?.length > 0 ? (
                                                                     <img
                                                                         src={song.image.find(img => img.quality === '500x500')?.url ||
@@ -651,7 +651,7 @@ export default function GenreDetailPage() {
                                                                 <p className={`font-medium truncate text-sm ${isCurrentSong ? 'text-green-500 font-semibold' : ''}`}>
                                                                     {decodeHtmlEntities(song.name)}
                                                                 </p>
-                                                                <p className={`text-xs truncate ${isCurrentSong ? 'text-green-400/80' : 'text-muted-foreground'}`}>
+                                                                <p className="text-xs truncate text-muted-foreground">
                                                                     {song.artists?.primary?.map(artist => artist.name).join(', ') || 'Unknown Artist'}
                                                                 </p>
                                                             </div>

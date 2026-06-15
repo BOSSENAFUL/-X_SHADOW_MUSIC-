@@ -300,7 +300,7 @@ export default function SongPage() {
     const desktopTitleRef = useRef(null);
 
     const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
-    const { playSong, currentSong, isPlaying, togglePlayPause, currentPlaylistId, isShuffle, setIsShuffle } = useMusicPlayer();
+    const { playSong, currentSong, isPlaying, togglePlayPause, currentPlaylistId, isShuffle, setIsShuffle, showTrackNumbersMobile } = useMusicPlayer();
 
     const decodeHtmlEntities = useCallback((text) => {
         if (!text) return text;
@@ -671,7 +671,7 @@ export default function SongPage() {
                                     className="flex md:grid md:grid-cols-[auto_1fr_auto] items-center gap-2 md:gap-4 p-1 md:p-2 rounded-md hover:bg-muted/50 group cursor-pointer"
                                     onClick={handlePlay}
                                 >
-                                    <div className="w-4 md:w-8 text-center shrink-0">
+                                    <div className={`w-4 md:w-8 text-center shrink-0 ${!showTrackNumbersMobile ? 'hidden md:block' : ''}`}>
                                         {isThisPlaying ? (
                                             <div className="flex items-end justify-center gap-0.5 h-3">
                                                 <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: "0s" }} />
@@ -698,7 +698,7 @@ export default function SongPage() {
                                             <p className={`font-semibold truncate text-sm md:text-base ${isCurrentSong ? "text-green-500" : ""}`}>
                                                 {decodeHtmlEntities(song.name)}
                                             </p>
-                                            <p className={`text-xs md:text-sm truncate flex items-center gap-1 ${isCurrentSong ? "text-green-400" : "text-muted-foreground"}`}>
+                                            <p className={`text-xs md:text-sm truncate flex items-center gap-1 ${isCurrentSong ? "text-muted-foreground md:text-green-400" : "text-muted-foreground"}`}>
                                                 {song.explicitContent && (
                                                     <span className="inline-flex items-center justify-center w-4 h-4 bg-muted-foreground/40 text-background rounded-sm text-[9px] font-bold shrink-0">E</span>
                                                 )}

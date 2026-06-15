@@ -495,7 +495,7 @@ export default function ArtistPage() {
   const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
 
   // Initialize music player
-  const { playSong, currentSong, isPlaying, togglePlayPause, currentPlaylistId, isShuffle, setIsShuffle, setPlaylist } = useMusicPlayer();
+  const { playSong, currentSong, isPlaying, togglePlayPause, currentPlaylistId, isShuffle, setIsShuffle, setPlaylist, showTrackNumbersMobile } = useMusicPlayer();
 
   // Sync new paginated songs into the player if we are currently listening to this artist
   useEffect(() => {
@@ -1440,7 +1440,7 @@ export default function ArtistPage() {
                             onClick={() => handlePlayClick(song, index)}
                           >
                             {/* Play indicator column */}
-                            <div className="w-6 text-center shrink-0">
+                            <div className={`w-6 text-center shrink-0 ${!showTrackNumbersMobile ? 'hidden' : ''}`}>
                               {isCurrentSong && isPlaying ? (
                                 <div className="flex items-center justify-center">
                                   <div className="flex items-end justify-center gap-0.5 h-3">
@@ -1463,7 +1463,7 @@ export default function ArtistPage() {
                             </div>
 
                             {/* Thumbnail */}
-                            <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
+                            <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden relative">
                               {song.image?.length > 0 ? (
                                 <img
                                   src={song.image.find(img => img.quality === '500x500')?.url ||
@@ -1490,7 +1490,7 @@ export default function ArtistPage() {
                               <p className={`font-medium truncate text-sm ${isCurrentSong ? 'text-green-500' : ''}`}>
                                 {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
                               </p>
-                              <p className={`text-xs truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'}`}>
+                              <p className="text-xs truncate text-muted-foreground">
                                 {song.album?.name || 'Unknown Album'}
                               </p>
                             </div>

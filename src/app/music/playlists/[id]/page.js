@@ -690,6 +690,7 @@ const SongRow = React.memo(function SongRow({
   handleRemoveFromPlaylist, handleDownloadSong, handleShareSong,
   decodeHtmlEntities, formatDuration, router, playlistId, viewAs
 }) {
+  const { showTrackNumbersMobile } = useMusicPlayer();
   const imageUrl = song.image?.find(img => img.quality === '500x500')?.url ||
     song.image?.find(img => img.quality === '150x150')?.url ||
     song.image?.[song.image.length - 1]?.url;
@@ -701,7 +702,7 @@ const SongRow = React.memo(function SongRow({
         className={`md:hidden flex items-center rounded hover:bg-muted/50 group cursor-pointer ${viewAs === 'compact' ? 'gap-2 pl-0 pr-0 py-1 h-[48px]' : 'gap-2 pl-0 pr-0 py-2 h-[64px]'}`}
         onClick={() => handlePlayClick(song, index)}
       >
-        <div className="grid place-items-center shrink-0 w-8 h-full">
+        <div className={`grid place-items-center shrink-0 w-8 h-full ${!showTrackNumbersMobile ? 'hidden' : ''}`}>
           {isCurrentSong && isPlaying ? (
             <div className="col-start-1 row-start-1 flex items-end justify-center gap-0.5 h-3 w-4">
               <div className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0s' }} />
@@ -720,7 +721,7 @@ const SongRow = React.memo(function SongRow({
           )}
         </div>
         <div className="flex-1 min-w-0 flex items-center gap-2.5">
-          <div className={`${viewAs === 'compact' ? 'w-10 h-10' : 'w-12 h-12'} rounded bg-muted shrink-0 overflow-hidden`}>
+          <div className={`${viewAs === 'compact' ? 'w-10 h-10' : 'w-12 h-12'} rounded bg-muted shrink-0 overflow-hidden relative`}>
             <img src={imageUrl || '/default-playlist-image.png'} alt={song.name}
               className="w-full h-full object-cover rounded" loading="lazy"
               onError={(e) => { e.target.src = '/default-playlist-image.png'; }} />
@@ -729,7 +730,7 @@ const SongRow = React.memo(function SongRow({
             <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''} ${viewAs === 'compact' ? 'text-sm' : ''}`}>
               {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
             </p>
-            <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'}`}>
+            <p className="text-sm truncate text-muted-foreground">
               {song.artists?.primary?.length > 0
                 ? song.artists.primary.map((a, ai) => <span key={a.id || ai}>{a.name}{ai < song.artists.primary.length - 1 && ', '}</span>)
                 : 'Unknown Artist'}

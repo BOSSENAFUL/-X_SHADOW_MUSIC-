@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 
 const MusicPlayerContext = createContext();
 
@@ -15,6 +15,18 @@ export function MusicPlayerProvider({ children }) {
   const [isFullscreenPlaylistOpen, setIsFullscreenPlaylistOpen] = useState(false);
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState("off"); // 'off', 'all', 'one'
+  const [showTrackNumbersMobile, setShowTrackNumbersMobile] = useState(false);
+
+  // Load mobile track numbers setting on mount (defer to prevent synchronous setState warning)
+  useEffect(() => {
+    const stored = localStorage.getItem("show_track_numbers_mobile");
+    if (stored === "true") {
+      const timeout = setTimeout(() => {
+        setShowTrackNumbersMobile(true);
+      }, 0);
+      return () => clearTimeout(timeout);
+    }
+  }, []);
 
   // Add audio timing states
   const [currentTime, setCurrentTime] = useState(0);
@@ -85,6 +97,8 @@ export function MusicPlayerProvider({ children }) {
         isRadioPlaying,
         isShuffle,
         repeatMode,
+        showTrackNumbersMobile,
+        setShowTrackNumbersMobile,
         isFullscreenOpen,
         isFullscreenPlaylistOpen,
         currentTime,

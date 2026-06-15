@@ -355,7 +355,7 @@ function SearchPageContent() {
   // Ref to track current search ID to prevent stale results
   const currentSearchId = useRef(0);
 
-  const { playSong, currentSong, isPlaying, togglePlayPause } = useMusicPlayer();
+  const { playSong, currentSong, isPlaying, togglePlayPause, showTrackNumbersMobile } = useMusicPlayer();
   const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
 
   // Blocks the search effect from firing while we are restoring saved state
@@ -2120,7 +2120,7 @@ function SearchPageContent() {
                                 className={`flex items-center gap-2 pl-1 pr-0 py-1.5 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150`}
                                 onClick={() => handlePlayClick(song, combinedSearchResults.songs.results, index)}
                               >
-                                <div className="text-sm text-muted-foreground w-6 text-center shrink-0">
+                                <div className={`text-sm text-muted-foreground w-6 text-center shrink-0 ${!showTrackNumbersMobile ? 'hidden md:block' : ''}`}>
                                   {isCurrentSong && isPlaying ? (
                                     <div className="flex items-center justify-center">
                                       <div className="flex items-end justify-center gap-0.5 h-3">
@@ -2137,7 +2137,7 @@ function SearchPageContent() {
                                   )}
                                 </div>
                                 <div className="relative shrink-0">
-                                  <div className="w-12 h-12 rounded bg-muted overflow-hidden">
+                                  <div className="w-12 h-12 rounded bg-muted overflow-hidden relative">
                                     {song.image?.length > 0 ? (
                                       <img
                                         src={song.image.find(img => img.quality === '500x500')?.url ||
@@ -2170,7 +2170,7 @@ function SearchPageContent() {
                                     }}>
                                     {decodeHtmlEntities(song.title || song.name)}
                                   </p>
-                                  <p className={`text-sm leading-tight truncate block ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
+                                  <p className={`text-sm leading-tight truncate block ${isCurrentSong ? 'text-muted-foreground md:text-green-400' : 'text-muted-foreground'
                                     }`} style={{
                                       whiteSpace: 'nowrap',
                                       overflow: 'hidden',
@@ -2407,24 +2407,24 @@ function SearchPageContent() {
                               className={`md:hidden flex items-center gap-2 pl-1 pr-0 py-1.5 rounded-md hover:bg-muted/30 group cursor-pointer transition-colors duration-150`}
                               onClick={() => handlePlayClick(song, combinedSearchResults.songs.results, index)}
                             >
-                              <div className="text-sm text-muted-foreground w-6 text-center shrink-0">
-                                {isCurrentSong && isPlaying ? (
-                                  <div className="flex items-center justify-center">
-                                    <div className="flex items-end justify-center gap-0.5 h-3">
-                                      <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
-                                      <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
-                                      <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
-                                      <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
-                                    </div>
-                                  </div>
-                                ) : isCurrentSong ? (
-                                  <IoMdPlay className="w-4 h-4 mx-auto text-green-500 fill-green-500" />
-                                ) : (
-                                  index + 1
-                                )}
-                              </div>
+                              <div className={`text-sm text-muted-foreground w-6 text-center shrink-0 ${!showTrackNumbersMobile ? 'hidden' : ''}`}>
+                                 {isCurrentSong && isPlaying ? (
+                                   <div className="flex items-center justify-center">
+                                     <div className="flex items-end justify-center gap-0.5 h-3">
+                                       <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
+                                       <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
+                                       <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
+                                       <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
+                                     </div>
+                                   </div>
+                                 ) : isCurrentSong ? (
+                                   <IoMdPlay className="w-4 h-4 mx-auto text-green-500 fill-green-500" />
+                                 ) : (
+                                   index + 1
+                                 )}
+                               </div>
                               <div className="relative shrink-0">
-                                <div className="w-12 h-12 rounded bg-muted overflow-hidden">
+                                <div className="w-12 h-12 rounded bg-muted overflow-hidden relative">
                                   {song.image?.length > 0 ? (
                                     <img
                                       src={song.image.find(img => img.quality === '500x500')?.url ||
@@ -2457,8 +2457,7 @@ function SearchPageContent() {
                                   }}>
                                   {decodeHtmlEntities(song.title || song.name)}
                                 </p>
-                                <p className={`text-sm leading-tight truncate block ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
-                                  }`} style={{
+                                <p className="text-sm leading-tight truncate block text-muted-foreground" style={{
                                     whiteSpace: 'nowrap',
                                     overflow: 'hidden',
                                     textOverflow: 'ellipsis',

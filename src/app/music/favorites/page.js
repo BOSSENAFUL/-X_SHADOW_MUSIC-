@@ -326,7 +326,7 @@ export default function FavoritesPage() {
   }, [loading, likedSongs.length]);
 
   // Initialize music player
-  const { playSong, currentSong, currentIndex, isPlaying, togglePlayPause, currentPlaylistId, isShuffle, setIsShuffle } = useMusicPlayer();
+  const { playSong, currentSong, currentIndex, isPlaying, togglePlayPause, currentPlaylistId, isShuffle, setIsShuffle, showTrackNumbersMobile } = useMusicPlayer();
 
   // Pre-calculate playlist data for the player to avoid mapping on every click
   const playlistData = useMemo(() => {
@@ -847,7 +847,7 @@ export default function FavoritesPage() {
                             }`}
                           onClick={() => handlePlayClick(likedSong, index)}
                         >
-                          <div className="w-6 text-center shrink-0">
+                          <div className={`w-6 text-center shrink-0 ${!showTrackNumbersMobile ? 'hidden' : ''}`}>
                             {isCurrentSong && isPlaying ? (
                               <div className="flex items-center justify-center">
                                 <div className="flex items-end justify-center gap-0.5 h-3">
@@ -869,7 +869,7 @@ export default function FavoritesPage() {
                             )}
                           </div>
 
-                          <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
+                          <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden relative">
                             {likedSong.image?.length > 0 ? (
                               <img
                                 src={likedSong.image.find(img => img.quality === '500x500')?.url ||
@@ -896,8 +896,7 @@ export default function FavoritesPage() {
                               }`}>
                               {decodeHtmlEntities(likedSong.songName) || `Track ${index + 1}`}
                             </p>
-                            <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'
-                              }`}>
+                            <p className="text-sm truncate text-muted-foreground">
                               {likedSong.artists?.length > 0 ? (
                                 likedSong.artists.map((artist, artistIndex) => (
                                   <span key={artist.id || artistIndex}>
@@ -965,7 +964,7 @@ export default function FavoritesPage() {
                           </div>
 
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
+                            <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden relative">
                               {likedSong.image?.length > 0 ? (
                                 <img
                                   src={likedSong.image.find(img => img.quality === '500x500')?.url ||

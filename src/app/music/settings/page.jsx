@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
+import { useMusicPlayer } from "@/contexts/music-player-context";
 import {
     SidebarInset,
     SidebarProvider,
@@ -147,6 +148,7 @@ function FeedPreferencePicker({ value, onChange }) {
 export default function SettingsPage() {
     const router = useRouter();
     const { data: session } = useSession();
+    const { showTrackNumbersMobile, setShowTrackNumbersMobile } = useMusicPlayer();
 
     const [notifNewFeatures, setNotifNewFeatures] = useState(() => {
         if (typeof window === "undefined") return true;
@@ -155,10 +157,15 @@ export default function SettingsPage() {
 
     const [feedPreference, setFeedPreference] = useState('all');
 
-    // Read from localStorage after mount to avoid SSR/client mismatch
+    // Read from localStorage after mount to avoid SSR/client mismatch (defer to prevent synchronous setState warning)
     useEffect(() => {
         const stored = localStorage.getItem('feed_preference');
-        if (stored) setFeedPreference(stored);
+        if (stored) {
+            const timeout = setTimeout(() => {
+                setFeedPreference(stored);
+            }, 0);
+            return () => clearTimeout(timeout);
+        }
     }, []);
 
     const toggle = (key, setter) => (val) => {
@@ -240,6 +247,23 @@ export default function SettingsPage() {
                                     onChange={handleFeedChange}
                                 />
                             </div>
+                        </SettingsSection>
+
+                        {/* Display Settings */}
+                        <SettingsSection title="Display Settings">
+                            <SettingsRow
+                                icon={Smartphone}
+                                label="Show track numbers on mobile"
+                                description="Display index numbers next to songs in lists on mobile devices"
+                            >
+                                <Switch
+                                    checked={showTrackNumbersMobile}
+                                    onCheckedChange={(val) => {
+                                        setShowTrackNumbersMobile(val);
+                                        localStorage.setItem("show_track_numbers_mobile", String(val));
+                                    }}
+                                />
+                            </SettingsRow>
                         </SettingsSection>
 
                         {/* Notifications */}
