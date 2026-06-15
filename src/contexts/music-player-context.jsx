@@ -16,6 +16,7 @@ export function MusicPlayerProvider({ children }) {
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState("off"); // 'off', 'all', 'one'
   const [showTrackNumbersMobile, setShowTrackNumbersMobile] = useState(false);
+  const [disableSpotifyCanvas, setDisableSpotifyCanvas] = useState(false);
 
   // Load mobile track numbers setting on mount (defer to prevent synchronous setState warning)
   useEffect(() => {
@@ -23,6 +24,17 @@ export function MusicPlayerProvider({ children }) {
     if (stored === "true") {
       const timeout = setTimeout(() => {
         setShowTrackNumbersMobile(true);
+      }, 0);
+      return () => clearTimeout(timeout);
+    }
+  }, []);
+
+  // Load Spotify Canvas setting on mount (defer to prevent synchronous setState warning)
+  useEffect(() => {
+    const stored = localStorage.getItem("disable_spotify_canvas");
+    if (stored === "true") {
+      const timeout = setTimeout(() => {
+        setDisableSpotifyCanvas(true);
       }, 0);
       return () => clearTimeout(timeout);
     }
@@ -99,6 +111,8 @@ export function MusicPlayerProvider({ children }) {
         repeatMode,
         showTrackNumbersMobile,
         setShowTrackNumbersMobile,
+        disableSpotifyCanvas,
+        setDisableSpotifyCanvas,
         isFullscreenOpen,
         isFullscreenPlaylistOpen,
         currentTime,

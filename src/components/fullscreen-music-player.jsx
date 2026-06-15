@@ -782,6 +782,7 @@ export function FullscreenMusicPlayer({
     setRepeatMode,
     isFullscreenPlaylistOpen: showPlaylist,
     setIsFullscreenPlaylistOpen: setShowPlaylist,
+    disableSpotifyCanvas,
   } = useMusicPlayer();
   const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
   const router = useRouter();
@@ -831,7 +832,7 @@ export function FullscreenMusicPlayer({
   const [hideControls, setHideControls] = useState(false);
 
   useEffect(() => {
-    if (!currentSong || !isMobile) {
+    if (!currentSong || !isMobile || disableSpotifyCanvas) {
       setCanvasUrl(null);
       setShowCanvas(false);
       setHideControls(false);
@@ -879,7 +880,7 @@ export function FullscreenMusicPlayer({
       isAborted = true;
       if (timerId) clearTimeout(timerId);
     };
-  }, [currentSong?.id, isMobile]);
+  }, [currentSong?.id, isMobile, disableSpotifyCanvas]);
 
   // Force show controls when entering/exiting video mode
   useEffect(() => {

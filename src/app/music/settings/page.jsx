@@ -37,6 +37,7 @@ import {
     Info,
     LayoutGrid,
     Check,
+    Video,
 } from "lucide-react";
 
 // ── Section wrapper ──────────────────────────────────────────────────────────
@@ -148,7 +149,12 @@ function FeedPreferencePicker({ value, onChange }) {
 export default function SettingsPage() {
     const router = useRouter();
     const { data: session } = useSession();
-    const { showTrackNumbersMobile, setShowTrackNumbersMobile } = useMusicPlayer();
+    const { 
+        showTrackNumbersMobile, 
+        setShowTrackNumbersMobile,
+        disableSpotifyCanvas,
+        setDisableSpotifyCanvas
+    } = useMusicPlayer();
 
     const [notifNewFeatures, setNotifNewFeatures] = useState(() => {
         if (typeof window === "undefined") return true;
@@ -261,6 +267,19 @@ export default function SettingsPage() {
                                     onCheckedChange={(val) => {
                                         setShowTrackNumbersMobile(val);
                                         localStorage.setItem("show_track_numbers_mobile", String(val));
+                                    }}
+                                />
+                            </SettingsRow>
+                            <SettingsRow
+                                icon={Video}
+                                label="Disable Spotify Canvas background"
+                                description="Turn off background video loops during music playback"
+                            >
+                                <Switch
+                                    checked={disableSpotifyCanvas}
+                                    onCheckedChange={(val) => {
+                                        setDisableSpotifyCanvas(val);
+                                        localStorage.setItem("disable_spotify_canvas", String(val));
                                     }}
                                 />
                             </SettingsRow>
