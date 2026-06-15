@@ -1300,7 +1300,7 @@ export default function ArtistPage() {
             <div className="p-4 pt-12 pb-2 md:p-8 md:pt-20 md:pb-4 text-foreground">
               {/* Mobile Layout */}
               <div className="block md:hidden">
-                <div className="flex flex-col items-center text-center space-y-4">
+                <div className="flex flex-col items-center space-y-4">
                   <div className="w-48 h-48 rounded-full overflow-hidden bg-muted">
                     {artist.image?.[2]?.url || artist.image?.[1]?.url || artist.image?.[0]?.url ? (
                       <img
@@ -1317,7 +1317,7 @@ export default function ArtistPage() {
                       </div>
                     )}
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2 w-full text-left flex flex-col items-start">
                     {artist.isVerified && (
                       <Badge variant="secondary" className="mb-2">
                         <span className="w-2 h-2 bg-blue-500 rounded-full mr-1" />
@@ -1327,7 +1327,7 @@ export default function ArtistPage() {
                     <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word">
                       {artist.name}
                     </h1>
-                    <div className="flex items-center justify-center gap-4 text-sm flex-wrap">
+                    <div className="flex items-center justify-start gap-4 text-sm flex-wrap">
                       <div className="flex items-center gap-1">
                         <Users className="w-4 h-4" />
                         <span>{formatFollowers(artist.followerCount)} followers</span>

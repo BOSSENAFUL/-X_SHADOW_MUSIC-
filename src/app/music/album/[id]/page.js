@@ -1017,7 +1017,7 @@ export default function AlbumPage() {
             <div className="p-4 pt-12 pb-2 md:p-8 md:pt-20 md:pb-4 text-foreground">
               {/* Mobile Layout */}
               <div className="block md:hidden">
-                <div className="flex flex-col items-center text-center space-y-4">
+                <div className="flex flex-col items-center space-y-4">
                   <div className="w-48 h-48 rounded-lg overflow-hidden bg-muted shadow-2xl">
                     {album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url ? (
                       <img
@@ -1036,31 +1036,38 @@ export default function AlbumPage() {
                       />
                     )}
                   </div>
-                  <div className="space-y-3">
-                    <Badge variant="secondary" className="mb-2">
-                      Album
-                    </Badge>
+                  <div className="space-y-3 w-full text-left flex flex-col items-start">
                     <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word leading-tight max-w-full" title={decodeHtmlEntities(album.name)}>
                       {truncateTitle(decodeHtmlEntities(album.name), 35)}
                     </h1>
-                    <div className="text-sm mb-2">
-                      {album.artists?.primary?.length > 0 && (
-                        <>
-                          {album.artists.primary.map((artist, index) => (
-                            <span key={artist.id || index}>
-                              <Link
-                                href={`/music/artist/${artist.id}`}
-                                className="font-semibold hover:underline transition-colors"
-                              >
-                                {decodeHtmlEntities(artist.name)}
-                              </Link>
-                              {index < album.artists.primary.length - 1 && ', '}
-                            </span>
-                          ))}
-                        </>
-                      )}
+                    <div className="flex items-center gap-2 text-sm mb-2 flex-wrap">
+                      {album.artists?.primary?.map((artist, index) => {
+                        const artistImageUrl = artist.image?.[2]?.url || artist.image?.[1]?.url || artist.image?.[0]?.url;
+                        return (
+                          <div key={artist.id || index} className="flex items-center gap-1.5 mr-2">
+                            {artistImageUrl ? (
+                              <img
+                                src={artistImageUrl}
+                                alt={artist.name}
+                                className="w-5 h-5 rounded-full object-cover shrink-0"
+                              />
+                            ) : (
+                              <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center shrink-0">
+                                <User className="w-3 h-3 text-muted-foreground" />
+                              </div>
+                            )}
+                            <Link
+                              href={`/music/artist/${artist.id}`}
+                              className="font-semibold hover:underline transition-colors"
+                            >
+                              {decodeHtmlEntities(artist.name)}
+                            </Link>
+                            {index < album.artists.primary.length - 1 && <span className="ml-1 text-muted-foreground/60">•</span>}
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div className="flex items-center justify-center gap-2 text-sm opacity-80 flex-wrap">
+                    <div className="flex items-center justify-start gap-2 text-sm opacity-80 flex-wrap">
                       {album.year && (
                         <div className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
@@ -1097,28 +1104,35 @@ export default function AlbumPage() {
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <Badge variant="secondary" className="mb-2">
-                    Album
-                  </Badge>
                   <h1 ref={desktopTitleRef} className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 wrap-break-word leading-tight" title={decodeHtmlEntities(album.name)}>
                     {truncateTitle(decodeHtmlEntities(album.name), 60)}
                   </h1>
-                  <div className="flex items-center gap-2 text-sm mb-2">
-                    {album.artists?.primary?.length > 0 && (
-                      <>
-                        {album.artists.primary.map((artist, index) => (
-                          <span key={artist.id || index}>
-                            <Link
-                              href={`/music/artist/${artist.id}`}
-                              className="font-semibold hover:underline transition-colors"
-                            >
-                              {decodeHtmlEntities(artist.name)}
-                            </Link>
-                            {index < album.artists.primary.length - 1 && ', '}
-                          </span>
-                        ))}
-                      </>
-                    )}
+                  <div className="flex items-center gap-2 text-sm mb-2 flex-wrap">
+                    {album.artists?.primary?.map((artist, index) => {
+                      const artistImageUrl = artist.image?.[2]?.url || artist.image?.[1]?.url || artist.image?.[0]?.url;
+                      return (
+                        <div key={artist.id || index} className="flex items-center gap-1.5 mr-2">
+                          {artistImageUrl ? (
+                            <img
+                              src={artistImageUrl}
+                              alt={artist.name}
+                              className="w-5 h-5 rounded-full object-cover shrink-0"
+                            />
+                          ) : (
+                            <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center shrink-0">
+                              <User className="w-3 h-3 text-muted-foreground" />
+                            </div>
+                          )}
+                          <Link
+                            href={`/music/artist/${artist.id}`}
+                            className="font-semibold hover:underline transition-colors"
+                          >
+                            {decodeHtmlEntities(artist.name)}
+                          </Link>
+                          {index < album.artists.primary.length - 1 && <span className="ml-1 text-muted-foreground/60">•</span>}
+                        </div>
+                      );
+                    })}
                   </div>
                   <div className="flex items-center gap-2 text-sm opacity-80">
                     {album.year && (
