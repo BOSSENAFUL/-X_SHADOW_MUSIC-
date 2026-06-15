@@ -826,6 +826,65 @@ export function FullscreenMusicPlayer({
     setIsMounted(true);
   }, []);
   const [lyrics, setLyrics] = useState(null);
+  const [canvasUrl, setCanvasUrl] = useState(null);
+  const [showCanvas, setShowCanvas] = useState(false);
+  const [hideControls, setHideControls] = useState(false);
+
+  useEffect(() => {
+    if (!currentSong || !isMobile) {
+      setCanvasUrl(null);
+      setShowCanvas(false);
+      setHideControls(false);
+      return;
+    }
+
+    setCanvasUrl(null);
+    setShowCanvas(false);
+    setHideControls(false);
+
+    let isAborted = false;
+    let timerId = null;
+
+    const fetchCanvas = async () => {
+      try {
+        const songName = currentSong.name || currentSong.title || '';
+        const artistName = getArtistNames(currentSong) || 'Unknown Artist';
+
+        if (!songName) return;
+
+        const res = await fetch(`/api/proxy/spotify-canvas?trackName=${encodeURIComponent(songName)}&artistName=${encodeURIComponent(artistName)}`);
+        if (isAborted) return;
+
+        if (res.ok) {
+          const data = await res.json();
+          if (isAborted) return;
+          if (data.success && data.canvasUrl) {
+            setCanvasUrl(data.canvasUrl);
+            
+            timerId = setTimeout(() => {
+              if (!isAborted) {
+                setShowCanvas(true);
+              }
+            }, 3000);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch Spotify Canvas:', err);
+      }
+    };
+
+    fetchCanvas();
+
+    return () => {
+      isAborted = true;
+      if (timerId) clearTimeout(timerId);
+    };
+  }, [currentSong?.id, isMobile]);
+
+  // Force show controls when entering/exiting video mode
+  useEffect(() => {
+    setHideControls(false);
+  }, [showVideoMode]);
 
   const startTimePolling = () => {
     stopTimePolling();
@@ -1438,6 +1497,16 @@ export function FullscreenMusicPlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [lyrics?.syncedLyrics]
   );
+
+  const activeLyricLineText = useMemo(() => {
+    if (!parsedLyrics || parsedLyrics.length === 0) return "";
+    const time = showVideoMode ? ytCurrentTime : currentTime;
+    const idx = getCurrentLyricIndex(parsedLyrics, time);
+    if (idx === -1) return "";
+    const line = parsedLyrics[idx];
+    if (!line) return "";
+    return line.text || (line.words ? line.words.map((w) => w.word).join(" ") : "");
+  }, [parsedLyrics, currentTime, ytCurrentTime, showVideoMode]);
 
   useEffect(() => {
     console.log("Jammify Fullscreen: lyrics state changed:", lyrics);
@@ -2824,6 +2893,11 @@ export function FullscreenMusicPlayer({
       ` }} />
       <div
         className="fixed inset-0 z-100 overflow-hidden transition-all duration-1000 ease-out"
+        onClick={() => {
+          if (isMobile && canvasUrl && showCanvas) {
+            setHideControls(h => !h);
+          }
+        }}
         style={{
           background: dominantColors.primary
             ? `linear-gradient(to bottom, 
@@ -2835,6 +2909,45 @@ export function FullscreenMusicPlayer({
       >
         {/* Enhanced Ambient Background */}
         <div className="absolute inset-0">
+          {/* Spotify Background Canvas Video */}
+          {isMobile && canvasUrl && !showVideoMode && (
+            <div 
+              className="absolute inset-0 transition-opacity duration-1000 pointer-events-none"
+              style={{
+                opacity: showCanvas ? 1 : 0,
+                zIndex: 2,
+              }}
+            >
+              <video
+                src={canvasUrl}
+                loop
+                muted
+                autoPlay
+                playsInline
+                className="w-full h-full object-cover"
+              />
+              {/* General dimming overlay when controls are visible */}
+              <div 
+                className="absolute inset-0 transition-opacity duration-300"
+                style={{
+                  background: 'rgba(0,0,0,0.15)',
+                  opacity: hideControls ? 0 : 1,
+                }}
+              />
+              {/* Fixed bottom gradient overlay for control/text readability with premium mask blur */}
+              <div 
+                className="absolute bottom-0 left-0 right-0 pointer-events-none transition-all duration-300"
+                style={{
+                  height: hideControls ? '200px' : '380px',
+                  background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.15) 35%, rgba(0,0,0,0.6) 70%, rgba(0,0,0,0.95) 100%)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  maskImage: 'linear-gradient(to bottom, transparent 0%, black 45%, black 100%)',
+                  WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 45%, black 100%)',
+                }}
+              />
+            </div>
+          )}
           {/* Ambient Video Glow */}
           {showVideoMode && ytVideoId && (
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -2945,7 +3058,7 @@ export function FullscreenMusicPlayer({
             } ${showLyrics ? "hidden" : ""}`}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-4 sm:p-6 shrink-0">
+          <div className="flex items-center justify-between p-4 sm:p-6 shrink-0" onClick={(e) => e.stopPropagation()}>
             <Button
               variant="ghost"
               size="sm"
@@ -3188,185 +3301,301 @@ export function FullscreenMusicPlayer({
                     </div>
                   </div>
                 ) : (
-                  /* ── Album Art ── */
-                  <div className="w-full max-w-[380px] min-[400px]:max-w-[340px] min-[430px]:max-w-[380px] sm:max-w-[85%] md:max-w-[90%] lg:max-w-[500px] px-2 sm:px-4">
-                    <div className="w-full aspect-square overflow-hidden shadow-2xl bg-linear-to-br from-gray-800 to-gray-900">
-                      {currentSong.image?.[2]?.url ? (
-                        <img
-                          src={currentSong.image[2].url}
-                          alt={currentSong.name}
-                          className="w-full h-full object-cover"
-                          onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
-                        />
-                      ) : (
-                        <img
-                          src="/default-playlist-image.png"
-                          alt={currentSong.name}
-                          className="w-full h-full object-cover"
-                        />
-                      )}
+                  /* Center Layout for Mobile */
+                  <div 
+                    className="w-full flex flex-col items-center justify-center transition-all duration-500 ease-in-out"
+                    style={{
+                      height: (showCanvas && canvasUrl) ? '100%' : 'auto',
+                      flexGrow: (showCanvas && canvasUrl) ? 1 : 0
+                    }}
+                  >
+                    {/* Synced Lyrics Overlay - Only when showCanvas is active */}
+                    {showCanvas && canvasUrl && (
+                      <div 
+                        className="w-full px-6 flex items-center justify-center text-center select-none py-10 animate-fade-in"
+                        style={{
+                          minHeight: '120px'
+                        }}
+                      >
+                        <p 
+                          className="text-xl sm:text-2xl font-bold text-white transition-all duration-300 drop-shadow-md leading-relaxed"
+                          style={{
+                            fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
+                          }}
+                        >
+                          {activeLyricLineText || ""}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* ── Album Art ── */}
+                    <div 
+                      className="w-full max-w-[380px] min-[400px]:max-w-[340px] min-[430px]:max-w-[380px] sm:max-w-[85%] md:max-w-[90%] lg:max-w-[500px] px-2 sm:px-4 transition-all duration-500 ease-in-out"
+                      style={{
+                        opacity: (showCanvas && canvasUrl) ? 0 : 1,
+                        height: (showCanvas && canvasUrl) ? '0px' : 'auto',
+                        margin: (showCanvas && canvasUrl) ? '0px' : 'auto',
+                        transform: (showCanvas && canvasUrl) ? 'scale(0.8)' : 'scale(1)',
+                        pointerEvents: (showCanvas && canvasUrl) ? 'none' : 'auto',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      <div className="w-full aspect-square overflow-hidden shadow-2xl bg-linear-to-br from-gray-800 to-gray-900 relative">
+                        {canvasUrl && (
+                          <video
+                            src={canvasUrl}
+                            loop
+                            muted
+                            autoPlay
+                            playsInline
+                            className="w-full h-full object-cover"
+                            style={{
+                              opacity: showCanvas ? 1 : 0,
+                              transition: 'opacity 1.2s ease-in-out',
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              height: '100%',
+                              zIndex: 10,
+                            }}
+                          />
+                        )}
+                        {currentSong.image?.[2]?.url ? (
+                          <img
+                            src={currentSong.image[2].url}
+                            alt={currentSong.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
+                            style={{
+                              opacity: showCanvas ? 0 : 1,
+                              transition: 'opacity 1.2s ease-in-out',
+                              pointerEvents: showCanvas ? 'none' : 'auto',
+                              position: canvasUrl ? 'absolute' : 'static',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              height: '100%',
+                            }}
+                          />
+                        ) : (
+                          <img
+                            src="/default-playlist-image.png"
+                            alt={currentSong.name}
+                            className="w-full h-full object-cover"
+                            style={{
+                              opacity: showCanvas ? 0 : 1,
+                              transition: 'opacity 1.2s ease-in-out',
+                              pointerEvents: showCanvas ? 'none' : 'auto',
+                              position: canvasUrl ? 'absolute' : 'static',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              height: '100%',
+                            }}
+                          />
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
               </div>
 
 
-              {/* Switch to video / audio — above the song title, Spotify-style */}
-              {hasPerfectVideo && (
-                <div className="flex justify-start px-1 sm:px-2 mb-2">
-                  <button
-                    onClick={() => setShowVideoMode(v => !v)}
-                    className="flex items-center gap-2 px-3.5 py-1.5 rounded-full active:scale-95 transition-all duration-200 select-none"
-                    style={{
-                      background: 'rgba(0,0,0,0.30)',
-                      border: '1px solid rgba(255,255,255,0.13)',
-                    }}
-                  >
-                    {showVideoMode ? (
-                      <Music2 style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
-                    ) : (
-                      <Video style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
-                    )}
-                    <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.90)', letterSpacing: '0.01em' }}>
-                      {showVideoMode ? 'Switch to audio' : 'Switch to video'}
-                    </span>
-                  </button>
-                </div>
-              )}
-
-              {/* Song Info - Compact for small screens */}
-              <div className="px-1 sm:px-2 pb-4 shrink-0">
-                <div className="flex items-center justify-between mb-3 sm:mb-4">
-                  <div className="flex-1 min-w-0 mb-1">
-                    <h1 className="text-lg sm:text-xl font-bold text-white truncate">
-                      {decodeHtmlEntities(currentSong.name)}
-                    </h1>
-                    <p className="text-sm sm:text-base text-white/70 truncate">
-                      {getArtistNames(currentSong)}
-                    </p>
-                  </div>
-
-                  {/* Like Button */}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleLikeToggle}
-                    disabled={isLikeLoading}
-                    className={`shrink-0 ml-4 p-0 h-auto w-auto transform-gpu will-change-transform ${getCurrentLikeState()
-                      ? "text-green-500"
-                      : "text-white/60"
-                      }`}
-                    style={{
-                      padding: '8px', // Controlled padding
-                      backfaceVisibility: 'hidden',
-                      WebkitBackfaceVisibility: 'hidden',
-                    }}
-                  >
-                    <Heart
-                      style={{ width: '24px', height: '24px' }}
-                      className={`transition-colors duration-150 ${getCurrentLikeState() ? "fill-green-500" : ""
-                        }`}
-                    />
-                  </Button>
-                </div>
-
-                {/* Progress Bar */}
-                <div className="mb-4 sm:mb-6">
-                  <Slider
-                    value={[showVideoMode ? ytCurrentTime : currentTime]}
-                    max={(showVideoMode ? ytDuration : duration) || 100}
-                    step={1}
-                    onValueChange={handleSeek}
-                    onValueCommit={handleSeekCommit}
-                    className="w-full **:data-[slot=slider-thumb]:opacity-100 **:data-[slot=slider-thumb]:bg-white **:data-[slot=slider-thumb]:w-2.5 **:data-[slot=slider-thumb]:h-2.5 **:data-[slot=slider-range]:bg-white **:data-[slot=slider-track]:bg-white/20"
-                  />
-                  <div className="flex justify-between text-xs sm:text-sm text-white/60 mt-2">
-                    <span>{formatTime(showVideoMode ? ytCurrentTime : currentTime)}</span>
-                    <span>{formatTime(showVideoMode ? ytDuration : duration)}</span>
-                  </div>
-                </div>
-
-                {/* Controls - Compact spacing for small screens */}
-                <div className="flex items-center justify-between max-[360px]:justify-center gap-3 max-[360px]:gap-2 sm:gap-8 mb-4 sm:mb-6">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsShuffle(!isShuffle)}
-                    className={`p-2 ${isShuffle ? "text-green-400" : "text-white/60"
-                      }`}
-                  >
-                    <RxShuffle style={{ width: '24px', height: '24px' }} />
-                  </Button>
-
-                  <Button
-                    size="xs"
-                    onClick={handlePrevious}
-                    disabled={playlist.length === 0}
-                    className="text-white  hover:bg-transparent bg-transparent"
-                  >
-                    <BiSkipPrevious style={{ width: '52px', height: '52px' }} />
-                  </Button>
-
-                  <Button
-                    variant="default"
-                    size="lg"
-                    onClick={handlePlayPause}
-                    className="rounded-full w-16 h-16 sm:w-20 sm:h-20 bg-white text-black hover:bg-white/90"
-                  >
-                    {(showVideoMode ? ytIsPlaying : isPlaying) ? (
-                      <HiPause style={{ width: '30px', height: '30px' }} />
-                    ) : (
-                      <IoMdPlay style={{ width: '30px', height: '30px', marginLeft: '4px' }} />
-                    )}
-                  </Button>
-
-                  <Button
-                    size="xs"
-                    onClick={handleNext}
-                    disabled={playlist.length === 0}
-                    className="text-white  hover:bg-transparent bg-transparent"
-                  >
-                    <BiSkipNext style={{ width: '52px', height: '52px' }} />
-                  </Button>
-
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={toggleRepeat}
-                    className={`relative p-2 ${repeatMode !== "off" ? "text-green-400" : "text-white/60"
-                      }`}
-                  >
-                    <BsRepeat style={{ width: '24px', height: '24px' }} />
-                    {repeatMode === "one" && (
-                      <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full flex items-center justify-center text-xs text-black font-bold">
-                        1
+              {/* Bottom controls wrapper for mobile layout */}
+              <div className="w-full shrink-0 relative z-10">
+                {/* Switch to video / audio — above the song title, Spotify-style */}
+                {hasPerfectVideo && (
+                  <div className="flex justify-start px-1 sm:px-2 mb-2" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => setShowVideoMode(v => !v)}
+                      className="flex items-center gap-2 px-3.5 py-1.5 rounded-full active:scale-95 transition-all duration-200 select-none"
+                      style={{
+                        background: 'rgba(0,0,0,0.30)',
+                        border: '1px solid rgba(255,255,255,0.13)',
+                      }}
+                    >
+                      {showVideoMode ? (
+                        <Music2 style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
+                      ) : (
+                        <Video style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
+                      )}
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.90)', letterSpacing: '0.01em' }}>
+                        {showVideoMode ? 'Switch to audio' : 'Switch to video'}
                       </span>
-                    )}
-                  </Button>
-                </div>
+                    </button>
+                  </div>
+                )}
 
+                {/* Song Info - Compact for small screens */}
+                <div className="px-1 sm:px-2 pb-4 shrink-0">
+                  <div className="flex items-center justify-between mb-3 sm:mb-4" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {showCanvas && canvasUrl && (
+                        <div className="w-12 h-12 rounded overflow-hidden shrink-0 shadow-md transition-all duration-300">
+                          <img
+                            src={currentSong.image?.[2]?.url || '/default-playlist-image.png'}
+                            alt={currentSong.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
+                          />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0 mb-1">
+                        <h1 className="text-lg sm:text-xl font-bold text-white truncate">
+                          {decodeHtmlEntities(currentSong.name)}
+                        </h1>
+                        <p className="text-sm sm:text-base text-white/70 truncate">
+                          {getArtistNames(currentSong)}
+                        </p>
+                      </div>
+                    </div>
 
-                <div className="flex items-center justify-between ">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowPlaylist(!showPlaylist)}
-                    className="text-white/60 hover:text-white p-3 rounded-full hover:bg-white/10"
+                    {/* Like Button */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleLikeToggle}
+                      disabled={isLikeLoading}
+                      className={`shrink-0 ml-4 p-0 h-auto w-auto transform-gpu will-change-transform ${getCurrentLikeState()
+                        ? "text-green-500"
+                        : "text-white/60"
+                        }`}
+                      style={{
+                        padding: '8px', // Controlled padding
+                        backfaceVisibility: 'hidden',
+                        WebkitBackfaceVisibility: 'hidden',
+                      }}
+                    >
+                      <Heart
+                        style={{ width: '24px', height: '24px' }}
+                        className={`transition-colors duration-150 ${getCurrentLikeState() ? "fill-green-500" : ""
+                          }`}
+                      />
+                    </Button>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="mb-4 sm:mb-6" onClick={(e) => e.stopPropagation()}>
+                    <Slider
+                      value={[showVideoMode ? ytCurrentTime : currentTime]}
+                      max={(showVideoMode ? ytDuration : duration) || 100}
+                      step={1}
+                      onValueChange={handleSeek}
+                      onValueCommit={handleSeekCommit}
+                      className="w-full **:data-[slot=slider-thumb]:opacity-100 **:data-[slot=slider-thumb]:bg-white **:data-[slot=slider-thumb]:w-2.5 **:data-[slot=slider-thumb]:h-2.5 **:data-[slot=slider-range]:bg-white **:data-[slot=slider-track]:bg-white/20"
+                    />
+                    <div className="flex justify-between text-xs sm:text-sm text-white/60 mt-2">
+                      <span>{formatTime(showVideoMode ? ytCurrentTime : currentTime)}</span>
+                      <span>{formatTime(showVideoMode ? ytDuration : duration)}</span>
+                    </div>
+                  </div>
+
+                  {/* Controls - Compact spacing for small screens */}
+                  <div 
+                    className="flex items-center justify-between max-[360px]:justify-center gap-3 max-[360px]:gap-2 sm:gap-8 transition-all duration-300"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      opacity: (showCanvas && canvasUrl && hideControls) ? 0 : 1,
+                      height: (showCanvas && canvasUrl && hideControls) ? '0px' : 'auto',
+                      marginBottom: (showCanvas && canvasUrl && hideControls) ? '0px' : '',
+                      pointerEvents: (showCanvas && canvasUrl && hideControls) ? 'none' : 'auto',
+                      transform: (showCanvas && canvasUrl && hideControls) ? 'translateY(20px)' : 'translateY(0px)',
+                      transition: 'opacity 0.3s ease-in-out, transform 0.3s ease-in-out, height 0.3s ease-in-out, margin 0.3s ease-in-out',
+                      overflow: 'hidden',
+                    }}
                   >
-                    <ListMusic style={{ width: '18px', height: '18px' }} />
-                  </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsShuffle(!isShuffle)}
+                      className={`p-2 ${isShuffle ? "text-green-400" : "text-white/60"
+                        }`}
+                    >
+                      <RxShuffle style={{ width: '24px', height: '24px' }} />
+                    </Button>
 
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`text-white/60 hover:text-white p-3 rounded-full hover:bg-white/10 ${
-                      showVideoMode ? "opacity-20 pointer-events-none cursor-not-allowed" : ""
-                    }`}
-                    onClick={handleLyricsToggle}
-                    disabled={showVideoMode}
+                    <Button
+                      size="xs"
+                      onClick={handlePrevious}
+                      disabled={playlist.length === 0}
+                      className="text-white  hover:bg-transparent bg-transparent"
+                    >
+                      <BiSkipPrevious style={{ width: '52px', height: '52px' }} />
+                    </Button>
+
+                    <Button
+                      variant="default"
+                      size="lg"
+                      onClick={handlePlayPause}
+                      className="rounded-full w-16 h-16 sm:w-20 sm:h-20 bg-white text-black hover:bg-white/90"
+                    >
+                      {(showVideoMode ? ytIsPlaying : isPlaying) ? (
+                        <HiPause style={{ width: '30px', height: '30px' }} />
+                      ) : (
+                        <IoMdPlay style={{ width: '30px', height: '30px', marginLeft: '4px' }} />
+                      )}
+                    </Button>
+
+                    <Button
+                      size="xs"
+                      onClick={handleNext}
+                      disabled={playlist.length === 0}
+                      className="text-white  hover:bg-transparent bg-transparent"
+                    >
+                      <BiSkipNext style={{ width: '52px', height: '52px' }} />
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleRepeat}
+                      className={`relative p-2 ${repeatMode !== "off" ? "text-green-400" : "text-white/60"
+                        }`}
+                    >
+                      <BsRepeat style={{ width: '24px', height: '24px' }} />
+                      {repeatMode === "one" && (
+                        <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full flex items-center justify-center text-xs text-black font-bold">
+                          1
+                        </span>
+                      )}
+                    </Button>
+                  </div>
+
+
+                  <div 
+                    className="flex items-center justify-between transition-all duration-300"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      opacity: (showCanvas && canvasUrl && hideControls) ? 0 : 1,
+                      height: (showCanvas && canvasUrl && hideControls) ? '0px' : 'auto',
+                      pointerEvents: (showCanvas && canvasUrl && hideControls) ? 'none' : 'auto',
+                      transform: (showCanvas && canvasUrl && hideControls) ? 'translateY(20px)' : 'translateY(0px)',
+                      transition: 'opacity 0.3s ease-in-out, transform 0.3s ease-in-out, height 0.3s ease-in-out',
+                      overflow: 'hidden',
+                    }}
                   >
-                    <Mic style={{ width: '18px', height: '18px' }} />
-                  </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowPlaylist(!showPlaylist)}
+                      className="text-white/60 hover:text-white p-3 rounded-full hover:bg-white/10"
+                    >
+                      <ListMusic style={{ width: '18px', height: '18px' }} />
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={`text-white/60 hover:text-white p-3 rounded-full hover:bg-white/10 ${
+                        showVideoMode ? "opacity-20 pointer-events-none cursor-not-allowed" : ""
+                      }`}
+                      onClick={handleLyricsToggle}
+                      disabled={showVideoMode}
+                    >
+                      <Mic style={{ width: '18px', height: '18px' }} />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
