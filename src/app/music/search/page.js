@@ -355,7 +355,7 @@ function SearchPageContent() {
   // Ref to track current search ID to prevent stale results
   const currentSearchId = useRef(0);
 
-  const { playSong, currentSong, isPlaying, togglePlayPause, showTrackNumbersMobile } = useMusicPlayer();
+  const { playSong, currentSong, isPlaying, togglePlayPause, showTrackNumbersMobile, setPlaylist } = useMusicPlayer();
   const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
 
   // Blocks the search effect from firing while we are restoring saved state
@@ -1601,15 +1601,13 @@ function SearchPageContent() {
         }
       }
 
-      // 3. Start playback with high quality data
-      // For the rest of the playlist, we can defer detailed fetching if needed,
-      // but for the current song we MUST have the quality link now.
-      playSong(detailedCurrentSong, playlist, null, index);
+      // 3. Start playback with high quality data and search results queue initially
+      playSong(detailedCurrentSong, playlist, 'search-suggestions-init', index);
 
     } catch (error) {
       console.error('Error in handlePlayClick:', error);
       // Absolute fallback
-      playSong(song, playlist, null, index);
+      playSong(song, playlist, 'search-suggestions-init', index);
     }
   };
 

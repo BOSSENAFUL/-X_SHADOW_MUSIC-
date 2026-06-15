@@ -1620,6 +1620,7 @@ export function FullscreenMusicPlayer({
   const [touchCurrentY, setTouchCurrentY] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [draggedElement, setDraggedElement] = useState(null);
+  const cachedSongRectsRef = useRef([]);
 
   // Helper to convert rgb(r, g, b) to hex color code for Android/Chrome status bar compatibility
   const convertRgbToHex = (rgbStr) => {
@@ -1828,11 +1829,29 @@ export function FullscreenMusicPlayer({
     setTouchCurrentY(touch.clientY);
     setDraggedIndex(index);
     setIsDragging(false);
-    setDraggedElement(e.currentTarget);
+    // Find the closest parent song item container so we drag the whole row, not just the handle icon
+    const songContainer = e.currentTarget.closest("[data-song-index]");
+    setDraggedElement(songContainer);
 
-    // Store initial touch position for better detection
-    e.currentTarget.touchStartX = touch.clientX;
-    e.currentTarget.touchStartTime = Date.now();
+    if (songContainer) {
+      // Store initial touch position on the container for better detection
+      songContainer.touchStartX = touch.clientX;
+      songContainer.touchStartTime = Date.now();
+    }
+
+    // Cache the rects of all song items once when drag starts, preventing layout thrashing during touchmove
+    // Restrict selection to the current active scroll container to prevent matching elements from the other layout
+    const parentContainer = e.currentTarget.closest(".overflow-y-auto");
+    const songElements = parentContainer ? parentContainer.querySelectorAll("[data-song-index]") : [];
+    const rects = [];
+    songElements.forEach((el) => {
+      const rect = el.getBoundingClientRect();
+      rects.push({
+        index: parseInt(el.getAttribute("data-song-index"), 10),
+        center: rect.top + rect.height / 2,
+      });
+    });
+    cachedSongRectsRef.current = rects;
 
     // Don't prevent default here to allow normal scrolling initially
   };
@@ -1878,20 +1897,17 @@ export function FullscreenMusicPlayer({
       // Prevent scrolling while dragging
       e.preventDefault();
 
-      // Get all song elements
-      const songElements = document.querySelectorAll("[data-song-index]");
       let closestIndex = draggedIndex;
       let closestDistance = Infinity;
 
-      // Find the closest song element to the touch point
-      songElements.forEach((element) => {
-        const rect = element.getBoundingClientRect();
-        const elementCenter = rect.top + rect.height / 2;
-        const distance = Math.abs(touch.clientY - elementCenter);
+      // Use the cached rect centers instead of querying the DOM on every pixel movement
+      const rects = cachedSongRectsRef.current || [];
+      rects.forEach((item) => {
+        const distance = Math.abs(touch.clientY - item.center);
 
         if (distance < closestDistance) {
           closestDistance = distance;
-          closestIndex = parseInt(element.getAttribute("data-song-index"));
+          closestIndex = item.index;
         }
       });
 
@@ -3998,218 +4014,183 @@ export function FullscreenMusicPlayer({
           </div>
         </div>
 
-        {/* Playlist Sidebar - Mobile Full Screen, Desktop Sidebar */}
-        {showPlaylist && (
-          <>
-            {/* Mobile: Full screen overlay */}
-            <div className="md:hidden fixed inset-0 bg-black/95 backdrop-blur-xl z-20">
-              <div className="flex flex-col h-full">
-                <div className="flex items-center justify-between p-4 border-b border-white/10">
-                  <h3 className="text-lg font-semibold text-white">Queue</h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowPlaylist(false)}
-                    className="text-white/60 hover:bg-white/10 rounded-full p-2"
-                  >
-                    <ChevronDown className="w-5 h-5" />
-                  </Button>
-                </div>
+        {/* Mobile: Vaul Drawer for Queue */}
+        <Drawer open={isMobile && showPlaylist} onOpenChange={setShowPlaylist}>
+          <DrawerContent className="h-[80vh] bg-black/95 border-t border-white/10 text-white flex flex-col focus:outline-none">
+            <DrawerHeader className="border-b border-white/10 flex items-center justify-between px-4 py-3 shrink-0">
+              <DrawerTitle className="text-lg font-semibold text-white">Queue</DrawerTitle>
+            </DrawerHeader>
+            <div 
+              className="flex-1 overflow-y-auto scrollbar-hide py-2 px-1"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
+              {getCurrentPlaylist().map((song, index) => (
                 <div
-                  className="flex-1 overflow-y-auto scrollbar-hide"
-                  style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
+                  key={`${song.id}-${index}`}
+                  data-song-index={index}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragEnd={handleDragEnd}
+                  onDragOver={handleDragOver}
+                  onDragEnter={(e) => handleDragEnter(e, index)}
+                  onDrop={(e) => handleDrop(e, index)}
+                  onClick={() => {
+                    if (!isDragging) {
+                      onSongChange?.(song, index, getCurrentPlaylist());
+                      setShowPlaylist(false); // Close queue on mobile after selection
+                    }
+                  }}
+                  className={`flex items-center gap-3 p-4 active:bg-white/5 transition-[opacity,transform] duration-200 select-none rounded-lg ${
+                    index === playerCurrentIndex ? "bg-white/10" : ""
+                  } ${dragOverIndex === index && draggedIndex !== index ? "border-t-2 border-green-400" : ""} ${
+                    draggedIndex === index ? "opacity-50 scale-95" : ""
+                  }`}
                 >
-                  {getCurrentPlaylist().map((song, index) => (
-                    <div
-                      key={`${song.id}-${index}`}
-                      data-song-index={index}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, index)}
-                      onDragEnd={handleDragEnd}
-                      onDragOver={handleDragOver}
-                      onDragEnter={(e) => handleDragEnter(e, index)}
-                      onDrop={(e) => handleDrop(e, index)}
-                      onTouchStart={(e) => handleTouchStart(e, index)}
-                      onTouchMove={handleTouchMove}
-                      onTouchEnd={handleTouchEnd}
-                      onClick={(e) => {
-                        // Only trigger song change if not dragging
-                        if (!isDragging) {
-                          onSongChange?.(song, index, getCurrentPlaylist());
-                          setShowPlaylist(false); // Close queue on mobile after selection
+                  <div className="w-12 h-12 rounded bg-white/10 overflow-hidden shrink-0">
+                    {song.image?.length > 0 ? (
+                      <img
+                        src={
+                          song.image.find((img) => img.quality === "500x500")?.url ||
+                          song.image.find((img) => img.quality === "150x150")?.url ||
+                          song.image[song.image.length - 1]?.url
                         }
-                      }}
-                      className={`flex items-center gap-3 p-4 active:bg-white/5 cursor-move transition-[opacity,transform] duration-200 select-none ${index === playerCurrentIndex ? "bg-white/10" : ""
-                        } ${dragOverIndex === index && draggedIndex !== index
-                          ? "border-t-2 border-green-400"
-                          : ""
-                        } ${draggedIndex === index ? "opacity-50 scale-95" : ""}`}
+                        alt={song.name}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <IoMdPlay className="w-4 h-4 text-white/50" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className={`font-medium truncate text-base ${
+                        index === playerCurrentIndex ? "text-green-400" : "text-white"
+                      }`}
                     >
-                      <div className="w-12 h-12 rounded bg-white/10 overflow-hidden shrink-0">
-                        {song.image?.length > 0 ? (
-                          <img
-                            src={
-                              song.image.find(
-                                (img) => img.quality === "500x500"
-                              )?.url ||
-                              song.image.find(
-                                (img) => img.quality === "150x150"
-                              )?.url ||
-                              song.image[song.image.length - 1]?.url
-                            }
-                            alt={song.name}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                            decoding="async"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <IoMdPlay className="w-4 h-4 text-white/50" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p
-                          className={`font-medium truncate text-base ${index === playerCurrentIndex
-                            ? "text-green-400"
-                            : "text-white"
-                            }`}
-                        >
-                          {decodeHtmlEntities(song.name)}
-                        </p>
-                        <p className="text-sm text-white/60 truncate">
-                          {decodeHtmlEntities(getArtistNames(song))}
-                        </p>
-                      </div>
-                      <div className="shrink-0 text-white/40">
-                        <ArrowUpDown className="w-4 h-4" />
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Reorder Queue Button */}
-                  {playlist.length > 1 && (
-                    <div className="p-4 border-t border-white/10">
-                      <Button
-                        variant="ghost"
-                        className="w-full text-white/60 hover:bg-white/5 hover:text-white/80 rounded-lg p-3 flex items-center justify-center gap-2"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // Add your reorder functionality here
-                          console.log("Reorder queue clicked");
-                        }}
-                      >
-                        <ArrowUpDown className="w-5 h-5" />
-                        <span className="text-sm font-medium">
-                          Reorder Queue
-                        </span>
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Desktop: Right sidebar */}
-            <div className="hidden md:block absolute right-0 top-0 bottom-0 w-80 bg-black/80 backdrop-blur-xl border-l border-white/10 transform transition-transform duration-300">
-              <div className="p-4 border-b border-white/10">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-white">Queue</h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowPlaylist(false)}
-                    className="text-white/60 hover:bg-white/10"
-                  >
-                    ×
-                  </Button>
-                </div>
-              </div>
-              <div className="overflow-y-auto h-full pb-20 scrollbar-hide">
-                {getCurrentPlaylist().map((song, index) => (
-                  <div
-                    key={`${song.id}-${index}`}
-                    data-song-index={index}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, index)}
-                    onDragEnd={handleDragEnd}
-                    onDragOver={handleDragOver}
-                    onDragEnter={(e) => handleDragEnter(e, index)}
-                    onDrop={(e) => handleDrop(e, index)}
+                      {decodeHtmlEntities(song.name)}
+                    </p>
+                    <p className="text-sm text-white/60 truncate">
+                      {decodeHtmlEntities(getArtistNames(song))}
+                    </p>
+                  </div>
+                  <div 
+                    className="shrink-0 text-white/40 p-2 -mr-2 touch-none cursor-grab active:cursor-grabbing"
                     onTouchStart={(e) => handleTouchStart(e, index)}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
-                    onClick={(e) => {
-                      // Only trigger song change if not dragging
-                      if (!isDragging) {
-                        onSongChange?.(song, index, getCurrentPlaylist());
-                      }
-                    }}
-                    className={`flex items-center gap-3 p-3 hover:bg-white/5 cursor-move transition-all duration-200 select-none ${index === playerCurrentIndex ? "bg-white/10" : ""
-                      } ${dragOverIndex === index && draggedIndex !== index
-                        ? "border-t-2 border-green-400"
-                        : ""
-                      } ${draggedIndex === index ? "opacity-50 scale-95" : ""}`}
                   >
-                    <div className="w-12 h-12 rounded bg-white/10 overflow-hidden shrink-0">
-                      {song.image?.length > 0 ? (
-                        <img
-                          src={
-                            song.image.find((img) => img.quality === "500x500")
-                              ?.url ||
-                            song.image.find((img) => img.quality === "150x150")
-                              ?.url ||
-                            song.image[song.image.length - 1]?.url
-                          }
-                          alt={song.name}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <IoMdPlay className="w-4 h-4 text-white/50" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className={`font-medium truncate text-sm ${index === playerCurrentIndex
-                          ? "text-green-400"
-                          : "text-white"
-                          }`}
-                      >
-                        {decodeHtmlEntities(song.name)}
-                      </p>
-                      <p className="text-xs text-white/60 truncate">
-                        {decodeHtmlEntities(getArtistNames(song))}
-                      </p>
-                    </div>
-                    <div className="shrink-0 text-white/40">
-                      <ArrowUpDown className="w-3 h-3" />
-                    </div>
+                    <ArrowUpDown className="w-4 h-4" />
                   </div>
-                ))}
+                </div>
+              ))}
+            </div>
+          </DrawerContent>
+        </Drawer>
 
-                {/* Reorder Queue Button */}
-                {playlist.length > 1 && (
-                  <div className="p-3 border-t border-white/10">
-                    <Button
-                      variant="ghost"
-                      className="w-full text-white/60 hover:bg-white/5 hover:text-white/80 rounded-lg p-2 flex items-center justify-center gap-2"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // Add your reorder functionality here
-                        console.log("Reorder queue clicked");
-                      }}
-                    >
-                      <ArrowUpDown className="w-4 h-4" />
-                      <span className="text-xs font-medium">Reorder Queue</span>
-                    </Button>
-                  </div>
-                )}
+        {/* Desktop: Right sidebar */}
+        {!isMobile && showPlaylist && (
+          <div className="hidden md:block absolute right-0 top-0 bottom-0 w-80 bg-black/80 backdrop-blur-xl border-l border-white/10 transform transition-transform duration-300">
+            <div className="p-4 border-b border-white/10">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white">Queue</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowPlaylist(false)}
+                  className="text-white/60 hover:bg-white/10"
+                >
+                  ×
+                </Button>
               </div>
             </div>
-          </>
+            <div className="overflow-y-auto h-full pb-20 scrollbar-hide">
+              {getCurrentPlaylist().map((song, index) => (
+                <div
+                  key={`${song.id}-${index}`}
+                  data-song-index={index}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragEnd={handleDragEnd}
+                  onDragOver={handleDragOver}
+                  onDragEnter={(e) => handleDragEnter(e, index)}
+                  onDrop={(e) => handleDrop(e, index)}
+                  onTouchStart={(e) => handleTouchStart(e, index)}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                  onClick={(e) => {
+                    // Only trigger song change if not dragging
+                    if (!isDragging) {
+                      onSongChange?.(song, index, getCurrentPlaylist());
+                    }
+                  }}
+                  className={`flex items-center gap-3 p-3 hover:bg-white/5 cursor-move transition-all duration-200 select-none ${index === playerCurrentIndex ? "bg-white/10" : ""
+                    } ${dragOverIndex === index && draggedIndex !== index
+                      ? "border-t-2 border-green-400"
+                      : ""
+                    } ${draggedIndex === index ? "opacity-50 scale-95" : ""}`}
+                >
+                  <div className="w-12 h-12 rounded bg-white/10 overflow-hidden shrink-0">
+                    {song.image?.length > 0 ? (
+                      <img
+                        src={
+                          song.image.find((img) => img.quality === "500x500")
+                            ?.url ||
+                          song.image.find((img) => img.quality === "150x150")
+                            ?.url ||
+                          song.image[song.image.length - 1]?.url
+                        }
+                        alt={song.name}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <IoMdPlay className="w-4 h-4 text-white/50" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className={`font-medium truncate text-sm ${index === playerCurrentIndex
+                        ? "text-green-400"
+                        : "text-white"
+                        }`}
+                    >
+                      {decodeHtmlEntities(song.name)}
+                    </p>
+                    <p className="text-xs text-white/60 truncate">
+                      {decodeHtmlEntities(getArtistNames(song))}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-white/40">
+                    <ArrowUpDown className="w-3 h-3" />
+                  </div>
+                </div>
+              ))}
+
+              {/* Reorder Queue Button */}
+              {playlist.length > 1 && (
+                <div className="p-3 border-t border-white/10">
+                  <Button
+                    variant="ghost"
+                    className="w-full text-white/60 hover:bg-white/5 hover:text-white/80 rounded-lg p-2 flex items-center justify-center gap-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Add your reorder functionality here
+                      console.log("Reorder queue clicked");
+                    }}
+                  >
+                    <ArrowUpDown className="w-4 h-4" />
+                    <span className="text-xs font-medium">Reorder Queue</span>
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {/* Lyrics View - Full Screen Overlay */}

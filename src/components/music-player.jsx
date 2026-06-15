@@ -39,6 +39,9 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     setRepeatMode,
     setIsFullscreenPlaylistOpen,
     isFullscreenPlaylistOpen,
+    currentPlaylistId,
+    setPlaylist,
+    playSong,
   } = useMusicPlayer();
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -55,6 +58,11 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   const lastSeekTimeRef = useRef(null);
   const lastSeekTimestampRef = useRef(0);
   const loadedSongIdRef = useRef(null);
+  const fetchedSuggestionsSongIdsRef = useRef(new Set());
+  const lastSuggestionsSongIdRef = useRef(null);
+  const initSuggestionsSongIdRef = useRef(null);
+  const currentSongIdRef = useRef(null);
+  const currentPlaylistIdRef = useRef(null);
 
   // Use currentIndex from context if available, fallback to findIndex
   const currentIndex = playerCurrentIndex ?? (playlist.findIndex((song) => song.id === currentSong?.id) || 0);
@@ -476,6 +484,102 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       }
     });
   }, [currentSong?.id, playlist]);
+
+  // Keep refs of current song and playlist ID to prevent race conditions during async fetches
+  useEffect(() => {
+    currentSongIdRef.current = currentSong?.id;
+    currentPlaylistIdRef.current = currentPlaylistId;
+  }, [currentSong, currentPlaylistId]);
+
+  // Clear fetched suggestions cache and init ref when playlist ID changes
+  useEffect(() => {
+    if (currentPlaylistId !== 'search-suggestions-init') {
+      initSuggestionsSongIdRef.current = null;
+    }
+    if (currentPlaylistId !== 'search-suggestions') {
+      fetchedSuggestionsSongIdsRef.current.clear();
+      lastSuggestionsSongIdRef.current = null;
+    }
+  }, [currentPlaylistId]);
+
+  // Initialize search suggestions when starting playback from search
+  useEffect(() => {
+    if (currentPlaylistId === 'search-suggestions-init' && currentSong?.id) {
+      const songId = currentSong.id;
+      if (initSuggestionsSongIdRef.current === songId) return;
+      initSuggestionsSongIdRef.current = songId;
+
+      console.log("Initializing suggestions for search-suggestions-init. Seed song ID:", songId);
+      const url = `${process.env.NEXT_PUBLIC_API_URL || 'https://nepotuneapi.vercel.app'}/api/songs/${songId}/suggestions?limit=20`;
+
+      fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          // Prevent race conditions: check if song or playlist changed during fetch
+          if (currentSongIdRef.current !== songId || currentPlaylistIdRef.current !== 'search-suggestions-init') {
+            console.log("Suggestions fetch resolved but song or playlist changed. Ignoring.");
+            return;
+          }
+
+          const suggestions = Array.isArray(data) ? data : data?.data ?? [];
+          if (suggestions && suggestions.length > 0) {
+            // Filter out current song to avoid duplicates
+            const filtered = suggestions.filter(s => s.id !== songId);
+            if (filtered.length > 0) {
+              console.log(`Fetched ${filtered.length} suggestions successfully. Switching to search-suggestions playlist.`);
+              // Switch playlist to [currentSong, ...filtered] and set id to 'search-suggestions', starting at index 0
+              playSong(currentSong, [currentSong, ...filtered], 'search-suggestions', 0);
+              return;
+            }
+          }
+
+          // Fallback if suggestions are empty/invalid
+          console.log("No recommendations found for this track. Falling back to the search results queue.");
+          playSong(currentSong, playlist, 'search-suggestions-fallback', currentIndex);
+        })
+        .catch(err => {
+          console.error("Error fetching initial suggestions, falling back to search results:", err);
+          if (currentSongIdRef.current === songId && currentPlaylistIdRef.current === 'search-suggestions-init') {
+            playSong(currentSong, playlist, 'search-suggestions-fallback', currentIndex);
+          }
+        });
+    }
+  }, [currentPlaylistId, currentSong, playlist, currentIndex, playSong]);
+
+  // Auto-extend playlist with new suggestions when playing the last song of a search queue
+  useEffect(() => {
+    if (currentPlaylistId === 'search-suggestions' && playlist.length > 0 && currentSong) {
+      // Clear cache only when starting a new song to avoid duplicate parallel requests
+      if (currentSong.id !== lastSuggestionsSongIdRef.current) {
+        fetchedSuggestionsSongIdsRef.current.clear();
+        lastSuggestionsSongIdRef.current = currentSong.id;
+      }
+      const isLastSong = playlist.findIndex(s => s.id === currentSong.id) === playlist.length - 1;
+      if (isLastSong && !fetchedSuggestionsSongIdsRef.current.has(currentSong.id)) {
+        fetchedSuggestionsSongIdsRef.current.add(currentSong.id);
+        console.log("Reaching the end of search-suggestions queue. Fetching more suggestions for:", currentSong.id);
+        const url = `${process.env.NEXT_PUBLIC_API_URL || 'https://nepotuneapi.vercel.app'}/api/songs/${currentSong.id}/suggestions?limit=20`;
+        fetch(url)
+          .then(res => res.json())
+          .then(data => {
+            const suggestions = Array.isArray(data) ? data : data?.data ?? [];
+            if (suggestions && suggestions.length > 0) {
+              // Filter out duplicate songs already in the playlist
+              const existingIds = new Set(playlist.map(s => s.id));
+              const filtered = suggestions.filter(s => !existingIds.has(s.id));
+              if (filtered.length > 0) {
+                console.log(`Appending ${filtered.length} new suggestions based on ${currentSong.name}.`);
+                setPlaylist(prev => [...prev, ...filtered]);
+              }
+            }
+          })
+          .catch(err => {
+            console.error("Error extending playlist with new suggestions:", err);
+            fetchedSuggestionsSongIdsRef.current.delete(currentSong.id);
+          });
+      }
+    }
+  }, [currentSong, playlist, currentPlaylistId, setPlaylist]);
 
   // Handle mobile back button to close fullscreen player
   useEffect(() => {
