@@ -38,7 +38,7 @@ export async function GET(request) {
     const yt = await getYtInstance();
     
     let info = null;
-    let lastError = null;
+    const errors = {};
     
     // Fallback chain of clients to get video info (TV and ANDROID bypass most Vercel/datacenter blocks)
     const clients = ['TV', 'ANDROID', 'YTMUSIC', 'WEB'];
@@ -52,17 +52,24 @@ export async function GET(request) {
           info = tempInfo;
           console.log(`[yt-stream] Successfully fetched video info with client: ${client}`);
           break;
+        } else {
+          const status = tempInfo?.playability_status?.status || 'UNKNOWN_STATUS';
+          const reason = tempInfo?.playability_status?.reason || 'No streaming data or status not OK';
+          console.warn(`[yt-stream] Client ${client} returned playability status: ${status}. Reason: ${reason}`);
+          errors[client] = `Status: ${status}, Reason: ${reason}`;
         }
       } catch (err) {
         console.warn(`[yt-stream] Client ${client} failed:`, err.message);
-        lastError = err;
+        errors[client] = err.message;
       }
     }
 
     if (!info) {
-      const errorMsg = lastError ? lastError.message : 'Streaming data not available';
-      console.error('[yt-stream] All clients failed to fetch video info. Last error:', errorMsg);
-      return Response.json({ error: `Streaming data not available: ${errorMsg}` }, { status: 500 });
+      console.error('[yt-stream] All clients failed to fetch video info. Errors:', errors);
+      return Response.json({ 
+        error: 'Streaming data not available',
+        details: errors
+      }, { status: 500 });
     }
 
     // Prioritize itag 18 (Video+Audio) because it bypasses signature-cipher range/seek locking
