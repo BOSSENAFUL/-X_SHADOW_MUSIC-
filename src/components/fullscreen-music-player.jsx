@@ -749,6 +749,163 @@ function MarqueeSongTitle({ title }) {
   );
 }
 
+const QueueItem = memo(({
+  song,
+  index,
+  currentIndex,
+  draggedIndex,
+  dragOverIndex,
+  isDragging,
+  onSongChange,
+  handleDragStart,
+  handleDragEnd,
+  handleDragOver,
+  handleDragEnter,
+  handleDrop,
+  handleTouchStart,
+  handleTouchMove,
+  handleTouchEnd,
+  isMobile,
+  setShowPlaylist,
+  songs
+}) => {
+  if (isMobile) {
+    return (
+      <div
+        data-song-index={index}
+        draggable
+        onDragStart={(e) => handleDragStart(e, index)}
+        onDragEnd={handleDragEnd}
+        onDragOver={handleDragOver}
+        onDragEnter={(e) => handleDragEnter(e, index)}
+        onDrop={(e) => handleDrop(e, index)}
+        onClick={() => {
+          if (!isDragging) {
+            onSongChange?.(song, index, songs);
+            setShowPlaylist(false); // Close queue on mobile after selection
+          }
+        }}
+        className={`flex items-center gap-3 p-4 active:bg-white/5 transition-[opacity,transform] duration-200 select-none rounded-lg ${
+          index === currentIndex ? "bg-white/10" : ""
+        } ${dragOverIndex === index && draggedIndex !== index ? "border-t-2 border-green-400" : ""} ${
+          draggedIndex === index ? "opacity-50 scale-95" : ""
+        }`}
+      >
+        <div className="w-12 h-12 rounded bg-white/10 overflow-hidden shrink-0">
+          {song.image?.length > 0 ? (
+            <img
+              src={
+                song.image.find((img) => img.quality === "500x500")?.url ||
+                song.image.find((img) => img.quality === "150x150")?.url ||
+                song.image[song.image.length - 1]?.url
+              }
+              alt={song.name}
+              className="w-full h-full object-cover"
+              loading="lazy"
+              decoding="async"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <IoMdPlay className="w-4 h-4 text-white/50" />
+            </div>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p
+            className={`font-medium truncate text-base ${
+              index === currentIndex ? "text-green-400" : "text-white"
+            }`}
+          >
+            {decodeHtmlEntities(song.name)}
+          </p>
+          <p className="text-sm text-white/60 truncate">
+            {decodeHtmlEntities(getArtistNames(song))}
+          </p>
+        </div>
+        <div 
+          className="shrink-0 text-white/40 p-2 -mr-2 touch-none cursor-grab active:cursor-grabbing"
+          onTouchStart={(e) => handleTouchStart(e, index)}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <ArrowUpDown className="w-4 h-4" />
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop layout
+  return (
+    <div
+      data-song-index={index}
+      draggable
+      onDragStart={(e) => handleDragStart(e, index)}
+      onDragEnd={handleDragEnd}
+      onDragOver={handleDragOver}
+      onDragEnter={(e) => handleDragEnter(e, index)}
+      onDrop={(e) => handleDrop(e, index)}
+      onTouchStart={(e) => handleTouchStart(e, index)}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onClick={(e) => {
+        if (!isDragging) {
+          onSongChange?.(song, index, songs);
+        }
+      }}
+      className={`flex items-center gap-3 p-3 hover:bg-white/5 cursor-move transition-all duration-200 select-none ${
+        index === currentIndex ? "bg-white/10" : ""
+      } ${dragOverIndex === index && draggedIndex !== index ? "border-t-2 border-green-400" : ""} ${
+        draggedIndex === index ? "opacity-50 scale-95" : ""
+      }`}
+    >
+      <div className="w-12 h-12 rounded bg-white/10 overflow-hidden shrink-0">
+        {song.image?.length > 0 ? (
+          <img
+            src={
+              song.image.find((img) => img.quality === "500x500")?.url ||
+              song.image.find((img) => img.quality === "150x150")?.url ||
+              song.image[song.image.length - 1]?.url
+            }
+            alt={song.name}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <IoMdPlay className="w-4 h-4 text-white/50" />
+          </div>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p
+          className={`font-medium truncate text-sm ${
+            index === currentIndex ? "text-green-400" : "text-white"
+          }`}
+        >
+          {decodeHtmlEntities(song.name)}
+        </p>
+        <p className="text-xs text-white/60 truncate">
+          {decodeHtmlEntities(getArtistNames(song))}
+        </p>
+      </div>
+      <div className="shrink-0 text-white/40">
+        <ArrowUpDown className="w-3 h-3" />
+      </div>
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.song.id === nextProps.song.id &&
+    prevProps.index === nextProps.index &&
+    prevProps.currentIndex === nextProps.currentIndex &&
+    prevProps.draggedIndex === nextProps.draggedIndex &&
+    prevProps.dragOverIndex === nextProps.dragOverIndex &&
+    prevProps.isDragging === nextProps.isDragging
+  );
+});
+
+QueueItem.displayName = "QueueItem";
+
 export function FullscreenMusicPlayer({
   currentSong,
   playlist = [],
@@ -4025,67 +4182,27 @@ export function FullscreenMusicPlayer({
               style={{ WebkitOverflowScrolling: 'touch' }}
             >
               {getCurrentPlaylist().map((song, index) => (
-                <div
+                <QueueItem
                   key={`${song.id}-${index}`}
-                  data-song-index={index}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, index)}
-                  onDragEnd={handleDragEnd}
-                  onDragOver={handleDragOver}
-                  onDragEnter={(e) => handleDragEnter(e, index)}
-                  onDrop={(e) => handleDrop(e, index)}
-                  onClick={() => {
-                    if (!isDragging) {
-                      onSongChange?.(song, index, getCurrentPlaylist());
-                      setShowPlaylist(false); // Close queue on mobile after selection
-                    }
-                  }}
-                  className={`flex items-center gap-3 p-4 active:bg-white/5 transition-[opacity,transform] duration-200 select-none rounded-lg ${
-                    index === playerCurrentIndex ? "bg-white/10" : ""
-                  } ${dragOverIndex === index && draggedIndex !== index ? "border-t-2 border-green-400" : ""} ${
-                    draggedIndex === index ? "opacity-50 scale-95" : ""
-                  }`}
-                >
-                  <div className="w-12 h-12 rounded bg-white/10 overflow-hidden shrink-0">
-                    {song.image?.length > 0 ? (
-                      <img
-                        src={
-                          song.image.find((img) => img.quality === "500x500")?.url ||
-                          song.image.find((img) => img.quality === "150x150")?.url ||
-                          song.image[song.image.length - 1]?.url
-                        }
-                        alt={song.name}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <IoMdPlay className="w-4 h-4 text-white/50" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className={`font-medium truncate text-base ${
-                        index === playerCurrentIndex ? "text-green-400" : "text-white"
-                      }`}
-                    >
-                      {decodeHtmlEntities(song.name)}
-                    </p>
-                    <p className="text-sm text-white/60 truncate">
-                      {decodeHtmlEntities(getArtistNames(song))}
-                    </p>
-                  </div>
-                  <div 
-                    className="shrink-0 text-white/40 p-2 -mr-2 touch-none cursor-grab active:cursor-grabbing"
-                    onTouchStart={(e) => handleTouchStart(e, index)}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
-                  >
-                    <ArrowUpDown className="w-4 h-4" />
-                  </div>
-                </div>
+                  song={song}
+                  index={index}
+                  currentIndex={playerCurrentIndex}
+                  draggedIndex={draggedIndex}
+                  dragOverIndex={dragOverIndex}
+                  isDragging={isDragging}
+                  onSongChange={onSongChange}
+                  handleDragStart={handleDragStart}
+                  handleDragEnd={handleDragEnd}
+                  handleDragOver={handleDragOver}
+                  handleDragEnter={handleDragEnter}
+                  handleDrop={handleDrop}
+                  handleTouchStart={handleTouchStart}
+                  handleTouchMove={handleTouchMove}
+                  handleTouchEnd={handleTouchEnd}
+                  isMobile={true}
+                  setShowPlaylist={setShowPlaylist}
+                  songs={getCurrentPlaylist()}
+                />
               ))}
             </div>
           </DrawerContent>
@@ -4109,67 +4226,26 @@ export function FullscreenMusicPlayer({
             </div>
             <div className="overflow-y-auto h-full pb-20 scrollbar-hide">
               {getCurrentPlaylist().map((song, index) => (
-                <div
+                <QueueItem
                   key={`${song.id}-${index}`}
-                  data-song-index={index}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, index)}
-                  onDragEnd={handleDragEnd}
-                  onDragOver={handleDragOver}
-                  onDragEnter={(e) => handleDragEnter(e, index)}
-                  onDrop={(e) => handleDrop(e, index)}
-                  onTouchStart={(e) => handleTouchStart(e, index)}
-                  onTouchMove={handleTouchMove}
-                  onTouchEnd={handleTouchEnd}
-                  onClick={(e) => {
-                    // Only trigger song change if not dragging
-                    if (!isDragging) {
-                      onSongChange?.(song, index, getCurrentPlaylist());
-                    }
-                  }}
-                  className={`flex items-center gap-3 p-3 hover:bg-white/5 cursor-move transition-all duration-200 select-none ${index === playerCurrentIndex ? "bg-white/10" : ""
-                    } ${dragOverIndex === index && draggedIndex !== index
-                      ? "border-t-2 border-green-400"
-                      : ""
-                    } ${draggedIndex === index ? "opacity-50 scale-95" : ""}`}
-                >
-                  <div className="w-12 h-12 rounded bg-white/10 overflow-hidden shrink-0">
-                    {song.image?.length > 0 ? (
-                      <img
-                        src={
-                          song.image.find((img) => img.quality === "500x500")
-                            ?.url ||
-                          song.image.find((img) => img.quality === "150x150")
-                            ?.url ||
-                          song.image[song.image.length - 1]?.url
-                        }
-                        alt={song.name}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <IoMdPlay className="w-4 h-4 text-white/50" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className={`font-medium truncate text-sm ${index === playerCurrentIndex
-                        ? "text-green-400"
-                        : "text-white"
-                        }`}
-                    >
-                      {decodeHtmlEntities(song.name)}
-                    </p>
-                    <p className="text-xs text-white/60 truncate">
-                      {decodeHtmlEntities(getArtistNames(song))}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-white/40">
-                    <ArrowUpDown className="w-3 h-3" />
-                  </div>
-                </div>
+                  song={song}
+                  index={index}
+                  currentIndex={playerCurrentIndex}
+                  draggedIndex={draggedIndex}
+                  dragOverIndex={dragOverIndex}
+                  isDragging={isDragging}
+                  onSongChange={onSongChange}
+                  handleDragStart={handleDragStart}
+                  handleDragEnd={handleDragEnd}
+                  handleDragOver={handleDragOver}
+                  handleDragEnter={handleDragEnter}
+                  handleDrop={handleDrop}
+                  handleTouchStart={handleTouchStart}
+                  handleTouchMove={handleTouchMove}
+                  handleTouchEnd={handleTouchEnd}
+                  isMobile={false}
+                  songs={getCurrentPlaylist()}
+                />
               ))}
 
               {/* Reorder Queue Button */}
