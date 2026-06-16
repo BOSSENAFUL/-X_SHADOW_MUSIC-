@@ -16,10 +16,20 @@ if (Platform.shim) {
 }
 
 let ytInstance = null;
+let lastUsedCookies = null;
 
 async function getYtInstance() {
-  if (!ytInstance) {
-    ytInstance = await Innertube.create();
+  const currentCookies = process.env.YOUTUBE_COOKIES || '';
+  if (!ytInstance || lastUsedCookies !== currentCookies) {
+    const config = {};
+    if (currentCookies) {
+      config.cookies = currentCookies;
+      console.log('[yt-stream] Initializing Innertube with YOUTUBE_COOKIES');
+    } else {
+      console.log('[yt-stream] Initializing Innertube without cookies (guest session)');
+    }
+    ytInstance = await Innertube.create(config);
+    lastUsedCookies = currentCookies;
   }
   return ytInstance;
 }
@@ -40,8 +50,8 @@ export async function GET(request) {
     let info = null;
     const errors = {};
     
-    // Fallback chain of clients to get video info (TV and ANDROID bypass most Vercel/datacenter blocks)
-    const clients = ['TV', 'ANDROID', 'YTMUSIC', 'WEB'];
+    // Fallback chain of clients to get video info (ANDROID and YTMUSIC bypass most locks and yield working streams)
+    const clients = ['ANDROID', 'YTMUSIC', 'TV', 'WEB'];
     for (const client of clients) {
       try {
         console.log(`[yt-stream] Attempting to fetch video info with client: ${client}`);
@@ -66,6 +76,39 @@ export async function GET(request) {
 
     if (!info) {
       console.error('[yt-stream] All clients failed to fetch video info. Errors:', errors);
+      
+      const isLoginRequired = Object.values(errors).some(msg => 
+        msg && (msg.includes('LOGIN_REQUIRED') || msg.includes("confirm you're not a bot") || msg.includes("confirm you’re not a bot"))
+      );
+      
+      if (isLoginRequired) {
+        if (!process.env.YOUTUBE_COOKIES) {
+          return Response.json({
+            error: 'YouTube requires authentication to confirm you are not a bot (LOGIN_REQUIRED).',
+            message: 'To resolve this, you must configure the YOUTUBE_COOKIES environment variable in your Vercel Dashboard.',
+            instructions: [
+              '1. Open a new Incognito window in your browser.',
+              '2. Log in to a secondary or "burner" Google/YouTube account.',
+              '3. Press F12 to open Developer Tools, and select the Network tab.',
+              '4. Refresh the page or click a video to trigger a network request.',
+              '5. Click on any request to youtube.com (e.g. youtube.com/v1/player).',
+              '6. Scroll down to Request Headers, find the "cookie" header, and copy its entire string value.',
+              '7. Paste this string value as the YOUTUBE_COOKIES environment variable in Vercel.'
+            ],
+            details: errors
+          }, { status: 403 });
+        } else {
+          return Response.json({
+            error: 'YouTube authentication failed or session expired (LOGIN_REQUIRED).',
+            message: 'The YOUTUBE_COOKIES environment variable is set, but YouTube is still requesting sign-in. Your session cookies may have expired or been invalidated.',
+            instructions: [
+              'Please update the YOUTUBE_COOKIES environment variable in Vercel with fresh cookies from your browser using the standard incognito setup steps.'
+            ],
+            details: errors
+          }, { status: 401 });
+        }
+      }
+
       return Response.json({ 
         error: 'Streaming data not available',
         details: errors
