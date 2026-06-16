@@ -37,8 +37,33 @@ export async function GET(request) {
 
     const yt = await getYtInstance();
     
-    // Fetch metadata and streaming data using the YTMUSIC client
-    const info = await yt.getInfo(videoId, { client: 'YTMUSIC' });
+    let info = null;
+    let lastError = null;
+    
+    // Fallback chain of clients to get video info (TV and ANDROID bypass most Vercel/datacenter blocks)
+    const clients = ['TV', 'ANDROID', 'YTMUSIC', 'WEB'];
+    for (const client of clients) {
+      try {
+        console.log(`[yt-stream] Attempting to fetch video info with client: ${client}`);
+        const tempInfo = await yt.getInfo(videoId, { client });
+        
+        // Check if we successfully got streaming data
+        if (tempInfo && (tempInfo.streaming_data || tempInfo.playability_status?.status === 'OK')) {
+          info = tempInfo;
+          console.log(`[yt-stream] Successfully fetched video info with client: ${client}`);
+          break;
+        }
+      } catch (err) {
+        console.warn(`[yt-stream] Client ${client} failed:`, err.message);
+        lastError = err;
+      }
+    }
+
+    if (!info) {
+      const errorMsg = lastError ? lastError.message : 'Streaming data not available';
+      console.error('[yt-stream] All clients failed to fetch video info. Last error:', errorMsg);
+      return Response.json({ error: `Streaming data not available: ${errorMsg}` }, { status: 500 });
+    }
 
     // Prioritize itag 18 (Video+Audio) because it bypasses signature-cipher range/seek locking
     // which prevents 403 Forbidden errors when seeking or streaming chunks > 1MB.
