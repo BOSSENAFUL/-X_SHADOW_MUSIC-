@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
-import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { triggerSmartlink } from "@/lib/smartlink";
+import Link from "next/link";
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -50,7 +50,6 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { memo } from "react";
 import { downloadWithMetadata } from "@/lib/clientDownload";
-import NativeAdRow from "@/components/NativeAdRow";
 import { applyThemeColor, getThemeColorForScroll } from "@/lib/utils";
 
 // --- Action Menu ---
@@ -832,11 +831,7 @@ export default function SongPage() {
                                 </div>
                             )}
                         </div>
-
-                        {/* Native Banner Ad */}
-                        <div className="px-4 md:px-8 pb-32 md:pb-24">
-                            <NativeAdRow />
-                        </div>
+                        <div className="pb-32 md:pb-24" />
                     </div>
                 </div>
             </SidebarInset>

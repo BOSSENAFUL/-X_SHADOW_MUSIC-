@@ -5,8 +5,6 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { AppSidebar } from "@/components/app-sidebar";
-import { triggerSmartlink } from "@/lib/smartlink";
-import NativeAdRow from "@/components/NativeAdRow";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -50,6 +48,7 @@ import { toast } from "sonner";
 import { memo } from "react";
 import { downloadWithMetadata } from "@/lib/clientDownload";
 import { applyThemeColor, getThemeColorForScroll } from "@/lib/utils";
+import { triggerSmartlink } from "@/lib/smartlink";
 
 
 // --- Helper Components ---
@@ -1423,10 +1422,7 @@ export default function AlbumPage() {
               )}
             </div>
 
-            {/* Native Banner Ad */}
-            <div className="px-4 md:px-8 pb-16">
-              <NativeAdRow />
-            </div>
+
           </div>
         </div>
       </SidebarInset>

@@ -18,7 +18,7 @@ const faqs = [
     },
     {
         q: "Does Jammify have ads?",
-        a: "No, currently the app is fully ad-free.",
+        a: "No, Jammify is completely ad-free. There are zero ads or interruptions.",
     },
     {
         q: "Can I import Spotify playlists?",

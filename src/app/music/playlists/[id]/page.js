@@ -93,7 +93,6 @@ import { HiPause } from "react-icons/hi2";
 import { IoMdPlay } from "react-icons/io";
 import { ShareStoryPreview } from "@/components/share-story-preview";
 import { downloadWithMetadata } from "@/lib/clientDownload";
-import NativeAdRow from "@/components/NativeAdRow";
 import { applyThemeColor, getThemeColorForScroll } from "@/lib/utils";
 
 // --- In-Memory Global Color Cache ---
@@ -2691,10 +2690,7 @@ export default function PlaylistDetailPage({ params }) {
               )}
             </div>
 
-            {/* Native Banner Ad */}
-            <div className="px-4 md:px-8 pb-32 md:pb-24">
-              <NativeAdRow />
-            </div>
+            <div className="pb-32 md:pb-24" />
           </div>
         </div>
       </SidebarInset>

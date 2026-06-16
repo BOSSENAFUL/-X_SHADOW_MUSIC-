@@ -48,7 +48,6 @@ import {
 } from "@/components/ui/drawer";
 import { memo } from "react";
 import { genres } from "@/data/genres";
-import NativeAdRow from "@/components/NativeAdRow";
 import { PlaylistCover } from "@/components/ui/playlist-cover";
 import { downloadWithMetadata } from "@/lib/clientDownload";
 
@@ -2875,10 +2874,7 @@ function SearchPageContent() {
                 </p>
               </div>
 
-              {/* Native Banner Ad */}
-              <div className="w-full max-w-6xl px-4 md:px-6 mb-12">
-                <NativeAdRow />
-              </div>
+              {/* Popular Genres Section */}
 
               {/* Popular Genres Section */}
               <div className="w-full max-w-6xl px-4 md:px-6">
@@ -2923,12 +2919,7 @@ function SearchPageContent() {
             )
           )}
 
-          {/* Native Banner Ad */}
-          {activeSearchQuery && (
-            <div className="px-4 md:px-8 pb-32 md:pb-12">
-              <NativeAdRow />
-            </div>
-          )}
+          <div className="pb-32 md:pb-12" />
 
         </div>
       </SidebarInset>

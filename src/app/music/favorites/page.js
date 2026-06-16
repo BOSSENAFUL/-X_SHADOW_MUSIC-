@@ -46,7 +46,6 @@ import {
 } from "@/components/ui/drawer";
 import { downloadWithMetadata } from "@/lib/clientDownload";
 import { triggerSmartlink } from "@/lib/smartlink";
-import NativeAdRow from "@/components/NativeAdRow";
 
 // --- Helper Components ---
 const SongActionMenu = memo(({
@@ -456,9 +455,7 @@ export default function FavoritesPage() {
       }, 3000);
       return;
     }
-
     triggerSmartlink(true); // Download — fire every time, no cooldown
-
     // Show initial toast
     const progressToast = document.createElement('div');
     progressToast.className = 'fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
@@ -1075,10 +1072,7 @@ export default function FavoritesPage() {
             )}
           </div>
 
-          {/* Native Sponsored Banner */}
-          <div className="pl-2 pr-1 md:px-6 pb-32 md:pb-24 ">
-            <NativeAdRow />
-          </div>
+
         </div>
       </SidebarInset>
 

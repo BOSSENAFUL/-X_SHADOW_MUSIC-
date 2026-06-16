@@ -27,7 +27,6 @@ import { useRouter } from "next/navigation";
 import { Music, Disc, LogOut, Edit2, MessageCircle, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeSelector } from "@/components/theme-selector";
-import NativeAdRow from "@/components/NativeAdRow";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -391,10 +390,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Content Section */}
             <div className="px-6 py-6 space-y-8">
-              {/* Native Sponsored Banner */}
-              <NativeAdRow />
 
               {/* Created Playlists */}
               <section>

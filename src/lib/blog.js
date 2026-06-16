@@ -19,25 +19,10 @@ export const blogPosts = [
       <h2>Why Migrate Your Playlists to Jammify?</h2>
       <p>Spotify is a great service, but the ads on the free tier can be incredibly disruptive, and the monthly subscription fees keep rising. If you want a clean listening experience, Jammify offers an excellent alternative. Here is what you get when you migrate:</p>
       <ul>
-        <li><strong>No Audio Interruptions (Supported by Banner Ads):</strong> To keep our servers running, we have added small, non-intrusive banner and box ads, but we guarantee zero audio ads or playback interruptions.</li>
+        <li><strong>No Ads:</strong> Enjoy a completely clean listening experience with zero ads or commercial interruptions.</li>
         <li><strong>High Fidelity:</strong> Stream your imported playlists in crystal-clear <a href="/blog/what-is-320kbps-audio-quality">320kbps audio quality</a> completely free.</li>
         <li><strong>No Cost:</strong> You get access to a catalog of 80M+ songs without pulling out your wallet.</li>
       </ul>
-
-      <blockquote>
-        <p><strong>A Message From the Creator regarding Server Costs & Ads:</strong></p>
-        <p>"Hey everyone,</p>
-        <p>I want to have a completely real, unfiltered conversation with you about the future of Jammify.</p>
-        <p>I originally built Jammify just for myself and my college friends 😅 I never expected it to grow, but now it has 2000+ users from all around the world. I know that’s still a small number compared to big apps, but I’m genuinely happy that a simple portfolio project of mine reached and is being used by so many people.</p>
-        <p>However, as our community has been growing incredibly fast, the reality behind the scenes is hitting hard: my server and database resources are burning out, and the hosting costs have pushed way past my personal budget.</p>
-        <p>To keep the platform from crashing and to cover these basic server bills, I have officially added some small banner and box ads to the layout.</p>
-        <p><strong>How you can help keep Jammify alive (For Free):</strong><br />
-        You don't need to donate money or pay a subscription fee to support Jammify. Since these are standard display ads, you help me out just by using the app normally. If a banner loads on your screen while you stream, it generates revenue. And if an ad catches your eye and you genuinely check it out, that support goes a long way toward paying off the monthly server costs.</p>
-        <p>I've made sure these ads are placed cleanly so they will never interrupt your playback or pause your music mid-song.</p>
-        <p><strong>I need your feedback:</strong><br />
-        I need to know what you think. Please comment down below or share your thoughts in our <a href="/music/chat">Community Chat</a>: do you want these small ads to stay so we can support the server, or not? I want to be 100% honest with you all—if we don't run these ads to offset the hosting bills, I won't be able to fund this out of my own pocket anymore. Without this ad revenue, the web app could go down permanently at any time once my current server resources completely burn out.</p>
-        <p>Thank you for understanding, and thank you for helping me keep the music playing."</p>
-      </blockquote>
 
       <h2>Step 1: Get Your Spotify Playlist URL</h2>
       <p>The migration process uses Spotify's public playlist links. Here is how to find yours:</p>
@@ -63,7 +48,7 @@ export const blogPosts = [
       <p>Once imported, your playlist will live in your personal Jammify Library. You can download it as a Progressive Web App (PWA) on your desktop or Android device, allowing you to access it instantly from your homescreen. Best of all, you can stream your newly imported songs in <a href="/blog/what-is-320kbps-audio-quality">320kbps audio quality</a>, a premium feature on other apps that Jammify provides for free.</p>
 
       <h2>Conclusion</h2>
-      <p>Migrating your music doesn't have to be a chore. With Jammify's streamlined playlist importer, you can say goodbye to intrusive audio ads and subscription fees without leaving your favorite tunes behind. Head to our <a href="/music">Web Player</a> now and try it out today!</p>
+      <p>Migrating your music doesn't have to be a chore. With Jammify's streamlined playlist importer, you can say goodbye to ads and subscription fees without leaving your favorite tunes behind. Head to our <a href="/music">Web Player</a> now and try it out today!</p>
     `
   },
   {
@@ -355,13 +340,13 @@ export const blogPosts = [
       <p>Spotify reported over 239 million free-tier users as of recent quarters. That's an enormous audience for advertisers to reach—which means Spotify has every financial incentive to serve <em>more</em> ads, not fewer. The free user experience is not something Spotify is trying to improve. It's something they're trying to make just frustrating enough to push you toward a paid plan.</p>
       <p>Knowing this, the smartest move isn't to fight the algorithm. It's to simply leave for somewhere better.</p>
 
-      <h2>The Real Fix: Switch to an App With No Audio Ads</h2>
-      <p>If you want music with no audio interruptions and you don't want to pay, the actual solution is a <strong>free music streaming app that doesn't monetise through audio ads in the first place.</strong></p>
+      <h2>The Real Fix: Switch to an App With Zero Ads</h2>
+      <p>If you want music with zero interruptions and you don't want to pay, the actual solution is a <strong>free music streaming app that doesn't serve advertisements in the first place.</strong></p>
 
       <h3>What to Look For in a Free, Ad-Free Music App</h3>
       <p>Not all "free" music apps are equal. Here's what actually matters:</p>
       <ul>
-        <li><strong>Zero audio ads during playback</strong>—the only kind that ruins the experience</li>
+        <li><strong>Zero ads during playback</strong>—an uninterrupted experience</li>
         <li><strong>On-demand song selection</strong>—no forced shuffle</li>
         <li><strong>High audio quality</strong>—at least 256kbps, ideally 320kbps</li>
         <li><strong>A large catalog</strong>—50M+ tracks so you're not limited</li>
@@ -370,33 +355,20 @@ export const blogPosts = [
       </ul>
       <p>One app checks every single one of those boxes.</p>
 
-      <h2>Meet Jammify — Free Music, Zero Audio Interruptions</h2>
-      <p><a href="/music"><strong>Jammify</strong></a> is a free music streaming Progressive Web App built for people who are done negotiating with ads. The core promise is simple: <strong>while you're listening to music on Jammify, nothing interrupts you.</strong> No audio ads. No "this playlist is brought to you by..." moments. No volume-spiking commercials between songs. Just music.</p>
+      <h2>Meet Jammify — Free Music, Zero Ads</h2>
+      <p><a href="/music"><strong>Jammify</strong></a> is a free music streaming Progressive Web App built for people who are done negotiating with ads. The core promise is simple: <strong>while you're listening to music on Jammify, nothing interrupts you.</strong> No visual banner ads, no popups, and no commercial interruptions between songs. Just music.</p>
 
       <h3>The Full Feature Breakdown</h3>
       <p>Here's what you get for free, from day one:</p>
       <ul>
         <li>🎵 <strong>80 million+ tracks</strong> available on demand—no shuffle restrictions</li>
-        <li>🔇 <strong>Zero audio ads during playback</strong>—the listening experience is completely uninterrupted</li>
+        <li>🔇 <strong>Zero ads</strong>—the listening experience is completely uninterrupted</li>
         <li>🔊 <strong>320kbps high-fidelity audio</strong>—noticeably better quality than Spotify Free's compressed streams. Read more in our guide on <a href="/blog/what-is-320kbps-audio-quality">what 320kbps audio actually means</a></li>
         <li>📋 <strong>One-click Spotify playlist import</strong>—paste your Spotify share link and your playlists migrate in seconds. Full walkthrough <a href="/blog/how-to-import-spotify-playlist-to-jammify">here</a></li>
         <li>📱 <strong>Install as a PWA</strong>—it lives on your home screen like a native app, works offline-first, and doesn't require an app store download</li>
         <li>🎤 <strong>Synchronized lyrics</strong>—line-by-line lyrics that scroll with the song</li>
         <li>⏭ <strong>Unlimited skips</strong>—skip as many tracks as you want, always</li>
       </ul>
-
-      <h3>The Small Trade-Off (And Why It's Completely Fair)</h3>
-      <p>Here's where we're fully transparent with you, because you deserve honesty: <strong>Jammify does have small visual ads.</strong> These are quiet banner-style ads that sit on the interface—not in your ears, not between your songs, not interrupting your flow.</p>
-      <p>Why do they exist? Jammify is an independent project. Hosting 80 million tracks, maintaining fast servers, and keeping the app running costs real money. The small visual ads help cover those operational costs without making you sit through audio commercials. It's the only way to keep the core listening experience genuinely free for everyone.</p>
-      <p>Think of it this way: you see a small banner, and in return, your music never stops. That's a trade most listeners are very happy to make.</p>
-
-      <blockquote>
-        <p><strong>A Message From the Creator:</strong></p>
-        <p>"Hey everyone,</p>
-        <p>I originally built Jammify just for myself and my college friends 😅 I never expected it to grow, but now it has 2000+ users from all around the world. I know that’s still a small number compared to big apps, but I’m genuinely happy that a simple portfolio project of mine reached and is being used by so many people.</p>
-        <p>However, as our community has been growing incredibly fast, the reality behind the scenes is hitting hard: my server and database resources are burning out, and the hosting costs have pushed way past my personal budget. The small visual ads are the only way to cover these server bills and keep Jammify alive without charging you a subscription or interrupting your music with loud audio ads.</p>
-        <p>Thank you so much for understanding, and thank you for helping me keep the music playing!"</p>
-      </blockquote>
 
       <h2>How to Switch From Spotify to Jammify in Under 2 Minutes</h2>
       <p>Getting started takes less time than the next Spotify ad that would've played if you'd stayed.</p>
