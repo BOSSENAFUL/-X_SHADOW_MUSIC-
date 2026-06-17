@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -1015,7 +1016,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                       }`}
                     onClick={() => !isRadioPlaying && setIsFullscreenOpen(true)}
                   >
-                    <div className="w-10 h-10 rounded-md bg-muted shrink-0 overflow-hidden shadow-lg">
+                    <div className="w-10 h-10 rounded-sm bg-muted shrink-0 overflow-hidden shadow-lg">
                       {currentSong.image?.length > 0 ? (
                         <img
                           src={
@@ -1028,7 +1029,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                             currentSong.image[currentSong.image.length - 1]?.url
                           }
                           alt={currentSong.name}
-                          className="w-full h-full object-cover rounded-md"
+                          className="w-full h-full object-cover"
                           loading="lazy"
                           onError={(e) => {
                             e.target.src = '/default-playlist-image.png';

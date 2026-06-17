@@ -646,7 +646,7 @@ const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }
           </button>
         </DrawerTrigger>
         <DrawerPortal>
-          <DrawerContent className="bg-popover border-none text-foreground outline-none focus:outline-none ring-0 focus-visible:ring-0">
+          <DrawerContent className="bg-background border-none text-foreground outline-none focus:outline-none ring-0 focus-visible:ring-0">
             <DrawerHeader className="sr-only">
               <DrawerTitle>Sort and View Options</DrawerTitle>
               <DrawerDescription>Select sorting order and view mode for the current playlist</DrawerDescription>
@@ -726,7 +726,14 @@ const SongRow = React.memo(function SongRow({
               onError={(e) => { e.target.src = '/default-playlist-image.png'; }} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''} ${viewAs === 'compact' ? 'text-sm' : ''}`}>
+            <p className={`font-medium truncate flex items-center gap-1.5 ${isCurrentSong ? 'text-green-500' : ''} ${viewAs === 'compact' ? 'text-sm' : ''}`}>
+              {isCurrentSong && isPlaying && (
+                <span className="flex items-end justify-center gap-0.5 h-3 w-3 shrink-0">
+                  <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0s' }} />
+                  <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.2s' }} />
+                  <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.4s' }} />
+                </span>
+              )}
               {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
             </p>
             <p className="text-sm truncate text-muted-foreground">
@@ -2155,7 +2162,7 @@ export default function PlaylistDetailPage({ params }) {
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset id="user-playlist-scroll-container" className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col">
-          <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background">
+          <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 md:border-b bg-background">
             <div className="flex items-center gap-2 px-3 md:px-4">
               <SidebarTrigger className="-ml-1 hidden md:flex" />
               <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:flex" />
@@ -2185,7 +2192,7 @@ export default function PlaylistDetailPage({ params }) {
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset id="user-playlist-scroll-container" className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col">
-          <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background">
+          <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 md:border-b bg-background">
             <div className="flex items-center gap-2 px-3 md:px-4">
               <SidebarTrigger className="-ml-1 hidden md:flex" />
               <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:flex" />
@@ -2221,7 +2228,7 @@ export default function PlaylistDetailPage({ params }) {
                 : '#1D1046'
               : undefined
           }}
-          className={`fixed md:sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b transition-all duration-300 w-full ${showHeaderTitle
+          className={`fixed md:sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 md:border-b transition-all duration-300 w-full ${showHeaderTitle
             ? "border-border"
             : "bg-transparent md:bg-background border-transparent"
             }`}
@@ -2549,7 +2556,7 @@ export default function PlaylistDetailPage({ params }) {
                   {/* Search Bar - Far Right side */}
                   <div ref={searchContainerRef}>
                     <div
-                      className={`flex items-center transition-all duration-300 ease-in-out ${isSearchVisible ? 'w-40 md:w-56 h-9 px-2.5 rounded-md border border-border bg-muted/50 justify-start' : 'w-9 h-9 justify-center rounded-full bg-muted/50 hover:bg-muted cursor-pointer border-none'}`}
+                      className={`flex items-center transition-colors duration-300 ease-in-out ${isSearchVisible ? 'w-40 md:w-56 h-9 px-2.5 rounded-md border border-border bg-muted/50 justify-start' : 'w-9 h-9 justify-center rounded-full bg-muted/50 hover:bg-muted cursor-pointer border-none'}`}
                       onClick={() => !isSearchVisible && setIsSearchVisible(true)}
                     >
                       <Search className={`w-4 h-4 text-muted-foreground shrink-0 transition-colors ${isSearchVisible ? 'text-foreground/70' : ''}`} />
@@ -2557,7 +2564,7 @@ export default function PlaylistDetailPage({ params }) {
                         ref={searchInputRef}
                         type="text"
                         placeholder="Search in playlist"
-                        className={`bg-transparent border-none outline-none text-foreground text-xs md:text-sm placeholder:text-muted-foreground transition-all duration-300 ${isSearchVisible ? 'w-full ml-2 opacity-100 visible' : 'w-0 ml-0 opacity-0 invisible'}`}
+                        className={`bg-transparent border-none outline-none text-foreground text-xs md:text-sm placeholder:text-muted-foreground transition-opacity duration-300 ${isSearchVisible ? 'w-full ml-2 opacity-100 visible' : 'w-0 ml-0 opacity-0 invisible'}`}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyDown={(e) => {

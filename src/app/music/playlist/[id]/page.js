@@ -1546,8 +1546,15 @@ function PlaylistPageContent() {
                           </div>
 
                           <div className="min-w-0 flex-1">
-                            <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''
+                            <p className={`font-medium truncate flex items-center gap-1.5 ${isCurrentSong ? 'text-green-500' : ''
                               }`}>
+                              {isCurrentSong && isPlaying && (
+                                <span className="flex items-end justify-center gap-0.5 h-3 w-3 shrink-0">
+                                  <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0s' }} />
+                                  <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.2s' }} />
+                                  <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.4s' }} />
+                                </span>
+                              )}
                               {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
                             </p>
                             <p className="text-sm truncate text-muted-foreground">

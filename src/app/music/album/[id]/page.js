@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -163,7 +164,7 @@ const SongActionMenu = memo(({
           </Button>
         </DrawerTrigger>
         <div onClick={(e) => e.stopPropagation()}>
-          <DrawerContent className="bg-popover border-none text-foreground outline-none focus:outline-none ring-0 focus-visible:ring-0">
+          <DrawerContent className="bg-background border-none text-foreground outline-none focus:outline-none ring-0 focus-visible:ring-0">
             <DrawerHeader className="p-0">
               <div className="flex items-center gap-4 px-4 py-4 border-b border-border">
                 <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0">
@@ -343,7 +344,7 @@ const AlbumActionMenu = memo(({
           </button>
         </DrawerTrigger>
         <div onClick={(e) => e.stopPropagation()}>
-          <DrawerContent className="bg-popover border-none text-foreground outline-none focus:outline-none ring-0 focus-visible:ring-0">
+          <DrawerContent className="bg-background border-none text-foreground outline-none focus:outline-none ring-0 focus-visible:ring-0">
             <DrawerHeader className="p-0">
               <div className="flex items-center gap-4 px-4 py-4 border-b border-border">
                 <div className="w-14 h-14 rounded-lg shadow-lg overflow-hidden shrink-0 bg-muted">
@@ -896,7 +897,7 @@ export default function AlbumPage() {
                 : 'transparent'
             }}
           />
-          <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-md md:bg-background">
+          <header className="sticky top-0 z-50 hidden md:flex h-16 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-md md:bg-background">
             <div className="flex items-center gap-2 px-3 md:px-4">
               <SidebarTrigger className="-ml-1 hidden md:flex" />
               <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:flex" />
@@ -907,19 +908,23 @@ export default function AlbumPage() {
             </div>
           </header>
           <div className="flex-1 p-4 pt-12 md:p-8 md:pt-20 relative z-10">
-            <div className="animate-pulse space-y-6">
-              {/* Header Skeleton Only - Matches UI position */}
-              <div className="flex flex-col md:flex-row gap-6 items-center md:items-end">
-                <div className="w-48 h-48 md:w-60 md:h-60 bg-muted rounded-lg shadow-2xl shrink-0" />
-                <div className="flex-1 space-y-4 text-center md:text-left w-full">
-                  {/* Badge Skeleton */}
-                  <div className="h-6 bg-muted rounded w-20 mx-auto md:mx-0" />
-
-                  {/* Title Skeleton */}
-                  <div className="h-8 md:h-12 bg-muted rounded w-3/4 md:w-96 mx-auto md:mx-0" />
-
-                  {/* Artist Skeleton */}
-                  <div className="h-4 bg-muted rounded w-1/2 md:w-48 mx-auto md:mx-0 opacity-70" />
+            <div className="space-y-6">
+              {/* Mobile Skeleton */}
+              <div className="flex flex-col items-center space-y-4 md:hidden">
+                <Skeleton className="w-48 h-48 rounded-lg shadow-2xl" />
+                <div className="space-y-3 w-full">
+                  <Skeleton className="h-8 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
+                  <Skeleton className="h-4 w-2/3" />
+                </div>
+              </div>
+              {/* Desktop Skeleton */}
+              <div className="hidden md:flex gap-6 items-end">
+                <Skeleton className="w-60 h-60 rounded-lg shadow-2xl shrink-0" />
+                <div className="flex-1 space-y-4 min-w-0">
+                  <Skeleton className="h-12 w-96" />
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-4 w-64" />
                 </div>
               </div>
             </div>
@@ -954,7 +959,7 @@ export default function AlbumPage() {
                 : '#1D1046'
               : undefined
           }}
-          className={`fixed md:sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b transition-all duration-300 w-full ${showHeaderTitle
+          className={`fixed md:sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 md:border-b transition-all duration-300 w-full ${showHeaderTitle
             ? "border-border text-white"
             : "bg-transparent md:bg-background border-transparent"
             }`}
@@ -1256,8 +1261,15 @@ export default function AlbumPage() {
                         </div>
 
                         <div className="min-w-0 flex-1">
-                          <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''
+                          <p className={`font-medium truncate flex items-center gap-1.5 ${isCurrentSong ? 'text-green-500' : ''
                             }`}>
+                            {isCurrentSong && isPlaying && (
+                              <span className="flex items-end justify-center gap-0.5 h-3 w-3 shrink-0">
+                                <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0s' }} />
+                                <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.2s' }} />
+                                <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.4s' }} />
+                              </span>
+                            )}
                             {decodeHtmlEntities(song.name) || `Track ${index + 1}`}
                           </p>
                           <p className="text-sm truncate text-muted-foreground">

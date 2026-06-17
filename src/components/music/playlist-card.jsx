@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 
 "use client";
 
@@ -164,10 +165,10 @@ export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
 
     return (
         <div
-            className="group cursor-pointer hover:scale-105 transition-transform"
+            className="group cursor-pointer"
             onClick={() => onClick(playlist)}
         >
-            <div className="relative rounded-lg aspect-square overflow-hidden mb-3 bg-muted border border-border shadow-lg">
+            <div className="relative rounded-md aspect-square overflow-hidden mb-3 bg-muted border border-border shadow-lg">
                 {collageDisplayImages.length >= 4 ? (
                     <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
                         {collageDisplayImages.slice(0, 4).map((src, idx) => (
@@ -196,7 +197,7 @@ export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
                     />
                 )}
 
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute inset-0 bg-black/40 opacity-0 pointer-events-none" />
 
                 {/* Dark gradient overlay for mixes — bottom to center */}
                 {playlist.source === 'mix' && (
@@ -238,7 +239,7 @@ export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
                     </button>
                 </div>
             </div>
-            <div className="space-y-1 px-1">
+            <div className="space-y-0.5 px-1">
                 <p className="text-sm font-bold leading-tight line-clamp-1 text-foreground">
                     {playlist.name || playlist.playlistName}
                 </p>

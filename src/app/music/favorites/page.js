@@ -20,7 +20,6 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,6 +45,7 @@ import {
 } from "@/components/ui/drawer";
 import { downloadWithMetadata } from "@/lib/clientDownload";
 import { triggerSmartlink } from "@/lib/smartlink";
+import { applyThemeColor } from "@/lib/utils";
 
 // --- Helper Components ---
 const SongActionMenu = memo(({
@@ -166,7 +166,7 @@ const SongActionMenu = memo(({
           </Button>
         </DrawerTrigger>
         <div onClick={(e) => e.stopPropagation()}>
-          <DrawerContent className="bg-popover border-none text-foreground outline-none focus:outline-none ring-0 focus-visible:ring-0">
+          <DrawerContent className="bg-background border-none text-foreground outline-none focus:outline-none ring-0 focus-visible:ring-0">
             <DrawerHeader className="p-0">
               <div className="flex items-center gap-4 px-4 py-4 border-b border-border">
                 <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0">
@@ -299,30 +299,41 @@ export default function FavoritesPage() {
     const scrollContainer = document.getElementById('favorites-scroll-container');
     if (!scrollContainer) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          // Detect visibility to only react to the title that is actually in the current layout
-          const isVisibleInLayout = entry.boundingClientRect.width > 0;
-          if (isVisibleInLayout) {
-            setShowHeaderTitle(!entry.isIntersecting);
-          }
-        });
-      },
-      {
-        root: scrollContainer,
-        threshold: 0,
-        rootMargin: "-64px 0px 0px 0px",
-      }
-    );
+    const handleScroll = () => {
+      // Pick the visible layout's title ref
+      const titleEl = desktopTitleRef.current?.offsetWidth > 0
+        ? desktopTitleRef.current
+        : mobileTitleRef.current?.offsetWidth > 0
+          ? mobileTitleRef.current
+          : null;
 
-    if (mobileTitleRef.current) observer.observe(mobileTitleRef.current);
-    if (desktopTitleRef.current) observer.observe(desktopTitleRef.current);
+      if (!titleEl) return;
+
+      const rect = titleEl.getBoundingClientRect();
+      const containerRect = scrollContainer.getBoundingClientRect();
+
+      // Title is "behind the header" when its top enters the header area (64px from container top)
+      setShowHeaderTitle(rect.top < containerRect.top + 64);
+    };
+
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+    // Check initial state
+    handleScroll();
 
     return () => {
-      observer.disconnect();
+      scrollContainer.removeEventListener('scroll', handleScroll);
     };
   }, [loading, likedSongs.length]);
+
+  // Dynamic PWA status bar theme-color update
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const defaultThemeColor = "#121212";
+    applyThemeColor(showHeaderTitle ? "#1D1046" : "#2C0E84");
+    return () => {
+      applyThemeColor(defaultThemeColor);
+    };
+  }, [showHeaderTitle]);
 
   // Initialize music player
   const { playSong, currentSong, currentIndex, isPlaying, togglePlayPause, currentPlaylistId, isShuffle, setIsShuffle, showTrackNumbersMobile } = useMusicPlayer();
@@ -643,7 +654,7 @@ export default function FavoritesPage() {
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col">
-          <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background">
+          <header className="sticky top-0 z-50 hidden md:flex h-16 shrink-0 items-center gap-2 border-b bg-background">
             <div className="flex items-center gap-2 px-3 md:px-4">
               <SidebarTrigger className="-ml-1 hidden md:flex" />
               <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:flex" />
@@ -679,10 +690,12 @@ export default function FavoritesPage() {
       <AppSidebar className="hidden md:flex" />
       <SidebarInset id="favorites-scroll-container" className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col">
         <header
-          className={`sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b transition-all duration-300 ${showHeaderTitle ? "bg-[#1D1046] border-border text-white" : "bg-background border-transparent"
+          className={`fixed md:sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 transition-all duration-300 w-full md:border-b border-border ${showHeaderTitle
+            ? "bg-[#1D1046] text-white"
+            : "bg-transparent md:bg-background"
             }`}
         >
-          <div className="flex items-center justify-between w-full gap-2 px-3 md:px-4">
+          <div className="flex items-center justify-between w-full gap-2 px-3 md:px-4 h-full relative z-10">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="-ml-1 hidden md:flex" />
               <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:flex" />
@@ -691,28 +704,45 @@ export default function FavoritesPage() {
                 <span className="hidden sm:inline">Back</span>
               </Button>
 
-              <div className="flex items-center gap-2 transition-all duration-300">
-                {showHeaderTitle ? (
-                  <h2 className="text-base font-bold animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="flex-1 flex items-center h-full min-w-0 relative">
+                {/* Desktop */}
+                <div className="hidden md:flex items-center h-full flex-1">
+                  <div className="flex items-center gap-2 transition-all duration-300">
+                    {showHeaderTitle ? (
+                      <h2 className="text-base font-bold animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        Liked Songs
+                      </h2>
+                    ) : (
+                      <Breadcrumb>
+                        <BreadcrumbList>
+                          <BreadcrumbItem className="hidden md:block">
+                            <BreadcrumbLink href="/music">Music</BreadcrumbLink>
+                          </BreadcrumbItem>
+                          <BreadcrumbSeparator className="hidden md:block" />
+                          <BreadcrumbItem>
+                            <BreadcrumbPage>Favorites</BreadcrumbPage>
+                          </BreadcrumbItem>
+                        </BreadcrumbList>
+                      </Breadcrumb>
+                    )}
+                  </div>
+                </div>
+
+                {/* Mobile */}
+                <div
+                  className="md:hidden flex items-center h-full flex-1 transition-all duration-300 pointer-events-none"
+                  style={{
+                    opacity: showHeaderTitle ? 1 : 0,
+                    transform: showHeaderTitle ? 'translate3d(0, 0, 0)' : 'translate3d(0, 8px, 0)',
+                    visibility: showHeaderTitle ? 'visible' : 'hidden'
+                  }}
+                >
+                  <h2 className="text-base font-bold line-clamp-1 pr-4">
                     Liked Songs
                   </h2>
-                ) : (
-                  <Breadcrumb>
-                    <BreadcrumbList>
-                      <BreadcrumbItem className="hidden md:block">
-                        <BreadcrumbLink href="/music">Music</BreadcrumbLink>
-                      </BreadcrumbItem>
-                      <BreadcrumbSeparator className="hidden md:block" />
-                      <BreadcrumbItem>
-                        <BreadcrumbPage>Favorites</BreadcrumbPage>
-                      </BreadcrumbItem>
-                    </BreadcrumbList>
-                  </Breadcrumb>
-                )}
+                </div>
               </div>
             </div>
-
-            {/* Optional search or other controls can go here */}
           </div>
         </header>
 
@@ -726,9 +756,7 @@ export default function FavoritesPage() {
                   <Heart className="w-16 h-16 fill-current text-white" />
                 </div>
                 <div className="space-y-2">
-                  <Badge variant="secondary" className="mb-2">
-                    Playlist
-                  </Badge>
+
                   <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word">
                     Liked Songs
                   </h1>
@@ -747,9 +775,6 @@ export default function FavoritesPage() {
                 <Heart className="w-20 h-20 fill-current text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <Badge variant="secondary" className="mb-2">
-                  Playlist
-                </Badge>
                 <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-4 wrap-break-word">
                   Liked Songs
                 </h1>
@@ -889,8 +914,15 @@ export default function FavoritesPage() {
                           </div>
 
                           <div className="min-w-0 flex-1">
-                            <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : ''
+                            <p className={`font-medium truncate flex items-center gap-1.5 ${isCurrentSong ? 'text-green-500' : ''
                               }`}>
+                              {isCurrentSong && isPlaying && (
+                                <span className="flex items-end justify-center gap-0.5 h-3 w-3 shrink-0">
+                                  <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0s' }} />
+                                  <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.2s' }} />
+                                  <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.4s' }} />
+                                </span>
+                              )}
                               {decodeHtmlEntities(likedSong.songName) || `Track ${index + 1}`}
                             </p>
                             <p className="text-sm truncate text-muted-foreground">

@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -129,7 +130,7 @@ const SongDetailActionMenu = memo(({
                         <MoreVertical style={{ width: "24px", height: "24px" }} />
                     </button>
                 </DrawerTrigger>
-                <DrawerContent className="bg-popover border-none text-foreground outline-none focus:outline-none ring-0 focus-visible:ring-0">
+                <DrawerContent className="bg-background border-none text-foreground outline-none focus:outline-none ring-0 focus-visible:ring-0">
                     <DrawerHeader className="p-0">
                         <div className="flex items-center gap-4 px-4 py-4 border-b border-border">
                             <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0">
@@ -446,7 +447,7 @@ export default function SongPage() {
                 <AppSidebar />
                 <SidebarInset id="song-scroll-container" className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col bg-background">
                     <div className="absolute inset-0 h-[390px] pointer-events-none" style={gradientStyle} />
-                    <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-md">
+                    <header className="sticky top-0 z-50 hidden md:flex h-16 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-md">
                         <div className="flex items-center gap-2 px-3 md:px-4">
                             <SidebarTrigger className="-ml-1 hidden md:flex" />
                             <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:flex" />
@@ -456,13 +457,23 @@ export default function SongPage() {
                         </div>
                     </header>
                     <div className="flex-1 p-4 pt-12 md:p-8 md:pt-20 relative z-10">
-                        <div className="animate-pulse space-y-6">
-                            <div className="flex flex-col md:flex-row gap-6 items-center md:items-end">
-                                <div className="w-48 h-48 md:w-60 md:h-60 bg-muted rounded-lg shadow-2xl shrink-0" />
-                                <div className="flex-1 space-y-4 text-center md:text-left w-full">
-                                    <div className="h-6 bg-muted rounded w-20 mx-auto md:mx-0" />
-                                    <div className="h-8 md:h-12 bg-muted rounded w-3/4 md:w-96 mx-auto md:mx-0" />
-                                    <div className="h-4 bg-muted rounded w-1/2 md:w-48 mx-auto md:mx-0 opacity-70" />
+                        <div className="space-y-6">
+                            {/* Mobile Skeleton */}
+                            <div className="flex flex-col items-center space-y-3 md:hidden">
+                                <Skeleton className="w-56 h-56 rounded-xl shadow-2xl" />
+                                <div className="space-y-1.5 pt-1 w-full">
+                                    <Skeleton className="h-8 w-3/4" />
+                                    <Skeleton className="h-4 w-1/2" />
+                                    <Skeleton className="h-4 w-2/3" />
+                                </div>
+                            </div>
+                            {/* Desktop Skeleton */}
+                            <div className="hidden md:flex gap-8 items-end">
+                                <Skeleton className="w-60 h-60 rounded-lg shadow-2xl shrink-0" />
+                                <div className="flex-1 space-y-4 min-w-0">
+                                    <Skeleton className="h-14 w-[500px]" />
+                                    <Skeleton className="h-4 w-48" />
+                                    <Skeleton className="h-4 w-64" />
                                 </div>
                             </div>
                         </div>
@@ -506,7 +517,7 @@ export default function SongPage() {
                             ? dominantColor ? `color-mix(in srgb, ${dominantColor}, black 60%)` : "#1D1046"
                             : undefined
                     }}
-                    className={`fixed md:sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b transition-all duration-300 w-full ${showHeaderTitle ? "border-border text-white" : "bg-transparent md:bg-background border-transparent"}`}
+                    className={`fixed md:sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 md:border-b transition-all duration-300 w-full ${showHeaderTitle ? "border-border text-white" : "bg-transparent md:bg-background border-transparent"}`}
                 >
                     <div className="flex items-center justify-between w-full gap-2 px-3 md:px-4">
                         <div className="flex items-center gap-2">
@@ -548,14 +559,13 @@ export default function SongPage() {
 
                             {/* Mobile */}
                             <div className="block md:hidden">
-                                <div className="flex flex-col items-center text-center space-y-3">
+                                <div className="flex flex-col items-center space-y-3">
                                     <div className="w-56 h-56 rounded-xl overflow-hidden bg-muted shadow-2xl">
                                         <img src={imgUrl} alt={song.name} className="w-full h-full object-cover"
                                             onError={e => { e.target.src = "/default-playlist-image.png"; }} />
                                     </div>
-                                    <div className="space-y-1.5 pt-1">
-                                        <Badge variant="secondary" className="text-xs">Song</Badge>
-                                        <h1 ref={mobileTitleRef} className="text-2xl font-bold break-words leading-tight px-2">
+                                    <div className="space-y-1.5 pt-1 w-full">
+                                        <h1 ref={mobileTitleRef} className="text-2xl font-bold break-words leading-tight">
                                             {decodeHtmlEntities(song.name)}
                                         </h1>
                                         <div className="text-sm font-semibold text-muted-foreground">
@@ -568,7 +578,7 @@ export default function SongPage() {
                                                 </span>
                                             ))}
                                         </div>
-                                        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground flex-wrap">
+                                        <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
                                             {song.year && <span>{song.year}</span>}
                                             {song.duration && <><span>•</span><span>{formatDuration(song.duration)}</span></>}
                                             {song.language && <><span>•</span><span className="capitalize">{song.language}</span></>}
@@ -584,7 +594,6 @@ export default function SongPage() {
                                         onError={e => { e.target.src = "/default-playlist-image.png"; }} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <Badge variant="secondary" className="mb-3">Song</Badge>
                                     <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-3 break-words leading-tight">
                                         {decodeHtmlEntities(song.name)}
                                     </h1>
@@ -615,7 +624,7 @@ export default function SongPage() {
 
                         {/* Controls */}
                         <div className="p-4 pt-2 md:p-8 md:pt-4">
-                            <div className="flex items-center gap-0.5 md:gap-1">
+                            <div className="flex items-center gap-3 md:gap-4">
                                 <Button
                                     size="lg"
                                     className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-all duration-300 cursor-pointer"
@@ -631,14 +640,12 @@ export default function SongPage() {
                                     }
                                 </Button>
 
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className={`h-10 w-10 md:h-12 md:w-12 rounded-full p-0 ${isLiked(song.id) ? "text-red-500 hover:text-red-400" : "text-muted-foreground hover:text-foreground"}`}
+                                <button
+                                    className={`rounded-full w-12 h-12 md:w-14 md:h-14 p-0 flex items-center justify-center hover:scale-105 transition-all duration-300 cursor-pointer ${isLiked(song.id) ? "text-green-500 hover:text-green-400" : "text-muted-foreground hover:text-foreground"}`}
                                     onClick={() => toggleLike(song).catch(console.error)}
                                 >
-                                    <Heart className={`w-5 h-5 md:w-6 md:h-6 ${isLiked(song.id) ? "fill-current" : ""}`} />
-                                </Button>
+                                    <Heart className={`w-6 h-6 md:w-7 md:h-7 ${isLiked(song.id) ? "fill-current" : ""}`} />
+                                </button>
 
                                 <SongDetailActionMenu
                                     song={song}
@@ -694,7 +701,14 @@ export default function SongPage() {
                                                 onError={e => { e.target.src = "/default-playlist-image.png"; }} />
                                         </div>
                                         <div className="min-w-0">
-                                            <p className={`font-semibold truncate text-sm md:text-base ${isCurrentSong ? "text-green-500" : ""}`}>
+                                            <p className={`font-semibold truncate text-sm md:text-base flex items-center gap-1.5 ${isCurrentSong ? "text-green-500" : ""}`}>
+                                                {isCurrentSong && isPlaying && (
+                                                    <span className="md:hidden flex items-end justify-center gap-0.5 h-3 w-3 shrink-0">
+                                                        <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0s' }} />
+                                                        <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.2s' }} />
+                                                        <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.4s' }} />
+                                                    </span>
+                                                )}
                                                 {decodeHtmlEntities(song.name)}
                                             </p>
                                             <p className={`text-xs md:text-sm truncate flex items-center gap-1 ${isCurrentSong ? "text-muted-foreground md:text-green-400" : "text-muted-foreground"}`}>

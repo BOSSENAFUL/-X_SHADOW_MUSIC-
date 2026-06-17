@@ -1872,7 +1872,7 @@ function SearchPageContent() {
     <SidebarProvider>
       <AppSidebar className="hidden md:flex" />
       <SidebarInset className="md:ml-0 overflow-x-hidden h-svh relative flex flex-col">
-        <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+        <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 md:border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1 hidden md:flex" />
             <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:block" />
@@ -2118,16 +2118,7 @@ function SearchPageContent() {
                                 onClick={() => handlePlayClick(song, combinedSearchResults.songs.results, index)}
                               >
                                 <div className={`text-sm text-muted-foreground w-6 text-center shrink-0 ${!showTrackNumbersMobile ? 'hidden md:block' : ''}`}>
-                                  {isCurrentSong && isPlaying ? (
-                                    <div className="flex items-center justify-center">
-                                      <div className="flex items-end justify-center gap-0.5 h-3">
-                                        <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
-                                        <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
-                                        <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
-                                        <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
-                                      </div>
-                                    </div>
-                                  ) : isCurrentSong ? (
+                                  {isCurrentSong ? (
                                     <IoMdPlay className="w-4 h-4 mx-auto text-green-500 fill-green-500" />
                                   ) : (
                                     index + 1
@@ -2158,13 +2149,20 @@ function SearchPageContent() {
 
                                 </div>
                                 <div className="flex-1 min-w-0 overflow-hidden pr-2">
-                                  <p className={`font-medium text-base leading-tight truncate block ${isCurrentSong ? 'text-green-500' : 'text-foreground'
+                                  <p className={`font-medium text-base leading-tight truncate flex items-center gap-1.5 ${isCurrentSong ? 'text-green-500' : 'text-foreground'
                                     }`} style={{
                                       whiteSpace: 'nowrap',
                                       overflow: 'hidden',
                                       textOverflow: 'ellipsis',
                                       maxWidth: '100%'
                                     }}>
+                                    {isCurrentSong && isPlaying && (
+                                      <span className="flex items-end justify-center gap-0.5 h-3 w-3 shrink-0">
+                                        <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0s' }} />
+                                        <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.2s' }} />
+                                        <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.4s' }} />
+                                      </span>
+                                    )}
                                     {decodeHtmlEntities(song.title || song.name)}
                                   </p>
                                   <p className={`text-sm leading-tight truncate block ${isCurrentSong ? 'text-muted-foreground md:text-green-400' : 'text-muted-foreground'
@@ -2405,53 +2403,51 @@ function SearchPageContent() {
                               onClick={() => handlePlayClick(song, combinedSearchResults.songs.results, index)}
                             >
                               <div className={`text-sm text-muted-foreground w-6 text-center shrink-0 ${!showTrackNumbersMobile ? 'hidden' : ''}`}>
-                                 {isCurrentSong && isPlaying ? (
-                                   <div className="flex items-center justify-center">
-                                     <div className="flex items-end justify-center gap-0.5 h-3">
-                                       <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
-                                       <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
-                                       <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
-                                       <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
-                                     </div>
-                                   </div>
-                                 ) : isCurrentSong ? (
+                                 {isCurrentSong ? (
                                    <IoMdPlay className="w-4 h-4 mx-auto text-green-500 fill-green-500" />
                                  ) : (
                                    index + 1
                                  )}
                                </div>
-                              <div className="relative shrink-0">
-                                <div className="w-12 h-12 rounded bg-muted overflow-hidden relative">
-                                  {song.image?.length > 0 ? (
-                                    <img
-                                      src={song.image.find(img => img.quality === '500x500')?.url ||
-                                        song.image.find(img => img.quality === '150x150')?.url ||
-                                        song.image[song.image.length - 1]?.url}
-                                      alt={song.title}
-                                      className="w-full h-full object-cover"
-                                      loading="lazy"
-                                      onError={(e) => {
-                                        e.target.src = '/default-playlist-image.png';
-                                      }}
-                                    />
-                                  ) : (
-                                    <img
-                                      src="/default-playlist-image.png"
-                                      alt={song.title}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  )}
-                                </div>
+                               <div className="relative shrink-0">
+                                 <div className="w-12 h-12 rounded bg-muted overflow-hidden relative">
+                                   {song.image?.length > 0 ? (
+                                     <img
+                                       src={song.image.find(img => img.quality === '500x500')?.url ||
+                                         song.image.find(img => img.quality === '150x150')?.url ||
+                                         song.image[song.image.length - 1]?.url}
+                                       alt={song.title}
+                                       className="w-full h-full object-cover"
+                                       loading="lazy"
+                                       onError={(e) => {
+                                         e.target.src = '/default-playlist-image.png';
+                                       }}
+                                     />
+                                   ) : (
+                                     <img
+                                       src="/default-playlist-image.png"
+                                       alt={song.title}
+                                       className="w-full h-full object-cover"
+                                     />
+                                   )}
+                                 </div>
 
                               </div>
                               <div className="flex-1 min-w-0 overflow-hidden pr-2">
-                                <p className={`font-medium text-base leading-tight truncate block ${isCurrentSong ? 'text-green-500' : 'text-foreground'
+                                <p className={`font-medium text-base leading-tight truncate flex items-center gap-1.5 ${isCurrentSong ? 'text-green-500' : 'text-foreground'
                                   }`} style={{
                                     whiteSpace: 'nowrap',
                                     overflow: 'hidden',
                                     textOverflow: 'ellipsis',
                                     maxWidth: '100%'
                                   }}>
+                                  {isCurrentSong && isPlaying && (
+                                    <span className="flex items-end justify-center gap-0.5 h-3 w-3 shrink-0">
+                                      <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0s' }} />
+                                      <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.2s' }} />
+                                      <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.4s' }} />
+                                    </span>
+                                  )}
                                   {decodeHtmlEntities(song.title || song.name)}
                                 </p>
                                 <p className="text-sm leading-tight truncate block text-muted-foreground" style={{
@@ -2484,16 +2480,7 @@ function SearchPageContent() {
                               onClick={() => handlePlayClick(song, combinedSearchResults.songs.results, index)}
                             >
                               <div className="w-8 text-center">
-                                {isCurrentSong && isPlaying ? (
-                                  <div className="flex items-center justify-center">
-                                    <div className="flex items-end justify-center gap-0.5 h-3">
-                                      <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0s' }} />
-                                      <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.2s' }} />
-                                      <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.4s' }} />
-                                      <div className="w-0.5 h-full bg-green-500 animate-music-bar text-[0px]" style={{ animationDelay: '0.1s' }} />
-                                    </div>
-                                  </div>
-                                ) : isCurrentSong ? (
+                                {isCurrentSong ? (
                                   <IoMdPlay className="w-4 h-4 mx-auto text-green-500 fill-green-500" />
                                 ) : (
                                   <>
@@ -2528,7 +2515,14 @@ function SearchPageContent() {
                                   )}
                                 </div>
                                 <div className="min-w-0">
-                                  <p className={`font-medium truncate ${isCurrentSong ? 'text-green-500' : 'text-foreground'}`}>
+                                  <p className={`font-medium truncate flex items-center gap-1.5 ${isCurrentSong ? 'text-green-500' : 'text-foreground'}`}>
+                                    {isCurrentSong && isPlaying && (
+                                      <span className="flex items-end justify-center gap-0.5 h-3 w-3 shrink-0">
+                                        <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0s' }} />
+                                        <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.2s' }} />
+                                        <span className="w-0.5 h-full bg-green-500 animate-music-bar" style={{ animationDelay: '0.4s' }} />
+                                      </span>
+                                    )}
                                     {decodeHtmlEntities(song.title || song.name)}
                                   </p>
                                   <p className={`text-sm truncate ${isCurrentSong ? 'text-green-400' : 'text-muted-foreground'}`}>
