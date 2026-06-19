@@ -11,11 +11,15 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Heart } from "lucide-react"
+import { ArrowLeft, Heart, Loader2 } from "lucide-react"
+import { IoMdPlay } from "react-icons/io"
+import { HiPause } from "react-icons/hi2"
 import { useLikedPlaylists } from "@/hooks/useLikedPlaylists"
 import { useLikedAlbums } from "@/hooks/useLikedAlbums"
 import { useLikedArtists } from "@/hooks/useLikedArtists"
 import { useLikedSongs } from "@/hooks/useLikedSongs"
+import { useMusicPlayer } from "@/contexts/music-player-context"
+import { trackRecentlyPlayed } from "@/lib/track-playlist"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbPage } from "@/components/ui/breadcrumb"
@@ -30,14 +34,14 @@ const PlaylistCollage = memo(({ images }) => {
       <img
         src={displayImages[0]}
         alt="Playlist Cover"
-        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+        className="w-full h-full object-cover"
         onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
       />
     );
   }
 
   return (
-    <div className="grid grid-cols-2 grid-rows-2 w-full h-full group-hover:scale-105 transition-transform duration-300">
+    <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
       {displayImages.map((src, idx) => (
         <div key={idx} className="relative w-full h-full overflow-hidden border-[0.5px] border-black/10">
           <img
@@ -75,7 +79,73 @@ export default function LibraryPage() {
   const userId = session?.user?.id
   const [activeTab, setActiveTab] = useState("All") // All, Playlists, Albums, Artists
   const [scrollRestored, setScrollRestored] = useState(false)
+  const [playingId, setPlayingId] = useState(null)
   const scrollContainerRef = useRef(null)
+  const { playSong, currentPlaylistId, isPlaying, togglePlayPause } = useMusicPlayer()
+
+  const handlePlay = useCallback(async (item, e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (currentPlaylistId === item.id) {
+      togglePlayPause()
+      return
+    }
+    if (playingId === item.id) return
+    setPlayingId(item.id)
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || ''
+      let songs = []
+      let source = item.type === 'album' ? 'jiosaavn' : 'user'
+
+      if (item.isLikedSongs) {
+        const res = await fetch('/api/favorites')
+        const data = await res.json()
+        if (data.success && data.data?.length) {
+          const ids = data.data.map(f => f.songId || f.id)
+          const songsRes = await fetch(`${apiUrl}/api/songs?ids=${ids.join(',')}`)
+          const songsData = await songsRes.json()
+          if (songsData.success && songsData.data) songs = songsData.data
+        }
+      } else if (item.type === 'playlist') {
+        const pid = item.id
+        if (item.source === 'user') {
+          const res = await fetch(`/api/playlists/${pid}`)
+          const result = await res.json()
+          if (result.success && result.data?.songIds?.length) {
+            const songsRes = await fetch(`${apiUrl}/api/songs?ids=${result.data.songIds.join(',')}`)
+            const songsData = await songsRes.json()
+            if (songsData.success && songsData.data) {
+              const map = {}
+              songsData.data.forEach(s => { map[s.id] = s })
+              songs = result.data.songIds.map(id => map[id]).filter(Boolean)
+            }
+          }
+          source = 'user'
+        } else {
+          const res = await fetch(`${apiUrl}/api/playlists?id=${pid}&page=0&limit=${item.songCount || 50}`)
+          const data = await res.json()
+          if (data.success && data.data?.songs) songs = data.data.songs
+          source = 'jiosaavn'
+        }
+      } else if (item.type === 'album') {
+        const res = await fetch(`${apiUrl}/api/albums?id=${item.id}`)
+        const data = await res.json()
+        if (data.success && data.data?.songs) songs = data.data.songs
+      }
+
+      if (songs.length > 0) {
+        playSong(songs[0], songs, item.id)
+        if (session?.user?.id) {
+          await trackRecentlyPlayed(item, source, songs)
+        }
+      }
+    } catch (err) {
+      console.error('Error playing from library:', err)
+    } finally {
+      setPlayingId(null)
+    }
+  }, [playingId, playSong, session, currentPlaylistId, isPlaying, togglePlayPause])
 
   const { likedPlaylists, loading: loadingPlaylists } = useLikedPlaylists(userId)
   const { likedAlbums, loading: loadingAlbums } = useLikedAlbums(userId)
@@ -248,6 +318,7 @@ export default function LibraryPage() {
         subtitle: `Playlist • ${likedSongsCount} songs`,
         type: "playlist",
         isLikedSongs: true,
+        source: 'user',
         onClick: "/music/favorites",
       })
     }
@@ -266,6 +337,8 @@ export default function LibraryPage() {
           isCollage: playlist.isCollage,
           type: "playlist",
           onClick: `/music/playlists/${playlist._id || playlist.playlistId}`,
+          source: 'user',
+          songCount: count,
         })
       })
 
@@ -283,6 +356,8 @@ export default function LibraryPage() {
           isCollage: playlist.isCollage,
           type: "playlist",
           onClick: playlistUrl,
+          source: playlist.isUserPlaylist ? 'user' : 'jiosaavn',
+          songCount: count,
         })
       })
     }
@@ -450,12 +525,12 @@ export default function LibraryPage() {
                   <Link
                     key={`${item.type}-${item.id}`}
                     href={item.onClick}
-                    className="group relative rounded-md hover:bg-muted/30 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="group relative rounded-md cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     aria-label={`View ${item.type} ${item.title}`}
                   >
                     {/* Image Container */}
                     <div className={cn(
-                      "aspect-square w-full mb-2 overflow-hidden shadow-lg relative",
+                      "aspect-square w-full mb-3 overflow-hidden shadow-lg relative border border-border",
                       item.type === "artist" ? "rounded-full" : "rounded-md"
                     )}>
                       {item.isLikedSongs ? (
@@ -468,7 +543,7 @@ export default function LibraryPage() {
                         <img
                           src={getImageSrc(item.image) || item.collageImages[0]}
                           alt={item.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          className="w-full h-full object-cover"
                           loading="lazy"
                           onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
                         />
@@ -479,11 +554,34 @@ export default function LibraryPage() {
                           </span>
                         </div>
                       )}
+
+                      {item.type !== "artist" && (
+                        <div className={`absolute bottom-2 right-2 transition-all duration-300 z-20 hidden md:flex ${
+                          currentPlaylistId === item.id && isPlaying
+                            ? 'opacity-100 translate-y-0'
+                            : 'opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0'
+                        }`}>
+                          <div
+                            className="rounded-full w-10 h-10 md:w-12 md:h-12 bg-green-500 hover:bg-green-400 hover:scale-105 flex items-center justify-center text-black shadow-lg transition-transform cursor-pointer"
+                            onClick={(e) => handlePlay(item, e)}
+                          >
+                            {playingId === item.id ? (
+                              <Loader2 className="w-5 h-5 md:w-6 md:h-6 animate-spin text-black" />
+                            ) : currentPlaylistId === item.id && isPlaying ? (
+                              <HiPause className="w-5 h-5 md:w-6 md:h-6 fill-black" />
+                            ) : (
+                              <IoMdPlay className="w-5 h-5 md:w-6 md:h-6 fill-black translate-x-0.5" />
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Text Content */}
                     <div className="min-w-0 space-y-0.5">
-                      <h3 className="font-bold text-foreground truncate text-[15px]">
+                      <h3 className={`font-bold truncate text-[15px] text-foreground ${
+                        currentPlaylistId === item.id ? 'md:text-green-500' : ''
+                      }`}>
                         {item.title}
                       </h3>
                       <p className="text-sm text-muted-foreground truncate font-medium">

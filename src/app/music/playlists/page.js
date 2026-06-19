@@ -23,6 +23,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Plus, Loader2, Music, Lock, Unlock, Search, Download } from "lucide-react"
+import { IoMdPlay } from "react-icons/io"
+import { HiPause } from "react-icons/hi2"
+import { useMusicPlayer } from "@/contexts/music-player-context"
 import {
   Dialog,
   DialogContent,
@@ -53,7 +56,7 @@ const PlaylistSkeleton = memo(() => (
 ));
 PlaylistSkeleton.displayName = "PlaylistSkeleton";
 
-const PlaylistCard = memo(({ playlist }) => {
+const PlaylistCard = memo(({ playlist, currentPlaylistId, isPlaying, togglePlayPause, onClick }) => {
   // Generate playlist cover based on songs
   const cover = useMemo(() => {
     if (playlist.image) {
@@ -100,17 +103,17 @@ const PlaylistCard = memo(({ playlist }) => {
 
   return (
     <>
-      <div className="aspect-square w-full mb-2 overflow-hidden shadow-lg relative rounded-md">
+      <div className="aspect-square w-full mb-3 overflow-hidden shadow-lg relative rounded-md border border-border">
         {cover.type === 'single' ? (
           <img
             src={cover.src}
             alt={playlist.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-cover"
             onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
             loading="lazy"
           />
         ) : cover.type === 'collage' ? (
-          <div className="grid grid-cols-2 grid-rows-2 w-full h-full group-hover:scale-105 transition-transform duration-300">
+          <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
             {cover.images.map((imageSrc, index) => (
               <div key={index} className="relative w-full h-full overflow-hidden border-[0.5px] border-black/10">
                 <img
@@ -137,13 +140,34 @@ const PlaylistCard = memo(({ playlist }) => {
             {playlist.isPublic ? "Public" : "Private"}
           </Badge>
         </div>
+
+        <div className={`absolute bottom-2 right-2 transition-all duration-300 z-20 hidden md:flex ${currentPlaylistId === playlist._id && isPlaying ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0'}`}>
+          <div
+            className="rounded-full w-10 h-10 md:w-12 md:h-12 bg-green-500 hover:bg-green-400 hover:scale-105 flex items-center justify-center text-black shadow-lg transition-transform cursor-pointer"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (currentPlaylistId === playlist._id) {
+                togglePlayPause();
+              } else {
+                onClick(playlist);
+              }
+            }}
+          >
+            {currentPlaylistId === playlist._id && isPlaying ? (
+              <HiPause className="w-5 h-5 md:w-6 md:h-6 fill-black" />
+            ) : (
+              <IoMdPlay className="w-5 h-5 md:w-6 md:h-6 fill-black translate-x-0.5" />
+            )}
+          </div>
+        </div>
       </div>
 
-      <div className="min-w-0 space-y-0.5">
-        <h3 className="font-bold text-foreground truncate text-[15px]">
+      <div className="min-w-0 space-y-0.5 px-1">
+        <h3 className={`text-sm font-bold leading-tight line-clamp-1 ${currentPlaylistId === playlist._id ? 'md:text-green-500' : 'text-foreground'}`}>
           {playlist.name}
         </h3>
-        <p className="text-sm text-muted-foreground truncate font-medium">
+        <p className="text-xs text-muted-foreground font-medium">
           {playlist.songIds?.length || 0} songs
         </p>
       </div>
@@ -157,6 +181,7 @@ PlaylistCard.displayName = "PlaylistCard";
 export default function PlaylistsPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
+  const { currentPlaylistId, isPlaying, togglePlayPause, playSong } = useMusicPlayer();
   const [isCreating, setIsCreating] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importUrl, setImportUrl] = useState("");
@@ -344,10 +369,30 @@ export default function PlaylistsPage() {
   const filteredPlaylists = useMemo(() => {
     const query = searchQuery.toLowerCase();
     return playlists.filter(p =>
-      p.name.toLowerCase().includes(query) ||
+      p.name?.toLowerCase().includes(query) ||
       (p.description && p.description.toLowerCase().includes(query))
     );
   }, [playlists, searchQuery]);
+
+  const handlePlay = useCallback(async (playlist) => {
+    if (currentPlaylistId === playlist._id) {
+      togglePlayPause();
+      return;
+    }
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    let songs = [];
+    if (playlist.songs?.length > 0 && playlist.songs[0]?.name) {
+      songs = playlist.songs;
+    } else if (playlist.songIds?.length > 0) {
+      const idsParam = playlist.songIds.join(',');
+      const res = await fetch(`${apiUrl}/api/songs?ids=${idsParam}`);
+      const data = await res.json();
+      if (data.success) songs = data.data;
+    }
+    if (songs.length > 0) {
+      playSong(songs[0], songs, playlist._id, 0);
+    }
+  }, [currentPlaylistId, isPlaying, togglePlayPause, playSong]);
 
 
   const handleCreatePlaylist = useCallback(async () => {
@@ -496,7 +541,7 @@ export default function PlaylistsPage() {
       <SidebarInset className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col" onScroll={(e) => {
         if (session?.user?.id && !loading && scrollRestored) {
           const scrollKey = `user_playlists_scroll_${session.user.id}`;
-          sessionStorage.setItem(scrollKey, e.currentTarget.scrollTop.toString());
+          safeSessionStorageSet(scrollKey, e.currentTarget.scrollTop.toString());
         }
       }} ref={scrollContainerRef}>
         <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center justify-between gap-2 border-b bg-background/95 backdrop-blur px-4 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
@@ -878,7 +923,13 @@ export default function PlaylistsPage() {
                   className="group relative rounded-md hover:bg-muted/30 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   aria-label={`View playlist ${playlist.name}`}
                 >
-                  <PlaylistCard playlist={playlist} />
+                  <PlaylistCard
+                    playlist={playlist}
+                    currentPlaylistId={currentPlaylistId}
+                    isPlaying={isPlaying}
+                    togglePlayPause={togglePlayPause}
+                    onClick={handlePlay}
+                  />
                 </Link>
               ))}
             </div>

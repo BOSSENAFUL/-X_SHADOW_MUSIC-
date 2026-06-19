@@ -21,14 +21,13 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Heart, Search, MessageSquare, Radio, Sparkles } from "lucide-react";
+import { Heart, Search, MessageSquare, Radio, Loader2 } from "lucide-react";
 
 import { PlaylistSection } from "@/components/music/playlist-section";
 import { PWAInstallBanner } from "@/components/music/pwa-install-banner";
 import { IoMdPlay } from "react-icons/io";
 import { useMusicPlayer } from "@/contexts/music-player-context";
-import { Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { HiPause } from "react-icons/hi2";
 
 const PlaylistCollage = memo(({ images }) => {
   if (!images || images.length === 0) return null;
@@ -118,7 +117,7 @@ export default function MusicPage() {
   const showIndian = feedPreference === 'indian' || feedPreference === 'all';
   const showGlobal = feedPreference === 'global' || feedPreference === 'all';
 
-  const { playSong } = useMusicPlayer();
+  const { playSong, currentPlaylistId, isPlaying, togglePlayPause } = useMusicPlayer();
 
 
   useEffect(() => {
@@ -614,32 +613,29 @@ export default function MusicPage() {
     return () => clearInterval(timer);
   }, [refreshCooldown]);
 
-  const handlePlayClick = useCallback(async (item, type) => {
-    if (type === 'liked-songs') {
-      const pid = 'liked-songs';
-      if (playingId === pid) return;
-      setPlayingId(pid);
-      try {
-        const res = await fetch(`/api/liked-songs?userId=${session?.user?.id}`);
-        const data = await res.json();
-        if (data.success && data.data?.length > 0) {
-          // Map stored liked song format to the format playSong expects
-          const songs = data.data.map(s => ({
-            id: s.songId,
-            name: s.songName,
-            artists: { primary: s.artists || [] },
-            album: s.album,
-            duration: s.duration,
-            image: s.image,
-            downloadUrl: s.downloadUrl,
-          }));
-          playSong(songs[0], songs, pid);
-        }
-      } catch (err) {
-        console.error('Error playing liked songs:', err);
-      } finally {
-        setPlayingId(null);
+  const handlePlayClick = useCallback(async () => {
+    const pid = 'liked-songs';
+    if (playingId === pid) return;
+    setPlayingId(pid);
+    try {
+      const res = await fetch(`/api/liked-songs?userId=${session?.user?.id}`);
+      const data = await res.json();
+      if (data.success && data.data?.length > 0) {
+        const songs = data.data.map(s => ({
+          id: s.songId,
+          name: s.songName,
+          artists: { primary: s.artists || [] },
+          album: s.album,
+          duration: s.duration,
+          image: s.image,
+          downloadUrl: s.downloadUrl,
+        }));
+        playSong(songs[0], songs, pid);
       }
+    } catch (err) {
+      console.error('Error playing liked songs:', err);
+    } finally {
+      setPlayingId(null);
     }
   }, [playingId, playSong, session?.user?.id]);
 
@@ -988,7 +984,8 @@ export default function MusicPage() {
     }
   }, [playlistColors, extractDominantColor]);
 
-
+  const isValidUrl = (url) =>
+    typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/'));
 
   return (
     <SidebarProvider>
@@ -1082,28 +1079,41 @@ export default function MusicPage() {
                     "linear-gradient(135deg, rgb(69, 10, 245), rgb(166, 174, 219))",
                 }}
               >
-                <Heart className="w-5 h-5 md:w-8 md:h-8 fill-white text-white " />
+                <Heart className="w-5 h-5 md:w-8 md:h-8 fill-white" />
               </div>
               <div className="min-w-0 flex-1 px-2 md:px-3 py-2 flex items-center">
-                <h3 className="font-bold text-[13px] md:text-[14px] lg:text-[16px] text-foreground line-clamp-2 leading-tight">
+                <h3 className={`font-bold text-[13px] md:text-[14px] lg:text-[16px] text-foreground line-clamp-2 leading-tight ${
+                  currentPlaylistId === 'liked-songs' ? 'md:text-green-500' : ''
+                }`}>
                   Liked Songs
                 </h3>
               </div>
 
               {/* Play button overlay */}
-              <div className="absolute right-2 md:right-3 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-20 hidden md:block">
+              <div className={`absolute right-2 md:right-3 transition-all duration-300 z-20 hidden md:flex ${
+                currentPlaylistId === 'liked-songs'
+                  ? 'opacity-100 translate-y-0'
+                  : 'opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0'
+              }`}>
                 <div
                   className="rounded-full w-8 h-8 md:w-12 md:h-12 bg-green-500 hover:bg-green-400 flex items-center justify-center text-black shadow-lg hover:scale-105 transition-transform"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    handlePlayClick({ type: "liked-songs" }, "liked-songs");
+                    if (currentPlaylistId === 'liked-songs') {
+                      togglePlayPause();
+                    } else {
+                       handlePlayClick();
+                    }
                   }}
                 >
-                  {playingId === 'liked-songs'
-                    ? <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin text-black" />
-                    : <IoMdPlay className="w-4 h-4 md:w-6 md:h-6 fill-black translate-x-0.5" />
-                  }
+                  {playingId === 'liked-songs' ? (
+                    <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin text-black" />
+                  ) : currentPlaylistId === 'liked-songs' && isPlaying ? (
+                    <HiPause className="w-4 h-4 md:w-5 md:h-5 fill-black" />
+                  ) : (
+                    <IoMdPlay className="w-4 h-4 md:w-6 md:h-6 fill-black translate-x-0.5" />
+                  )}
                 </div>
               </div>
             </Link>
@@ -1132,10 +1142,8 @@ export default function MusicPage() {
                 >
                   <div className="h-full aspect-square shrink-0 relative bg-muted border-r border-border">
                     {(() => {
-                      const isValidUrl = (url) =>
-                        typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/'));
                       const collageImages = playlist.collageImages || (
-                        playlist.source === 'user' && playlist.image?.length >= 4
+                        playlist.source === 'user' && Array.isArray(playlist.image) && playlist.image.length >= 4
                           ? playlist.image.map(img => img.url).filter(isValidUrl)
                           : null
                       );
@@ -1165,7 +1173,11 @@ export default function MusicPage() {
                     })()}
                   </div>
                   <div className="min-w-0 flex-1 px-2 md:px-3 py-2 flex flex-col justify-center gap-0.5">
-                    <h3 className="font-bold text-[13px] md:text-[14px] lg:text-[16px] text-foreground line-clamp-1 leading-tight">
+                    <h3 className={`font-bold text-[13px] md:text-[14px] lg:text-[16px] text-foreground line-clamp-1 leading-tight ${
+                      currentPlaylistId === (playlist.playlistId || playlist.id)
+                        ? 'md:text-green-500'
+                        : ''
+                    }`}>
                       {playlist.playlistName}
                     </h3>
                     {playlist.source === 'user' && (
@@ -1174,18 +1186,30 @@ export default function MusicPage() {
                   </div>
 
                   {/* Play button overlay */}
-                  <div className={`absolute right-2 md:right-3 transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-20 hidden md:block ${playingId === (playlist.playlistId || playlist.id) ? 'opacity-100 translate-y-0' : 'opacity-0 group-hover:opacity-100'}`}>
+                  <div className={`absolute right-2 md:right-3 transition-all duration-300 z-20 hidden md:flex ${
+                    currentPlaylistId === (playlist.playlistId || playlist.id)
+                      ? 'opacity-100 translate-y-0'
+                      : 'opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0'
+                  }`}>
                     <div
-                      className="rounded-full w-8 h-8 md:w-12 md:h-12 bg-green-500 hover:bg-green-400 flex items-center justify-center text-black shadow-lg hover:scale-105 transition-transform "
+                      className="rounded-full w-8 h-8 md:w-12 md:h-12 bg-green-500 hover:bg-green-400 flex items-center justify-center text-black shadow-lg hover:scale-105 transition-transform"
                       onClick={(e) => {
                         e.preventDefault();
-                        handlePlaylistPlay(playlist, e);
+                        e.stopPropagation();
+                        if (currentPlaylistId === (playlist.playlistId || playlist.id)) {
+                          togglePlayPause();
+                        } else {
+                          handlePlaylistPlay(playlist, e);
+                        }
                       }}
                     >
-                      {playingId === (playlist.playlistId || playlist.id)
-                        ? <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin text-black" />
-                        : <IoMdPlay className="w-4 h-4 md:w-6 md:h-6 fill-black translate-x-0.5" />
-                      }
+                      {playingId === (playlist.playlistId || playlist.id) ? (
+                        <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin text-black" />
+                      ) : currentPlaylistId === (playlist.playlistId || playlist.id) && isPlaying ? (
+                        <HiPause className="w-4 h-4 md:w-5 md:h-5 fill-black" />
+                      ) : (
+                        <IoMdPlay className="w-4 h-4 md:w-6 md:h-6 fill-black translate-x-0.5" />
+                      )}
                     </div>
                   </div>
                 </Link>

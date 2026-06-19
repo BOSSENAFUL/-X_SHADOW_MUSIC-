@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -22,7 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Play, ArrowLeft, Heart, MoreVertical, Shuffle, Users, Calendar, Plus, Disc, Share, Download, Music2 } from "lucide-react";
+import { Play, ArrowLeft, Heart, MoreVertical, Shuffle, Users, Calendar, Plus, Disc, Share, Download, Music2, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,10 +45,76 @@ import {
   DrawerDescription,
 } from "@/components/ui/drawer";
 import { toast } from "sonner";
-import { memo } from "react";
 import { downloadWithMetadata } from "@/lib/clientDownload";
 import { applyThemeColor, getThemeColorForScroll } from "@/lib/utils";
 import { triggerSmartlink } from "@/lib/smartlink";
+
+const formatDuration = (duration) => {
+  if (!duration) return "0:00";
+  const minutes = Math.floor(duration / 60);
+  const seconds = duration % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
+
+const formatFollowers = (count) => {
+  if (!count) return "0";
+  if (count >= 1000000) {
+    return `${(count / 1000000).toFixed(1)}M`;
+  }
+  if (count >= 1000) {
+    return `${(count / 1000).toFixed(1)}K`;
+  }
+  return count.toString();
+};
+
+const decodeHtmlEntities = (text) => {
+  if (!text) return text;
+
+  const mojibake = {
+    '\u00E2\u20AC\u0153': '\u201C',
+    '\u00E2\u20AC': '\u201D',
+    '\u00E2\u20AC\u02DC': '\u2018',
+    '\u00E2\u20AC\u2122': '\u2019',
+    '\u00E2\u20AC\u201D': '\u2014',
+    '\u00E2\u20AC\u201C': '\u2013',
+    '\u00E2\u20AC\u00A6': '\u2026',
+    '\u00C2': '',
+  };
+
+  let cleanedText = text;
+  for (const [bad, good] of Object.entries(mojibake)) {
+    cleanedText = cleanedText.split(bad).join(good);
+  }
+
+  if (!cleanedText.includes('&')) return cleanedText;
+
+  const htmlEntities = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&apos;': "'"
+  };
+  return cleanedText.replace(/&(?:amp|lt|gt|quot|#39|apos);/g, m => htmlEntities[m]);
+};
+
+const getSongImageUrl = (song) => {
+  if (!song?.image || !Array.isArray(song.image)) return '/default-playlist-image.png';
+  return song.image.find(img => img.quality === '500x500')?.url ||
+    song.image.find(img => img.quality === '150x150')?.url ||
+    song.image[song.image.length - 1]?.url ||
+    '/default-playlist-image.png';
+};
+
+const getAlbumImageUrl = (album) => {
+  if (!album?.image || !Array.isArray(album.image)) return '/default-playlist-image.png';
+  return album.image.find(img => img.quality === '500x500')?.url ||
+    album.image[2]?.url ||
+    album.image[1]?.url ||
+    album.image[0]?.url ||
+    '/default-playlist-image.png';
+};
 
 // --- Helper Components ---
 const SongActionMenu = memo(({
@@ -57,8 +123,7 @@ const SongActionMenu = memo(({
   onGoToAlbum,
   onDownload,
   toggleLike,
-  isLiked,
-  decodeHtmlEntities
+  isLiked
 }) => {
   const isMobile = useIsMobile();
   const router = useRouter();
@@ -67,9 +132,7 @@ const SongActionMenu = memo(({
   const artistNames = song.artists?.primary?.map(a => a.name).join(', ') ||
     (Array.isArray(song.artists) ? song.artists.map(a => a.name).join(', ') : null) ||
     'Unknown Artist';
-  const songImageUrl = song.image?.find(img => img.quality === '150x150')?.url ||
-    song.image?.[song.image.length - 1]?.url ||
-    '/default-playlist-image.png';
+  const songImageUrl = getSongImageUrl(song);
 
   const ActionItems = ({ onItemClick }) => (
     <>
@@ -279,8 +342,7 @@ const ArtistActionMenu = memo(({
   isArtistLiked,
   toggleArtistLike,
   onDownloadSongs,
-  artistLikeLoading,
-  decodeHtmlEntities
+  artistLikeLoading
 }) => {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
@@ -430,6 +492,7 @@ export default function ArtistPage() {
   const [biography, setBiography] = useState([]);
   const [fetchingBio, setFetchingBio] = useState(false);
   const [showHeaderTitle, setShowHeaderTitle] = useState(false);
+  const [playingId, setPlayingId] = useState(null);
 
   // Dynamic PWA status bar theme-color update
   useEffect(() => {
@@ -672,15 +735,13 @@ export default function ArtistPage() {
             console.error('Error fetching more playcounts:', err);
           }
 
-          let uniqueNew = [];
           setSongs(prev => {
             const existingIds = new Set(prev.map(s => s.id));
-            uniqueNew = newSongs.filter(s => s.id && !existingIds.has(s.id));
+            const uniqueNew = newSongs.filter(s => s.id && !existingIds.has(s.id));
+            setHasMoreSongs(uniqueNew.length > 0 && newSongs.length >= 10);
             return [...prev, ...uniqueNew];
           });
           setSongsPage(nextPage + 1);
-          // Stop if no new unique songs were added OR batch was smaller than a full page
-          setHasMoreSongs(uniqueNew.length > 0 && newSongs.length >= 10);
           setShowAllTopSongs(true); // Ensure new songs are visible
         } else {
           setHasMoreSongs(false);
@@ -818,9 +879,38 @@ export default function ArtistPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [artist?.name, loading]); // Removed 'biography' and 'fetchingBio' from dependencies to prevent loop
 
-  const handlePlayClick = (song, index) => {
+  const handlePlayClick = useCallback((song, index) => {
+    if (currentSong?.id === song.id && isPlaying) {
+      togglePlayPause();
+      return;
+    }
+    if (index < 0) return;
     playSong(song, songs, artistId, index);
-  };
+  }, [songs, artistId, playSong, currentSong, isPlaying, togglePlayPause]);
+
+  const handleAlbumPlay = useCallback(async (album, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const albumId = album.id;
+    if (currentPlaylistId === albumId) {
+      togglePlayPause();
+      return;
+    }
+    if (playingId === albumId) return;
+    setPlayingId(albumId);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const res = await fetch(`${apiUrl}/api/albums?id=${albumId}`);
+      const data = await res.json();
+      if (data.success && data.data?.songs?.length > 0) {
+        playSong(data.data.songs[0], data.data.songs, albumId);
+      }
+    } catch (err) {
+      console.error('Error playing album:', err);
+    } finally {
+      setPlayingId(null);
+    }
+  }, [playingId, playSong, currentPlaylistId, togglePlayPause]);
 
   const handlePlayAll = () => {
     if (songs && songs.length > 0) {
@@ -917,51 +1007,6 @@ export default function ArtistPage() {
     });
   };
 
-  const formatDuration = (duration) => {
-    if (!duration) return "0:00";
-    const minutes = Math.floor(duration / 60);
-    const seconds = duration % 60;
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
-
-  const formatFollowers = (count) => {
-    if (!count) return "0";
-    if (count >= 1000000) {
-      return `${(count / 1000000).toFixed(1)}M`;
-    }
-    if (count >= 1000) {
-      return `${(count / 1000).toFixed(1)}K`;
-    }
-    return count.toString();
-  };
-
-  const decodeHtmlEntities = useCallback((text) => {
-    if (!text) return text;
-
-    // Handle Mojibake (UTF-8 interpreted as Latin-1/Windows-1252)
-    let cleanedText = text
-      .replace(/â€œ/g, '“')
-      .replace(/â€/g, '”')
-      .replace(/â€˜/g, '‘')
-      .replace(/â€™/g, '’')
-      .replace(/â€”/g, '—')
-      .replace(/â€“/g, '–')
-      .replace(/â€¦/g, '…')
-      .replace(/Â/g, ''); // Non-breaking space artifact
-
-    if (!cleanedText.includes('&')) return cleanedText;
-
-    const entities = {
-      '&amp;': '&',
-      '&lt;': '<',
-      '&gt;': '>',
-      '&quot;': '"',
-      '&#39;': "'",
-      '&apos;': "'"
-    };
-    return cleanedText.replace(/&amp;|&lt;|&gt;|&quot;|&#39;|&apos;/g, m => entities[m]);
-  }, []);
-
   const downloadSingleSong = async (song, silent = false) => {
     let toastId = null;
     if (!silent) {
@@ -1001,10 +1046,7 @@ export default function ArtistPage() {
 
       if (!downloadUrl) throw new Error('No download URL available');
 
-      // 2. Resolve Best Image
-      const imageUrl = song.image?.find(img => img.quality === '500x500')?.url ||
-        song.image?.find(img => img.quality === '150x150')?.url ||
-        song.image?.[song.image.length - 1]?.url;
+      const imageUrl = getSongImageUrl(song);
 
       const title = decodeHtmlEntities(song.name);
       const songArtist = song.artists?.primary?.map(a => a.name).join(', ') || 'Unknown Artist';
@@ -1044,20 +1086,8 @@ export default function ArtistPage() {
       return;
     }
 
-    triggerSmartlink(true); // Download — fire every time, no cooldown
-    // Show initial toast
-    const progressToast = document.createElement('div');
-    progressToast.className = 'fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
-    progressToast.innerHTML = `
-      <div class="flex items-center gap-2">
-        <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-        <div class="flex flex-col">
-          <span class="font-bold text-sm">Downloading Songs...</span>
-          <span class="text-xs opacity-90" id="download-progress-text">Preparing 0 / ${songsToDownload.length}</span>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(progressToast);
+    triggerSmartlink(true);
+    const progressToastId = toast.loading(`Downloading 0 / ${songsToDownload.length}...`);
 
     let downloadedCount = 0;
     let failedCount = 0;
@@ -1076,40 +1106,17 @@ export default function ArtistPage() {
           console.error(`Failed to download ${song.name}:`, error);
           failedCount++;
         }
-
-        const progressText = document.getElementById('download-progress-text');
-        if (progressText) {
-          progressText.textContent = `Progress: ${downloadedCount + failedCount} / ${songsToDownload.length} (${failedCount} failed)`;
-        }
       }
     };
 
-    // Spin up workers
     await Promise.all(Array(Math.min(CONCURRENCY_LIMIT, queue.length)).fill(null).map(downloadWorker));
 
-    // Finish
-    if (document.body.contains(progressToast)) {
-      document.body.removeChild(progressToast);
+    toast.dismiss(progressToastId);
+    if (failedCount > 0) {
+      toast.error(`${downloadedCount} songs saved, ${failedCount} failed.`);
+    } else {
+      toast.success(`${downloadedCount} songs downloaded successfully!`);
     }
-
-    const completionToast = document.createElement('div');
-    completionToast.className = `fixed bottom-4 right-4 ${failedCount > 0 ? 'bg-orange-600' : 'bg-green-600'} text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300`;
-    completionToast.innerHTML = `
-      <div class="flex flex-col">
-        <span class="font-bold text-sm">Download Finished</span>
-        <span class="text-xs opacity-90">${downloadedCount} songs saved. ${failedCount > 0 ? `${failedCount} failed.` : ''}</span>
-      </div>
-    `;
-    document.body.appendChild(completionToast);
-
-    setTimeout(() => {
-      completionToast.style.opacity = '0';
-      setTimeout(() => {
-        if (document.body.contains(completionToast)) {
-          document.body.removeChild(completionToast);
-        }
-      }, 300);
-    }, 5000);
   };
 
   const toggleArtistLike = async () => {
@@ -1422,7 +1429,6 @@ export default function ArtistPage() {
                   toggleArtistLike={toggleArtistLike}
                   onDownloadSongs={handleDownloadSongs}
                   artistLikeLoading={artistLikeLoading}
-                  decodeHtmlEntities={decodeHtmlEntities}
                 />
               </div>
             </div>
@@ -1467,25 +1473,15 @@ export default function ArtistPage() {
 
                             {/* Thumbnail */}
                             <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden relative">
-                              {song.image?.length > 0 ? (
-                                <img
-                                  src={song.image.find(img => img.quality === '500x500')?.url ||
-                                    song.image.find(img => img.quality === '150x150')?.url ||
-                                    song.image[song.image.length - 1]?.url}
-                                  alt={song.name}
-                                  className="w-full h-full object-cover rounded"
-                                  loading="lazy"
-                                  onError={(e) => {
-                                    e.target.src = '/default-playlist-image.png';
-                                  }}
-                                />
-                              ) : (
-                                <img
-                                  src="/default-playlist-image.png"
-                                  alt={song.name}
-                                  className="w-full h-full object-cover rounded"
-                                />
-                              )}
+                              <img
+                                src={getSongImageUrl(song)}
+                                alt={song.name}
+                                className="w-full h-full object-cover rounded"
+                                loading="lazy"
+                                onError={(e) => {
+                                  e.target.src = '/default-playlist-image.png';
+                                }}
+                              />
                             </div>
 
                             {/* Song name + album subtitle */}
@@ -1513,7 +1509,6 @@ export default function ArtistPage() {
                                 onDownload={handleDownload}
                                 toggleLike={toggleLike}
                                 isLiked={isLiked}
-                                decodeHtmlEntities={decodeHtmlEntities}
                               />
                             </div>
                           </div>
@@ -1548,25 +1543,15 @@ export default function ArtistPage() {
 
                             {/* Thumbnail */}
                             <div className="w-12 h-12 rounded bg-muted shrink-0 overflow-hidden">
-                              {song.image?.length > 0 ? (
-                                <img
-                                  src={song.image.find(img => img.quality === '500x500')?.url ||
-                                    song.image.find(img => img.quality === '150x150')?.url ||
-                                    song.image[song.image.length - 1]?.url}
-                                  alt={song.name}
-                                  className="w-full h-full object-cover rounded"
-                                  loading="lazy"
-                                  onError={(e) => {
-                                    e.target.src = '/default-playlist-image.png';
-                                  }}
-                                />
-                              ) : (
-                                <img
-                                  src="/default-playlist-image.png"
-                                  alt={song.name}
-                                  className="w-full h-full object-cover rounded"
-                                />
-                              )}
+                              <img
+                                src={getSongImageUrl(song)}
+                                alt={song.name}
+                                className="w-full h-full object-cover rounded"
+                                loading="lazy"
+                                onError={(e) => {
+                                  e.target.src = '/default-playlist-image.png';
+                                }}
+                              />
                             </div>
 
                             {/* Song name + album subtitle */}
@@ -1619,15 +1604,14 @@ export default function ArtistPage() {
                                 onDownload={handleDownload}
                                 toggleLike={toggleLike}
                                 isLiked={isLiked}
-                                decodeHtmlEntities={decodeHtmlEntities}
                               />
                             </div>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
+                        );
+                      })}
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
                     {songs.length > 10 && (
                       <Button
                         variant="ghost"
@@ -1702,11 +1686,7 @@ export default function ArtistPage() {
                     <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory">
                       {latestSongs.length > 0 ? latestSongs.map((song, index) => {
                         const isCurrentSong = currentSong?.id === song.id;
-                        const imgUrl =
-                          song.image?.find(i => i.quality === '500x500')?.url ||
-                          song.image?.find(i => i.quality === '150x150')?.url ||
-                          song.image?.[song.image.length - 1]?.url ||
-                          '/default-playlist-image.png';
+                        const imgUrl = getSongImageUrl(song);
                         const releaseYear = song.releaseDate
                           ? new Date(song.releaseDate).getFullYear()
                           : song.year || '';
@@ -1718,36 +1698,40 @@ export default function ArtistPage() {
                             href={`/music/song/${song.id}`}
                             className="group cursor-pointer shrink-0 snap-start w-[140px] md:w-[160px] lg:w-[180px]"
                           >
-                            <div className="relative rounded-lg aspect-square overflow-hidden mb-2 bg-muted">
+                            <div className="relative rounded-md aspect-square overflow-hidden mb-3 bg-muted border border-border shadow-lg">
                               <img
                                 src={imgUrl}
                                 alt={song.name}
-                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                className="w-full h-full object-cover"
                                 loading="lazy"
                                 onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
                               />
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 pointer-events-none" />
                               <div
-                                className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-1 group-hover:translate-y-0 hidden md:flex"
+                                className={`absolute bottom-2 right-2 transition-all duration-300 z-20 hidden md:flex ${
+                                  isCurrentSong && isPlaying
+                                    ? 'opacity-100 translate-y-0'
+                                    : 'opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0'
+                                }`}
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
                                   handlePlayClick(song, songs.findIndex(s => s.id === song.id));
                                 }}
                               >
-                                <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-green-500 hover:bg-green-400 hover:scale-105 flex items-center justify-center shadow-lg transition-transform">
+                                <div className="rounded-full w-10 h-10 md:w-12 md:h-12 bg-green-500 hover:bg-green-400 hover:scale-105 flex items-center justify-center text-black shadow-lg transition-transform">
                                   {isCurrentSong && isPlaying
-                                    ? <HiPause className="w-4 h-4 text-black" />
-                                    : <IoMdPlay className="w-4 h-4 text-black ml-0.5" />
+                                    ? <HiPause className="w-5 h-5 md:w-6 md:h-6 fill-black" />
+                                    : <IoMdPlay className="w-5 h-5 md:w-6 md:h-6 fill-black translate-x-0.5" />
                                   }
                                 </div>
                               </div>
                             </div>
                             <div className="space-y-0.5 px-1">
-                              <p className={`text-xs md:text-sm font-bold leading-tight line-clamp-1 ${isCurrentSong ? 'text-green-500' : 'text-foreground'}`}>
+                              <p className={'text-sm font-bold leading-tight line-clamp-1 ' + (isCurrentSong ? 'md:text-green-500' : 'text-foreground')}>
                                 {decodeHtmlEntities(song.name)}
                               </p>
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-xs text-muted-foreground font-medium">
                                 {isLatest && <span className="text-foreground font-medium">Latest Release · </span>}
                                 {releaseYear} · Single
                               </p>
@@ -1775,25 +1759,38 @@ export default function ArtistPage() {
                             href={`/music/album/${album.id}`}
                             className="group cursor-pointer shrink-0 snap-start w-[140px] md:w-[160px] lg:w-[180px]"
                           >
-                            <div className="relative rounded-lg aspect-square overflow-hidden mb-2 bg-muted">
+                            <div className="relative rounded-md aspect-square overflow-hidden mb-3 bg-muted border border-border shadow-lg">
                               <img
-                                src={album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url || '/def playlist image.jpg'}
+                                src={getAlbumImageUrl(album)}
                                 alt={album.name}
-                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                onError={(e) => { e.target.src = '/def playlist image.jpg'; }}
+                                className="w-full h-full object-cover"
+                                onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
                               />
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
-                              <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-1 group-hover:translate-y-0">
-                                <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-green-500 hover:bg-green-400 hover:scale-105 flex items-center justify-center shadow-lg transition-transform">
-                                  <IoMdPlay className="w-4 h-4 text-black ml-0.5" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 pointer-events-none" />
+                              <div
+                                className={`absolute bottom-2 right-2 transition-all duration-300 z-20 hidden md:flex ${
+                                  currentPlaylistId === album.id && isPlaying
+                                    ? 'opacity-100 translate-y-0'
+                                    : 'opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0'
+                                }`}
+                                onClick={(e) => handleAlbumPlay(album, e)}
+                              >
+                                <div className="rounded-full w-10 h-10 md:w-12 md:h-12 bg-green-500 hover:bg-green-400 hover:scale-105 flex items-center justify-center text-black shadow-lg transition-transform">
+                                  {playingId === album.id ? (
+                                    <Loader2 className="w-5 h-5 md:w-6 md:h-6 animate-spin text-black" />
+                                  ) : currentPlaylistId === album.id && isPlaying ? (
+                                    <HiPause className="w-5 h-5 md:w-6 md:h-6 fill-black" />
+                                  ) : (
+                                    <IoMdPlay className="w-5 h-5 md:w-6 md:h-6 fill-black translate-x-0.5" />
+                                  )}
                                 </div>
                               </div>
                             </div>
                             <div className="space-y-0.5 px-1">
-                              <p className="text-xs md:text-sm font-bold leading-tight line-clamp-1 text-foreground">
+                              <p className={`text-sm font-bold leading-tight line-clamp-1 ${currentPlaylistId === album.id ? 'md:text-green-500' : 'text-foreground'}`}>
                                 {album.name}
                               </p>
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-xs text-muted-foreground font-medium">
                                 {isLatest && <span className="text-foreground font-medium">Latest Release · </span>}
                                 {releaseYear} · {typeLabel}
                               </p>
@@ -1817,38 +1814,40 @@ export default function ArtistPage() {
                       <Link
                         key={album.id}
                         href={`/music/album/${album.id}`}
-                        className="group cursor-pointer hover:scale-105 transition-transform"
+                        className="group cursor-pointer"
                       >
-                        <div className="relative rounded-lg aspect-square overflow-hidden mb-2 md:mb-3 bg-muted">
-                          {album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url ? (
-                            <img
-                              src={album.image?.[2]?.url || album.image?.[1]?.url || album.image?.[0]?.url}
-                              alt={album.name}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                e.target.src = '/def playlist image.jpg';
-                              }}
-                            />
-                          ) : (
-                            <img
-                              src="/def playlist image.jpg"
-                              alt={album.name}
-                              className="w-full h-full object-cover"
-                            />
-                          )}
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
-                          <Button
-                            size="icon"
-                            className="absolute bottom-1 right-1 md:bottom-2 md:right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-green-500 hover:bg-green-600 rounded-full shadow-lg w-8 h-8 md:w-10 md:h-10 flex items-center justify-center"
+                        <div className="relative rounded-md aspect-square overflow-hidden mb-3 bg-muted border border-border shadow-lg">
+                          <img
+                            src={getAlbumImageUrl(album)}
+                            alt={album.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 pointer-events-none" />
+                          <div
+                            className={`absolute bottom-2 right-2 transition-all duration-300 z-20 hidden md:flex ${
+                              currentPlaylistId === album.id && isPlaying
+                                ? 'opacity-100 translate-y-0'
+                                : 'opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0'
+                            }`}
+                            onClick={(e) => handleAlbumPlay(album, e)}
                           >
-                            <IoMdPlay className="w-3 h-3 md:w-4 md:h-4 text-black ml-0.5" />
-                          </Button>
+                            <div className="rounded-full w-10 h-10 md:w-12 md:h-12 bg-green-500 hover:bg-green-400 hover:scale-105 flex items-center justify-center text-black shadow-lg transition-transform">
+                              {playingId === album.id ? (
+                                <Loader2 className="w-5 h-5 md:w-6 md:h-6 animate-spin text-black" />
+                              ) : currentPlaylistId === album.id && isPlaying ? (
+                                <HiPause className="w-5 h-5 md:w-6 md:h-6 fill-black" />
+                              ) : (
+                                <IoMdPlay className="w-5 h-5 md:w-6 md:h-6 fill-black translate-x-0.5" />
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div className="space-y-1">
-                          <p className="text-xs md:text-sm font-medium leading-tight line-clamp-2 text-foreground">
+                        <div className="space-y-0.5 px-1">
+                          <p className={`text-sm font-bold leading-tight line-clamp-1 ${currentPlaylistId === album.id ? 'md:text-green-500' : 'text-foreground'}`}>
                             {album.name}
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-muted-foreground font-medium">
                             {album.year} • Album
                           </p>
                         </div>

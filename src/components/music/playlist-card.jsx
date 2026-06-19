@@ -5,6 +5,7 @@
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { IoMdPlay } from "react-icons/io";
+import { HiPause } from "react-icons/hi2";
 import { useSession } from "next-auth/react";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { trackRecentlyPlayed } from "@/lib/track-playlist";
@@ -80,7 +81,7 @@ function useImageColor(imageUrl) {
 export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
     const [localPlayingId, setLocalPlayingId] = useState(null);
     const { data: session } = useSession();
-    const { playSong } = useMusicPlayer();
+    const { playSong, currentPlaylistId, isPlaying, togglePlayPause } = useMusicPlayer();
 
     const currentPlayingId = externalPlayingId || localPlayingId;
     const id = playlist.id || playlist.playlistId;
@@ -88,6 +89,10 @@ export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
     const handlePlaylistPlay = async (e) => {
         e.stopPropagation();
         const pid = playlist.id || playlist.playlistId;
+        if (currentPlaylistId === pid) {
+            togglePlayPause();
+            return;
+        }
         if (currentPlayingId === pid) return;
 
         if (onPlay) {
@@ -98,11 +103,11 @@ export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
         setLocalPlayingId(pid);
 
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
             let songs = [];
             const source = playlist.source || 'jiosaavn';
 
-            if (source === 'user') {
+            if (source === 'user' || source === 'spotify') {
                 const res = await fetch(`/api/playlists/${pid}`);
                 const result = await res.json();
                 if (result.success && result.data?.songIds?.length) {
@@ -225,13 +230,15 @@ export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
                     );
                 })()}
 
-                <div className={`absolute bottom-2 right-2 transition-all duration-300 z-20 hidden md:block ${currentPlayingId === id ? 'opacity-100 translate-y-0' : 'opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0'}`}>
+                <div className={`absolute bottom-2 right-2 transition-all duration-300 z-20 hidden md:flex ${currentPlaylistId === id && isPlaying ? 'opacity-100 translate-y-0' : 'opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0'}`}>
                     <button
                         type="button"
                         className="rounded-full w-10 h-10 md:w-12 md:h-12 bg-green-500 hover:bg-green-400 flex items-center justify-center text-black shadow-lg hover:scale-105 transition-transform"
                         onClick={handlePlaylistPlay}
                     >
-                        {currentPlayingId === id ? (
+                        {currentPlaylistId === id && isPlaying ? (
+                            <HiPause className="w-5 h-5 md:w-6 md:h-6 fill-black" />
+                        ) : currentPlayingId === id ? (
                             <Loader2 className="w-5 h-5 md:w-6 md:h-6 animate-spin text-black" />
                         ) : (
                             <IoMdPlay className="w-5 h-5 md:w-6 md:h-6 fill-black translate-x-0.5" />
@@ -240,7 +247,7 @@ export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
                 </div>
             </div>
             <div className="space-y-0.5 px-1">
-                <p className="text-sm font-bold leading-tight line-clamp-1 text-foreground">
+                <p className={`text-sm font-bold leading-tight line-clamp-1 text-foreground ${currentPlaylistId === id ? 'md:text-green-500' : ''}`}>
                     {playlist.name || playlist.playlistName}
                 </p>
                 <p className="text-xs text-muted-foreground font-medium">

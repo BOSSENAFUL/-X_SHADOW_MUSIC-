@@ -7,6 +7,7 @@ export function PlaylistCover({
   playlist,
   className = "w-full aspect-square",
   showPlayIcon = true,
+  showBorder = true,
 }) {
   const [imageErrors, setImageErrors] = useState({});
 
@@ -18,15 +19,6 @@ export function PlaylistCover({
         (song) =>
           song.image && Array.isArray(song.image) && song.image.length > 0
       ) || [];
-
-  // Debug logging (only when there are issues)
-  if (playlist?.songs?.length > 0 && songsWithImages.length === 0) {
-    console.log("⚠️ Playlist has songs but no images:", {
-      name: playlist.name,
-      songsCount: playlist.songs.length,
-      firstSong: playlist.songs[0],
-    });
-  }
 
   const handleImageError = (index) => {
     setImageErrors((prev) => ({ ...prev, [index]: true }));
@@ -55,12 +47,12 @@ export function PlaylistCover({
     if (imageUrl) {
       return (
         <div
-          className={`${className} rounded-xl bg-muted overflow-hidden shadow-md group-hover:shadow-lg transition-shadow relative`}
+          className={`${className} rounded-md bg-muted overflow-hidden transition-shadow relative ${showBorder ? 'border border-border shadow-lg' : ''}`}
         >
           <img
             src={imageUrl}
             alt={playlist.name || playlist.title}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+            className="w-full h-full object-cover"
             onError={() => {
               // Fallback to collage if custom image fails
               setImageErrors({ customImage: true });
@@ -80,7 +72,7 @@ export function PlaylistCover({
   if (songsWithImages.length > 0) {
     return (
       <div
-        className={`${className} rounded-xl bg-muted overflow-hidden shadow-md group-hover:shadow-lg transition-shadow relative`}
+        className={`${className} rounded-md bg-muted overflow-hidden transition-shadow relative ${showBorder ? 'border border-border shadow-lg' : ''}`}
       >
         {songsWithImages.length === 1 ? (
           // Single image - full cover
@@ -88,8 +80,8 @@ export function PlaylistCover({
             <img
               src={getImageUrl(songsWithImages[0])}
               alt={playlist.name || playlist.title}
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-              onError={() => handleImageError(0)}
+              className="w-full h-full object-cover"
+              onError={(e) => { handleImageError(0); e.target.src = '/default-playlist-image.png'; }}
             />
           </div>
         ) : songsWithImages.length === 2 ? (
@@ -100,8 +92,8 @@ export function PlaylistCover({
                 <img
                   src={getImageUrl(song)}
                   alt={`Song ${index + 1}`}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                  onError={() => handleImageError(index)}
+                  className="w-full h-full object-cover"
+                  onError={(e) => { handleImageError(index); e.target.src = '/default-playlist-image.png'; }}
                 />
               </div>
             ))}
@@ -113,8 +105,8 @@ export function PlaylistCover({
               <img
                 src={getImageUrl(songsWithImages[0])}
                 alt="Song 1"
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                onError={() => handleImageError(0)}
+                className="w-full h-full object-cover"
+                onError={(e) => { handleImageError(0); e.target.src = '/default-playlist-image.png'; }}
               />
             </div>
             <div className="w-1/2 h-full flex flex-col">
@@ -123,8 +115,8 @@ export function PlaylistCover({
                   <img
                     src={getImageUrl(song)}
                     alt={`Song ${index + 2}`}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                    onError={() => handleImageError(index + 1)}
+                    className="w-full h-full object-cover"
+                    onError={(e) => { handleImageError(index + 1); e.target.src = '/default-playlist-image.png'; }}
                   />
                 </div>
               ))}
@@ -138,8 +130,8 @@ export function PlaylistCover({
                 <img
                   src={getImageUrl(song)}
                   alt={`Song ${index + 1}`}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                  onError={() => handleImageError(index)}
+                  className="w-full h-full object-cover"
+                  onError={(e) => { handleImageError(index); e.target.src = '/default-playlist-image.png'; }}
                 />
               </div>
             ))}
@@ -147,7 +139,7 @@ export function PlaylistCover({
         )}
 
         {showPlayIcon && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
             <Play className="w-8 h-8 text-white drop-shadow-lg" />
           </div>
         )}
@@ -158,7 +150,7 @@ export function PlaylistCover({
   // Fallback gradient when no images available
   return (
     <div
-      className={`${className} rounded-xl bg-gradient-to-br from-green-500 to-blue-500 overflow-hidden shadow-md group-hover:shadow-lg transition-shadow relative flex items-center justify-center`}
+      className={`${className} rounded-md bg-gradient-to-br from-green-500 to-blue-500 overflow-hidden transition-shadow relative flex items-center justify-center ${showBorder ? 'border border-border shadow-lg' : ''}`}
     >
       <Play className="w-8 h-8 text-white/70" />
       {showPlayIcon && (
