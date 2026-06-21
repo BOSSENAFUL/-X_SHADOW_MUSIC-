@@ -72,9 +72,11 @@ export function PlaylistSection({
                             key={index}
                             className="w-[140px] md:w-[160px] lg:w-[180px] shrink-0 snap-start"
                         >
-                            <div className="bg-muted animate-pulse rounded-lg aspect-square mb-3" />
-                            <div className="bg-muted animate-pulse h-4 rounded mb-1" />
-                            <div className="bg-muted animate-pulse h-3 rounded w-2/3" />
+                            <div className="bg-accent/60 animate-pulse rounded-md aspect-square mb-3 border border-border shadow-lg" />
+                            <div className="space-y-0.5 px-1">
+                                <div className="bg-accent/50 animate-pulse h-[18px] rounded w-11/12" />
+                                <div className="bg-accent/30 animate-pulse h-4 rounded w-2/3" />
+                            </div>
                         </div>
                     ))
                     : playlists.map((playlist) => (

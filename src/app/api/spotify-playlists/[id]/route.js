@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 import { getSpotifyPlaylistModel } from '@/models/SpotifyPlaylist';
+import { getSectionPlaylistModel } from '@/models/SectionPlaylist';
+import { getSectionModel } from '@/models/Section';
 import cache from '@/lib/cache';
 
 const CACHE_TTL = 300; // 5 minutes
@@ -29,8 +31,25 @@ export async function GET(_request, { params }) {
         const playlist = await cache.cachedQuery(
             `spotify-playlist:${id}`,
             async () => {
-                const SpotifyPlaylist = await getSpotifyPlaylistModel();
-                return SpotifyPlaylist.findById(id).lean();
+                const [SpotifyPlaylist, SectionPlaylist, Section] = await Promise.all([
+                    getSpotifyPlaylistModel(),
+                    getSectionPlaylistModel(),
+                    getSectionModel(),
+                ]);
+                const p = await SpotifyPlaylist.findById(id).lean();
+                if (!p) return null;
+
+                if (!p.sectionId || !p.genreId) {
+                    const spRelation = await SectionPlaylist.findOne({ playlistId: id }).lean();
+                    if (spRelation) {
+                        p.sectionId = spRelation.sectionId;
+                        const sec = await Section.findById(spRelation.sectionId).lean();
+                        if (sec) {
+                            p.genreId = sec.genreId;
+                        }
+                    }
+                }
+                return p;
             },
             CACHE_TTL
         );
@@ -46,8 +65,8 @@ export async function GET(_request, { params }) {
         const data = {
             ...playlist,
             _id: playlist._id.toString(),
-            sectionId: playlist.sectionId.toString(),
-            genreId: playlist.genreId.toString(),
+            sectionId: playlist.sectionId ? playlist.sectionId.toString() : '',
+            genreId: playlist.genreId ? playlist.genreId.toString() : '',
             trackMap:
                 playlist.trackMap instanceof Map
                     ? Object.fromEntries(playlist.trackMap)

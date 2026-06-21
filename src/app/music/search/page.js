@@ -49,7 +49,6 @@ import {
   DrawerPortal,
 } from "@/components/ui/drawer";
 import { memo } from "react";
-import { genres } from "@/data/genres";
 import { PlaylistCover } from "@/components/ui/playlist-cover";
 import { downloadWithMetadata } from "@/lib/clientDownload";
 
@@ -350,6 +349,32 @@ function SearchPageContent() {
   const observerTarget = useRef(null);
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState(null);
+
+  const isGradient = (colorStr) => {
+    return colorStr && (colorStr.includes("from-") || colorStr.includes("to-") || colorStr.includes("via-"));
+  };
+
+  const [dbGenres, setDbGenres] = useState([]);
+  const [genresLoading, setGenresLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDbGenres = async () => {
+      try {
+        setGenresLoading(true);
+        const res = await fetch("/api/genres");
+        if (!res.ok) throw new Error("Failed to fetch genres");
+        const data = await res.json();
+        if (data.success) {
+          setDbGenres(data.data);
+        }
+      } catch (err) {
+        console.error("Error fetching db genres for search page:", err);
+      } finally {
+        setGenresLoading(false);
+      }
+    };
+    fetchDbGenres();
+  }, []);
 
   // Ref for the search input to enable auto-focus
   const searchInputRef = useRef(null);
@@ -3078,21 +3103,52 @@ function SearchPageContent() {
                     See all
                   </Button>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {(genres || []).slice(0, 8).map((genre) => (
-                    <div
-                      key={genre.id}
-                      className={`relative h-28 sm:h-32 md:h-40 rounded-xl overflow-hidden cursor-pointer group transition-all hover:brightness-110 active:scale-95 bg-linear-to-br ${genre.color} shadow-lg`}
-                      onClick={() => router.push(`/music/discover/genres/${genre.id}`)}
-                    >
-                      <div className="absolute inset-0 bg-black/10 group-hover:bg-black/5 transition-colors" />
-                      <div className="relative h-full flex items-start p-4">
-                        <h3 className="text-white font-bold text-lg sm:text-xl drop-shadow-lg leading-tight">
-                          {genre.name}
-                        </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
+                  {genresLoading ? (
+                    Array.from({ length: 8 }).map((_, i) => (
+                      <div key={i} className="aspect-[1.45] rounded-xl bg-muted/20 animate-pulse relative overflow-hidden shadow-sm">
+                        <div className="absolute top-3 sm:top-4 left-3 sm:left-4 w-[60%] h-4 sm:h-5 bg-muted/40 rounded" />
+                        <div className="absolute right-0 bottom-0 w-[46%] sm:w-[48%] aspect-square translate-x-[20%] sm:translate-x-[24%] translate-y-[10%] sm:translate-y-[14%] rotate-[25deg] bg-muted/30 rounded-md" />
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    (dbGenres || []).slice(0, 8).map((genre) => (
+                      <div
+                        key={genre._id}
+                        className={`relative aspect-[1.45] rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.03] active:scale-95 shadow-md flex flex-col justify-between group ${
+                          isGradient(genre.color) ? `bg-gradient-to-br ${genre.color}` : ""
+                        }`}
+                        style={!isGradient(genre.color) ? { backgroundColor: genre.color || "#121212" } : {}}
+                        onClick={() => router.push(`/music/discover/genres/${genre._id}`)}
+                      >
+                        {/* Genre Name */}
+                        <div className="p-3 sm:p-4 flex-1">
+                          <h3 className="text-white font-extrabold text-sm md:text-base lg:text-lg tracking-tight leading-tight break-words max-w-[78%] drop-shadow-md">
+                            {genre.name}
+                          </h3>
+                        </div>
+
+                        {/* Tilted Cover Art Image */}
+                        <div className="absolute right-0 bottom-0 w-[46%] sm:w-[48%] aspect-square translate-x-[20%] sm:translate-x-[24%] translate-y-[10%] sm:translate-y-[14%] rotate-[25deg] shadow-[-4px_4px_12px_rgba(0,0,0,0.5)] overflow-hidden rounded-md shrink-0 transition-transform duration-300 group-hover:scale-105 group-hover:translate-x-[14%] sm:group-hover:translate-x-[18%] group-hover:translate-y-[5%] sm:group-hover:translate-y-[8%]">
+                          {genre.coverImage ? (
+                            <img
+                              src={genre.coverImage}
+                              alt={genre.name}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-black/30 flex items-center justify-center">
+                              <Music2 className="w-8 h-8 text-white/50" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 import { getSpotifyPlaylistModel } from '@/models/SpotifyPlaylist';
+import { getSectionPlaylistModel } from '@/models/SectionPlaylist';
+import { getSectionModel } from '@/models/Section';
 import cache from '@/lib/cache';
 
 const CACHE_TTL = 300; // 5 minutes
@@ -46,39 +48,119 @@ export async function GET(request) {
             );
         }
 
-        // sectionId is more specific — it takes precedence
-        const filter = {};
-        if (sectionId) filter.sectionId = sectionId;
-        else if (genreId) filter.genreId = genreId;
-
         const cacheKey = `spotify-playlists:${sectionId ?? ''}:${genreId ?? ''}:${page}:${limit}`;
 
         const result = await cache.cachedQuery(
             cacheKey,
             async () => {
-                const SpotifyPlaylist = await getSpotifyPlaylistModel();
-
-                const [total, playlists] = await Promise.all([
-                    SpotifyPlaylist.countDocuments(filter),
-                    SpotifyPlaylist.find(filter)
-                        .select('-trackMap -songIds')
-                        .sort({ order: 1 })
-                        .skip(skip)
-                        .limit(limit)
-                        .lean(),
+                const [SpotifyPlaylist, SectionPlaylist, Section] = await Promise.all([
+                    getSpotifyPlaylistModel(),
+                    getSectionPlaylistModel(),
+                    getSectionModel(),
                 ]);
 
-                return { total, playlists };
+                if (sectionId) {
+                    const junctions = await SectionPlaylist.find({ sectionId })
+                        .sort({ order: 1 })
+                        .lean();
+
+                    const uniqueJunctions = [];
+                    const seenPids = new Set();
+                    for (const j of junctions) {
+                        const pidStr = j.playlistId.toString();
+                        if (!seenPids.has(pidStr)) {
+                            seenPids.add(pidStr);
+                            uniqueJunctions.push(j);
+                        }
+                    }
+
+                    const total = uniqueJunctions.length;
+                    const slicedJunctions = uniqueJunctions.slice(skip, skip + limit);
+
+                    const playlistIds = slicedJunctions.map((j) => j.playlistId);
+                    const playlists = await SpotifyPlaylist.find({ _id: { $in: playlistIds } })
+                        .select('-trackMap -songIds')
+                        .lean();
+
+                    const playlistMap = new Map(playlists.map((p) => [p._id.toString(), p]));
+                    const orderedPlaylists = slicedJunctions
+                        .map((j) => {
+                            const p = playlistMap.get(j.playlistId.toString());
+                            if (!p) return null;
+                            return { ...p, sectionId };
+                        })
+                        .filter(Boolean);
+
+                    return { total, playlists: orderedPlaylists };
+                } else if (genreId) {
+                    const sections = await Section.find({ genreId }).select('_id').lean();
+                    const sectionIds = sections.map((s) => s._id);
+
+                    const junctions = await SectionPlaylist.find({ sectionId: { $in: sectionIds } })
+                        .sort({ order: 1 })
+                        .lean();
+
+                    const uniqueJunctions = [];
+                    const seenPids = new Set();
+                    for (const j of junctions) {
+                        const pidStr = j.playlistId.toString();
+                        if (!seenPids.has(pidStr)) {
+                            seenPids.add(pidStr);
+                            uniqueJunctions.push(j);
+                        }
+                    }
+
+                    const total = uniqueJunctions.length;
+                    const slicedJunctions = uniqueJunctions.slice(skip, skip + limit);
+
+                    const playlistIds = slicedJunctions.map((j) => j.playlistId);
+                    const playlists = await SpotifyPlaylist.find({ _id: { $in: playlistIds } })
+                        .select('-trackMap -songIds')
+                        .lean();
+
+                    const playlistMap = new Map(playlists.map((p) => [p._id.toString(), p]));
+                    const orderedPlaylists = slicedJunctions
+                        .map((j) => {
+                            const p = playlistMap.get(j.playlistId.toString());
+                            if (!p) return null;
+                            return { ...p, sectionId: j.sectionId.toString() };
+                        })
+                        .filter(Boolean);
+
+                    return { total, playlists: orderedPlaylists };
+                } else {
+                    const [total, playlists] = await Promise.all([
+                        SpotifyPlaylist.countDocuments({}),
+                        SpotifyPlaylist.find({})
+                            .select('-trackMap -songIds')
+                            .sort({ order: 1 })
+                            .skip(skip)
+                            .limit(limit)
+                            .lean(),
+                    ]);
+                    return { total, playlists };
+                }
             },
             CACHE_TTL
         );
 
-        const data = result.playlists.map((p) => ({
-            ...p,
-            _id: p._id.toString(),
-            sectionId: p.sectionId.toString(),
-            genreId: p.genreId.toString(),
-        }));
+        let genreIdMap = new Map();
+        if (result.playlists.length > 0) {
+            const Section = await getSectionModel();
+            const uniqueSectionIds = [...new Set(result.playlists.map(p => p.sectionId).filter(Boolean))];
+            const sections = await Section.find({ _id: { $in: uniqueSectionIds } }).select('_id genreId').lean();
+            genreIdMap = new Map(sections.map(s => [s._id.toString(), s.genreId.toString()]));
+        }
+
+        const data = result.playlists.map((p) => {
+            const secId = p.sectionId ? p.sectionId.toString() : '';
+            return {
+                ...p,
+                _id: p._id.toString(),
+                sectionId: secId,
+                genreId: genreIdMap.get(secId) || (p.genreId ? p.genreId.toString() : ''),
+            };
+        });
 
         return NextResponse.json(
             {

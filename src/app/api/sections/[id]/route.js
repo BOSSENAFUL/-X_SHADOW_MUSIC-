@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 import { getSectionModel } from '@/models/Section';
 import { getSpotifyPlaylistModel } from '@/models/SpotifyPlaylist';
+import { getSectionPlaylistModel } from '@/models/SectionPlaylist';
 import cache from '@/lib/cache';
 
 const CACHE_TTL = 300; // 5 minutes
@@ -30,20 +31,43 @@ export async function GET(_request, { params }) {
         const result = await cache.cachedQuery(
             `section:${id}`,
             async () => {
-                const [Section, SpotifyPlaylist] = await Promise.all([
+                const [Section, SpotifyPlaylist, SectionPlaylist] = await Promise.all([
                     getSectionModel(),
                     getSpotifyPlaylistModel(),
+                    getSectionPlaylistModel(),
                 ]);
 
-                const [section, playlists] = await Promise.all([
-                    Section.findById(id).lean(),
-                    SpotifyPlaylist.find({ sectionId: id })
-                        .select('-trackMap -songIds')
-                        .sort({ order: 1 })
-                        .lean(),
-                ]);
+                const section = await Section.findById(id).lean();
+                if (!section) return null;
 
-                return section ? { section, playlists } : null;
+                const junctions = await SectionPlaylist.find({ sectionId: id })
+                    .sort({ order: 1 })
+                    .lean();
+
+                const playlistIds = junctions.map((j) => j.playlistId);
+                const playlists = await SpotifyPlaylist.find({ _id: { $in: playlistIds } })
+                    .select('-trackMap -songIds')
+                    .lean();
+
+                const playlistMap = new Map(playlists.map((p) => [p._id.toString(), p]));
+                const seenPlaylistIds = new Set();
+                const orderedPlaylists = junctions
+                    .map((j) => {
+                        const pidStr = j.playlistId.toString();
+                        if (seenPlaylistIds.has(pidStr)) return null;
+
+                        const playlist = playlistMap.get(pidStr);
+                        if (!playlist) return null;
+
+                        seenPlaylistIds.add(pidStr);
+                        return {
+                            ...playlist,
+                            sectionId: id,
+                        };
+                    })
+                    .filter(Boolean);
+
+                return { section, playlists: orderedPlaylists };
             },
             CACHE_TTL
         );
@@ -64,8 +88,8 @@ export async function GET(_request, { params }) {
             playlists: result.playlists.map((p) => ({
                 ...p,
                 _id: p._id.toString(),
-                sectionId: p.sectionId.toString(),
-                genreId: p.genreId.toString(),
+                sectionId: id,
+                genreId: result.section.genreId.toString(),
             })),
         };
 

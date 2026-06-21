@@ -66,32 +66,32 @@ export function PWAInstallBanner() {
 
   return (
     <div
-      className="relative block w-full p-4 bg-[#fbbcc4] box-border animate-in fade-in slide-in-from-top-2 duration-300"
+      className="fixed bottom-32 left-4 right-4 md:left-auto md:right-6 md:bottom-24 md:w-[360px] p-5 bg-card border border-border shadow-2xl rounded-2xl z-50 flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-4 duration-300"
       role="banner"
     >
       <button
-        className="absolute top-4 right-4 p-1 text-black z-10 flex items-center justify-center hover:opacity-70 transition-opacity"
+        className="absolute top-4 right-4 p-1 text-muted-foreground hover:text-foreground transition-colors z-10 flex items-center justify-center"
         onClick={handleDismiss}
         aria-label="Dismiss install banner"
       >
-        <X size={24} strokeWidth={2.5} />
+        <X size={18} />
       </button>
 
-      <div className="flex flex-col gap-2 max-w-[90%]">
-        <h2 className="text-2xl font-extrabold text-black m-0 leading-tight">
-          Install app
+      <div className="flex flex-col gap-1 pr-6">
+        <h2 className="text-lg font-bold text-foreground leading-tight">
+          Install Jammify
         </h2>
-        <p className="text-base font-medium text-black mb-3 leading-normal">
-          Install Jammify for faster and easier access to your favorite music.
+        <p className="text-xs text-muted-foreground leading-normal">
+          Install Jammify on your home screen for fast, seamless access to your music.
         </p>
-        
-        <button 
-          className="inline-flex items-center justify-center w-fit min-w-[100px] h-11 px-6 rounded-full bg-black text-white text-base font-bold cursor-pointer active:scale-95 transition-transform" 
-          onClick={handleInstall}
-        >
-          Install
-        </button>
       </div>
+      
+      <button 
+        className="inline-flex items-center justify-center w-full h-9 rounded-lg bg-primary hover:bg-primary/95 text-primary-foreground text-xs font-bold cursor-pointer active:scale-95 transition-transform" 
+        onClick={handleInstall}
+      >
+        Install
+      </button>
     </div>
   );
 }

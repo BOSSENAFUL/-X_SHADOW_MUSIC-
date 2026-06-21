@@ -88,7 +88,7 @@ export default function SectionPage() {
             <SidebarInset className="md:ml-0 overflow-x-hidden h-svh relative flex flex-col">
 
                 {/* ── Header ── */}
-                <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+                <header className="sticky top-0 z-50 hidden md:flex h-16 shrink-0 items-center gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1" />
                         <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
@@ -123,24 +123,27 @@ export default function SectionPage() {
                     <div className="space-y-6">
 
                         {/* Page title + count */}
-                        <div className="flex items-start justify-between gap-x-4">
-                            <div className="min-w-0 flex-1">
-                                {loading
-                                    ? <div className="h-9 sm:h-10 md:h-12 w-56 rounded-lg bg-muted animate-pulse" />
-                                    : <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight truncate">
+                        <div className="min-w-0">
+                            {loading ? (
+                                <>
+                                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight">
+                                        <span className="inline-block h-[24px] sm:h-[30px] md:h-[36px] w-56 rounded-md bg-muted animate-pulse" />
+                                    </h1>
+                                    <p className="text-xs sm:text-sm text-muted-foreground mt-1.5 font-medium">
+                                        <span className="inline-block h-[12px] sm:h-[14px] w-32 rounded bg-muted animate-pulse" />
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight truncate">
                                         {section?.name ?? ''}
                                     </h1>
-                                }
-                            </div>
-                            {!loading && playlists.length > 0 && (
-                                <div className="text-right shrink-0 mt-2 sm:mt-0 pt-1">
-                                    <p className="text-muted-foreground text-[10px] sm:text-xs md:text-sm font-medium leading-tight">
-                                        <span className="text-foreground font-bold block sm:inline sm:mr-1 text-xs sm:text-sm">
-                                            {playlists.length}
-                                        </span>
-                                        playlists
-                                    </p>
-                                </div>
+                                    {playlists.length > 0 && (
+                                        <p className="text-xs sm:text-sm text-muted-foreground mt-1.5 font-medium">
+                                            Playlist &bull; {playlists.length} playlists
+                                        </p>
+                                    )}
+                                </>
                             )}
                         </div>
 
@@ -148,10 +151,12 @@ export default function SectionPage() {
                         {loading ? (
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-10 gap-x-3 gap-y-6 md:gap-x-4 md:gap-y-8">
                                 {Array.from({ length: 20 }).map((_, i) => (
-                                    <div key={i} className="space-y-3">
-                                        <div className="bg-muted animate-pulse rounded-lg aspect-square" />
-                                        <div className="bg-muted animate-pulse h-4 rounded" />
-                                        <div className="bg-muted animate-pulse h-3 rounded w-2/3" />
+                                    <div key={i}>
+                                        <div className="bg-muted animate-pulse rounded-md aspect-square mb-3" />
+                                        <div className="space-y-0.5 px-1">
+                                            <div className="bg-muted animate-pulse h-[18px] rounded w-11/12" />
+                                            <div className="bg-muted animate-pulse h-4 rounded w-2/3" />
+                                        </div>
                                     </div>
                                 ))}
                             </div>

@@ -160,8 +160,37 @@ export default function MusicPage() {
 
     let isMounted = true;
     const fetchRecentlyPlayed = async () => {
+      const CACHE_KEY = `recently_played_playlists_${session.user.id}`;
+      
+      // Attempt to load from sessionStorage instantly
       try {
-        if (isMounted) setRecentlyPlayedLoading(true);
+        const cached = sessionStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            if (isMounted) {
+              setRecentlyPlayed(parsed);
+              setRecentlyPlayedLoading(false);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to read recently played cache:", e);
+      }
+
+      try {
+        // Set loading only if there is no cache
+        let hasCache = false;
+        try {
+          const cached = sessionStorage.getItem(CACHE_KEY);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) hasCache = true;
+          }
+        } catch {}
+        
+        if (isMounted && !hasCache) setRecentlyPlayedLoading(true);
+
         const res = await fetch('/api/recently-played-playlists');
         const data = await res.json();
 
@@ -180,6 +209,9 @@ export default function MusicPage() {
           if (isMounted) {
             setRecentlyPlayed(rawPlaylists);
             setRecentlyPlayedLoading(false);
+            try {
+              sessionStorage.setItem(CACHE_KEY, JSON.stringify(rawPlaylists));
+            } catch {}
           }
           return;
         }
@@ -232,12 +264,27 @@ export default function MusicPage() {
               }
               return p;
             });
-            if (isMounted) setRecentlyPlayed(processed);
+            if (isMounted) {
+              setRecentlyPlayed(processed);
+              try {
+                sessionStorage.setItem(CACHE_KEY, JSON.stringify(processed));
+              } catch {}
+            }
           } else {
-            if (isMounted) setRecentlyPlayed(rawPlaylists);
+            if (isMounted) {
+              setRecentlyPlayed(rawPlaylists);
+              try {
+                sessionStorage.setItem(CACHE_KEY, JSON.stringify(rawPlaylists));
+              } catch {}
+            }
           }
         } else {
-          if (isMounted) setRecentlyPlayed(rawPlaylists);
+          if (isMounted) {
+            setRecentlyPlayed(rawPlaylists);
+            try {
+              sessionStorage.setItem(CACHE_KEY, JSON.stringify(rawPlaylists));
+            } catch {}
+          }
         }
       } catch (err) {
         console.error('Error fetching recently played playlists:', err);
@@ -514,11 +561,43 @@ export default function MusicPage() {
   useEffect(() => {
     let isMounted = true;
     const fetchCommunity = async () => {
+      const CACHE_KEY = 'community_playlists_cache';
+      
+      // Attempt to load from sessionStorage instantly
       try {
+        const cached = sessionStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setCommunityPlaylists(parsed);
+            setCommunityLoading(false);
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to read community playlists cache:", e);
+      }
+
+      try {
+        // Set loading only if there is no cache
+        let hasCache = false;
+        try {
+          const cached = sessionStorage.getItem(CACHE_KEY);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) hasCache = true;
+          }
+        } catch {}
+        
+        if (isMounted && !hasCache) setCommunityLoading(true);
+
         const res = await fetch('/api/playlists/community');
         const data = await res.json();
         if (isMounted && data.success) {
-          setCommunityPlaylists(data.data || []);
+          const playlists = data.data || [];
+          setCommunityPlaylists(playlists);
+          try {
+            sessionStorage.setItem(CACHE_KEY, JSON.stringify(playlists));
+          } catch {}
         }
       } catch (err) {
         console.error('Error fetching community playlists:', err);
@@ -539,8 +618,37 @@ export default function MusicPage() {
     }
     let isMounted = true;
     const fetchMixes = async () => {
-      if (isMounted) setMixesLoading(true);
+      const CACHE_KEY = `recommended_mixes_${session.user.id}`;
+      
+      // Attempt to load from sessionStorage instantly
       try {
+        const cached = sessionStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            if (isMounted) {
+              setRecommendedMixes(parsed);
+              setMixesLoading(false);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to read recommended mixes cache:", e);
+      }
+
+      try {
+        // Set loading only if there is no cache
+        let hasCache = false;
+        try {
+          const cached = sessionStorage.getItem(CACHE_KEY);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) hasCache = true;
+          }
+        } catch {}
+        
+        if (isMounted && !hasCache) setMixesLoading(true);
+
         const res = await fetch('/api/recommendations');
         const data = await res.json();
         if (isMounted && data.success && data.data?.length > 0) {
@@ -560,6 +668,9 @@ export default function MusicPage() {
             description: `${mix.songIds?.length || 0} songs`,
           }));
           setRecommendedMixes(shaped);
+          try {
+            sessionStorage.setItem(CACHE_KEY, JSON.stringify(shaped));
+          } catch {}
         }
       } catch (err) {
         console.error('Error fetching recommended mixes:', err);
@@ -593,7 +704,12 @@ export default function MusicPage() {
       const res = await fetch('/api/recommendations', { method: 'DELETE' });
       const data = await res.json();
       if (data.success && data.data?.length > 0) {
-        setRecommendedMixes(shapeMixes(data.data));
+        const shaped = shapeMixes(data.data);
+        setRecommendedMixes(shaped);
+        try {
+          const CACHE_KEY = `recommended_mixes_${session?.user?.id}`;
+          sessionStorage.setItem(CACHE_KEY, JSON.stringify(shaped));
+        } catch {}
       } else if (data.rateLimited) {
         setRefreshCooldown(data.retryAfter || 300);
       }
@@ -734,6 +850,10 @@ export default function MusicPage() {
             const updatedData = await trackRes.json();
             if (updatedData.success && updatedData.data) {
               setRecentlyPlayed(updatedData.data);
+              try {
+                const CACHE_KEY = `recently_played_playlists_${session.user.id}`;
+                sessionStorage.setItem(CACHE_KEY, JSON.stringify(updatedData.data));
+              } catch {}
             }
           }
         }
