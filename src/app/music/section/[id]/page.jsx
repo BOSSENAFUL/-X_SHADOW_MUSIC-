@@ -119,7 +119,7 @@ export default function SectionPage() {
                 </header>
 
                 {/* ── Content ── */}
-                <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-6">
+                <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 pb-36 md:pb-36">
                     <div className="space-y-6">
 
                         {/* Page title + count */}

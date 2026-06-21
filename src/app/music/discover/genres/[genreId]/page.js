@@ -37,6 +37,127 @@ import { PlaylistSection } from "@/components/music/playlist-section";
 import { toast } from "sonner";
 import Link from "next/link";
 import { downloadWithMetadata } from "@/lib/clientDownload";
+import { applyThemeColor, getThemeColorForScroll } from "@/lib/utils";
+
+const TAILWIND_COLORS = {
+    slate: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a' },
+    gray: { 50: '#f9fafb', 100: '#f3f4f6', 200: '#e5e7eb', 300: '#d1d5db', 400: '#9ca3af', 500: '#6b7280', 600: '#4b5563', 700: '#374151', 800: '#1f2937', 900: '#111827' },
+    zinc: { 50: '#fafafa', 100: '#f4f4f5', 200: '#e4e4e7', 300: '#d4d4d8', 400: '#a1a1aa', 500: '#71717a', 600: '#52525b', 700: '#3f3f46', 800: '#27272a', 900: '#18181b' },
+    neutral: { 50: '#fafafa', 100: '#f5f5f5', 200: '#e5e5e5', 300: '#d4d4d4', 400: '#a3a3a3', 500: '#737373', 600: '#525252', 700: '#404040', 800: '#262626', 900: '#171717' },
+    stone: { 50: '#fafaf9', 100: '#f5f5f4', 200: '#e7e5e4', 300: '#d6d3d1', 400: '#a8a29e', 500: '#78716c', 600: '#57534e', 700: '#44403c', 800: '#292524', 900: '#1c1917' },
+    red: { 50: '#fef2f2', 100: '#fee2e2', 200: '#fecaca', 300: '#fca5a5', 400: '#f87171', 500: '#ef4444', 600: '#dc2626', 700: '#b91c1c', 800: '#991b1b', 900: '#7f1d1d' },
+    orange: { 50: '#fff7ed', 100: '#ffedd5', 200: '#fed7aa', 300: '#fdba74', 400: '#fb923c', 500: '#f97316', 600: '#ea580c', 700: '#c2410c', 800: '#9a3412', 900: '#7c2d12' },
+    amber: { 50: '#fffbeb', 100: '#fef3c7', 200: '#fde68a', 300: '#fcd34d', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309', 800: '#92400e', 900: '#78350f' },
+    yellow: { 50: '#fefce8', 100: '#fef9c3', 200: '#fef08a', 300: '#fde047', 400: '#facc15', 500: '#eab308', 600: '#ca8a04', 700: '#a16207', 800: '#854d0e', 900: '#713f12' },
+    lime: { 50: '#f7fee7', 100: '#ecfccb', 200: '#d9f99d', 300: '#bef264', 400: '#a3e635', 500: '#84cc16', 600: '#65a30d', 700: '#4d7c0f', 800: '#3f6212', 900: '#365314' },
+    green: { 50: '#f0fdf4', 100: '#dcfce7', 200: '#bbf7d0', 300: '#86efac', 400: '#4ade80', 500: '#22c55e', 600: '#16a34a', 700: '#15803d', 800: '#166534', 900: '#14532d' },
+    emerald: { 50: '#ecfdf5', 100: '#d1fae5', 200: '#a7f3d0', 300: '#6ee7b7', 400: '#34d399', 500: '#10b981', 600: '#059669', 700: '#047857', 800: '#065f46', 900: '#064e3b' },
+    teal: { 50: '#f0fdfa', 100: '#ccfbf1', 200: '#99f6e4', 300: '#5eead4', 400: '#2dd4bf', 500: '#14b8a6', 600: '#0d9488', 700: '#0f766e', 800: '#115e59', 900: '#134e4a' },
+    cyan: { 50: '#ecfeff', 100: '#cffafe', 200: '#a5f3fc', 300: '#67e8f9', 400: '#22d3ee', 500: '#06b6d4', 600: '#0891b2', 700: '#0e7490', 800: '#155e75', 900: '#164e63' },
+    sky: { 50: '#f0f9ff', 100: '#e0f2fe', 200: '#bae6fd', 300: '#7dd3fc', 400: '#38bdf8', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1', 800: '#075985', 900: '#0c4a6e' },
+    blue: { 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a' },
+    indigo: { 50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc', 400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 800: '#3730a3', 900: '#312e81' },
+    violet: { 50: '#f5f3ff', 100: '#ede9fe', 200: '#ddd6fe', 300: '#c4b5fd', 400: '#a78bfa', 500: '#8b5cf6', 600: '#7c3aed', 700: '#6d28d9', 800: '#5b21b6', 900: '#4c1d95' },
+    purple: { 50: '#faf5ff', 100: '#f3e8ff', 200: '#e9d5ff', 300: '#d8b4fe', 400: '#c084fc', 500: '#a855f7', 600: '#9333ea', 700: '#7e22ce', 800: '#6b21a8', 900: '#581c87' },
+    fuchsia: { 50: '#fdf4ff', 100: '#fae8ff', 200: '#f5d0fe', 300: '#f0abfc', 400: '#e879f9', 500: '#d946ef', 600: '#c026d3', 700: '#a21caf', 800: '#86198f', 900: '#701a75' },
+    pink: { 50: '#fdf2f8', 100: '#fce7f3', 200: '#fbcfe8', 300: '#f472b6', 400: '#f472b6', 500: '#ec4899', 600: '#db2777', 700: '#be185d', 800: '#9d174d', 900: '#831843' },
+    rose: { 50: '#fff1f2', 100: '#ffe4e6', 200: '#fecdd3', 300: '#fda4af', 400: '#fb7185', 500: '#f43f5e', 600: '#e11d48', 700: '#be123c', 800: '#9f1239', 900: '#881337' },
+    black: '#000000',
+    white: '#ffffff',
+};
+
+const hexToRgb = (hex) => {
+    if (!hex) return null;
+    const cleanHex = hex.replace("#", "");
+    if (cleanHex.length === 3) {
+        const r = parseInt(cleanHex[0] + cleanHex[0], 16);
+        const g = parseInt(cleanHex[1] + cleanHex[1], 16);
+        const b = parseInt(cleanHex[2] + cleanHex[2], 16);
+        return `rgb(${r}, ${g}, ${b})`;
+    } else if (cleanHex.length === 6) {
+        const r = parseInt(cleanHex.substring(0, 2), 16);
+        const g = parseInt(cleanHex.substring(2, 4), 16);
+        const b = parseInt(cleanHex.substring(4, 6), 16);
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+    return null;
+};
+
+const getRgbFromTailwind = (colorStr) => {
+    if (!colorStr) return "rgb(30, 30, 30)";
+    
+    const arbitraryMatch = colorStr.match(/from-\[#([0-9a-fA-F]{3,6})\]/);
+    if (arbitraryMatch) {
+        const rgb = hexToRgb("#" + arbitraryMatch[1]);
+        if (rgb) return rgb;
+    }
+    
+    const stdMatch = colorStr.match(/from-([a-z]+)-(\d+)/);
+    if (stdMatch) {
+        const colorFamily = TAILWIND_COLORS[stdMatch[1]];
+        if (colorFamily) {
+            const hex = typeof colorFamily === 'string' ? colorFamily : colorFamily[stdMatch[2]];
+            if (hex) {
+                const rgb = hexToRgb(hex);
+                if (rgb) return rgb;
+            }
+        }
+    }
+
+    if (colorStr.includes("from-black") || colorStr === "black") {
+        return "rgb(0, 0, 0)";
+    }
+    if (colorStr.includes("from-white") || colorStr === "white") {
+        return "rgb(255, 255, 255)";
+    }
+
+    const plainMatch = colorStr.match(/^([a-z]+)-(\d+)$/);
+    if (plainMatch) {
+        const colorFamily = TAILWIND_COLORS[plainMatch[1]];
+        if (colorFamily) {
+            const hex = typeof colorFamily === 'string' ? colorFamily : colorFamily[plainMatch[2]];
+            if (hex) {
+                const rgb = hexToRgb(hex);
+                if (rgb) return rgb;
+            }
+        }
+    }
+
+    if (colorStr.startsWith("#")) {
+        const rgb = hexToRgb(colorStr);
+        if (rgb) return rgb;
+    }
+    if (colorStr.startsWith("rgb")) {
+        return colorStr;
+    }
+
+    return "rgb(30, 30, 30)";
+};
+
+const getThemeColorForGenreScroll = (colorStr, progress, defaultThemeColor = "#121212") => {
+    if (!colorStr) return defaultThemeColor;
+    const match = colorStr.match(/\d+/g);
+    if (!match || match.length < 3) return defaultThemeColor;
+    const r = parseInt(match[0], 10);
+    const g = parseInt(match[1], 10);
+    const b = parseInt(match[2], 10);
+
+    // Smooth linear interpolation from solid color (progress = 0) to defaultThemeColor (progress = 1)
+    // Jammify default background (#121212) corresponds to rgb(18, 18, 18)
+    const targetR = 18;
+    const targetG = 18;
+    const targetB = 18;
+
+    const mixedR = Math.max(0, Math.min(255, Math.round(r * (1 - progress) + targetR * progress)));
+    const mixedG = Math.max(0, Math.min(255, Math.round(g * (1 - progress) + targetG * progress)));
+    const mixedB = Math.max(0, Math.min(255, Math.round(b * (1 - progress) + targetB * progress)));
+
+    const toHex = (c) => {
+        const hex = c.toString(16);
+        return hex.length === 1 ? "0" + hex : hex;
+    };
+    return `#${toHex(mixedR)}${toHex(mixedG)}${toHex(mixedB)}`;
+};
 
 export default function GenreDetailPage() {
     const router = useRouter();
@@ -256,6 +377,74 @@ export default function GenreDetailPage() {
 
         fetchGenreContent();
     }, [genreId]);
+
+    // Dynamic PWA status bar theme-color update
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+
+        const defaultThemeColor = "#121212";
+        const rgbColor = getRgbFromTailwind(currentGenre?.color);
+
+        window._getActivePageThemeColor = (progress) => getThemeColorForGenreScroll(rgbColor, progress, defaultThemeColor);
+
+        if (!currentGenre) {
+            applyThemeColor(defaultThemeColor);
+            return;
+        }
+
+        // Set initial theme color for progress = 0 (exact match to header color)
+        const initialColor = getThemeColorForGenreScroll(rgbColor, 0, defaultThemeColor);
+        applyThemeColor(initialColor);
+
+        return () => {
+            applyThemeColor(defaultThemeColor);
+            delete window._getActivePageThemeColor;
+        };
+    }, [currentGenre]);
+
+    // Effect to handle scroll and PWA theme-color updates
+    useEffect(() => {
+        const scrollContainer = document.getElementById('genre-details-scroll-container');
+        if (!scrollContainer) return;
+
+        let ticking = false;
+
+        const handleScroll = () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    const isMobile = window.innerWidth < 768;
+
+                    if (isMobile) {
+                        const scrollTop = scrollContainer.scrollTop;
+                        const imageThreshold = 350;
+
+                        // Clamp value strictly between 0 and 1
+                        const progress = Math.max(0, Math.min(1, scrollTop / imageThreshold));
+
+                        // Set scroll progress variable for potential CSS use
+                        scrollContainer.style.setProperty('--scroll-progress', progress.toString());
+
+                        // Update theme-color meta tag for seamless status bar
+                        if (window._getActivePageThemeColor) {
+                            const currentThemeColor = window._getActivePageThemeColor(progress);
+                            const metaThemeColor = document.querySelector("meta[name=theme-color]");
+                            if (metaThemeColor) {
+                                metaThemeColor.setAttribute("content", currentThemeColor);
+                            }
+                        }
+                    }
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        };
+
+        scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+
+        return () => {
+            scrollContainer.removeEventListener('scroll', handleScroll);
+        };
+    }, [loading]);
 
     const handleGoBack = () => {
         router.back();
@@ -650,7 +839,7 @@ export default function GenreDetailPage() {
                         </div>
                     </header>
 
-                    <div className="flex-1 overflow-y-auto">
+                    <div id="genre-details-scroll-container" className="flex-1 overflow-y-auto">
                         {/* Giant Header skeleton */}
                         <div className="bg-accent/30 pt-16 pb-8 md:pt-24 md:pb-12 px-6 md:px-8 flex flex-col justify-end min-h-[200px] md:min-h-[260px]">
                             <div className="flex items-end gap-6">
@@ -661,7 +850,7 @@ export default function GenreDetailPage() {
                         </div>
                         
                         {/* Body skeleton */}
-                        <div className="space-y-8 px-4 md:px-6 py-6 pb-24">
+                        <div className="space-y-8 px-4 md:px-6 py-6 pb-36">
                             {isObjectId ? (
                                 // DB Genre Sections Skeletons
                                 Array.from({ length: 3 }).map((_, i) => (
@@ -749,7 +938,7 @@ export default function GenreDetailPage() {
                     </div>
                 </header>
 
-                <div className="flex-1 overflow-y-auto">
+                <div id="genre-details-scroll-container" className="flex-1 overflow-y-auto">
                     {/* Genre Header */}
                     <div 
                         className={`text-white ${
@@ -785,7 +974,7 @@ export default function GenreDetailPage() {
                     </div>
 
                     {currentGenre?.isDbGenre ? (
-                        <div className="space-y-8 px-4 md:px-6 py-6 pb-24">
+                        <div className="space-y-8 px-4 md:px-6 py-6 pb-36">
                             {sectionsData.map(({ section, playlists, loading }) => (
                                 <PlaylistSection
                                     key={section._id}
@@ -829,7 +1018,7 @@ export default function GenreDetailPage() {
                             </div>
 
                             {/* Content */}
-                            <div className="px-2 md:px-6 pb-24">
+                            <div className="px-2 md:px-6 pb-36">
                                 {activeTab === 'songs' && (
                                     <div className="py-4 md:py-6">
                                         {hasLoaded && songs.length === 0 ? (
