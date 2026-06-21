@@ -65,6 +65,33 @@ const decodeHtmlEntities = (text) => {
   return textarea.value;
 };
 
+const RADIO_API_SERVERS = [
+  "https://de1.api.radio-browser.info",
+  "https://nl1.api.radio-browser.info",
+  "https://at1.api.radio-browser.info"
+];
+
+const fetchFromRadioBrowser = async (path) => {
+  let lastError = null;
+  for (const server of RADIO_API_SERVERS) {
+    try {
+      const response = await fetch(`${server}${path}`, {
+        headers: {
+          'User-Agent': 'Jammify/1.0'
+        }
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+      throw new Error(`HTTP error! status: ${response.status}`);
+    } catch (err) {
+      console.warn(`Radio API server ${server} failed:`, err);
+      lastError = err;
+    }
+  }
+  throw lastError || new Error("All Radio API servers failed");
+};
+
 const RadioMap = dynamic(() => import("@/components/radio-map"), {
   ssr: false,
   loading: () => (
@@ -89,6 +116,13 @@ export default function RadioPage() {
   const [tags, setTags] = useState([]);
   const [currentStation, setCurrentStation] = useState(null);
   const [viewMode, setViewMode] = useState("map"); // "map" or "list"
+  const [visibleCount, setVisibleCount] = useState(60);
+  const [showFiltersMobile, setShowFiltersMobile] = useState(false);
+
+  // Reset visible count when search or filters change
+  useEffect(() => {
+    setVisibleCount(60);
+  }, [searchTerm, selectedCountry, selectedLanguage, selectedTag]);
 
   const { playSong, currentSong, isPlayerVisible, isPlaying } = useMusicPlayer();
 
@@ -118,11 +152,13 @@ export default function RadioPage() {
           }
         }
         
-        // Fetch stations with geo info - increased limit for better global coverage
-        const stationsResponse = await fetch(
-          "https://de1.api.radio-browser.info/json/stations/search?limit=2500&has_geo_info=true&hidebroken=true&order=clickcount&reverse=true"
-        );
-        const stationsData = await stationsResponse.json();
+        // Fetch all initial metadata and search entries in parallel
+        const [stationsData, countriesData, languagesData, tagsData] = await Promise.all([
+          fetchFromRadioBrowser("/json/stations/search?limit=2500&has_geo_info=true&hidebroken=true&order=clickcount&reverse=true"),
+          fetchFromRadioBrowser("/json/countries?hidebroken=true"),
+          fetchFromRadioBrowser("/json/languages?hidebroken=true&order=stationcount&reverse=true"),
+          fetchFromRadioBrowser("/json/tags?hidebroken=true&order=stationcount&reverse=true")
+        ]);
         
         // Filter stations with valid coordinates
         const validStations = stationsData.filter(
@@ -134,34 +170,21 @@ export default function RadioPage() {
         setStations(validStations);
 
         // Fetch countries
-        const countriesResponse = await fetch(
-          "https://de1.api.radio-browser.info/json/countries?hidebroken=true"
+        const validCountries = countriesData.filter(
+          country => country && typeof country.name === 'string' && country.name.trim() !== ""
         );
-        const countriesData = await countriesResponse.json();
-        const sortedCountries = countriesData.sort((a, b) => a.name.localeCompare(b.name));
+        const sortedCountries = validCountries.sort((a, b) => a.name.localeCompare(b.name));
         setCountries(sortedCountries); // Show all countries, sorted alphabetically
 
-        // Fetch languages - ordered by popularity
-        const languagesResponse = await fetch(
-          "https://de1.api.radio-browser.info/json/languages?hidebroken=true&order=stationcount&reverse=true"
-        );
-        const languagesData = await languagesResponse.json();
-        
         // Filter for clean language names and sort by popularity
         const topLanguages = languagesData
-          .filter(lang => /^[a-zA-Z\s-]+$/.test(lang.name)) // Only alphabetic names
+          .filter(lang => lang && typeof lang.name === 'string' && /^[a-zA-Z\s-]+$/.test(lang.name)) // Only alphabetic names
           .slice(0, 80);
         setLanguages(topLanguages); 
 
-        // Fetch tags - ordered by popularity
-        const tagsResponse = await fetch(
-          "https://de1.api.radio-browser.info/json/tags?hidebroken=true&order=stationcount&reverse=true"
-        );
-        const tagsData = await tagsResponse.json();
-        
         // Filter for clean genre names
         const topTags = tagsData
-          .filter(tag => /^[a-zA-Z\s-]+$/.test(tag.name) && tag.name.length > 2)
+          .filter(tag => tag && typeof tag.name === 'string' && tag.name.length > 2 && /^[a-zA-Z\s-]+$/.test(tag.name))
           .slice(0, 80);
         setTags(topTags); 
 
@@ -193,19 +216,18 @@ export default function RadioPage() {
 
     const fetchFilteredData = async () => {
       try {
-        let url = "https://de1.api.radio-browser.info/json/stations/search?limit=500&has_geo_info=true&hidebroken=true&order=clickcount&reverse=true";
+        let queryParams = "?limit=500&has_geo_info=true&hidebroken=true&order=clickcount&reverse=true";
         
         if (selectedCountry !== "all") {
           // Send both name and try to remove "The" prefix for API search
           const cleanCountry = selectedCountry.toLowerCase().startsWith("the ") ? selectedCountry.slice(4) : selectedCountry;
-          url += `&country=${encodeURIComponent(cleanCountry)}`;
+          queryParams += `&country=${encodeURIComponent(cleanCountry)}`;
         }
         
-        if (selectedLanguage !== "all") url += `&language=${encodeURIComponent(selectedLanguage)}`;
-        if (selectedTag !== "all") url += `&tag=${encodeURIComponent(selectedTag)}`;
+        if (selectedLanguage !== "all") queryParams += `&language=${encodeURIComponent(selectedLanguage)}`;
+        if (selectedTag !== "all") queryParams += `&tag=${encodeURIComponent(selectedTag)}`;
 
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = await fetchFromRadioBrowser(`/json/stations/search${queryParams}`);
         
         const validNewStations = data.filter(
           station => station.geo_lat && station.geo_long && 
@@ -279,15 +301,7 @@ export default function RadioPage() {
   const handleStationPlay = useCallback(async (station) => {
     try {
       // Click counter for the station and get the proper stream URL
-      const clickResponse = await fetch(
-        `https://de1.api.radio-browser.info/json/url/${station.stationuuid}`,
-        {
-          headers: {
-            'User-Agent': 'Jammify/1.0'
-          }
-        }
-      );
-      const clickData = await clickResponse.json();
+      const clickData = await fetchFromRadioBrowser(`/json/url/${station.stationuuid}`);
       
       // Use the URL from the click response or fallback to station URL
       const streamUrl = clickData.url || station.url_resolved || station.url;
@@ -436,16 +450,24 @@ export default function RadioPage() {
 
           {/* Filters */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Filter className="w-5 h-5" />
-                Filters
-              </CardTitle>
-              <CardDescription>
+            <CardHeader 
+              className="cursor-pointer md:cursor-default select-none" 
+              onClick={() => setShowFiltersMobile(!showFiltersMobile)}
+            >
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Filter className="w-5 h-5" />
+                  Filters
+                </CardTitle>
+                <span className="text-xs text-muted-foreground md:hidden border border-muted px-2.5 py-1 rounded-full bg-muted/20">
+                  {showFiltersMobile ? "Tap to collapse" : "Tap to expand"}
+                </span>
+              </div>
+              <CardDescription className="hidden md:block mt-1.5">
                 Filter radio stations by location, language, or genre
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className={showFiltersMobile ? "block" : "hidden md:block"}>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Search</label>
@@ -468,7 +490,7 @@ export default function RadioPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All countries</SelectItem>
-                      {countries.map((country) => (
+                      {countries.filter(c => c && c.name && c.name.trim() !== "").map((country) => (
                         <SelectItem key={country.name} value={country.name}>
                           {country.name}
                         </SelectItem>
@@ -485,7 +507,7 @@ export default function RadioPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All languages</SelectItem>
-                      {languages.map((language) => (
+                      {languages.filter(l => l && l.name && l.name.trim() !== "").map((language) => (
                         <SelectItem key={language.name} value={language.name}>
                           {language.name}
                         </SelectItem>
@@ -502,7 +524,7 @@ export default function RadioPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All genres</SelectItem>
-                      {tags.map((tag) => (
+                      {tags.filter(t => t && t.name && t.name.trim() !== "").map((tag) => (
                         <SelectItem key={tag.name} value={tag.name}>
                           {tag.name}
                         </SelectItem>
@@ -527,7 +549,7 @@ export default function RadioPage() {
           {viewMode === "map" ? (
             <Card className="mb-20">
               <CardContent className="p-0">
-                <div className="h-[calc(100vh-360px)] min-h-[400px] max-h-[calc(100vh-360px)] overflow-hidden relative">
+                <div className="h-[360px] md:h-[calc(100vh-360px)] min-h-[300px] md:min-h-[400px] max-h-[calc(100vh-360px)] overflow-hidden relative">
                   <RadioMap 
                     stations={filteredStations} 
                     onStationClick={handleStationPlay}
@@ -537,73 +559,87 @@ export default function RadioPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredStations.map((station) => (
-                <Card key={station.stationuuid} className="hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base truncate">
-                          {station.name}
-                        </CardTitle>
-                        <CardDescription className="flex items-center gap-1 mt-1">
-                          <MapPin className="w-3 h-3" />
-                          {station.country}
-                          {station.state && `, ${station.state}`}
-                        </CardDescription>
-                      </div>
-                      {station.favicon && (
-                        <img
-                          src={station.favicon}
-                          alt={station.name}
-                          className="w-8 h-8 rounded"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                          }}
-                        />
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="space-y-3">
-                      {station.tags && (
-                        <div className="flex flex-wrap gap-1">
-                          {station.tags.split(',').slice(0, 3).map((tag, index) => (
-                            <Badge key={index} variant="secondary" className="text-xs">
-                              {tag.trim()}
-                            </Badge>
-                          ))}
+            <div className="space-y-8 mb-24">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredStations.slice(0, visibleCount).map((station) => (
+                  <Card key={station.stationuuid} className="hover:shadow-md transition-shadow">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-base truncate">
+                            {station.name}
+                          </CardTitle>
+                          <CardDescription className="flex items-center gap-1 mt-1">
+                            <MapPin className="w-3 h-3" />
+                            {station.country}
+                            {station.state && `, ${station.state}`}
+                          </CardDescription>
                         </div>
-                      )}
-                      
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>{station.codec} • {station.bitrate}kbps</span>
-                        <span>{station.clickcount} listeners</span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => handleStationPlay(station)}
-                          className="flex-1"
-                        >
-                          <Play className="w-4 h-4 mr-2" />
-                          Play
-                        </Button>
-                        {station.homepage && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => window.open(station.homepage, '_blank')}
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </Button>
+                        {station.favicon && (
+                          <img
+                            src={station.favicon}
+                            alt={station.name}
+                            className="w-8 h-8 rounded"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                            }}
+                          />
                         )}
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="space-y-3">
+                        {station.tags && (
+                          <div className="flex flex-wrap gap-1">
+                            {station.tags.split(',').slice(0, 3).map((tag, index) => (
+                              <Badge key={index} variant="secondary" className="text-xs">
+                                {tag.trim()}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center justify-between text-sm text-muted-foreground">
+                          <span>{station.codec} • {station.bitrate}kbps</span>
+                          <span>{station.clickcount} listeners</span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleStationPlay(station)}
+                            className="flex-1"
+                          >
+                            <Play className="w-4 h-4 mr-2" />
+                            Play
+                          </Button>
+                          {station.homepage && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => window.open(station.homepage, '_blank')}
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {visibleCount < filteredStations.length && (
+                <div className="flex justify-center pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => setVisibleCount((prev) => prev + 60)}
+                    className="rounded-full px-8 py-2 border-muted-foreground/30 hover:bg-muted/50 transition-colors"
+                  >
+                    Load More Stations
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>

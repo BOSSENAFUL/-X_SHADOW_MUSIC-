@@ -189,7 +189,7 @@ function StationMarkers({ stations, onStationClick, currentStation }) {
             position={[lat, lng]}
             icon={icon}
           >
-            <Popup className="radio-popup" maxWidth={320}>
+            <Popup className="radio-popup" maxWidth={280} minWidth={240}>
               <Card className="w-full">
                 <CardHeader className="pb-3">
                   <div className="flex items-start gap-3">
@@ -394,7 +394,12 @@ export default function MapComponent({ stations, onStationClick, currentStation 
           margin: 0 !important;
           padding: 0 !important;
           width: auto !important;
-          min-width: 300px !important;
+          min-width: 240px !important;
+        }
+        @media (min-width: 768px) {
+          .leaflet-popup-content {
+            min-width: 300px !important;
+          }
         }
         
         .leaflet-control-zoom {

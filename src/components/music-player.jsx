@@ -627,7 +627,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     }
 
     // Check if we need to fetch detailed song info (e.g. from search playlist)
-    const needsFetch = !currentSong.downloadUrl || !Array.isArray(currentSong.downloadUrl) || currentSong.downloadUrl.length < 5;
+    const needsFetch = !currentSong.isRadio && (!currentSong.downloadUrl || !Array.isArray(currentSong.downloadUrl) || currentSong.downloadUrl.length < 5);
 
     if (needsFetch) {
       const songId = currentSong.id;
@@ -654,28 +654,28 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       // Use only 320kbps quality audio URL
       let audioUrl = null;
 
-      // First try to find 320kbps quality explicitly
+      // First try to find 320kbps or stream quality explicitly
       if (currentSong.downloadUrl) {
         audioUrl = currentSong.downloadUrl.find(
-          (url) => url.quality === "320kbps" || url.quality === 320
+          (url) => url.quality === "320kbps" || url.quality === 320 || url.quality === "stream"
         )?.url;
 
-        // If no explicit 320kbps found, use the highest quality available (index 4)
+        // If no explicit 320kbps or stream found, use the highest quality available
         if (!audioUrl) {
-          audioUrl = currentSong.downloadUrl[4]?.url;
+          audioUrl = currentSong.downloadUrl[4]?.url || currentSong.downloadUrl[currentSong.downloadUrl.length - 1]?.url;
         }
       }
 
       if (audioUrl) {
         // ONLY assign src and load audio if the song ID has actually changed!
         if (loadedSongIdRef.current !== currentSong.id) {
-          console.log("Playing 320kbps quality:", audioUrl);
+          console.log("Playing audio stream:", audioUrl);
           audioRef.current.src = audioUrl;
           audioRef.current.load();
           loadedSongIdRef.current = currentSong.id;
         }
       } else {
-        console.warn("320kbps quality not available for this song");
+        console.warn("Audio stream URL not available for this song");
       }
     }
   }, [currentSong, currentIndex, onSongChange]);
