@@ -1498,7 +1498,7 @@ function PlaylistPageContent() {
                     <div key={song.id || index} >
                       {/* Mobile Layout */}
                       <div
-                        className={`md:hidden flex items-center rounded hover:bg-muted/50 group cursor-pointer ${viewAs === 'compact' ? 'gap-2 pl-0 pr-0 py-1 h-[48px]' : 'gap-2 pl-0 pr-0 py-2 h-[64px]'}`}
+                        className={`md:hidden flex items-center rounded hover:bg-muted/50 group cursor-pointer ${viewAs === 'compact' ? 'gap-2 pl-1 pr-0 py-1 h-[48px]' : 'gap-2 pl-1 pr-0 py-2 h-[64px]'}`}
                         onClick={() => handlePlayClick(song, index)}
                       >
                         <div className={`grid place-items-center shrink-0 w-8 h-full ${!showTrackNumbersMobile ? 'hidden' : ''}`}>
