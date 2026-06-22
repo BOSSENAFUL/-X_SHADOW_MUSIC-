@@ -317,7 +317,7 @@ export default function PostDetailPage({ params }) {
           {/* Post a Comment Area */}
           <div className="flex gap-3 md:gap-4 items-stretch">
             <div className="flex flex-col items-center shrink-0">
-              <Avatar className="w-8 h-8 md:w-10 md:h-10 border border-border/5">
+              <Avatar className="w-10 h-10 md:w-12 md:h-12 border border-border/10 shadow-sm">
                 <AvatarImage src={session?.user?.image} alt={session?.user?.name} />
                 <AvatarFallback className="bg-zinc-800 text-xs">{session?.user?.name?.[0]?.toUpperCase()}</AvatarFallback>
               </Avatar>
@@ -423,7 +423,7 @@ export default function PostDetailPage({ params }) {
                             <div className="flex flex-col items-center shrink-0">
                               <Avatar className="w-8 h-8 md:w-10 md:h-10">
                                 <AvatarImage src={reply.author?.image} alt={reply.author?.name} />
-                                <AvatarFallback className="bg-muted text-[10px]">{reply.author?.name?.[0]?.toUpperCase()}</AvatarFallback>
+                                <AvatarFallback className="bg-muted text-xs">{reply.author?.name?.[0]?.toUpperCase()}</AvatarFallback>
                               </Avatar>
                               {index < replies.length - 1 && (
                                       <div className="w-[2px] flex-1 bg-border mt-2 mb-2" />
@@ -432,13 +432,13 @@ export default function PostDetailPage({ params }) {
                             <div className="flex-1 pb-6">
                               <div className="flex items-center mb-0.5">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-bold text-xs md:text-sm text-foreground hover:underline cursor-pointer">{reply.author?.name}</span>
+                                  <span className="font-bold text-sm text-foreground hover:underline cursor-pointer">{reply.author?.name}</span>
                                   <span className="text-xs text-muted-foreground">
                                     {formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true })}
                                   </span>
                                 </div>
                               </div>
-                              <div className="text-xs md:text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap font-medium">
+                              <div className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap font-medium">
                                 {renderWithLinks(reply.content)}
                               </div>
                               <div className="flex items-center gap-4 text-muted-foreground mt-3">
