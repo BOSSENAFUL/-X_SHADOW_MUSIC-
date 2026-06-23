@@ -3090,7 +3090,7 @@ export function FullscreenMusicPlayer({
           {/* Spotify Background Canvas Video */}
           {isMobile && canvasUrl && !showVideoMode && (
             <div 
-              className="absolute inset-0 transition-opacity duration-1000 pointer-events-none"
+              className="absolute inset-0 transition-opacity duration-500 pointer-events-none"
               style={{
                 opacity: showCanvas ? 1 : 0,
                 zIndex: 2,
@@ -3481,98 +3481,53 @@ export function FullscreenMusicPlayer({
                 ) : (
                   /* Center Layout for Mobile */
                   <div 
-                    className="w-full flex flex-col items-center justify-center transition-all duration-500 ease-in-out"
-                    style={{
-                      height: (showCanvas && canvasUrl) ? '100%' : 'auto',
-                      flexGrow: (showCanvas && canvasUrl) ? 1 : 0
-                    }}
+                    className="w-full self-stretch flex-1 grid grid-cols-1 grid-rows-1 items-center justify-items-center relative"
                   >
                     {/* Synced Lyrics Overlay - Only when showCanvas is active */}
-                    {showCanvas && canvasUrl && (
-                      <div 
-                        className="w-full px-6 flex items-center justify-center text-center select-none py-10 animate-fade-in"
+                    <div 
+                      className="col-start-1 row-start-1 w-full px-6 flex items-center justify-center text-center select-none py-10 transition-all duration-500 ease-in-out"
+                      style={{
+                        opacity: (showCanvas && canvasUrl) ? 1 : 0,
+                        transform: (showCanvas && canvasUrl) ? 'scale(1) translateY(0px)' : 'scale(0.95) translateY(10px)',
+                        pointerEvents: (showCanvas && canvasUrl) ? 'auto' : 'none',
+                        minHeight: '120px',
+                        zIndex: (showCanvas && canvasUrl) ? 2 : 1
+                      }}
+                    >
+                      <p 
+                        className="text-xl sm:text-2xl font-bold text-white drop-shadow-md leading-relaxed"
                         style={{
-                          minHeight: '120px'
+                          fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
                         }}
                       >
-                        <p 
-                          className="text-xl sm:text-2xl font-bold text-white transition-all duration-300 drop-shadow-md leading-relaxed"
-                          style={{
-                            fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
-                          }}
-                        >
-                          {activeLyricLineText || ""}
-                        </p>
-                      </div>
-                    )}
+                        {activeLyricLineText || ""}
+                      </p>
+                    </div>
 
                     {/* ── Album Art ── */}
                     <div 
-                      className="w-full max-w-[380px] min-[400px]:max-w-[340px] min-[430px]:max-w-[380px] sm:max-w-[85%] md:max-w-[90%] lg:max-w-[500px] px-2 sm:px-4 transition-all duration-500 ease-in-out"
+                      onClick={() => {
+                        if (canvasUrl) {
+                          setShowCanvas(true);
+                        } else if (hasPerfectVideo) {
+                          setShowVideoMode(true);
+                        }
+                      }}
+                      className={`col-start-1 row-start-1 w-full max-w-[380px] min-[400px]:max-w-[340px] min-[430px]:max-w-[380px] sm:max-w-[85%] md:max-w-[90%] lg:max-w-[500px] px-2 sm:px-4 transition-all duration-500 ease-in-out ${(canvasUrl || hasPerfectVideo) ? 'cursor-pointer active:scale-[0.98]' : ''}`}
                       style={{
                         opacity: (showCanvas && canvasUrl) ? 0 : 1,
-                        height: (showCanvas && canvasUrl) ? '0px' : 'auto',
-                        margin: (showCanvas && canvasUrl) ? '0px' : 'auto',
-                        transform: (showCanvas && canvasUrl) ? 'scale(0.8)' : 'scale(1)',
+                        transform: (showCanvas && canvasUrl) ? 'scale(0.95) translateY(-10px)' : 'scale(1) translateY(0px)',
                         pointerEvents: (showCanvas && canvasUrl) ? 'none' : 'auto',
-                        overflow: 'hidden'
+                        zIndex: (showCanvas && canvasUrl) ? 1 : 2
                       }}
                     >
-                      <div className="w-full aspect-square overflow-hidden shadow-2xl bg-linear-to-br from-gray-800 to-gray-900 relative">
-                        {canvasUrl && (
-                          <video
-                            src={canvasUrl}
-                            loop
-                            muted
-                            autoPlay
-                            playsInline
-                            className="w-full h-full object-cover"
-                            style={{
-                              opacity: showCanvas ? 1 : 0,
-                              transition: 'opacity 1.2s ease-in-out',
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              width: '100%',
-                              height: '100%',
-                              zIndex: 10,
-                            }}
-                          />
-                        )}
-                        {currentSong.image?.[2]?.url ? (
-                          <img
-                            src={currentSong.image[2].url}
-                            alt={currentSong.name}
-                            className="w-full h-full object-cover"
-                            onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
-                            style={{
-                              opacity: showCanvas ? 0 : 1,
-                              transition: 'opacity 1.2s ease-in-out',
-                              pointerEvents: showCanvas ? 'none' : 'auto',
-                              position: canvasUrl ? 'absolute' : 'static',
-                              top: 0,
-                              left: 0,
-                              width: '100%',
-                              height: '100%',
-                            }}
-                          />
-                        ) : (
-                          <img
-                            src="/default-playlist-image.png"
-                            alt={currentSong.name}
-                            className="w-full h-full object-cover"
-                            style={{
-                              opacity: showCanvas ? 0 : 1,
-                              transition: 'opacity 1.2s ease-in-out',
-                              pointerEvents: showCanvas ? 'none' : 'auto',
-                              position: canvasUrl ? 'absolute' : 'static',
-                              top: 0,
-                              left: 0,
-                              width: '100%',
-                              height: '100%',
-                            }}
-                          />
-                        )}
+                      <div className="w-full aspect-square overflow-hidden shadow-2xl bg-linear-to-br from-gray-800 to-gray-900">
+                        <img
+                          src={currentSong.image?.[2]?.url || '/default-playlist-image.png'}
+                          alt={currentSong.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => { e.target.src = '/default-playlist-image.png'; }}
+                        />
                       </div>
                     </div>
                   </div>
@@ -3609,8 +3564,16 @@ export function FullscreenMusicPlayer({
                 <div className="px-1 sm:px-2 pb-4 shrink-0">
                   <div className="flex items-center justify-between mb-3 sm:mb-4" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      {showCanvas && canvasUrl && (
-                        <div className="w-12 h-12 rounded overflow-hidden shrink-0 shadow-md transition-all duration-300">
+                      {((showCanvas && canvasUrl) || showVideoMode) && (
+                        <div
+                          onClick={() => {
+                            setShowVideoMode(false);
+                            setShowCanvas(false);
+                          }}
+                          className="w-12 h-12 rounded overflow-hidden shrink-0 shadow-md transition-all duration-300 cursor-pointer active:scale-95"
+                          role="button"
+                          aria-label="Show album art"
+                        >
                           <img
                             src={currentSong.image?.[2]?.url || '/default-playlist-image.png'}
                             alt={currentSong.name}
