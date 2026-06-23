@@ -17,6 +17,7 @@ export function MusicPlayerProvider({ children }) {
   const [repeatMode, setRepeatMode] = useState("off"); // 'off', 'all', 'one'
   const [showTrackNumbersMobile, setShowTrackNumbersMobile] = useState(false);
   const [disableSpotifyCanvas, setDisableSpotifyCanvas] = useState(false);
+  const [disableLyricsBg, setDisableLyricsBg] = useState(true);
 
   // Load mobile track numbers setting on mount (defer to prevent synchronous setState warning)
   useEffect(() => {
@@ -35,6 +36,17 @@ export function MusicPlayerProvider({ children }) {
     if (stored === "true") {
       const timeout = setTimeout(() => {
         setDisableSpotifyCanvas(true);
+      }, 0);
+      return () => clearTimeout(timeout);
+    }
+  }, []);
+
+  // Load lyrics background setting on mount (defer to prevent synchronous setState warning)
+  useEffect(() => {
+    const stored = localStorage.getItem("disable_lyrics_bg");
+    if (stored === "false") {
+      const timeout = setTimeout(() => {
+        setDisableLyricsBg(false);
       }, 0);
       return () => clearTimeout(timeout);
     }
@@ -113,6 +125,8 @@ export function MusicPlayerProvider({ children }) {
         setShowTrackNumbersMobile,
         disableSpotifyCanvas,
         setDisableSpotifyCanvas,
+        disableLyricsBg,
+        setDisableLyricsBg,
         isFullscreenOpen,
         isFullscreenPlaylistOpen,
         currentTime,

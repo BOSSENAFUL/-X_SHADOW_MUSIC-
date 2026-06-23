@@ -153,7 +153,9 @@ export default function SettingsPage() {
         showTrackNumbersMobile, 
         setShowTrackNumbersMobile,
         disableSpotifyCanvas,
-        setDisableSpotifyCanvas
+        setDisableSpotifyCanvas,
+        disableLyricsBg,
+        setDisableLyricsBg
     } = useMusicPlayer();
 
     const [notifNewFeatures, setNotifNewFeatures] = useState(() => {
@@ -280,6 +282,19 @@ export default function SettingsPage() {
                                     onCheckedChange={(val) => {
                                         setDisableSpotifyCanvas(val);
                                         localStorage.setItem("disable_spotify_canvas", String(val));
+                                    }}
+                                />
+                            </SettingsRow>
+                            <SettingsRow
+                                icon={Layers}
+                                label="Disable dynamic lyrics background"
+                                description="Turn off color-morphing WebGL backdrop during lyrics view"
+                            >
+                                <Switch
+                                    checked={disableLyricsBg}
+                                    onCheckedChange={(val) => {
+                                        setDisableLyricsBg(val);
+                                        localStorage.setItem("disable_lyrics_bg", String(val));
                                     }}
                                 />
                             </SettingsRow>

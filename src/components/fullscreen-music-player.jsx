@@ -940,6 +940,7 @@ export function FullscreenMusicPlayer({
     isFullscreenPlaylistOpen: showPlaylist,
     setIsFullscreenPlaylistOpen: setShowPlaylist,
     disableSpotifyCanvas,
+    disableLyricsBg,
   } = useMusicPlayer();
   const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
   const router = useRouter();
@@ -1765,7 +1766,10 @@ export function FullscreenMusicPlayer({
     // Bottom is at ~85%
     const bottomRgb = interpolateRgbRaw(accent, secondary, (0.85 - 0.5) / 0.5);
 
-    return { topRgb, bottomRgb };
+    const [pr, pg, pb] = parseRgbRaw(primary);
+    const primaryRgbRaw = `${pr}, ${pg}, ${pb}`;
+
+    return { topRgb, bottomRgb, primaryRgbRaw };
   }, [dominantColors]);
 
   // Drag and drop state
@@ -4282,13 +4286,14 @@ export function FullscreenMusicPlayer({
                 : '#121212',
             }}
           >
-            {/* AMLL WebGL Dynamic Background - desktop/tablet only */}
-            {/* Hidden on phones to keep a clean static gradient background */}
-            <div className="absolute inset-0 pointer-events-none z-0 hidden md:block">
-              <ErrorBoundary fallback={<div className="absolute inset-0 bg-linear-to-b from-black/40 to-black/60" />}>
-                <BackgroundRender album={currentSongImageUrlProxied} />
-              </ErrorBoundary>
-            </div>
+            {/* AMLL WebGL Dynamic Background */}
+            {!disableLyricsBg && (
+              <div className="absolute inset-0 pointer-events-none z-0 block">
+                <ErrorBoundary fallback={<div className="absolute inset-0 bg-linear-to-b from-black/40 to-black/60" />}>
+                  <BackgroundRender album={currentSongImageUrlProxied} />
+                </ErrorBoundary>
+              </div>
+            )}
 
             <div className="relative z-10 flex flex-col h-full safe-area-inset">
               {/* Lyrics Header - Minimal with just back button (desktop only) */}
@@ -4307,58 +4312,71 @@ export function FullscreenMusicPlayer({
               <div className="flex-1 overflow-hidden">
                 {/* Mobile Layout */}
                 <div className="md:hidden h-full flex flex-col">
-                  {/* Apple Music Style top grabber handle */}
-                  <div className="flex justify-center pt-3 pb-1 shrink-0">
-                    <button
-                      onClick={() => setShowLyrics(false)}
-                      className="w-10 h-1.5 rounded-full bg-white/25 hover:bg-white/35 transition-colors duration-200 cursor-pointer"
-                      aria-label="Dismiss lyrics"
-                    />
-                  </div>
-                  {/* Album Art and Song Info */}
-                  <div className="flex items-center gap-4 p-4 border-b border-white/5">
-                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-linear-to-br from-gray-800 to-gray-900 shrink-0">
-                      {currentSong.image?.length > 0 ? (
-                        <img
-                          src={
-                            currentSong.image.find(
-                              (img) => img.quality === "500x500"
-                            )?.url ||
-                            currentSong.image.find(
-                              (img) => img.quality === "150x150"
-                            )?.url ||
-                            currentSong.image[currentSong.image.length - 1]?.url
-                          }
-                          alt={currentSong.name}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <IoMdPlay className="w-6 h-6 text-white/50" />
-                        </div>
-                      )}
+                  {/* Mobile Header Container with solid theme background */}
+                  <div
+                    className="relative z-30 shrink-0"
+                    style={{
+                      background: dominantColors.primary || '#121212',
+                    }}
+                  >
+                    {/* Apple Music Style top grabber handle */}
+                    <div className="flex justify-center pt-3 pb-1">
+                      <button
+                        onClick={() => setShowLyrics(false)}
+                        className="w-10 h-1.5 rounded-full bg-white/25 hover:bg-white/35 transition-colors duration-200 cursor-pointer"
+                        aria-label="Dismiss lyrics"
+                      />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-white font-semibold truncate text-lg">
-                        {decodeHtmlEntities(currentSong.name)}
-                      </h4>
-                      <p className="text-white/70 truncate">
-                        {getArtistNames(currentSong)}
-                      </p>
+                    {/* Album Art and Song Info */}
+                    <div className="flex items-center gap-4 p-4">
+                      <div
+                        onClick={() => setShowLyrics(false)}
+                        className="w-16 h-16 rounded-lg overflow-hidden bg-linear-to-br from-gray-800 to-gray-900 shrink-0 cursor-pointer active:scale-95 transition-all duration-200"
+                        role="button"
+                        aria-label="Dismiss lyrics"
+                      >
+                        {currentSong.image?.length > 0 ? (
+                          <img
+                            src={
+                              currentSong.image.find(
+                                (img) => img.quality === "500x500"
+                              )?.url ||
+                              currentSong.image.find(
+                                (img) => img.quality === "150x150"
+                              )?.url ||
+                              currentSong.image[currentSong.image.length - 1]?.url
+                            }
+                            alt={currentSong.name}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <IoMdPlay className="w-6 h-6 text-white/50" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-white font-semibold truncate text-lg">
+                          {decodeHtmlEntities(currentSong.name)}
+                        </h4>
+                        <p className="text-white/70 truncate">
+                          {getArtistNames(currentSong)}
+                        </p>
+                      </div>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={handlePlayPause}
+                        className="shrink-0 rounded-full w-12 h-12 bg-white/20 hover:bg-white/30 text-white hover:scale-105 transition-all duration-200"
+                      >
+                        {(showVideoMode ? ytIsPlaying : isPlaying) ? (
+                          <HiPause style={{ width: '20px', height: '20px' }} />
+                        ) : (
+                          <IoMdPlay style={{ width: '20px', height: '20px' }} className="ml-0.5" />
+                        )}
+                      </Button>
                     </div>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={handlePlayPause}
-                      className="shrink-0 rounded-full w-12 h-12 bg-white/20 hover:bg-white/30 text-white hover:scale-105 transition-all duration-200"
-                    >
-                      {(showVideoMode ? ytIsPlaying : isPlaying) ? (
-                        <HiPause style={{ width: '20px', height: '20px' }} />
-                      ) : (
-                        <IoMdPlay style={{ width: '20px', height: '20px' }} className="ml-0.5" />
-                      )}
-                    </Button>
                   </div>
 
                   {/* Lyrics Text */}
@@ -4366,7 +4384,7 @@ export function FullscreenMusicPlayer({
                     ref={mobileLyricsContainerRef}
                     className="flex-1 overflow-hidden lyrics-fade-mask relative"
                     style={{
-                      '--lyrics-fade-top-rgb': fadeColors.topRgb,
+                      '--lyrics-fade-top-rgb': fadeColors.primaryRgbRaw,
                       '--lyrics-fade-bottom-rgb': fadeColors.bottomRgb,
                       '--current-theme-color': dominantColors.primary || '#121212',
                     }}
@@ -4414,12 +4432,12 @@ export function FullscreenMusicPlayer({
                                   )}
                                 </div>
                               }>
-                                <LyricPlayer lyricLines={parsedLyrics} currentTime={currentTime * 1000} onLyricLineClick={handleLyricLineClick} style={{ mixBlendMode: 'normal', contain: 'none', height: '100%', width: '100%', overflow: 'visible' }} />
+                                <LyricPlayer lyricLines={parsedLyrics} currentTime={currentTime * 1000} onLyricLineClick={handleLyricLineClick} alignPosition={0.3} style={{ mixBlendMode: 'normal', contain: 'none', height: '100%', width: '100%', overflow: 'visible' }} />
                               </ErrorBoundary>
                             </div>
                           ) : lyrics.plainLyrics ? (
                             /* Plain Lyrics */
-                            <div className="space-y-6 leading-relaxed py-6">
+                            <div className="space-y-6 leading-relaxed overflow-y-auto h-full max-h-[68vh] pr-2 pb-24">
                               {lyrics.plainLyrics
                                 .split("\n")
                                 .map((line, index) => (
@@ -4482,7 +4500,7 @@ export function FullscreenMusicPlayer({
                 {/* Desktop Layout - Split Screen with Album Art + Lyrics */}
                 <div className="hidden md:flex h-full">
                   {/* Left Side - Apple Music style: album art + controls below */}
-                  <div className="hidden lg:flex w-1/2 flex-col items-center justify-center shrink-0 px-6 lg:px-10 py-6 gap-5">
+                  <div className="hidden md:flex w-1/2 flex-col items-center justify-center shrink-0 px-4 md:px-6 lg:px-10 py-6 gap-4 md:gap-5">
                     {/* Album Art / Video */}
                     {showVideoMode ? (
                       <div
@@ -4567,8 +4585,11 @@ export function FullscreenMusicPlayer({
                       </div>
                     ) : (
                       <div
-                        className="w-full aspect-square rounded-2xl overflow-hidden shadow-2xl bg-linear-to-br from-gray-800 to-gray-900 shrink-0"
+                        onClick={() => setShowLyrics(false)}
+                        className="w-full aspect-square rounded-2xl overflow-hidden shadow-2xl bg-linear-to-br from-gray-800 to-gray-900 shrink-0 cursor-pointer hover:opacity-90 active:scale-95 transition-all duration-200"
                         style={{ maxWidth: "min(560px, 90vw)" }}
+                        role="button"
+                        aria-label="Dismiss lyrics"
                       >
                         {currentSong.image?.length > 0 ? (
                           <img
@@ -4802,7 +4823,7 @@ export function FullscreenMusicPlayer({
                   </div>
 
                   {/* Right Side - Lyrics: full width on md, half on lg+ */}
-                  <div className="w-full lg:w-1/2 flex items-center justify-start px-10 lg:px-16 py-8 border-l-0 lg:border-l border-white/10">
+                  <div className="w-full md:w-1/2 flex items-center justify-start px-6 md:px-10 lg:px-16 py-8 border-l-0 md:border-l border-white/10">
                     <div className="w-full max-w-4xl">
                       <div
                         ref={desktopLyricsContainerRef}
@@ -4830,7 +4851,7 @@ export function FullscreenMusicPlayer({
                                         lyrics.plainLyrics.split("\n").map((line, idx) => (
                                           <p
                                             key={idx}
-                                            className="text-5xl xl:text-6xl text-white/35 font-bold cursor-pointer hover:text-white/70 transition-all duration-200"
+                                            className="text-2xl md:text-3xl lg:text-4xl xl:text-5xl 2xl:text-6xl text-white/35 font-bold cursor-pointer hover:text-white/70 transition-all duration-200"
                                             style={{
                                               fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
                                               letterSpacing: '-0.02em',
@@ -4844,7 +4865,7 @@ export function FullscreenMusicPlayer({
                                         parsedLyrics.map((line, idx) => (
                                           <p
                                             key={idx}
-                                            className="text-5xl xl:text-6xl text-white/35 font-bold cursor-pointer hover:text-white/70 transition-all duration-200"
+                                            className="text-2xl md:text-3xl lg:text-4xl xl:text-5xl 2xl:text-6xl text-white/35 font-bold cursor-pointer hover:text-white/70 transition-all duration-200"
                                             style={{
                                               fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
                                               letterSpacing: '-0.02em',
@@ -4857,18 +4878,18 @@ export function FullscreenMusicPlayer({
                                       )}
                                     </div>
                                   }>
-                                    <LyricPlayer lyricLines={parsedLyrics} currentTime={currentTime * 1000} onLyricLineClick={handleLyricLineClick} style={{ mixBlendMode: 'normal', contain: 'none', height: '100%', width: '100%', overflow: 'visible' }} />
+                                    <LyricPlayer lyricLines={parsedLyrics} currentTime={currentTime * 1000} onLyricLineClick={handleLyricLineClick} alignPosition={0.3} style={{ mixBlendMode: 'normal', contain: 'none', height: '100%', width: '100%', overflow: 'visible' }} />
                                   </ErrorBoundary>
                                 </div>
                               ) : lyrics.plainLyrics ? (
                                 /* Plain Lyrics */
-                                <div className="space-y-6 leading-tight text-left py-20">
+                                <div className="space-y-6 leading-tight text-left overflow-y-auto h-full max-h-[75vh] pr-4 py-20">
                                   {lyrics.plainLyrics
                                     .split("\n")
                                     .map((line, index) => (
                                       <p
                                         key={index}
-                                        className="text-5xl xl:text-6xl text-white/35 font-bold cursor-pointer hover:text-white/70 transition-all duration-200"
+                                        className="text-2xl md:text-3xl lg:text-4xl xl:text-5xl 2xl:text-6xl text-white/35 font-bold cursor-pointer hover:text-white/70 transition-all duration-200"
                                         style={{
                                           fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
                                           letterSpacing: '-0.02em',

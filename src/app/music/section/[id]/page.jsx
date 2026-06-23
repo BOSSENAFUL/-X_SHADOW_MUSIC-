@@ -18,7 +18,7 @@ import {
     SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { PlaylistCard } from "@/components/music/playlist-card";
 
 export default function SectionPage() {
@@ -28,21 +28,36 @@ export default function SectionPage() {
     const [section, setSection] = useState(null);
     const [playlists, setPlaylists] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [totalPlaylists, setTotalPlaylists] = useState(0);
+
+    const [playlistsPage, setPlaylistsPage] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
 
     const scrollRef = useRef(null);
+    const loadingRef = useRef(null);
+    const isMounted = useRef(true);
+
+    useEffect(() => {
+        isMounted.current = true;
+        return () => {
+            isMounted.current = false;
+        };
+    }, []);
 
     useEffect(() => {
         if (!id) return;
-        let isMounted = true;
 
-        const load = async () => {
+        const loadInitial = async () => {
             try {
                 setLoading(true);
+                setPlaylistsPage(0);
+                setHasMore(true);
 
-                // Fetch section metadata + its playlists in parallel
+                // Fetch section metadata + first page of playlists in parallel
                 const [sectionRes, playlistsRes] = await Promise.all([
                     fetch(`/api/sections/${id}`),
-                    fetch(`/api/spotify-playlists?sectionId=${id}&limit=100`),
+                    fetch(`/api/spotify-playlists?sectionId=${id}&limit=100&page=0`),
                 ]);
 
                 const [sectionData, playlistsData] = await Promise.all([
@@ -50,7 +65,7 @@ export default function SectionPage() {
                     playlistsRes.json(),
                 ]);
 
-                if (!isMounted) return;
+                if (!isMounted.current) return;
 
                 if (sectionData.success) setSection(sectionData.data.section);
 
@@ -66,17 +81,71 @@ export default function SectionPage() {
                         sourceUrl: p.sourceUrl ?? '',
                     }));
                     setPlaylists(normalised);
+                    setTotalPlaylists(playlistsData.total || normalised.length);
+                    setHasMore(playlistsData.data.length >= 100);
                 }
             } catch (err) {
-                console.error('Error loading section:', err);
+                console.error('Error loading initial section data:', err);
             } finally {
-                if (isMounted) setLoading(false);
+                if (isMounted.current) setLoading(false);
             }
         };
 
-        load();
-        return () => { isMounted = false; };
+        loadInitial();
     }, [id]);
+
+    // Infinite scroll observer for loading more playlists
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
+                    const fetchNextPage = async () => {
+                        try {
+                            setLoadingMore(true);
+                            const nextPage = playlistsPage + 1;
+                            const res = await fetch(`/api/spotify-playlists?sectionId=${id}&limit=100&page=${nextPage}`);
+                            const data = await res.json();
+
+                            if (!isMounted.current) return;
+
+                            if (data.success) {
+                                const normalised = data.data.map((p) => ({
+                                    id: p._id,
+                                    name: p.name,
+                                    image: p.image ? [{ quality: 'default', url: p.image }] : [],
+                                    songCount: p.songCount ?? 0,
+                                    description: p.description ?? '',
+                                    source: 'spotify',
+                                    sourceUrl: p.sourceUrl ?? '',
+                                }));
+
+                                setPlaylists((prev) => {
+                                    const seen = new Set(prev.map((item) => item.id));
+                                    const uniqueNew = normalised.filter((item) => !seen.has(item.id));
+                                    return [...prev, ...uniqueNew];
+                                });
+
+                                setHasMore(data.data.length >= 100);
+                                setPlaylistsPage(nextPage);
+                            }
+                        } catch (err) {
+                            console.error('Error fetching more playlists:', err);
+                        } finally {
+                            if (isMounted.current) setLoadingMore(false);
+                        }
+                    };
+                    fetchNextPage();
+                }
+            },
+            { threshold: 0.1 }
+        );
+
+        if (loadingRef.current) {
+            observer.observe(loadingRef.current);
+        }
+
+        return () => observer.disconnect();
+    }, [hasMore, loading, loadingMore, playlistsPage, id]);
 
     const handleCardClick = (playlist) => {
         router.push(`/music/playlists/${playlist.id}`);
@@ -138,9 +207,9 @@ export default function SectionPage() {
                                     <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight truncate">
                                         {section?.name ?? ''}
                                     </h1>
-                                    {playlists.length > 0 && (
+                                    {(totalPlaylists > 0 || playlists.length > 0) && (
                                         <p className="text-xs sm:text-sm text-muted-foreground mt-1.5 font-medium">
-                                            Playlist &bull; {playlists.length} playlists
+                                            Playlist &bull; {totalPlaylists || playlists.length} playlists
                                         </p>
                                     )}
                                 </>
@@ -175,6 +244,15 @@ export default function SectionPage() {
                                 <p className="text-muted-foreground">No playlists found in this section.</p>
                             </div>
                         )}
+
+                        {/* Infinite scroll loading indicator */}
+                        <div ref={loadingRef} className="pt-8 pb-16 flex justify-center w-full">
+                            {loadingMore && (
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                    <Loader2 className="h-5 w-5 animate-spin" />
+                                </div>
+                            )}
+                        </div>
 
                     </div>
                 </div>
