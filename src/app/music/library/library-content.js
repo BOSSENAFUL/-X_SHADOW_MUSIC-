@@ -746,21 +746,22 @@ export default function LibraryContent() {
                 <ArrowLeft className="w-6 h-6" />
               </button>
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-2.5 w-4 h-4 text-zinc-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search Your Library"
-                  className="w-full bg-zinc-800 text-white placeholder:text-zinc-400 text-sm font-semibold rounded-lg pl-9 pr-8 py-2 outline-none focus:ring-1 focus:ring-green-500"
+                  className="w-full bg-muted/50 text-white placeholder:text-muted-foreground text-sm font-medium rounded-lg pl-9 pr-10 py-2.5 outline-none border-0 focus:bg-muted/70 transition-colors"
                   autoFocus
                 />
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery("")}
-                    className="absolute right-3 top-2.5 text-zinc-400 hover:text-white text-xs font-bold"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white transition-colors"
+                    aria-label="Clear search"
                   >
-                    Clear
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                   </button>
                 )}
               </div>
@@ -803,7 +804,7 @@ export default function LibraryContent() {
                         <Plus className="w-6 h-6" />
                       </button>
                     </DrawerTrigger>
-                    <DrawerContent className="pb-8 px-4 bg-zinc-900 border-zinc-800 text-white rounded-t-2xl border-t">
+                    <DrawerContent className="pb-8 px-4 bg-[#1F1F1F] border-zinc-800 text-white rounded-t-2xl border-t">
                       <div className="sr-only">
                         <DrawerTitle>Add to Library</DrawerTitle>
                       </div>
@@ -903,7 +904,7 @@ export default function LibraryContent() {
                   <span>{SORT_LABELS[sortBy]}</span>
                 </button>
               </DrawerTrigger>
-              <DrawerContent className="pb-8 px-4 bg-zinc-900 border-zinc-800 text-white rounded-t-2xl border-t">
+              <DrawerContent className="pb-8 px-4 bg-[#1F1F1F] border-zinc-800 text-white rounded-t-2xl border-t">
                 <DrawerHeader className="pb-4 border-b border-zinc-800 text-center">
                   <DrawerTitle className="text-center text-lg font-bold text-white tracking-tight">Sort by</DrawerTitle>
                 </DrawerHeader>

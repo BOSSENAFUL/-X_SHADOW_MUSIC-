@@ -167,7 +167,7 @@ const SongActionMenu = memo(({
           </Button>
         </DrawerTrigger>
         <div onClick={(e) => e.stopPropagation()}>
-          <DrawerContent className="bg-[#121212] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
+          <DrawerContent className="bg-[#1F1F1F] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
             <DrawerHeader className="p-0">
               <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
                 <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0">

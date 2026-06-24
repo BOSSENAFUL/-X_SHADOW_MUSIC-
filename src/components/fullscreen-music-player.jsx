@@ -3269,7 +3269,7 @@ export function FullscreenMusicPlayer({
                     </Button>
                   </DrawerTrigger>
 
-                  <DrawerContent className="bg-[#121212] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
+                  <DrawerContent className="bg-[#1F1F1F] border-none text-white outline-none focus:outline-none ring-0 focus-visible:ring-0">
                     <DrawerHeader className="p-0">
                       <div className="flex items-center gap-4 px-4 py-4 border-b border-white/10">
                         <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0">
@@ -4141,7 +4141,7 @@ export function FullscreenMusicPlayer({
 
         {/* Mobile: Vaul Drawer for Queue */}
         <Drawer open={isMobile && showPlaylist} onOpenChange={setShowPlaylist}>
-          <DrawerContent className="h-[80vh] bg-black/95 border-t border-white/10 text-white flex flex-col focus:outline-none">
+          <DrawerContent className="h-[80vh] bg-[#1F1F1F] border-t border-white/10 text-white flex flex-col focus:outline-none">
             <DrawerHeader className="border-b border-white/10 flex items-center justify-between px-4 py-3 shrink-0">
               <DrawerTitle className="text-lg font-semibold text-white">Queue</DrawerTitle>
             </DrawerHeader>
