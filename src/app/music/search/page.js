@@ -1299,26 +1299,7 @@ function SearchPageContent() {
     }
   };
 
-  // Auto-focus the search input only when arriving fresh (no saved state)
-  useEffect(() => {
-    // Don't steal focus on back-navigation — check sessionStorage directly
-    try {
-      const raw = sessionStorage.getItem('searchPageState');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed?.query) return;
-      }
-    } catch { /* ignore */ }
-
-    const timer = setTimeout(() => {
-      if (searchInputRef.current) {
-        searchInputRef.current.focus();
-      }
-    }, 100);
-
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Search suggestions logic hook or other effects can go here
 
   // Handle initial query from URL parameters
   useEffect(() => {
@@ -1954,7 +1935,7 @@ function SearchPageContent() {
     <SidebarProvider>
       <AppSidebar className="hidden md:flex" />
       <SidebarInset className="md:ml-0 overflow-x-hidden h-svh relative flex flex-col">
-        <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 md:border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+        <header className="sticky top-0 z-50 hidden md:flex h-16 shrink-0 items-center gap-2 md:border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1 hidden md:flex" />
             <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:block" />
@@ -1983,7 +1964,7 @@ function SearchPageContent() {
           style={{ opacity: isInitialRestore ? 0 : 1 }}
         >
           {/* Search Input */}
-          <div className="p-4 sm:p-6 pb-4">
+          <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md p-4 sm:p-6 pb-4 border-b border-white/5">
             <div ref={searchWrapperRef} className="relative w-full max-w-2xl mx-auto">
               <Search className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 transition-colors ${(loading || lyricsLoading || publicPlaylistsLoading || (activeSearchQuery.trim() && !combinedSearchResults))
                 ? 'text-primary animate-pulse'
@@ -2001,7 +1982,7 @@ function SearchPageContent() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
                 onFocus={() => setShowSuggestions(true)}
-                className="pl-12 pr-4 bg-muted/50 border-0 h-12 sm:h-14 text-base sm:text-lg rounded-full focus:bg-muted/70 transition-colors"
+                className="pl-12 pr-4 bg-muted/50 border-0 h-12 sm:h-14 text-base sm:text-lg rounded-lg focus:bg-muted/70 focus-visible:ring-0 font-medium text-white transition-colors"
               />
               {(loading || lyricsLoading || publicPlaylistsLoading || (activeSearchQuery.trim() && !combinedSearchResults)) && (
                 <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
@@ -3079,15 +3060,7 @@ function SearchPageContent() {
           )}
 
           {!searchQuery && !loading && (
-            <div className="flex flex-col items-center justify-center py-10 md:py-16">
-
-              <div className="flex flex-col items-center mb-12">
-                <Search className="w-16 h-16 text-muted-foreground mb-4" />
-                <h3 className="text-xl font-semibold mb-2">Search for music</h3>
-                <p className="text-muted-foreground text-center px-4">
-                  Find your favorite songs, albums, artists, and playlists
-                </p>
-              </div>
+            <div className="flex flex-col items-center justify-center py-6 md:py-8">
 
               {/* Popular Genres Section */}
 
@@ -3096,8 +3069,9 @@ function SearchPageContent() {
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl md:text-2xl font-bold tracking-tight">Browse all</h2>
                   <Button
-                    variant="link"
-                    className="text-primary font-semibold"
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-white hover:bg-white/10 font-semibold text-sm rounded-full transition-colors"
                     onClick={() => router.push('/music/discover/genres')}
                   >
                     See all

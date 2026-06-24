@@ -105,7 +105,7 @@ export default function GenresPage() {
           </div>
 
           {/* Search Bar */}
-          <div className="mb-6">
+          <div className="sticky top-0 md:top-16 z-30 bg-background/95 backdrop-blur-md -mx-4 sm:-mx-6 px-4 sm:px-6 py-4 mb-6 border-b border-white/5">
             <div className="relative max-w-md w-full">
               <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-5 h-5 text-black/60 dark:text-black/60 z-10" />
               <Input
