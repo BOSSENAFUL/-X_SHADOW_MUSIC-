@@ -329,9 +329,25 @@ export default function FavoritesPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const defaultThemeColor = "#121212";
-    applyThemeColor(showHeaderTitle ? "#1D1046" : "#2C0E84");
+
+    window._getActivePageThemeColor = (progress) => {
+      // Interpolate between #2C0E84 (scroll progress = 0) and #1D1046 (scroll progress = 1)
+      const r = Math.round(44 * (1 - progress) + 29 * progress);
+      const g = Math.round(14 * (1 - progress) + 16 * progress);
+      const b = Math.round(132 * (1 - progress) + 70 * progress);
+      const toHex = (c) => {
+        const hex = c.toString(16);
+        return hex.length === 1 ? "0" + hex : hex;
+      };
+      return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    };
+
+    const targetColor = showHeaderTitle ? "#1D1046" : "#2C0E84";
+    applyThemeColor(targetColor);
+
     return () => {
       applyThemeColor(defaultThemeColor);
+      delete window._getActivePageThemeColor;
     };
   }, [showHeaderTitle]);
 

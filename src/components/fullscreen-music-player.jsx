@@ -1818,7 +1818,8 @@ export function FullscreenMusicPlayer({
 
     const getActivePageColor = () => {
       if (window._getActivePageThemeColor) {
-        const scrollContainer = document.getElementById('user-playlist-scroll-container') ||
+        const scrollContainer = document.getElementById('favorites-scroll-container') ||
+                                document.getElementById('user-playlist-scroll-container') ||
                                 document.getElementById('playlist-scroll-container') ||
                                 document.getElementById('album-scroll-container') ||
                                 document.getElementById('artist-scroll-container') ||
