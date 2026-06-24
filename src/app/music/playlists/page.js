@@ -197,6 +197,27 @@ export default function PlaylistsPage() {
   const [scrollRestored, setScrollRestored] = useState(false);
   const scrollContainerRef = useRef(null);
 
+  // Handle auto-import trigger from query parameters (coming from Library page mobile drawer)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const importParam = params.get("import");
+      if (importParam === "spotify") {
+        setImportSource("spotify");
+        setImportUrl("");
+        setImportStage(0);
+        setShowImportDialog(true);
+        router.replace("/music/playlists");
+      } else if (importParam === "youtube") {
+        setImportSource("youtube");
+        setImportUrl("");
+        setImportStage(0);
+        setShowImportDialog(true);
+        router.replace("/music/playlists");
+      }
+    }
+  }, [router]);
+
   // Safe storage helper to avoid QuotaExceededError
   const safeSessionStorageSet = useCallback((key, value) => {
     try {

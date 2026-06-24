@@ -1600,7 +1600,7 @@ export default function PlaylistDetailPage({ params }) {
       if (result.success) {
         if (session?.user?.id) {
           sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
-          sessionStorage.removeItem(`created_playlists_${session.user.id}`);
+          sessionStorage.removeItem(`created_playlists_${session.user.id}_v3`);
         }
         toast.success(result.data.isPublic ? 'Playlist is now public' : 'Playlist is now private');
         // Clear cache so changes reflect on reload
@@ -1656,7 +1656,7 @@ export default function PlaylistDetailPage({ params }) {
       if (result.success) {
         if (session?.user?.id) {
           sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
-          sessionStorage.removeItem(`created_playlists_${session.user.id}`);
+          sessionStorage.removeItem(`created_playlists_${session.user.id}_v3`);
         }
         setPlaylist(prev => ({
           ...prev,
@@ -1688,7 +1688,7 @@ export default function PlaylistDetailPage({ params }) {
       if (result.success) {
         if (session?.user?.id) {
           sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
-          sessionStorage.removeItem(`created_playlists_${session.user.id}`);
+          sessionStorage.removeItem(`created_playlists_${session.user.id}_v3`);
         }
         toast.success('Playlist deleted');
 
@@ -1725,7 +1725,7 @@ export default function PlaylistDetailPage({ params }) {
       if (result.success) {
         if (session?.user?.id) {
           sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
-          sessionStorage.removeItem(`created_playlists_${session.user.id}`);
+          sessionStorage.removeItem(`created_playlists_${session.user.id}_v3`);
         }
 
         // Remove the song from the local state
