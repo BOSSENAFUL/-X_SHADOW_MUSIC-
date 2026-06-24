@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useRef } from "react";
 
 const MusicPlayerContext = createContext();
 
@@ -18,6 +18,97 @@ export function MusicPlayerProvider({ children }) {
   const [showTrackNumbersMobile, setShowTrackNumbersMobile] = useState(false);
   const [disableSpotifyCanvas, setDisableSpotifyCanvas] = useState(false);
   const [disableLyricsBg, setDisableLyricsBg] = useState(true);
+  const [restoredTime, setRestoredTime] = useState(null);
+  const [isRestored, setIsRestored] = useState(false);
+
+  // Add audio timing states
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(1);
+  const [audioRef, setAudioRef] = useState(null);
+
+  // Load player state from localStorage on mount (defer to prevent hydration issues)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const storedSong = localStorage.getItem("jammify_player_song");
+        const storedIndex = localStorage.getItem("jammify_player_index");
+        const storedPlaylist = localStorage.getItem("jammify_player_playlist");
+        const storedPlaylistId = localStorage.getItem("jammify_player_playlist_id");
+        const storedVisible = localStorage.getItem("jammify_player_visible");
+        const storedVolume = localStorage.getItem("jammify_player_volume");
+        const storedTime = localStorage.getItem("jammify_player_current_time");
+
+        if (storedSong && storedSong !== "null") {
+          const parsedSong = JSON.parse(storedSong);
+          const parsedPlaylist = storedPlaylist ? JSON.parse(storedPlaylist) : [];
+          const parsedIndex = storedIndex ? parseInt(storedIndex, 10) : 0;
+          const parsedPlaylistId = storedPlaylistId && storedPlaylistId !== "null" ? storedPlaylistId : null;
+          const parsedTime = storedTime ? parseFloat(storedTime) : 0;
+
+          setTimeout(() => {
+            setCurrentSong(parsedSong);
+            setPlaylist(parsedPlaylist);
+            setCurrentIndex(parsedIndex);
+            setCurrentPlaylistId(parsedPlaylistId);
+            setIsPlayerVisible(storedVisible === "true");
+            setIsPlaying(false); // ALWAYS start paused on reopen!
+            if (parsedTime > 0) {
+              setRestoredTime(parsedTime);
+              setCurrentTime(parsedTime);
+            }
+            if (storedVolume) {
+              setVolume(parseFloat(storedVolume));
+            }
+            setIsRestored(true);
+          }, 0);
+        } else {
+          setTimeout(() => {
+            setIsRestored(true);
+          }, 0);
+        }
+      } catch (e) {
+        console.error("Failed to restore player state", e);
+        setIsRestored(true);
+      }
+    }
+  }, []);
+
+  // Save core state to localStorage on state changes
+  useEffect(() => {
+    if (!isRestored) return;
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("jammify_player_song", JSON.stringify(currentSong));
+        localStorage.setItem("jammify_player_index", String(currentIndex));
+        localStorage.setItem("jammify_player_playlist", JSON.stringify(playlist));
+        localStorage.setItem("jammify_player_playlist_id", String(currentPlaylistId));
+        localStorage.setItem("jammify_player_visible", String(isPlayerVisible));
+      } catch (e) {
+        console.error("Failed to save player state", e);
+      }
+    }
+  }, [currentSong, currentIndex, playlist, currentPlaylistId, isPlayerVisible, isRestored]);
+
+  // Save volume to localStorage on change
+  useEffect(() => {
+    if (!isRestored) return;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("jammify_player_volume", String(volume));
+    }
+  }, [volume, isRestored]);
+
+  // Save progress time to localStorage (throttled to at least 1.5s interval of change)
+  const lastSavedTimeRef = useRef(0);
+  useEffect(() => {
+    if (!isRestored) return;
+    if (typeof window !== "undefined" && currentSong) {
+      if (Math.abs(currentTime - lastSavedTimeRef.current) >= 1.5) {
+        localStorage.setItem("jammify_player_current_time", String(currentTime));
+        lastSavedTimeRef.current = currentTime;
+      }
+    }
+  }, [currentTime, currentSong, isRestored]);
 
   // Load mobile track numbers setting on mount (defer to prevent synchronous setState warning)
   useEffect(() => {
@@ -52,11 +143,7 @@ export function MusicPlayerProvider({ children }) {
     }
   }, []);
 
-  // Add audio timing states
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [audioRef, setAudioRef] = useState(null);
+
 
   // Helper function to check if current song is a radio station
   const isRadioPlaying = currentSong?.isRadio === true;
@@ -127,6 +214,8 @@ export function MusicPlayerProvider({ children }) {
         setDisableSpotifyCanvas,
         disableLyricsBg,
         setDisableLyricsBg,
+        restoredTime,
+        setRestoredTime,
         isFullscreenOpen,
         isFullscreenPlaylistOpen,
         currentTime,

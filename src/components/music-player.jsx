@@ -43,10 +43,16 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     currentPlaylistId,
     setPlaylist,
     playSong,
+    restoredTime,
+    setRestoredTime,
+    updateCurrentTime: setContextCurrentTime,
+    updateDuration: setContextDuration,
+    volume,
+    updateVolume: setVolume,
+    setAudioRef,
   } = useMusicPlayer();
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.7);
   const [prevVolume, setPrevVolume] = useState(0.7);
   const [dominantColor, setDominantColor] = useState("rgb(40, 40, 40)"); // Default dark color
   const [isScrubbing, setIsScrubbing] = useState(false);
@@ -64,6 +70,24 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   const initSuggestionsSongIdRef = useRef(null);
   const currentSongIdRef = useRef(null);
   const currentPlaylistIdRef = useRef(null);
+  const lastContextTimeRef = useRef(0);
+  const restoredTimeRef = useRef(restoredTime);
+
+  useEffect(() => {
+    restoredTimeRef.current = restoredTime;
+  }, [restoredTime]);
+
+  // Sync audioRef to context
+  useEffect(() => {
+    setAudioRef(audioRef);
+  }, [setAudioRef]);
+
+  // Sync volume to audio element
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume]);
 
   // Use currentIndex from context if available, fallback to findIndex
   const currentIndex = playerCurrentIndex ?? (playlist.findIndex((song) => song.id === currentSong?.id) || 0);
@@ -179,6 +203,8 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     if (audioRef.current) {
       audioRef.current.currentTime = value[0];
       setCurrentTime(value[0]);
+      setContextCurrentTime(value[0]);
+      lastContextTimeRef.current = value[0];
     }
   };
 
@@ -191,6 +217,8 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       lastSeekTimestampRef.current = Date.now();
       audioRef.current.currentTime = targetTime;
       setCurrentTime(targetTime);
+      setContextCurrentTime(targetTime);
+      lastContextTimeRef.current = targetTime;
     }
   };
 
@@ -218,6 +246,8 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       lastSeekTimestampRef.current = Date.now();
       audioRef.current.currentTime = targetTime;
       setCurrentTime(targetTime);
+      setContextCurrentTime(targetTime);
+      lastContextTimeRef.current = targetTime;
       // Resume directly via audioRef — do NOT call setIsPlaying(true).
       if (wasPlayingBeforeScrub) {
         audioRef.current.play().catch(() => { });
@@ -702,6 +732,12 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
       setCurrentTime(newTime);
 
+      // Throttled sync of context time for localStorage persistence:
+      if (Math.abs(newTime - lastContextTimeRef.current) >= 1.5) {
+        setContextCurrentTime(newTime);
+        lastContextTimeRef.current = newTime;
+      }
+
       // Immediately update media session position state
       if (
         typeof window !== "undefined" &&
@@ -723,6 +759,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     const updateDuration = () => {
       const newDuration = audio.duration;
       setDuration(newDuration);
+      setContextDuration(newDuration);
 
       // Update media session with new duration
       if (
@@ -751,15 +788,32 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     };
 
     const handleLoadStart = () => {
-      // Reset time when loading new song
+      // Reset time when loading new song, unless we are restoring time on mount
+      if (restoredTimeRef.current !== null) {
+        return;
+      }
       setCurrentTime(0);
       setDuration(0);
+      setContextCurrentTime(0);
+      lastContextTimeRef.current = 0;
     };
 
     const handleCanPlay = () => {
       // Update duration when audio can play
       if (audio.duration && !isNaN(audio.duration)) {
         setDuration(audio.duration);
+        setContextDuration(audio.duration);
+      }
+
+      // Seek to restoredTime if available
+      if (restoredTimeRef.current !== null) {
+        const targetTime = restoredTimeRef.current;
+        console.log("Restoring playback position on canplay to:", targetTime);
+        audio.currentTime = targetTime;
+        setCurrentTime(targetTime);
+        setContextCurrentTime(targetTime);
+        setRestoredTime(null);
+        restoredTimeRef.current = null;
       }
     };
 
@@ -776,7 +830,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       audio.removeEventListener("loadstart", handleLoadStart);
       audio.removeEventListener("ended", handleEnded);
     };
-  }, [currentSong]);
+  }, [currentSong, setContextCurrentTime, setContextDuration, setRestoredTime]);
 
   // Build shuffled order when shuffle is toggled on or playlist changes
   useEffect(() => {
@@ -819,13 +873,15 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       }
     } else {
       audio.pause();
+      setContextCurrentTime(audio.currentTime);
+      lastContextTimeRef.current = audio.currentTime;
     }
 
     // Update media session playback state
     if (typeof window !== "undefined" && "mediaSession" in navigator) {
       navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
     }
-  }, [isPlaying, currentSong]);
+  }, [isPlaying, currentSong, setContextCurrentTime]);
 
   // Media Session API — register action handlers only once, update metadata
   // only when the song ID changes, update playbackState in its own lightweight
