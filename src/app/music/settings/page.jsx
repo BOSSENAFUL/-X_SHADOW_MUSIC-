@@ -38,6 +38,7 @@ import {
     LayoutGrid,
     Check,
     Video,
+    Mic,
 } from "lucide-react";
 
 // ── Section wrapper ──────────────────────────────────────────────────────────
@@ -87,22 +88,22 @@ function SettingsRow({ icon: Icon, label, description, onClick, children, danger
 // ── Feed preference options ───────────────────────────────────────────────────
 const FEED_OPTIONS = [
     {
-        value: 'indian',
-        label: 'Indian',
-        description: 'Hindi playlists & Bollywood sections',
+        value: 'all',
+        label: 'All',
+        description: 'Show both music and podcast categories',
+        icon: Layers,
+    },
+    {
+        value: 'music',
+        label: 'Music',
+        description: 'Show only music playlists and suggestions',
         icon: Music2,
     },
     {
-        value: 'global',
-        label: 'Global',
-        description: 'English playlists & international sections',
-        icon: Globe,
-    },
-    {
-        value: 'all',
-        label: 'All',
-        description: 'Both Indian and Global content together',
-        icon: Layers,
+        value: 'podcasts',
+        label: 'Podcasts',
+        description: 'Show only podcast episodes and shows',
+        icon: Mic,
     },
 ];
 

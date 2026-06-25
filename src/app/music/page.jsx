@@ -21,7 +21,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Heart, Search, MessageSquare, Radio, Loader2 } from "lucide-react";
+import { Heart, Search, MessageSquare, Radio, Loader2, Mic } from "lucide-react";
 
 import { PlaylistSection } from "@/components/music/playlist-section";
 import { PWAInstallBanner } from "@/components/music/pwa-install-banner";
@@ -69,6 +69,106 @@ const AmbientGradient = memo(({ color }) => {
 
 AmbientGradient.displayName = "AmbientGradient";
 
+const MOCK_PODCASTS = [
+  {
+    id: "just-wucka",
+    title: "Just Wucka",
+    cover: "https://images.unsplash.com/photo-1552053831-71594a27632d?w=300&h=300&fit=crop",
+    episodes: [
+      { id: "jw-ep1", title: "EP 1: Why Dogs Wear Hats", desc: "Today we dive deep into the psychology of yellow duck hats and why golden retrievers love them.", duration: "42 min", date: "2 days ago" },
+      { id: "jw-ep2", title: "EP 2: Fetching the Truth", desc: "Is fetch a sport or a lifestyle? We debate with professional ball-chasers.", duration: "38 min", date: "1 week ago" }
+    ]
+  },
+  {
+    id: "anime-grind",
+    title: "Anime Grind",
+    cover: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=300&h=300&fit=crop",
+    episodes: [
+      { id: "ag-ep1", title: "EP 45: Gym Music Tier List", desc: "Rating the best anime soundtracks to lift heavy weights to. Gurenge vs. Silhouette.", duration: "55 min", date: "Yesterday" }
+    ]
+  },
+  {
+    id: "chainsfr",
+    title: "ChainsFR On Spotify",
+    cover: "https://images.unsplash.com/photo-1531346878377-a5be20888e57?w=300&h=300&fit=crop",
+    episodes: [
+      { id: "cfr-ep1", title: "My Dumbest High School Stories", desc: "Talking about that one time I accidentally locked myself in the school basement during finals.", duration: "18 min", date: "4 days ago" }
+    ]
+  },
+  {
+    id: "distractible",
+    title: "Distractible",
+    cover: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=300&h=300&fit=crop",
+    episodes: [
+      { id: "dist-ep1", title: "We Are All Getting Older", desc: "Mark, Bob, and Wade contemplate the passage of time, back pains, and the mysteries of fiber intake.", duration: "62 min", date: "3 days ago" }
+    ]
+  },
+  {
+    id: "trust-me-bro",
+    title: "Trust Me Bro",
+    cover: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=300&h=300&fit=crop",
+    episodes: [
+      { id: "tmb-ep1", title: "EP 82: Why the Pyramids are Actually UFOs", desc: "Trust me bro, the angles align perfectly with Orion's belt. We have zero proof, but a lot of confidence.", duration: "50 min", date: "5 days ago" }
+    ]
+  },
+  {
+    id: "trash-taste",
+    title: "Trash Taste Podcast",
+    cover: "https://images.unsplash.com/photo-1601987177651-8edfe6c20009?w=300&h=300&fit=crop",
+    episodes: [
+      { id: "tt-ep1", title: "EP 198: Our Worst Food Opinions Yet", desc: "Joey, Connor, and Garnt argue for two hours about why boneless chicken is better and bread is overrated.", duration: "128 min", date: "6 days ago" }
+    ]
+  },
+  {
+    id: "weekly-motivation",
+    title: "Weekly Motivation",
+    cover: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&h=300&fit=crop",
+    episodes: [
+      { id: "wm-ep1", title: "Day 1: Rise & Dominate", desc: "Wake up with purpose. No excuses, no shortcuts. A heavy dose of focus for your morning routine.", duration: "12 min", date: "Monday" }
+    ]
+  },
+  {
+    id: "figuring-out",
+    title: "Figuring Out",
+    cover: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&h=300&fit=crop",
+    episodes: [
+      { id: "fo-ep1", title: "Building a 100 Crore Brand with Zero Funding", desc: "Raj Shamani talks with top entrepreneurs about unit economics, scale, and the mental grit required.", duration: "48 min", date: "3 days ago" }
+    ]
+  },
+  {
+    id: "mindset-meditation",
+    title: "The Mindset Meditation",
+    cover: "https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=300&h=300&fit=crop",
+    episodes: [
+      { id: "mm-ep1", title: "10-Minute Anxiety Release Session", desc: "Sit back, breathe deeply, and align your focus. Perfect for midday stress relief.", duration: "10 min", date: "2 days ago" }
+    ]
+  },
+  {
+    id: "at-podcast",
+    title: "AT Podcast",
+    cover: "https://images.unsplash.com/photo-1610116306796-6fea9f4fae38?w=300&h=300&fit=crop",
+    episodes: [
+      { id: "at-ep1", title: "Coding in your Sleep: The Future of AI", desc: "Discussing autonomous coding models, developer workflows, and human-in-the-loop pair programming.", duration: "32 min", date: "Last week" }
+    ]
+  },
+  {
+    id: "mrballen",
+    title: "MrBallen Podcast",
+    cover: "https://images.unsplash.com/photo-1509248961158-e54f6934749c?w=300&h=300&fit=crop",
+    episodes: [
+      { id: "mb-ep1", title: "The Man Who Lived In The Walls", desc: "A terrifying story of a family who realized someone was living behind their living room drywall for months.", duration: "44 min", date: "1 week ago" }
+    ]
+  },
+  {
+    id: "true-story-rwj",
+    title: "True Story Podcast",
+    cover: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&h=300&fit=crop",
+    episodes: [
+      { id: "ts-ep1", title: "The Wildest Heist You Never Heard Of", desc: "Ray William Johnson tells the unbelievable true story of the diamond heist in Antwerp.", duration: "25 min", date: "5 days ago" }
+    ]
+  }
+];
+
 export default function MusicPage() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
@@ -100,12 +200,17 @@ export default function MusicPage() {
 
   // Read feed preference from localStorage (set in Settings)
   const [feedPreference, setFeedPreference] = useState('all');
+  const [followedPodcasts, setFollowedPodcasts] = useState([]);
 
   // Read from localStorage after mount + re-read when tab becomes visible
   useEffect(() => {
     const read = () => {
       const pref = localStorage.getItem('feed_preference') || 'all';
       setFeedPreference(pref);
+      try {
+        const followed = localStorage.getItem("followed_podcasts");
+        setFollowedPodcasts(followed ? JSON.parse(followed) : []);
+      } catch (e) {}
     };
     read(); // initial read after hydration
     document.addEventListener('visibilitychange', () => {
@@ -114,8 +219,8 @@ export default function MusicPage() {
     return () => document.removeEventListener('visibilitychange', read);
   }, []);
 
-  const showIndian = feedPreference === 'indian' || feedPreference === 'all';
-  const showGlobal = feedPreference === 'global' || feedPreference === 'all';
+  const showIndian = feedPreference === 'indian' || feedPreference === 'all' || feedPreference === 'music';
+  const showGlobal = feedPreference === 'global' || feedPreference === 'all' || feedPreference === 'music';
 
   const { playSong, currentPlaylistId, isPlaying, togglePlayPause } = useMusicPlayer();
 
@@ -1111,68 +1216,87 @@ export default function MusicPage() {
     <SidebarProvider>
       <AppSidebar className="hidden md:flex" />
       <SidebarInset className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col">
-        <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-          <div className="flex items-center justify-between w-full gap-2 px-3 md:px-4">
+        {/* Desktop header */}
+        <header className="sticky top-0 z-50 hidden md:flex h-16 shrink-0 items-center gap-2 border-b bg-background group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+          <div className="flex items-center justify-between w-full gap-2 px-4">
             <div className="flex items-center gap-2">
-              <SidebarTrigger className="-ml-1 hidden md:flex" />
-              <Separator
-                orientation="vertical"
-                className="mr-2 data-[orientation=vertical]:h-4 hidden md:block"
-              />
+              <SidebarTrigger className="-ml-1" />
+              <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
               <Breadcrumb>
                 <BreadcrumbList>
-                  <BreadcrumbItem className="hidden md:block">
+                  <BreadcrumbItem>
                     <BreadcrumbLink href="/music">Music</BreadcrumbLink>
                   </BreadcrumbItem>
-                  <BreadcrumbSeparator className="hidden md:block" />
+                  <BreadcrumbSeparator />
                   <BreadcrumbItem>
                     <BreadcrumbPage>Discover</BreadcrumbPage>
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
             </div>
-
-            {/* Right Actions */}
-            <div className="flex items-center gap-2">
-
-              {/* Search Bar - Hidden on mobile */}
-              <div className="relative hidden sm:block">
-                <Button
-                  variant="ghost"
-                  onClick={() => router.push("/music/search")}
-                  className="flex items-center justify-start gap-3 bg-muted/30 hover:bg-muted/50 border border-muted-foreground/20 hover:border-muted-foreground/30 transition-all duration-200 rounded-full h-9 w-40 md:w-48 lg:w-56 xl:w-64 px-4"
-                >
-                  <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <span className="text-sm text-muted-foreground text-left truncate">
-                    Search music...
-                  </span>
-                </Button>
-              </div>
-
-              {/* Mobile Radio Button */}
+            <div className="relative hidden sm:flex">
               <Button
                 variant="ghost"
-                size="icon"
-                onClick={() => router.push("/music/radio")}
-                className="h-9 w-9 rounded-full bg-muted/30 hover:bg-muted/50 border border-muted-foreground/20 hover:border-muted-foreground/30 flex items-center justify-center shrink-0 md:hidden relative"
-                title="Radio Stations"
+                onClick={() => router.push("/music/search")}
+                className="flex items-center justify-start gap-3 bg-muted/30 hover:bg-muted/50 border border-muted-foreground/20 hover:border-muted-foreground/30 transition-all duration-200 rounded-full h-9 w-48 lg:w-56 xl:w-64 px-4"
               >
-                <Radio className="w-4 h-4 text-muted-foreground" />
-              </Button>
-
-              {/* Mobile Community Button */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => router.push("/music/chat")}
-                className="h-9 w-9 rounded-full bg-muted/30 hover:bg-muted/50 border border-muted-foreground/20 hover:border-muted-foreground/30 flex items-center justify-center shrink-0 md:hidden relative"
-                title="Community Hub"
-              >
-                <MessageSquare className="w-4 h-4 text-muted-foreground" />
-                {/* Red dot to indicate activity / new feature */}
-                <span className="absolute top-[6px] right-[6px] w-[8px] h-[8px] bg-red-500 rounded-full border border-background shadow-sm animate-pulse"></span>
+                <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+                <span className="text-sm text-muted-foreground text-left truncate">Search music...</span>
               </Button>
             </div>
+          </div>
+        </header>
+
+        {/* Mobile Spotify-style header */}
+        <header className="sticky top-0 z-50 md:hidden flex items-center gap-3 px-4 pt-[14px] pb-[10px] bg-background">
+          <Link href="/music/profile" className="shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-full">
+            {session?.user?.image ? (
+              <img
+                src={session.user.image}
+                alt="Profile"
+                className="w-8 h-8 rounded-full object-cover border border-white/10"
+                onError={(e) => { e.target.src = '/default-avatar.png'; }}
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-indigo-700 flex items-center justify-center text-sm font-bold text-white border border-white/10">
+                {session?.user?.name?.charAt(0).toUpperCase() || "J"}
+              </div>
+            )}
+          </Link>
+
+          <div className="flex items-center gap-2 flex-1 overflow-x-auto scrollbar-hide">
+            {[
+              { label: "All",      value: "all" },
+              { label: "Music",    value: "music" },
+              { label: "Podcasts", value: "podcasts" },
+            ].map(({ label, value }) => (
+              <button
+                key={value}
+                onClick={() => {
+                  setFeedPreference(value);
+                  localStorage.setItem('feed_preference', value);
+                }}
+                className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                  feedPreference === value
+                    ? "bg-green-500 text-black"
+                    : "bg-white/10 text-white hover:bg-white/20"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push("/music/chat")}
+              className="relative h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center"
+            >
+              <MessageSquare className="w-4 h-4 text-white" />
+              <span className="absolute top-[5px] right-[5px] w-[7px] h-[7px] bg-red-500 rounded-full border border-background shadow-sm animate-pulse" />
+            </Button>
           </div>
         </header>
 
@@ -1183,8 +1307,171 @@ export default function MusicPage() {
           {/* PWA Install Banner — mobile only */}
           <PWAInstallBanner />
 
-          {/* Quick Access Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
+          {feedPreference === 'podcasts' ? (
+            followedPodcasts.length === 0 ? (
+              <div className="space-y-4 z-10 relative">
+                <h2 className="text-xl md:text-2xl font-bold tracking-tight text-white select-none">
+                  Latest episodes
+                </h2>
+                
+                <div className="bg-[#181818]/80 border border-white/5 rounded-xl p-8 sm:p-12 flex flex-col items-center justify-center text-center shadow-lg">
+                  {/* Overlapping Podcast Covers Stack */}
+                  <div className="h-32 sm:h-36 w-full flex items-center justify-center relative mb-6">
+                    {/* Left 2 */}
+                    <img
+                      src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=150&h=150&fit=crop"
+                      alt="Podcast cover left 2"
+                      className="absolute w-[60px] h-[60px] sm:w-[75px] sm:h-[75px] z-10 -translate-x-[65px] sm:-translate-x-[85px] opacity-40 rounded-md object-cover shadow-[0_4px_12px_rgba(0,0,0,0.3)] select-none pointer-events-none"
+                    />
+                    {/* Left 1 */}
+                    <img
+                      src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=180&h=180&fit=crop"
+                      alt="Podcast cover left 1"
+                      className="absolute w-[75px] h-[75px] sm:w-[95px] sm:h-[95px] z-20 -translate-x-[35px] sm:-translate-x-[45px] opacity-75 rounded-md object-cover shadow-[0_6px_16px_rgba(0,0,0,0.4)] select-none pointer-events-none"
+                    />
+                    {/* Right 2 */}
+                    <img
+                      src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=150&h=150&fit=crop"
+                      alt="Podcast cover right 2"
+                      className="absolute w-[60px] h-[60px] sm:w-[75px] sm:h-[75px] z-10 translate-x-[65px] sm:translate-x-[85px] opacity-40 rounded-md object-cover shadow-[0_4px_12px_rgba(0,0,0,0.3)] select-none pointer-events-none"
+                    />
+                    {/* Right 1 */}
+                    <img
+                      src="https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=180&h=180&fit=crop"
+                      alt="Podcast cover right 1"
+                      className="absolute w-[75px] h-[75px] sm:w-[95px] sm:h-[95px] z-20 translate-x-[35px] sm:-translate-x-[45px] opacity-75 rounded-md object-cover shadow-[0_6px_16px_rgba(0,0,0,0.4)] select-none pointer-events-none"
+                    />
+                    {/* Center */}
+                    <img
+                      src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=220&h=220&fit=crop"
+                      alt="Podcast cover center"
+                      className="w-[90px] h-[90px] sm:w-[115px] sm:h-[115px] z-30 rounded-md object-cover shadow-[0_8px_24px_rgba(0,0,0,0.6)] border border-white/10 select-none pointer-events-none animate-pulse"
+                    />
+                  </div>
+
+                  <h3 className="text-white font-bold text-lg sm:text-xl md:text-2xl tracking-tight leading-tight max-w-sm">
+                    You haven&apos;t followed any podcasts
+                  </h3>
+                  
+                  <p className="text-muted-foreground text-xs sm:text-sm mt-2 max-w-xs">
+                    Follow your favourites to stay up to date.
+                  </p>
+
+                  <Button
+                    onClick={() => router.push("/music/podcasts/choose")}
+                    className="mt-6 bg-white hover:bg-neutral-200 text-black font-bold text-sm px-7 py-2.5 rounded-full shadow-md hover:scale-[1.03] active:scale-95 transition-all select-none"
+                  >
+                    Browse podcasts
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6 z-10 relative">
+                {/* Followed Shows Carousel */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl md:text-2xl font-bold tracking-tight text-white select-none">
+                      Your Shows
+                    </h2>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground hover:text-white hover:bg-white/10 text-xs font-semibold rounded-full"
+                      onClick={() => router.push("/music/podcasts/choose")}
+                    >
+                      Edit shows
+                    </Button>
+                  </div>
+                  <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
+                    {followedPodcasts.map((fid) => {
+                      const show = MOCK_PODCASTS.find((p) => p.id === fid);
+                      if (!show) return null;
+                      return (
+                        <div key={show.id} className="flex flex-col items-center shrink-0 w-24 sm:w-28 text-center group cursor-pointer" onClick={() => router.push("/music/podcasts/choose")}>
+                          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-white/5 shadow-md mb-2 group-hover:scale-[1.03] transition-transform duration-200">
+                            <img src={show.cover} alt={show.title} className="w-full h-full object-cover" />
+                          </div>
+                          <span className="text-white text-xs font-bold truncate w-full px-1">
+                            {show.title}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Latest Episodes List */}
+                <div className="space-y-4">
+                  <h2 className="text-xl md:text-2xl font-bold tracking-tight text-white select-none mb-4">
+                    Latest episodes
+                  </h2>
+                  <div className="space-y-3">
+                    {followedPodcasts.flatMap((fid) => {
+                      const show = MOCK_PODCASTS.find((p) => p.id === fid);
+                      if (!show) return [];
+                      return show.episodes.map((ep) => ({ ...ep, show }));
+                    })
+                    .sort((a, b) => {
+                      if (a.date.includes("Yesterday")) return -1;
+                      if (b.date.includes("Yesterday")) return 1;
+                      if (a.date.includes("days ago") && b.date.includes("days ago")) {
+                        return parseInt(a.date) - parseInt(b.date);
+                      }
+                      return 0;
+                    })
+                    .map((episode) => (
+                      <div
+                        key={episode.id}
+                        className="bg-[#181818]/60 border border-white/5 rounded-xl p-4 sm:p-5 flex gap-4 hover:bg-[#181818]/85 transition-colors relative group"
+                      >
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-md overflow-hidden shrink-0 border border-white/5 shadow-sm">
+                          <img src={episode.show.cover} alt={episode.show.title} className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-1 min-w-0 flex flex-col justify-center">
+                          <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider mb-0.5">
+                            {episode.show.title}
+                          </span>
+                          <h4 className="text-white font-bold text-sm sm:text-base leading-snug line-clamp-1 group-hover:text-green-500 transition-colors">
+                            {episode.title}
+                          </h4>
+                          <p className="text-muted-foreground text-xs line-clamp-2 mt-1 leading-normal">
+                            {episode.desc}
+                          </p>
+                          <div className="flex items-center gap-3 mt-3 text-[11px] text-muted-foreground font-semibold">
+                            <span>{episode.date}</span>
+                            <span className="w-1 h-1 rounded-full bg-neutral-600" />
+                            <span>{episode.duration}</span>
+                          </div>
+                        </div>
+                        
+                        <button
+                          onClick={() => {
+                            const track = {
+                              id: episode.id,
+                              title: episode.title,
+                              artist: episode.show.title,
+                              image: episode.show.cover,
+                              downloadUrl: [
+                                { link: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", quality: "320kbps" },
+                                { link: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", quality: "128kbps" }
+                              ]
+                            };
+                            playSong(track);
+                          }}
+                          className="absolute right-4 bottom-4 w-9 h-9 rounded-full bg-white hover:bg-neutral-200 flex items-center justify-center text-black shadow-md md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 hover:scale-105 active:scale-95"
+                        >
+                          <IoMdPlay className="w-4 h-4 fill-black translate-x-0.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )
+          ) : (
+            <>
+              {/* Quick Access Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
             {/* Liked Songs */}
             <Link
               href="/music/favorites"
@@ -1520,6 +1807,8 @@ export default function MusicPage() {
               onPlayClick={handlePlaylistPlay}
               playingId={playingId}
             />
+          )}
+            </>
           )}
 
           {/* Bottom padding to prevent content being hidden behind music player */}

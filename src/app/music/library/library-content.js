@@ -771,17 +771,17 @@ export default function LibraryContent() {
               {/* Top Bar: Profile, Title, Action Icons */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Link href="/music/profile" className="outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-full">
+                  <Link href="/music/profile" className="shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-full">
                     {session?.user?.image ? (
                       <img
                         src={session.user.image}
-                        className="w-9 h-9 rounded-full object-cover border border-white/10 hover:opacity-85 transition-opacity"
                         alt="Profile"
+                        className="w-8 h-8 rounded-full object-cover border border-white/10"
                         onError={(e) => { e.target.src = '/default-avatar.png'; }}
                       />
                     ) : (
-                      <div className="w-9 h-9 rounded-full bg-indigo-700 flex items-center justify-center text-sm font-bold text-white border border-white/10 hover:bg-indigo-600 transition-colors">
-                        {session?.user?.name?.charAt(0).toUpperCase() || "U"}
+                      <div className="w-8 h-8 rounded-full bg-indigo-700 flex items-center justify-center text-sm font-bold text-white border border-white/10">
+                        {session?.user?.name?.charAt(0).toUpperCase() || "J"}
                       </div>
                     )}
                   </Link>

@@ -16,7 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, Heart, Pause, MoreVertical, Plus, User, Disc, Share, Download, Clock, Music2, Loader2 } from "lucide-react";
+import { Search, Heart, Pause, MoreVertical, Plus, User, Disc, Share, Download, Clock, Music2, Loader2, Radio } from "lucide-react";
 import { IoMdPlay } from "react-icons/io";
 import { HiPause } from "react-icons/hi2";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -3078,15 +3078,33 @@ function SearchPageContent() {
                   </Button>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
+                  {/* Live Radio Card */}
+                  <div
+                    className="relative aspect-[1.45] rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.03] active:scale-95 shadow-md flex flex-col justify-between group bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 border border-white/5"
+                    onClick={() => router.push('/music/radio')}
+                  >
+                    <div className="p-3 sm:p-4 flex-1">
+                      <h3 className="text-white font-extrabold text-sm md:text-base lg:text-lg tracking-tight leading-tight drop-shadow-md select-none">
+                        Live Radio
+                      </h3>
+                      <p className="text-white/70 text-[10px] md:text-[11px] mt-1 leading-snug drop-shadow-sm select-none">
+                        Tune into world stations
+                      </p>
+                    </div>
+                    <div className="absolute right-0 bottom-0 w-[46%] sm:w-[48%] aspect-square translate-x-[20%] sm:translate-x-[24%] translate-y-[10%] sm:translate-y-[14%] rotate-[25deg] shadow-[-4px_4px_12px_rgba(0,0,0,0.5)] overflow-hidden rounded-md shrink-0 transition-transform duration-300 group-hover:scale-105 group-hover:translate-x-[14%] sm:group-hover:translate-x-[18%] group-hover:translate-y-[5%] sm:group-hover:translate-y-[8%] bg-black/30 border border-white/10 flex items-center justify-center">
+                      <Radio className="w-8 h-8 text-white/90 animate-pulse" />
+                    </div>
+                  </div>
+
                   {genresLoading ? (
-                    Array.from({ length: 8 }).map((_, i) => (
+                    Array.from({ length: 7 }).map((_, i) => (
                       <div key={i} className="aspect-[1.45] rounded-xl bg-muted/20 animate-pulse relative overflow-hidden shadow-sm">
                         <div className="absolute top-3 sm:top-4 left-3 sm:left-4 w-[60%] h-4 sm:h-5 bg-muted/40 rounded" />
                         <div className="absolute right-0 bottom-0 w-[46%] sm:w-[48%] aspect-square translate-x-[20%] sm:translate-x-[24%] translate-y-[10%] sm:translate-y-[14%] rotate-[25deg] bg-muted/30 rounded-md" />
                       </div>
                     ))
                   ) : (
-                    (dbGenres || []).slice(0, 8).map((genre) => (
+                    (dbGenres || []).slice(0, 7).map((genre) => (
                       <div
                         key={genre._id}
                         className={`relative aspect-[1.45] rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.03] active:scale-95 shadow-md flex flex-col justify-between group ${
