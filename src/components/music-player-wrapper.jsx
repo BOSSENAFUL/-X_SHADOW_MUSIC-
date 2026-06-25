@@ -8,8 +8,8 @@ export function MusicPlayerWrapper() {
   const { currentSong, playlist, isPlayerVisible, handleSongChange } = useMusicPlayer();
   const pathname = usePathname();
 
-  // Hide the player bar entirely on the choose podcasts page
-  if (pathname === "/music/podcasts/choose") return null;
+  // Hide the player bar entirely on all podcasts pages
+  if (pathname.startsWith("/music/podcasts")) return null;
 
   // Always render MusicPlayer when there's a current song and player is visible
   // The MusicPlayer itself will handle hiding the bottom bar when fullscreen is open

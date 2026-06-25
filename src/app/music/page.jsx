@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useState, useEffect, useCallback, memo } from "react";
+import { useState, useEffect, useCallback, Fragment, memo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -21,7 +21,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Heart, Search, MessageSquare, Radio, Loader2, Mic } from "lucide-react";
+import { Heart, Search, MessageSquare, Radio, Loader2, Mic, MoreVertical } from "lucide-react";
 
 import { PlaylistSection } from "@/components/music/playlist-section";
 import { PWAInstallBanner } from "@/components/music/pwa-install-banner";
@@ -201,23 +201,126 @@ export default function MusicPage() {
   // Read feed preference from localStorage (set in Settings)
   const [feedPreference, setFeedPreference] = useState('all');
   const [followedPodcasts, setFollowedPodcasts] = useState([]);
+  const [podcastEpisodes, setPodcastEpisodes] = useState([]);
+  const [podcastsLoading, setPodcastsLoading] = useState(false);
 
-  // Read from localStorage after mount + re-read when tab becomes visible
+  const getProxiedImageUrl = (url) => {
+    if (!url) return null;
+    return url.startsWith("http")
+      ? `/api/proxy/image?url=${encodeURIComponent(url)}`
+      : url;
+  };
+
+  const loadPodcastsData = async () => {
+    if (sessionStatus !== 'authenticated') return;
+    try {
+      setPodcastsLoading(true);
+      const res = await fetch('/api/podcasts/follow');
+      const data = await res.json();
+      if (data.success) {
+        if (data.results.length > 0) {
+          const promises = data.results.map(podcast =>
+            fetch(`/api/podcasts/episodes?playlistId=${podcast.podcastId}`)
+              .then(r => r.json())
+              .catch(e => ({ success: false, error: e.message }))
+          );
+          
+          const epResults = await Promise.all(promises);
+          
+          // Map shows with hasNewEpisodes status
+          const updatedShows = data.results.map((show, idx) => {
+            const epData = epResults[idx];
+            let hasNewEpisodes = false;
+            if (epData && epData.success && epData.episodes && epData.episodes.length > 0) {
+              const latestEp = epData.episodes[0]; // Newest first
+              const published = latestEp.published || '';
+              const p = published.toLowerCase();
+              if (
+                p.includes('hour') || 
+                p.includes('minute') || 
+                p.includes('second') || 
+                p.includes('day') || 
+                p.includes('today') || 
+                p.includes('yesterday') || 
+                p.includes('1 week')
+              ) {
+                hasNewEpisodes = true;
+              }
+            }
+            return {
+              ...show,
+              hasNewEpisodes
+            };
+          });
+          setFollowedPodcasts(updatedShows);
+          
+          let allEpisodes = [];
+          epResults.forEach((epData, idx) => {
+            if (epData.success) {
+              const show = updatedShows[idx];
+              const eps = (epData.episodes || []).slice(0, 3).map(ep => ({
+                ...ep,
+                show: {
+                  id: show.podcastId,
+                  title: show.podcastTitle,
+                  cover: show.coverImage,
+                  publisher: show.publisher
+                }
+              }));
+              allEpisodes = [...allEpisodes, ...eps];
+            }
+          });
+
+          // Sort chronologically (newest first) using relative date weight
+          const getRelativeWeight = (publishedStr) => {
+            if (!publishedStr) return Infinity;
+            const str = publishedStr.toLowerCase();
+            let value = parseFloat(str) || 1;
+            if (str.includes('second')) return value;
+            if (str.includes('minute')) return value * 60;
+            if (str.includes('hour')) return value * 3600;
+            if (str.includes('day')) return value * 86400;
+            if (str.includes('week')) return value * 86400 * 7;
+            if (str.includes('month')) return value * 86400 * 30;
+            if (str.includes('year')) return value * 86400 * 365;
+            if (str.includes('today') || str.includes('now')) return 0;
+            if (str.includes('yesterday')) return 86400;
+            return Infinity;
+          };
+
+          allEpisodes.sort((a, b) => getRelativeWeight(a.published) - getRelativeWeight(b.published));
+
+          setPodcastEpisodes(allEpisodes);
+        } else {
+          setFollowedPodcasts([]);
+          setPodcastEpisodes([]);
+        }
+      }
+    } catch (e) {
+      console.error('Error loading podcasts data:', e);
+    } finally {
+      setPodcastsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const read = () => {
-      const pref = localStorage.getItem('feed_preference') || 'all';
-      setFeedPreference(pref);
-      try {
-        const followed = localStorage.getItem("followed_podcasts");
-        setFollowedPodcasts(followed ? JSON.parse(followed) : []);
-      } catch (e) {}
+    if (sessionStatus === 'authenticated') {
+      loadPodcastsData();
+    }
+  }, [sessionStatus]);
+
+  // Re-load podcast data when page becomes active/visible
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        if (sessionStatus === 'authenticated') {
+          loadPodcastsData();
+        }
+      }
     };
-    read(); // initial read after hydration
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') read();
-    });
-    return () => document.removeEventListener('visibilitychange', read);
-  }, []);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [sessionStatus]);
 
   const showIndian = feedPreference === 'indian' || feedPreference === 'all' || feedPreference === 'music';
   const showGlobal = feedPreference === 'global' || feedPreference === 'all' || feedPreference === 'music';
@@ -1273,8 +1376,11 @@ export default function MusicPage() {
               <button
                 key={value}
                 onClick={() => {
-                  setFeedPreference(value);
-                  localStorage.setItem('feed_preference', value);
+                  if (value === "podcasts") {
+                    router.push("/music/podcasts");
+                  } else {
+                    setFeedPreference(value);
+                  }
                 }}
                 className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
                   feedPreference === value
@@ -1367,104 +1473,136 @@ export default function MusicPage() {
               </div>
             ) : (
               <div className="space-y-6 z-10 relative">
-                {/* Followed Shows Carousel */}
+                {/* Followed Shows Grid with + Button */}
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xl md:text-2xl font-bold tracking-tight text-white select-none">
                       Your Shows
                     </h2>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-muted-foreground hover:text-white hover:bg-white/10 text-xs font-semibold rounded-full"
+                    <button 
                       onClick={() => router.push("/music/podcasts/choose")}
+                      className="text-xs sm:text-sm font-bold text-neutral-400 hover:text-white transition-colors cursor-pointer"
                     >
                       Edit shows
-                    </Button>
+                    </button>
                   </div>
-                  <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
-                    {followedPodcasts.map((fid) => {
-                      const show = MOCK_PODCASTS.find((p) => p.id === fid);
+                  <div className="flex items-center gap-4 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-3 max-w-full">
+                    {followedPodcasts.map((show) => {
                       if (!show) return null;
                       return (
-                        <div key={show.id} className="flex flex-col items-center shrink-0 w-24 sm:w-28 text-center group cursor-pointer" onClick={() => router.push("/music/podcasts/choose")}>
-                          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-white/5 shadow-md mb-2 group-hover:scale-[1.03] transition-transform duration-200">
-                            <img src={show.cover} alt={show.title} className="w-full h-full object-cover" />
+                        <div 
+                          key={show.podcastId} 
+                          className="relative w-20 sm:w-24 md:w-28 flex-shrink-0 aspect-square cursor-pointer hover:scale-[1.03] active:scale-95 transition-transform group" 
+                          onClick={() => router.push(`/music/podcasts/${show.podcastId}`)}
+                          title={show.podcastTitle}
+                        >
+                          <div className="w-full h-full rounded-full overflow-hidden border border-white/10 shadow-md">
+                            <img 
+                              src={getProxiedImageUrl(show.coverImage)} 
+                              alt={show.podcastTitle} 
+                              className="w-full h-full object-cover animate-in fade-in duration-300" 
+                              onError={(e) => {
+                                e.target.src = '/default-playlist-image.png';
+                              }}
+                            />
                           </div>
-                          <span className="text-white text-xs font-bold truncate w-full px-1">
-                            {show.title}
-                          </span>
+                          {/* Blue Dot Badge on top-right to signify updates */}
+                          {show.hasNewEpisodes && (
+                            <span className="absolute top-[8%] right-[8%] w-3 h-3 bg-blue-500 rounded-full border-2 border-[#121212] z-10" />
+                          )}
                         </div>
                       );
                     })}
+                    <div 
+                      onClick={() => router.push("/music/podcasts/choose")} 
+                      className="w-20 sm:w-24 md:w-28 flex-shrink-0 aspect-square rounded-full border border-dashed border-white/20 bg-neutral-900/40 hover:bg-neutral-800/40 flex items-center justify-center cursor-pointer transition-all active:scale-95"
+                    >
+                      <span className="text-xl sm:text-2xl text-neutral-400 font-light">+</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Latest Episodes List */}
-                <div className="space-y-4">
+                {/* Latest Episodes YouTube-style Feed */}
+                <div className="space-y-4 pt-2">
                   <h2 className="text-xl md:text-2xl font-bold tracking-tight text-white select-none mb-4">
                     Latest episodes
                   </h2>
-                  <div className="space-y-3">
-                    {followedPodcasts.flatMap((fid) => {
-                      const show = MOCK_PODCASTS.find((p) => p.id === fid);
-                      if (!show) return [];
-                      return show.episodes.map((ep) => ({ ...ep, show }));
-                    })
-                    .sort((a, b) => {
-                      if (a.date.includes("Yesterday")) return -1;
-                      if (b.date.includes("Yesterday")) return 1;
-                      if (a.date.includes("days ago") && b.date.includes("days ago")) {
-                        return parseInt(a.date) - parseInt(b.date);
-                      }
-                      return 0;
-                    })
-                    .map((episode) => (
-                      <div
-                        key={episode.id}
-                        className="bg-[#181818]/60 border border-white/5 rounded-xl p-4 sm:p-5 flex gap-4 hover:bg-[#181818]/85 transition-colors relative group"
-                      >
-                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-md overflow-hidden shrink-0 border border-white/5 shadow-sm">
-                          <img src={episode.show.cover} alt={episode.show.title} className="w-full h-full object-cover" />
-                        </div>
-                        <div className="flex-1 min-w-0 flex flex-col justify-center">
-                          <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider mb-0.5">
-                            {episode.show.title}
-                          </span>
-                          <h4 className="text-white font-bold text-sm sm:text-base leading-snug line-clamp-1 group-hover:text-green-500 transition-colors">
-                            {episode.title}
-                          </h4>
-                          <p className="text-muted-foreground text-xs line-clamp-2 mt-1 leading-normal">
-                            {episode.desc}
-                          </p>
-                          <div className="flex items-center gap-3 mt-3 text-[11px] text-muted-foreground font-semibold">
-                            <span>{episode.date}</span>
-                            <span className="w-1 h-1 rounded-full bg-neutral-600" />
-                            <span>{episode.duration}</span>
+                  {podcastsLoading && podcastEpisodes.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-neutral-400">
+                      <Loader2 className="w-8 h-8 animate-spin mb-3 text-white" />
+                      <span className="text-sm font-semibold">Fetching episodes...</span>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-5 gap-y-8 -mx-3 md:mx-0">
+                      {podcastEpisodes.map((episode) => (
+                        <div
+                          key={episode.id}
+                          onClick={() => router.push(`/music/podcasts/watch/${episode.id}?showId=${episode.show?.id || ''}&showTitle=${encodeURIComponent(episode.show?.title || '')}`)}
+                          className="group cursor-pointer select-none flex flex-col justify-between"
+                        >
+                          <div>
+                            {/* Large Aspect-Video (16:9) Thumbnail */}
+                            <div className="relative w-full aspect-video rounded-none md:rounded-2xl overflow-hidden border-y md:border border-white/5 bg-[#181818]/60 shadow-[0_6px_20px_rgba(0,0,0,0.4)] group-hover:scale-[1.01] active:scale-95 transition-transform duration-200">
+                              <img 
+                                src={`https://i.ytimg.com/vi/${episode.id}/maxresdefault.jpg`} 
+                                alt={episode.title} 
+                                className="w-full h-full object-cover animate-in fade-in duration-300"
+                                loading="lazy"
+                                onError={(e) => {
+                                  if (e.target.src.includes('maxresdefault.jpg')) {
+                                    e.target.src = `https://i.ytimg.com/vi/${episode.id}/hqdefault.jpg`;
+                                  } else if (e.target.src.includes('hqdefault.jpg')) {
+                                    e.target.src = episode.coverImage || episode.show.cover;
+                                  }
+                                }}
+                              />
+                              {episode.duration && (
+                                <span className="absolute bottom-3 right-3 bg-black/85 text-[10px] sm:text-xs font-extrabold px-2 py-0.5 rounded border border-white/5 text-white">
+                                  {episode.duration}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Details Info Row */}
+                            <div className="flex gap-3 mt-3.5 px-2 md:px-1.5">
+                              {/* Circular Show Avatar */}
+                              <div className="w-9 h-9 rounded-full overflow-hidden border border-white/10 shrink-0 shadow-sm bg-neutral-900">
+                                <img 
+                                  src={getProxiedImageUrl(episode.show.cover)} 
+                                  alt={episode.show.title} 
+                                  className="w-full h-full object-cover" 
+                                  onError={(e) => {
+                                    e.target.src = '/default-playlist-image.png';
+                                  }}
+                                />
+                              </div>
+
+                              {/* Text info */}
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-white font-extrabold text-sm sm:text-base leading-snug line-clamp-2 group-hover:text-green-500 transition-colors">
+                                  {episode.title}
+                                </h4>
+                                <p className="text-neutral-400 text-xs sm:text-sm font-semibold truncate mt-1">
+                                  {episode.show.publisher || episode.show.title} • {episode.views || '78K views'} • {episode.published || '7 days ago'}
+                                </p>
+                              </div>
+
+                              {/* More Vertical menu icon */}
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(`/music/podcasts/watch/${episode.id}?showId=${episode.show?.id || ''}&showTitle=${encodeURIComponent(episode.show?.title || '')}`);
+                                }}
+                                className="text-neutral-400 hover:text-white p-1 hover:bg-white/5 rounded-full transition-colors shrink-0 self-start cursor-pointer"
+                              >
+                                <MoreVertical className="w-5 h-5" />
+                              </button>
+                            </div>
                           </div>
                         </div>
-                        
-                        <button
-                          onClick={() => {
-                            const track = {
-                              id: episode.id,
-                              title: episode.title,
-                              artist: episode.show.title,
-                              image: episode.show.cover,
-                              downloadUrl: [
-                                { link: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", quality: "320kbps" },
-                                { link: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", quality: "128kbps" }
-                              ]
-                            };
-                            playSong(track);
-                          }}
-                          className="absolute right-4 bottom-4 w-9 h-9 rounded-full bg-white hover:bg-neutral-200 flex items-center justify-center text-black shadow-md md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 hover:scale-105 active:scale-95"
-                        >
-                          <IoMdPlay className="w-4 h-4 fill-black translate-x-0.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )

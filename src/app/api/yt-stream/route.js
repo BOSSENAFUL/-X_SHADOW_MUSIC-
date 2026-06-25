@@ -1,38 +1,4 @@
-import { Innertube, Platform } from 'youtubei.js';
-
-// Configure the custom JavaScript evaluator for youtubei.js signature deciphering
-if (Platform.shim) {
-  Platform.shim.eval = async (data, env) => {
-    const properties = [];
-    if (env.n) {
-      properties.push(`n: exportedVars.nFunction("${env.n}")`);
-    }
-    if (env.sig) {
-      properties.push(`sig: exportedVars.sigFunction("${env.sig}")`);
-    }
-    const code = `${data.output}\nreturn { ${properties.join(', ')} }`;
-    return new Function(code)();
-  };
-}
-
-let ytInstance = null;
-let lastUsedCookies = null;
-
-async function getYtInstance() {
-  const currentCookies = process.env.YOUTUBE_COOKIES || '';
-  if (!ytInstance || lastUsedCookies !== currentCookies) {
-    const config = {};
-    if (currentCookies) {
-      config.cookies = currentCookies;
-      console.log('[yt-stream] Initializing Innertube with YOUTUBE_COOKIES');
-    } else {
-      console.log('[yt-stream] Initializing Innertube without cookies (guest session)');
-    }
-    ytInstance = await Innertube.create(config);
-    lastUsedCookies = currentCookies;
-  }
-  return ytInstance;
-}
+import { getYtInstance } from '@/lib/youtube';
 
 export const runtime = 'nodejs';
 

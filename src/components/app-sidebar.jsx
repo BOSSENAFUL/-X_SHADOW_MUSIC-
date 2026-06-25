@@ -13,6 +13,7 @@ import {
   Home,
   TrendingUp,
   MessageSquare,
+  Mic,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -52,6 +53,11 @@ const data = {
       title: "Search",
       url: "/music/search",
       icon: Search,
+    },
+    {
+      title: "Podcasts",
+      url: "/music/podcasts",
+      icon: Mic,
     },
     {
       title: "Community",

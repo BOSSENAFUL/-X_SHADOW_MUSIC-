@@ -440,3 +440,10 @@
   padding-right: env(safe-area-inset-right, 0px);
 }
 
+/* Scoped YouTube font family for podcasts sections */
+.font-youtube,
+.font-youtube * {
+  font-family: "Roboto", "Arial", sans-serif !important;
+}
+
+
