@@ -215,86 +215,63 @@ export default function MusicPage() {
     if (sessionStatus !== 'authenticated') return;
     try {
       setPodcastsLoading(true);
-      const res = await fetch('/api/podcasts/follow');
-      const data = await res.json();
-      if (data.success) {
-        if (data.results.length > 0) {
-          const promises = data.results.map(podcast =>
-            fetch(`/api/podcasts/episodes?playlistId=${podcast.podcastId}`)
-              .then(r => r.json())
-              .catch(e => ({ success: false, error: e.message }))
-          );
-          
-          const epResults = await Promise.all(promises);
-          
-          // Map shows with hasNewEpisodes status
-          const updatedShows = data.results.map((show, idx) => {
-            const epData = epResults[idx];
-            let hasNewEpisodes = false;
-            if (epData && epData.success && epData.episodes && epData.episodes.length > 0) {
-              const latestEp = epData.episodes[0]; // Newest first
-              const published = latestEp.published || '';
-              const p = published.toLowerCase();
-              if (
-                p.includes('hour') || 
-                p.includes('minute') || 
-                p.includes('second') || 
-                p.includes('day') || 
-                p.includes('today') || 
-                p.includes('yesterday') || 
-                p.includes('1 week')
-              ) {
-                hasNewEpisodes = true;
-              }
+      // 1. Fetch followed shows
+      const followRes = await fetch('/api/youtube/follow');
+      const followData = await followRes.json();
+      
+      if (followData.success && followData.results.length > 0) {
+        // 2. Fetch unified subscriptions feed
+        const feedRes = await fetch('/api/youtube/subscriptions');
+        const feedData = await feedRes.json();
+
+        // 3. Map episodes to frontend structure
+        let episodes = [];
+        if (feedData.success && feedData.results) {
+          episodes = feedData.results.map(ep => ({
+            id: ep.id,
+            title: ep.title,
+            coverImage: ep.thumbnail,
+            duration: ep.duration,
+            views: ep.views,
+            published: ep.published,
+            show: {
+              id: ep.channelId,
+              title: ep.channelName,
+              cover: ep.channelAvatar,
+              publisher: ep.channelName
             }
-            return {
-              ...show,
-              hasNewEpisodes
-            };
-          });
-          setFollowedPodcasts(updatedShows);
-          
-          let allEpisodes = [];
-          epResults.forEach((epData, idx) => {
-            if (epData.success) {
-              const show = updatedShows[idx];
-              const eps = (epData.episodes || []).slice(0, 3).map(ep => ({
-                ...ep,
-                show: {
-                  id: show.podcastId,
-                  title: show.podcastTitle,
-                  cover: show.coverImage,
-                  publisher: show.publisher
-                }
-              }));
-              allEpisodes = [...allEpisodes, ...eps];
-            }
-          });
-
-          // Sort chronologically (newest first) using relative date weight
-          const getRelativeWeight = (publishedStr) => {
-            if (!publishedStr) return Infinity;
-            const str = publishedStr.toLowerCase();
-            let value = parseFloat(str) || 1;
-            if (str.includes('second')) return value;
-            if (str.includes('minute')) return value * 60;
-            if (str.includes('hour')) return value * 3600;
-            if (str.includes('day')) return value * 86400;
-            if (str.includes('week')) return value * 86400 * 7;
-            if (str.includes('month')) return value * 86400 * 30;
-            if (str.includes('year')) return value * 86400 * 365;
-            if (str.includes('today') || str.includes('now')) return 0;
-            if (str.includes('yesterday')) return 86400;
-            return Infinity;
-          };
-
-          allEpisodes.sort((a, b) => getRelativeWeight(a.published) - getRelativeWeight(b.published));
-
-          setPodcastEpisodes(allEpisodes);
-        } else {
-          setFollowedPodcasts([]);
-          setPodcastEpisodes([]);
+          }));
         }
+
+        // 4. Determine hasNewEpisodes status for followed channels
+        const updatedShows = followData.results.map((show) => {
+          const hasNew = episodes.some(ep => 
+            ep.show.id === show.podcastId && 
+            (() => {
+              const published = (ep.published || "").toLowerCase();
+              return (
+                published.includes('hour') || 
+                published.includes('minute') || 
+                published.includes('second') || 
+                published.includes('day') || 
+                published.includes('today') || 
+                published.includes('yesterday') || 
+                published.includes('1 week')
+              );
+            })()
+          );
+
+          return {
+            ...show,
+            hasNewEpisodes: hasNew
+          };
+        });
+
+        setFollowedPodcasts(updatedShows);
+        setPodcastEpisodes(episodes);
+      } else {
+        setFollowedPodcasts([]);
+        setPodcastEpisodes([]);
       }
     } catch (e) {
       console.error('Error loading podcasts data:', e);
@@ -304,23 +281,10 @@ export default function MusicPage() {
   };
 
   useEffect(() => {
-    if (sessionStatus === 'authenticated') {
+    if (sessionStatus === 'authenticated' && feedPreference === 'youtube') {
       loadPodcastsData();
     }
-  }, [sessionStatus]);
-
-  // Re-load podcast data when page becomes active/visible
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        if (sessionStatus === 'authenticated') {
-          loadPodcastsData();
-        }
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, [sessionStatus]);
+  }, [sessionStatus, feedPreference]);
 
   const showIndian = feedPreference === 'indian' || feedPreference === 'all' || feedPreference === 'music';
   const showGlobal = feedPreference === 'global' || feedPreference === 'all' || feedPreference === 'music';
@@ -1371,13 +1335,13 @@ export default function MusicPage() {
             {[
               { label: "All",      value: "all" },
               { label: "Music",    value: "music" },
-              { label: "Podcasts", value: "podcasts" },
+              { label: "YouTube",  value: "youtube" },
             ].map(({ label, value }) => (
               <button
                 key={value}
                 onClick={() => {
-                  if (value === "podcasts") {
-                    router.push("/music/podcasts");
+                  if (value === "youtube") {
+                    router.push("/music/youtube");
                   } else {
                     setFeedPreference(value);
                   }
@@ -1413,61 +1377,61 @@ export default function MusicPage() {
           {/* PWA Install Banner — mobile only */}
           <PWAInstallBanner />
 
-          {feedPreference === 'podcasts' ? (
+          {feedPreference === 'youtube' ? (
             followedPodcasts.length === 0 ? (
               <div className="space-y-4 z-10 relative">
                 <h2 className="text-xl md:text-2xl font-bold tracking-tight text-white select-none">
-                  Latest episodes
+                  Latest Videos
                 </h2>
                 
                 <div className="bg-[#181818]/80 border border-white/5 rounded-xl p-8 sm:p-12 flex flex-col items-center justify-center text-center shadow-lg">
-                  {/* Overlapping Podcast Covers Stack */}
+                  {/* Overlapping YouTube Covers Stack */}
                   <div className="h-32 sm:h-36 w-full flex items-center justify-center relative mb-6">
                     {/* Left 2 */}
                     <img
                       src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=150&h=150&fit=crop"
-                      alt="Podcast cover left 2"
+                      alt="Channel cover left 2"
                       className="absolute w-[60px] h-[60px] sm:w-[75px] sm:h-[75px] z-10 -translate-x-[65px] sm:-translate-x-[85px] opacity-40 rounded-md object-cover shadow-[0_4px_12px_rgba(0,0,0,0.3)] select-none pointer-events-none"
                     />
                     {/* Left 1 */}
                     <img
                       src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=180&h=180&fit=crop"
-                      alt="Podcast cover left 1"
+                      alt="Channel cover left 1"
                       className="absolute w-[75px] h-[75px] sm:w-[95px] sm:h-[95px] z-20 -translate-x-[35px] sm:-translate-x-[45px] opacity-75 rounded-md object-cover shadow-[0_6px_16px_rgba(0,0,0,0.4)] select-none pointer-events-none"
                     />
                     {/* Right 2 */}
                     <img
                       src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=150&h=150&fit=crop"
-                      alt="Podcast cover right 2"
+                      alt="Channel cover right 2"
                       className="absolute w-[60px] h-[60px] sm:w-[75px] sm:h-[75px] z-10 translate-x-[65px] sm:translate-x-[85px] opacity-40 rounded-md object-cover shadow-[0_4px_12px_rgba(0,0,0,0.3)] select-none pointer-events-none"
                     />
                     {/* Right 1 */}
                     <img
                       src="https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=180&h=180&fit=crop"
-                      alt="Podcast cover right 1"
+                      alt="Channel cover right 1"
                       className="absolute w-[75px] h-[75px] sm:w-[95px] sm:h-[95px] z-20 translate-x-[35px] sm:-translate-x-[45px] opacity-75 rounded-md object-cover shadow-[0_6px_16px_rgba(0,0,0,0.4)] select-none pointer-events-none"
                     />
                     {/* Center */}
                     <img
                       src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=220&h=220&fit=crop"
-                      alt="Podcast cover center"
+                      alt="Channel cover center"
                       className="w-[90px] h-[90px] sm:w-[115px] sm:h-[115px] z-30 rounded-md object-cover shadow-[0_8px_24px_rgba(0,0,0,0.6)] border border-white/10 select-none pointer-events-none animate-pulse"
                     />
                   </div>
 
                   <h3 className="text-white font-bold text-lg sm:text-xl md:text-2xl tracking-tight leading-tight max-w-sm">
-                    You haven&apos;t followed any podcasts
+                    You haven&apos;t subscribed to any channels
                   </h3>
                   
                   <p className="text-muted-foreground text-xs sm:text-sm mt-2 max-w-xs">
-                    Follow your favourites to stay up to date.
+                    Subscribe to your favorites to stay up to date.
                   </p>
 
                   <Button
-                    onClick={() => router.push("/music/podcasts/choose")}
+                    onClick={() => router.push("/music/youtube/search")}
                     className="mt-6 bg-white hover:bg-neutral-200 text-black font-bold text-sm px-7 py-2.5 rounded-full shadow-md hover:scale-[1.03] active:scale-95 transition-all select-none"
                   >
-                    Browse podcasts
+                    Browse channels
                   </Button>
                 </div>
               </div>
@@ -1477,13 +1441,13 @@ export default function MusicPage() {
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xl md:text-2xl font-bold tracking-tight text-white select-none">
-                      Your Shows
+                      Subscribed Channels
                     </h2>
                     <button 
-                      onClick={() => router.push("/music/podcasts/choose")}
+                      onClick={() => router.push("/music/youtube/search")}
                       className="text-xs sm:text-sm font-bold text-neutral-400 hover:text-white transition-colors cursor-pointer"
                     >
-                      Edit shows
+                      Manage Subscriptions
                     </button>
                   </div>
                   <div className="flex items-center gap-4 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-3 max-w-full">
@@ -1493,7 +1457,7 @@ export default function MusicPage() {
                         <div 
                           key={show.podcastId} 
                           className="relative w-20 sm:w-24 md:w-28 flex-shrink-0 aspect-square cursor-pointer hover:scale-[1.03] active:scale-95 transition-transform group" 
-                          onClick={() => router.push(`/music/podcasts/${show.podcastId}`)}
+                          onClick={() => router.push(`/music/youtube/${show.podcastId}`)}
                           title={show.podcastTitle}
                         >
                           <div className="w-full h-full rounded-full overflow-hidden border border-white/10 shadow-md">
@@ -1514,7 +1478,7 @@ export default function MusicPage() {
                       );
                     })}
                     <div 
-                      onClick={() => router.push("/music/podcasts/choose")} 
+                      onClick={() => router.push("/music/youtube/search")} 
                       className="w-20 sm:w-24 md:w-28 flex-shrink-0 aspect-square rounded-full border border-dashed border-white/20 bg-neutral-900/40 hover:bg-neutral-800/40 flex items-center justify-center cursor-pointer transition-all active:scale-95"
                     >
                       <span className="text-xl sm:text-2xl text-neutral-400 font-light">+</span>
@@ -1525,19 +1489,19 @@ export default function MusicPage() {
                 {/* Latest Episodes YouTube-style Feed */}
                 <div className="space-y-4 pt-2">
                   <h2 className="text-xl md:text-2xl font-bold tracking-tight text-white select-none mb-4">
-                    Latest episodes
+                    Latest Videos
                   </h2>
                   {podcastsLoading && podcastEpisodes.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 text-neutral-400">
                       <Loader2 className="w-8 h-8 animate-spin mb-3 text-white" />
-                      <span className="text-sm font-semibold">Fetching episodes...</span>
+                      <span className="text-sm font-semibold">Fetching videos...</span>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-5 gap-y-8 -mx-3 md:mx-0">
                       {podcastEpisodes.map((episode) => (
                         <div
                           key={episode.id}
-                          onClick={() => router.push(`/music/podcasts/watch/${episode.id}?showId=${episode.show?.id || ''}&showTitle=${encodeURIComponent(episode.show?.title || '')}`)}
+                          onClick={() => router.push(`/music/youtube/watch/${episode.id}?showId=${episode.show?.id || ''}&showTitle=${encodeURIComponent(episode.show?.title || '')}`)}
                           className="group cursor-pointer select-none flex flex-col justify-between"
                         >
                           <div>
@@ -1591,7 +1555,7 @@ export default function MusicPage() {
                               <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  router.push(`/music/podcasts/watch/${episode.id}?showId=${episode.show?.id || ''}&showTitle=${encodeURIComponent(episode.show?.title || '')}`);
+                                  router.push(`/music/youtube/watch/${episode.id}?showId=${episode.show?.id || ''}&showTitle=${encodeURIComponent(episode.show?.title || '')}`);
                                 }}
                                 className="text-neutral-400 hover:text-white p-1 hover:bg-white/5 rounded-full transition-colors shrink-0 self-start cursor-pointer"
                               >

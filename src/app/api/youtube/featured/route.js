@@ -342,7 +342,7 @@ export async function GET(request) {
 
     return NextResponse.json({ success: true, results: FEATURED_PODCASTS });
   } catch (error) {
-    console.error('Error in /api/podcasts/featured:', error);
+    console.error('Error in /api/youtube/featured:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

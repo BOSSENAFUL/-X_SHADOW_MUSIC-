@@ -32,22 +32,19 @@ export async function GET(request) {
 
     for (const api of apis) {
         try {
-            console.log(`TTML Lyrics proxy: fetching from ${api.url}`);
             const response = await fetch(api.url, {
                 headers: {
                     'User-Agent': userAgent,
                 },
-                signal: AbortSignal.timeout(6000) // 6 second timeout per try
+                signal: AbortSignal.timeout(6000)
             });
 
             if (response.status === 404 || response.status === 401) {
-                console.log(`TTML Lyrics proxy: 404 from provider, checking next`);
                 lastError = { status: 404, message: 'Lyrics not found in source database' };
                 continue;
             }
 
             if (!response.ok) {
-                console.warn(`TTML Lyrics proxy: provider returned status ${response.status}`);
                 lastError = { status: response.status, message: `Lyrics provider status: ${response.status}` };
                 continue;
             }
@@ -66,7 +63,6 @@ export async function GET(request) {
                 }
             }
 
-            console.warn(`TTML Lyrics proxy: invalid structure from provider`);
             lastError = { status: 502, message: 'Invalid payload structure' };
         } catch (error) {
             console.error(`TTML Lyrics proxy failed for ${api.url}:`, error.message);

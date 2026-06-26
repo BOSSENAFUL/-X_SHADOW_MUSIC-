@@ -40,7 +40,7 @@ export default function PodcastsPage() {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Podcasts</BreadcrumbPage>
+                  <BreadcrumbPage>YouTube</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>

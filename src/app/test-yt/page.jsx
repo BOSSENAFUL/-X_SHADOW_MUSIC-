@@ -36,7 +36,7 @@ export default function TestYtPage() {
       }
       const data = await response.json();
       if (data.success) {
-        setVideos(data.results || []);
+        setVideos(Array.isArray(data.results) ? data.results : (data.results?.videos || []));
       } else {
         throw new Error(data.error || "Failed to search videos");
       }

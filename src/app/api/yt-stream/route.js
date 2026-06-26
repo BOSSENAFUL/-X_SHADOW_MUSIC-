@@ -20,22 +20,18 @@ export async function GET(request) {
     const clients = ['ANDROID', 'YTMUSIC', 'TV', 'WEB'];
     for (const client of clients) {
       try {
-        console.log(`[yt-stream] Attempting to fetch video info with client: ${client}`);
         const tempInfo = await yt.getInfo(videoId, { client });
         
         // Check if we successfully got streaming data
         if (tempInfo && (tempInfo.streaming_data || tempInfo.playability_status?.status === 'OK')) {
           info = tempInfo;
-          console.log(`[yt-stream] Successfully fetched video info with client: ${client}`);
           break;
         } else {
           const status = tempInfo?.playability_status?.status || 'UNKNOWN_STATUS';
           const reason = tempInfo?.playability_status?.reason || 'No streaming data or status not OK';
-          console.warn(`[yt-stream] Client ${client} returned playability status: ${status}. Reason: ${reason}`);
           errors[client] = `Status: ${status}, Reason: ${reason}`;
         }
       } catch (err) {
-        console.warn(`[yt-stream] Client ${client} failed:`, err.message);
         errors[client] = err.message;
       }
     }
@@ -86,7 +82,6 @@ export async function GET(request) {
     // If itag 18 is not found, fall back to best audio format.
     let format = info.chooseFormat({ itag: 18 });
     if (!format) {
-      console.warn('itag 18 not found, falling back to best audio format');
       format = info.chooseFormat({ type: 'audio', quality: 'best' });
     }
 
@@ -99,8 +94,7 @@ export async function GET(request) {
     if (!streamUrl) {
       try {
         streamUrl = await format.decipher(yt.session.player);
-      } catch (decipherError) {
-        console.warn('Decipher failed, falling back to format.url:', decipherError);
+      } catch {
         streamUrl = format.url || null;
       }
     }

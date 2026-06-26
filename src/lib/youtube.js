@@ -1,4 +1,7 @@
-import { Innertube, Platform } from 'youtubei.js';
+import { Innertube, Platform, Log } from 'youtubei.js';
+
+// Suppress youtubei.js library logs (Parser warnings, Text parse warnings, etc.)
+Log.setLevel(Log.Level.ERROR);
 
 // Configure the custom JavaScript evaluator for youtubei.js signature deciphering
 if (Platform.shim) {
@@ -15,9 +18,10 @@ if (Platform.shim) {
   };
 }
 
-let ytInstancePromise = null;
-let ytInstance = null;
-let lastUsedCookies = null;
+// Maintain cached instances on global to survive Next.js hot-reloads in development
+let ytInstancePromise = global.ytInstancePromise || null;
+let ytInstance = global.ytInstance || null;
+let lastUsedCookies = global.ytLastUsedCookies || null;
 
 export async function getYtInstance() {
   const currentCookies = process.env.YOUTUBE_COOKIES || '';
@@ -25,6 +29,10 @@ export async function getYtInstance() {
   if (lastUsedCookies !== currentCookies) {
     ytInstance = null;
     ytInstancePromise = null;
+    if (typeof global !== 'undefined') {
+      global.ytInstance = null;
+      global.ytInstancePromise = null;
+    }
   }
 
   if (ytInstance) {
@@ -35,19 +43,31 @@ export async function getYtInstance() {
     const config = {};
     if (currentCookies) {
       config.cookies = currentCookies;
-      console.log('[youtube] Initializing Innertube with YOUTUBE_COOKIES');
-    } else {
-      console.log('[youtube] Initializing Innertube without cookies (guest session)');
     }
     
     lastUsedCookies = currentCookies;
+    if (typeof global !== 'undefined') {
+      global.ytLastUsedCookies = currentCookies;
+    }
+
     ytInstancePromise = Innertube.create(config).then((instance) => {
       ytInstance = instance;
+      if (typeof global !== 'undefined') {
+        global.ytInstance = instance;
+        global.ytInstancePromise = ytInstancePromise;
+      }
       return instance;
     }).catch((err) => {
-      ytInstancePromise = null; // Reset on failure
+      ytInstancePromise = null;
+      if (typeof global !== 'undefined') {
+        global.ytInstancePromise = null;
+      }
       throw err;
     });
+
+    if (typeof global !== 'undefined') {
+      global.ytInstancePromise = ytInstancePromise;
+    }
   }
 
   return ytInstancePromise;

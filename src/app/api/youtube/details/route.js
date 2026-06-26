@@ -61,7 +61,6 @@ export async function GET(request) {
     }
 
     const yt = await getYtInstance();
-    console.log(`[details] Fetching video details for videoId: ${videoId}`);
     
     const info = await yt.getInfo(videoId);
 
@@ -78,8 +77,16 @@ export async function GET(request) {
     
     // Parse channel details
     const owner = info.secondary_info?.owner;
-    const channelId = owner?.author?.id || info.basic_info.channel_id || '';
-    const channelName = owner?.author?.name || info.basic_info.author || 'Unknown Creator';
+    
+    let channelId = owner?.author?.id || info.basic_info.channel_id || '';
+    if (channelId === 'N/A') {
+      channelId = info.basic_info.channel_id || '';
+    }
+
+    let channelName = owner?.author?.name || info.basic_info.author || 'Unknown Creator';
+    if (channelName === 'N/A') {
+      channelName = info.basic_info.author || 'Unknown Creator';
+    }
     
     let channelAvatar = '';
     const avatars = owner?.author?.thumbnails || [];
@@ -87,7 +94,33 @@ export async function GET(request) {
       // Pick highest resolution
       channelAvatar = avatars[0].url;
     }
-    const subscriberCountText = owner?.subscriber_count?.toString() || '';
+    
+    let subscriberCountText = owner?.subscriber_count?.toString() || '';
+    if (subscriberCountText === 'N/A') {
+      subscriberCountText = '';
+    }
+
+    // If the parsed channel avatar or name is missing/generic, and we have a valid channelId,
+    // fetch the channel metadata dynamically as a fallback to avoid "N/A" / blank avatar
+    if ((!channelAvatar || channelName === 'Unknown Creator' || !subscriberCountText) && channelId) {
+      try {
+        const channel = await yt.getChannel(channelId);
+        if (channel && channel.metadata) {
+          if (!channelAvatar && channel.metadata.avatar?.[0]?.url) {
+            const av = channel.metadata.avatar[0].url;
+            channelAvatar = av.startsWith('//') ? 'https:' + av : av;
+          }
+          if (channelName === 'Unknown Creator' && channel.metadata.title) {
+            channelName = channel.metadata.title;
+          }
+          if (!subscriberCountText && channel.metadata.subscriber_count) {
+            subscriberCountText = channel.metadata.subscriber_count.toString();
+          }
+        }
+      } catch (e) {
+        console.error(`[details] Failed to fetch fallback channel info:`, e.message);
+      }
+    }
 
     // Parse related recommendations
     let recommendations = [];
@@ -120,7 +153,7 @@ export async function GET(request) {
       recommendations
     });
   } catch (error) {
-    console.error('Error in /api/podcasts/details:', error);
+    console.error('Error in /api/youtube/details:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

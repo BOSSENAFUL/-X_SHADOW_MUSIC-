@@ -464,7 +464,9 @@ const searchPerfectVideo = async (songName, artistName, albumName, parentSignal 
       throw new Error(data.error || 'API search failed');
     }
 
-    const results = data.results || [];
+    const results = Array.isArray(data.results)
+      ? data.results
+      : (data.results?.videos || []);
 
     const candidates = results
       .map(video => ({ video, score: scoreVideoCandidate(video, cleanTitle, cleanArtist, project) }))

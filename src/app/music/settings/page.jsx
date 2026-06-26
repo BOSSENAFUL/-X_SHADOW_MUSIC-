@@ -100,8 +100,8 @@ const FEED_OPTIONS = [
         icon: Music2,
     },
     {
-        value: 'podcasts',
-        label: 'Podcasts',
+        value: 'youtube',
+        label: 'YouTube',
         description: 'Show only podcast episodes and shows',
         icon: Mic,
     },

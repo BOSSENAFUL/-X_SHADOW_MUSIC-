@@ -5,7 +5,7 @@ import { MobileBottomNav } from "@/components/mobile-bottom-nav"
 
 export default function MusicLayoutClient({ children }) {
   const pathname = usePathname()
-  const hideBottomNav = pathname === "/music/podcasts/choose"
+  const hideBottomNav = pathname === "/music/youtube/search"
 
   return (
     <>
