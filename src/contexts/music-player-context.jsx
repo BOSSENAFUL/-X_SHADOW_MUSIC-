@@ -18,6 +18,7 @@ export function MusicPlayerProvider({ children }) {
   const [showTrackNumbersMobile, setShowTrackNumbersMobile] = useState(false);
   const [disableSpotifyCanvas, setDisableSpotifyCanvas] = useState(false);
   const [disableLyricsBg, setDisableLyricsBg] = useState(true);
+  const [disableHaptic, setDisableHaptic] = useState(false);
   const [restoredTime, setRestoredTime] = useState(null);
   const [isRestored, setIsRestored] = useState(false);
 
@@ -69,7 +70,9 @@ export function MusicPlayerProvider({ children }) {
         }
       } catch (e) {
         console.error("Failed to restore player state", e);
-        setIsRestored(true);
+        setTimeout(() => {
+          setIsRestored(true);
+        }, 0);
       }
     }
   }, []);
@@ -143,7 +146,16 @@ export function MusicPlayerProvider({ children }) {
     }
   }, []);
 
-
+  // Load haptic setting on mount (default: on, so only restore if explicitly "true")
+  useEffect(() => {
+    const stored = localStorage.getItem("disable_haptic");
+    if (stored === "true") {
+      const timeout = setTimeout(() => {
+        setDisableHaptic(true);
+      }, 0);
+      return () => clearTimeout(timeout);
+    }
+  }, []);
 
   // Helper function to check if current song is a radio station
   const isRadioPlaying = currentSong?.isRadio === true;
@@ -214,6 +226,8 @@ export function MusicPlayerProvider({ children }) {
         setDisableSpotifyCanvas,
         disableLyricsBg,
         setDisableLyricsBg,
+        disableHaptic,
+        setDisableHaptic,
         restoredTime,
         setRestoredTime,
         isFullscreenOpen,

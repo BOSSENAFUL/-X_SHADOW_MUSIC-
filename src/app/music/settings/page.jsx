@@ -156,7 +156,9 @@ export default function SettingsPage() {
         disableSpotifyCanvas,
         setDisableSpotifyCanvas,
         disableLyricsBg,
-        setDisableLyricsBg
+        setDisableLyricsBg,
+        disableHaptic,
+        setDisableHaptic
     } = useMusicPlayer();
 
     const [notifNewFeatures, setNotifNewFeatures] = useState(() => {
@@ -296,6 +298,19 @@ export default function SettingsPage() {
                                     onCheckedChange={(val) => {
                                         setDisableLyricsBg(val);
                                         localStorage.setItem("disable_lyrics_bg", String(val));
+                                    }}
+                                />
+                            </SettingsRow>
+                            <SettingsRow
+                                icon={Smartphone}
+                                label="Haptic feedback"
+                                description="Vibrate on tap and drag interactions"
+                            >
+                                <Switch
+                                    checked={!disableHaptic}
+                                    onCheckedChange={(val) => {
+                                        setDisableHaptic(!val);
+                                        localStorage.setItem("disable_haptic", String(!val));
                                     }}
                                 />
                             </SettingsRow>

@@ -943,6 +943,7 @@ export function FullscreenMusicPlayer({
     setIsFullscreenPlaylistOpen: setShowPlaylist,
     disableSpotifyCanvas,
     disableLyricsBg,
+    disableHaptic,
   } = useMusicPlayer();
   const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
   const router = useRouter();
@@ -2047,8 +2048,8 @@ export function FullscreenMusicPlayer({
         draggedElement.style.zIndex = "1000";
         draggedElement.style.boxShadow = "0 10px 30px rgba(0,0,0,0.3)";
 
-        // Add haptic feedback if available
-        if (navigator.vibrate) {
+        // Add haptic feedback if available and enabled
+        if (!disableHaptic && navigator.vibrate) {
           navigator.vibrate(50);
         }
       }

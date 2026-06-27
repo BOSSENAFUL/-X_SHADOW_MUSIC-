@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Home, Search, ListMusic, Plus, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useWebHaptics } from "web-haptics/react"
+import { useMusicPlayer } from "@/contexts/music-player-context"
 
 const navItems = [
   {
@@ -37,6 +38,13 @@ const navItems = [
 export function MobileBottomNav() {
   const pathname = usePathname()
   const { trigger } = useWebHaptics()
+  const { disableHaptic } = useMusicPlayer()
+
+  const handleClick = (e, href) => {
+    if (!disableHaptic) {
+      trigger("success")
+    }
+  }
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-t border-border md:hidden pb-safe">
@@ -53,7 +61,7 @@ export function MobileBottomNav() {
             <Link
               key={item.name}
               href={item.href}
-              onClick={() => trigger("success")}
+              onClick={(e) => handleClick(e, item.href)}
               className="flex flex-col items-center justify-center min-w-0 flex-1 h-full group"
             >
               <div className={cn(
