@@ -838,7 +838,7 @@ export default function FavoritesPage() {
           </div>
 
           {/* Songs List */}
-          <div className="pl-2 pr-1 md:px-6">
+          <div className="pl-2 pr-1 md:px-6 pb-28 md:pb-36">
             {loading ? (
               <div className="space-y-2">
                 {Array.from({ length: 5 }).map((_, index) => (

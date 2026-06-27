@@ -72,6 +72,39 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   const currentPlaylistIdRef = useRef(null);
   const lastContextTimeRef = useRef(0);
   const restoredTimeRef = useRef(restoredTime);
+  // Tracks last known valid duration so the OS media widget stays alive during song transitions
+  const lastKnownDurationRef = useRef(0);
+  // True while loading a new song — suppresses zeroed position state updates
+  const isLoadingNewSongRef = useRef(false);
+  // Live refs so MediaSession handlers can read latest values without re-registering.
+  // Initialized with safe defaults — sync effects below keep them up-to-date every render.
+  const playlistRef = useRef(playlist);
+  const currentIndexRef = useRef(0); // currentIndex computed later; synced via effect
+  const isShuffleRef = useRef(isShuffle);
+  const repeatModeRef = useRef(repeatMode);
+  // Mirror of isPlaying readable inside effects without stale closure issues
+  const isPlayingRef = useRef(false);
+
+
+  const silenceAudioRef = useRef(null);
+
+  // Initialize a silent looping audio anchor to prevent Chrome on Android
+  // from releasing media focus / collapsing the notification when audio.src changes.
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const audio = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
+      audio.loop = true;
+      audio.volume = 1.0; // Must be > 0 so Chrome registers it as active audible playback
+      silenceAudioRef.current = audio;
+    }
+    return () => {
+      if (silenceAudioRef.current) {
+        silenceAudioRef.current.pause();
+        silenceAudioRef.current = null;
+      }
+    };
+  }, []);
+
 
   useEffect(() => {
     restoredTimeRef.current = restoredTime;
@@ -700,9 +733,64 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
         // ONLY assign src and load audio if the song ID has actually changed!
         if (loadedSongIdRef.current !== currentSong.id) {
           console.log("Playing audio stream:", audioUrl);
+
+          // ────────────────────────────────────────────────────────────────────────
+          // THE FIX: Update MediaMetadata FIRST, then set src and immediately
+          // call play() — WITHOUT calling load().
+          //
+          // Why this works:
+          //   • Setting audio.src schedules the "emptied" event as a QUEUED TASK
+          //     (not synchronous) per the HTML spec resource-selection algorithm.
+          //   • audio.play() sets audio.paused = false SYNCHRONOUSLY.
+          //   • By the time the queued "emptied" task fires, audio.paused is
+          //     already false, so Chrome does NOT collapse the lock screen widget.
+          //   • Calling load() explicitly is what kills the session — it forces
+          //     an immediate synchronous reset to NETWORK_EMPTY state before play()
+          //     has a chance to run.
+          // ────────────────────────────────────────────────────────────────────────
+
+          // 1. Update metadata so the OS already has the new song info
+          if (typeof window !== "undefined" && "mediaSession" in navigator) {
+            try {
+              const artistName =
+                currentSong.artists?.primary?.[0]?.name ||
+                (Array.isArray(currentSong.artists) ? currentSong.artists[0]?.name : null) ||
+                currentSong.primaryArtists ||
+                "Unknown Artist";
+              const albumName = currentSong.album?.name || "Unknown Album";
+              const songTitle = (currentSong.name || currentSong.title || "Unknown Song")
+                .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#039;/g, "'");
+              const artwork = [];
+              if (currentSong.image && Array.isArray(currentSong.image)) {
+                currentSong.image.forEach((img, index) => {
+                  if (img?.url) {
+                    const sizes = ["50x50", "150x150", "500x500"];
+                    artwork.push({ src: img.url, sizes: sizes[index] || "500x500", type: "image/jpeg" });
+                  }
+                });
+              }
+              if (artwork.length === 0) {
+                artwork.push({ src: "/icon-192.png", sizes: "192x192", type: "image/png" });
+              }
+              navigator.mediaSession.metadata = new MediaMetadata({
+                title: songTitle, artist: artistName, album: albumName, artwork,
+              });
+              navigator.mediaSession.playbackState = "playing";
+            } catch (_) { }
+          }
+
+          // 2. Set src (schedules emptied as a queued task — NOT synchronous)
           audioRef.current.src = audioUrl;
-          audioRef.current.load();
           loadedSongIdRef.current = currentSong.id;
+
+          // 3. Call play() IMMEDIATELY — this sets audio.paused = false synchronously
+          //    BEFORE the queued emptied task fires, keeping the lock screen widget alive.
+          //    Do NOT call audio.load() — that is what collapses the notification.
+          if (isPlayingRef.current !== false) {
+            audioRef.current.play().catch((e) => {
+              if (e.name !== "AbortError") console.error("Audio play error:", e);
+            });
+          }
         }
       } else {
         console.warn("Audio stream URL not available for this song");
@@ -739,29 +827,41 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       }
 
       // Immediately update media session position state
+      // Skip if we're mid-transition (loading new song) to prevent zeroed state
+      // that would collapse the OS lock screen widget.
       if (
+        !isLoadingNewSongRef.current &&
         typeof window !== "undefined" &&
         "mediaSession" in navigator &&
         navigator.mediaSession.setPositionState
       ) {
-        try {
-          navigator.mediaSession.setPositionState({
-            duration: audio.duration || 0,
-            playbackRate: audio.playbackRate || 1,
-            position: newTime,
-          });
-        } catch (error) {
-          // Ignore position state errors
+        const dur = audio.duration;
+        if (dur && !isNaN(dur) && dur > 0) {
+          try {
+            navigator.mediaSession.setPositionState({
+              duration: dur,
+              playbackRate: audio.playbackRate || 1,
+              position: newTime,
+            });
+          } catch (error) {
+            // Ignore position state errors
+          }
         }
       }
     };
 
     const updateDuration = () => {
       const newDuration = audio.duration;
+      if (!newDuration || isNaN(newDuration) || newDuration <= 0) return;
+
       setDuration(newDuration);
       setContextDuration(newDuration);
+      // Store the valid duration for use during future song transitions
+      lastKnownDurationRef.current = newDuration;
+      // We now have a real duration — clear the loading guard
+      isLoadingNewSongRef.current = false;
 
-      // Update media session with new duration
+      // Update media session with new duration (only when valid)
       if (
         typeof window !== "undefined" &&
         "mediaSession" in navigator &&
@@ -792,11 +892,27 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       if (restoredTimeRef.current !== null) {
         return;
       }
+      // Mark that we're in a loading transition — suppresses zeroed position state
+      // so the OS lock screen widget does NOT collapse during song changes.
+      isLoadingNewSongRef.current = true;
+
       setCurrentTime(0);
       setDuration(0);
       setContextCurrentTime(0);
       lastContextTimeRef.current = 0;
     };
+
+    // ── CRITICAL: Handle the 'emptied' event ─────────────────────────────────
+    // When audio.src is set to a new URL, the browser fires 'emptied' which
+    // signals the OS that playback has stopped — this is what hides the lock
+    // screen widget for 1-2s.  We counter it by immediately re-asserting
+    // playbackState = 'playing' so the OS knows we are still active.
+    const handleEmptied = () => {
+      if (typeof window !== "undefined" && "mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "playing";
+      }
+    };
+    // ─────────────────────────────────────────────────────────────────────────
 
     const handleCanPlay = () => {
       // Update duration when audio can play
@@ -821,6 +937,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     audio.addEventListener("loadedmetadata", updateDuration);
     audio.addEventListener("canplay", handleCanPlay);
     audio.addEventListener("loadstart", handleLoadStart);
+    audio.addEventListener("emptied", handleEmptied);
     audio.addEventListener("ended", handleEnded);
 
     return () => {
@@ -828,6 +945,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       audio.removeEventListener("loadedmetadata", updateDuration);
       audio.removeEventListener("canplay", handleCanPlay);
       audio.removeEventListener("loadstart", handleLoadStart);
+      audio.removeEventListener("emptied", handleEmptied);
       audio.removeEventListener("ended", handleEnded);
     };
   }, [currentSong, setContextCurrentTime, setContextDuration, setRestoredTime]);
@@ -857,9 +975,15 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   // Auto-play when isPlaying becomes true or song changes
   useEffect(() => {
     const audio = audioRef.current;
+    const silence = silenceAudioRef.current;
     if (!audio || !currentSong) return;
 
     if (isPlaying) {
+      // Play the silence loop to hold the browser's active audio context
+      if (silence) {
+        silence.play().catch(() => {});
+      }
+
       // Add a small delay to prevent AbortError
       const playPromise = audio.play();
       if (playPromise !== undefined) {
@@ -873,6 +997,9 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       }
     } else {
       audio.pause();
+      if (silence) {
+        silence.pause();
+      }
       setContextCurrentTime(audio.currentTime);
       lastContextTimeRef.current = audio.currentTime;
     }
@@ -892,6 +1019,69 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   const handleNextRef = useRef(handleNext);
   useEffect(() => { handlePreviousRef.current = handlePrevious; });
   useEffect(() => { handleNextRef.current = handleNext; });
+  // Keep live refs in sync so MediaSession handlers can always read current values
+  useEffect(() => { playlistRef.current = playlist; });
+  useEffect(() => { currentIndexRef.current = currentIndex; });
+  useEffect(() => { isShuffleRef.current = isShuffle; });
+  useEffect(() => { repeatModeRef.current = repeatMode; });
+  useEffect(() => { isPlayingRef.current = isPlaying; });
+
+
+  // Helper: build MediaMetadata from a song object (used for instant pre-update)
+  const buildMediaMetadata = (song) => {
+    if (!song) return null;
+    const artistName =
+      song.artists?.primary?.[0]?.name ||
+      (Array.isArray(song.artists) ? song.artists[0]?.name : null) ||
+      song.primaryArtists ||
+      "Unknown Artist";
+    const albumName = song.album?.name || "Unknown Album";
+    const songTitle = (song.name || song.title || "Unknown Song")
+      .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#039;/g, "'");
+    const artwork = [];
+    if (song.image && Array.isArray(song.image)) {
+      song.image.forEach((img, index) => {
+        if (img?.url) {
+          const sizes = ["50x50", "150x150", "500x500"];
+          artwork.push({ src: img.url, sizes: sizes[index] || "500x500", type: "image/jpeg" });
+        }
+      });
+    }
+    if (artwork.length === 0) {
+      artwork.push({ src: "/icon-192.png", sizes: "192x192", type: "image/png" });
+    }
+    return new MediaMetadata({ title: songTitle, artist: artistName, album: albumName, artwork });
+  };
+
+  // Helper: synchronously look up the next song from refs (for instant metadata pre-update)
+  const peekNextSong = () => {
+    const pl = playlistRef.current;
+    const idx = currentIndexRef.current;
+    if (!pl || pl.length === 0) return null;
+    if (isShuffleRef.current) {
+      const order = shuffleOrderRef.current;
+      if (!order || order.length < 2) return null;
+      const nextPos = shuffleIndexRef.current + 1;
+      const nextIdx = nextPos >= order.length ? order[0] : order[nextPos];
+      return pl[nextIdx] || null;
+    }
+    return pl[idx < pl.length - 1 ? idx + 1 : 0] || null;
+  };
+
+  // Helper: synchronously look up the previous song from refs
+  const peekPrevSong = () => {
+    const pl = playlistRef.current;
+    const idx = currentIndexRef.current;
+    if (!pl || pl.length === 0) return null;
+    if (isShuffleRef.current) {
+      const order = shuffleOrderRef.current;
+      if (!order || order.length < 2) return null;
+      const prevPos = shuffleIndexRef.current > 0 ? shuffleIndexRef.current - 1 : order.length - 1;
+      return pl[order[prevPos]] || null;
+    }
+    return pl[idx > 0 ? idx - 1 : pl.length - 1] || null;
+  };
+
 
   // Register action handlers ONCE on mount — never re-register.
   useEffect(() => {
@@ -910,11 +1100,38 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       }
     });
     navigator.mediaSession.setActionHandler("previoustrack", () => {
+      // ── INSTANT METADATA PRE-UPDATE ─────────────────────────────────────
+      // Update MediaMetadata with the previous song RIGHT NOW, before React
+      // processes any state change or audio.src changes.  This keeps the OS
+      // lock screen widget visible with the correct song title throughout.
+      const prevSong = peekPrevSong();
+      if (prevSong) {
+        try {
+          const meta = buildMediaMetadata(prevSong);
+          if (meta) navigator.mediaSession.metadata = meta;
+          navigator.mediaSession.playbackState = "playing";
+        } catch (_) { }
+      }
+      // ───────────────────────────────────────────────────────────────────────
       handlePreviousRef.current();
     });
     navigator.mediaSession.setActionHandler("nexttrack", () => {
+      // ── INSTANT METADATA PRE-UPDATE ─────────────────────────────────────
+      // Update MediaMetadata with the NEXT song RIGHT NOW, before React processes
+      // any state change or audio.src changes.  This keeps the OS lock screen
+      // widget visible with the correct song title throughout the transition.
+      const nextSong = peekNextSong();
+      if (nextSong) {
+        try {
+          const meta = buildMediaMetadata(nextSong);
+          if (meta) navigator.mediaSession.metadata = meta;
+          navigator.mediaSession.playbackState = "playing";
+        } catch (_) { }
+      }
+      // ───────────────────────────────────────────────────────────────────────
       handleNextRef.current();
     });
+
     navigator.mediaSession.setActionHandler("seekbackward", (details) => {
       const skipTime = details.seekOffset || 10;
       if (audioRef.current) {
@@ -936,19 +1153,21 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     });
     navigator.mediaSession.setActionHandler("seekto", (details) => {
       if (details.seekTime !== undefined && audioRef.current) {
-        const newTime = Math.max(
-          0,
-          Math.min(details.seekTime, audioRef.current.duration || 0)
-        );
+        const safeDuration = (audioRef.current.duration && !isNaN(audioRef.current.duration) && audioRef.current.duration > 0)
+          ? audioRef.current.duration
+          : lastKnownDurationRef.current;
+        const newTime = Math.max(0, Math.min(details.seekTime, safeDuration || 0));
         audioRef.current.currentTime = newTime;
         setCurrentTime(newTime);
-        try {
-          navigator.mediaSession.setPositionState({
-            duration: audioRef.current.duration || 0,
-            playbackRate: audioRef.current.playbackRate || 1,
-            position: newTime,
-          });
-        } catch (_) { }
+        if (safeDuration > 0) {
+          try {
+            navigator.mediaSession.setPositionState({
+              duration: safeDuration,
+              playbackRate: audioRef.current.playbackRate || 1,
+              position: newTime,
+            });
+          } catch (_) { }
+        }
       }
     });
     return () => {
@@ -962,6 +1181,10 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
   // Update song metadata ONLY when the song ID changes.
   // Never tied to isPlaying so a play/pause toggle never touches MediaMetadata.
+  // NOTE: metadata is also updated synchronously in the src-change effect BEFORE
+  // audio.src is assigned — this is what prevents the widget from vanishing.
+  // This effect is a safety net for cases where the song object arrives after
+  // the audio URL is already set (e.g. after a details fetch).
   useEffect(() => {
     if (!currentSong || typeof window === "undefined" || !("mediaSession" in navigator))
       return;
@@ -993,6 +1216,8 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       album: albumName,
       artwork,
     });
+    // Keep playing state asserted every time song changes
+    navigator.mediaSession.playbackState = "playing";
   }, [currentSong?.id]); // Only song ID — not isPlaying
 
   // Update playbackState when isPlaying toggles — lightweight, never touches
