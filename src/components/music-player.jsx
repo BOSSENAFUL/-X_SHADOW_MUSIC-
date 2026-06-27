@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1, ListMusic } from "lucide-react";
+import { Volume2, VolumeX, Shuffle, Repeat, Repeat1, ListMusic } from "lucide-react";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { FullscreenMusicPlayer } from "@/components/fullscreen-music-player";
 import { IoMdPlay } from "react-icons/io";
@@ -13,7 +13,19 @@ import { BiSkipNext, BiSkipPrevious } from "react-icons/bi";
 
 // Module-level color cache — persists across re-renders and survives
 // component unmount/remount. Keyed by song ID for instant lookups.
+// Limited to 200 entries to prevent memory leaks.
 const _colorCache = new Map();
+const _COLOR_CACHE_MAX = 200;
+
+function _setCachedColor(songId, color) {
+  if (_colorCache.has(songId)) {
+    _colorCache.delete(songId);
+  } else if (_colorCache.size >= _COLOR_CACHE_MAX) {
+    const firstKey = _colorCache.keys().next().value;
+    _colorCache.delete(firstKey);
+  }
+  _colorCache.set(songId, color);
+}
 
 // Helper to get the smallest image URL from a song's image array
 function _getSmallImageUrl(song) {
@@ -24,6 +36,16 @@ function _getSmallImageUrl(song) {
     song.image[song.image.length - 1]?.url ||
     '/default-playlist-image.png'
   );
+}
+
+// Helper: convert HSL back to RGB — hoisted to avoid redefinition on every color extraction
+function hue2rgb(p, q, t) {
+  if (t < 0) t += 1;
+  if (t > 1) t -= 1;
+  if (t < 1 / 6) return p + (q - p) * 6 * t;
+  if (t < 1 / 2) return q;
+  if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+  return p;
 }
 
 export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
@@ -82,10 +104,6 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   const currentIndexRef = useRef(0); // currentIndex computed later; synced via effect
   const isShuffleRef = useRef(isShuffle);
   const repeatModeRef = useRef(repeatMode);
-  // Mirror of isPlaying readable inside effects without stale closure issues
-  const isPlayingRef = useRef(false);
-
-
   const silenceAudioRef = useRef(null);
 
   // Initialize a silent looping audio anchor to prevent Chrome on Android
@@ -123,7 +141,10 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   }, [volume]);
 
   // Use currentIndex from context if available, fallback to findIndex
-  const currentIndex = playerCurrentIndex ?? (playlist.findIndex((song) => song.id === currentSong?.id) || 0);
+  const currentIndex = playerCurrentIndex ?? (() => {
+    const idx = playlist.findIndex((song) => song.id === currentSong?.id);
+    return idx >= 0 ? idx : 0;
+  })();
 
   // Helper functions
   const formatTime = (time) => {
@@ -230,15 +251,6 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     const currentIndex = modes.indexOf(repeatMode);
     const nextIndex = (currentIndex + 1) % modes.length;
     setRepeatMode(modes[nextIndex]);
-  };
-
-  const handleSeek = (value) => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = value[0];
-      setCurrentTime(value[0]);
-      setContextCurrentTime(value[0]);
-      lastContextTimeRef.current = value[0];
-    }
   };
 
   const handleDirectSeek = (value) => {
@@ -447,16 +459,6 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
           s = Math.min(1, s * 1.2); // Increase saturation by 20% (reduced from 30%)
           l = Math.max(0.1, Math.min(0.25, l * 0.6)); // Target much darker range for white text
 
-          // Convert HSL back to RGB
-          const hue2rgb = (p, q, t) => {
-            if (t < 0) t += 1;
-            if (t > 1) t -= 1;
-            if (t < 1 / 6) return p + (q - p) * 6 * t;
-            if (t < 1 / 2) return q;
-            if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-            return p;
-          };
-
           if (s === 0) {
             r = g = b = l; // achromatic
           } else {
@@ -505,9 +507,11 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
   // Extract color when current song changes — with caching & pre-extraction
   useEffect(() => {
+    let cancelled = false;
+
     if (!currentSong?.id) {
       setDominantColor("rgb(40, 40, 40)");
-      return;
+      return () => { cancelled = true; };
     }
 
     const songId = currentSong.id;
@@ -520,7 +524,8 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       const imageUrl = _getSmallImageUrl(currentSong);
       if (imageUrl) {
         extractLeastDominantColor(imageUrl).then((color) => {
-          _colorCache.set(songId, color);
+          if (cancelled) return;
+          _setCachedColor(songId, color);
           setDominantColor(color);
         });
       }
@@ -530,23 +535,29 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
     // 3. Pre-extract colors for adjacent songs so next/prev feels instant
     const idx = playlist.findIndex((s) => s.id === songId);
-    const adjacentIndices = [idx - 1, idx + 1, idx + 2].filter(
-      (i) => i >= 0 && i < playlist.length
-    );
-    // Use requestIdleCallback (or setTimeout fallback) so this never blocks the UI
-    const schedule = window.requestIdleCallback || ((cb) => setTimeout(cb, 50));
-    schedule(() => {
-      for (const adjIdx of adjacentIndices) {
-        const adjSong = playlist[adjIdx];
-        if (!adjSong?.id || _colorCache.has(adjSong.id)) continue;
-        const adjUrl = _getSmallImageUrl(adjSong);
-        if (adjUrl) {
-          extractLeastDominantColor(adjUrl).then((color) => {
-            _colorCache.set(adjSong.id, color);
-          });
+    if (idx >= 0) {
+      const adjacentIndices = [idx - 1, idx + 1, idx + 2].filter(
+        (i) => i >= 0 && i < playlist.length
+      );
+      // Use requestIdleCallback (or setTimeout fallback) so this never blocks the UI
+      const schedule = window.requestIdleCallback || ((cb) => setTimeout(cb, 50));
+      schedule(() => {
+        if (cancelled) return;
+        for (const adjIdx of adjacentIndices) {
+          const adjSong = playlist[adjIdx];
+          if (!adjSong?.id || _colorCache.has(adjSong.id)) continue;
+          const adjUrl = _getSmallImageUrl(adjSong);
+          if (adjUrl) {
+            extractLeastDominantColor(adjUrl).then((color) => {
+              if (cancelled) return;
+              _setCachedColor(adjSong.id, color);
+            });
+          }
         }
-      }
-    });
+      });
+    }
+
+    return () => { cancelled = true; };
   }, [currentSong?.id, playlist]);
 
   // Keep refs of current song and playlist ID to prevent race conditions during async fetches
@@ -725,7 +736,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
         // If no explicit 320kbps or stream found, use the highest quality available
         if (!audioUrl) {
-          audioUrl = currentSong.downloadUrl[4]?.url || currentSong.downloadUrl[currentSong.downloadUrl.length - 1]?.url;
+          audioUrl = currentSong.downloadUrl[currentSong.downloadUrl.length - 1]?.url;
         }
       }
 
@@ -786,7 +797,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
           // 3. Call play() IMMEDIATELY — this sets audio.paused = false synchronously
           //    BEFORE the queued emptied task fires, keeping the lock screen widget alive.
           //    Do NOT call audio.load() — that is what collapses the notification.
-          if (isPlayingRef.current !== false) {
+          if (isPlaying) {
             audioRef.current.play().catch((e) => {
               if (e.name !== "AbortError") console.error("Audio play error:", e);
             });
@@ -1024,7 +1035,6 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   useEffect(() => { currentIndexRef.current = currentIndex; });
   useEffect(() => { isShuffleRef.current = isShuffle; });
   useEffect(() => { repeatModeRef.current = repeatMode; });
-  useEffect(() => { isPlayingRef.current = isPlaying; });
 
 
   // Helper: build MediaMetadata from a song object (used for instant pre-update)
@@ -1232,7 +1242,6 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     if (typeof window === "undefined") return "Music";
 
     const currentPath = window.location.pathname;
-    const searchParams = new URLSearchParams(window.location.search);
 
     // Check current route and determine context
     if (currentPath.includes("/search")) {
