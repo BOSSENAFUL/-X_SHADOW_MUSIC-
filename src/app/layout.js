@@ -1,3 +1,8 @@
+/*
+Copyright (c) 2026 Shree Jaybhay
+All rights reserved.
+Unauthorized copying or distribution prohibited.
+*/
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "next-themes";

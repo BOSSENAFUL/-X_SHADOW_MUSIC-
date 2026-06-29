@@ -3,6 +3,11 @@
 <img src="https://i.postimg.cc/WbpSYHsp/extension-icon-(1).png" alt="Jammify Logo" width="80" />
 
 # **Jammify**
+
+⚠️ Source available only for viewing and learning.
+
+Copying, deployment, redistribution, modification, or creating derivative projects is not permitted without explicit permission from the author.
+
 ### 🎶 Stream Music with Style
 
 **A modern music streaming web application built for learning and experimentation**

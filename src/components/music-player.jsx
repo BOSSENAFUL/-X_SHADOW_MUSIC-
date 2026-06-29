@@ -1,3 +1,8 @@
+/*
+Copyright (c) 2026 Shree Jaybhay
+All rights reserved.
+Unauthorized copying or distribution prohibited.
+*/
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
