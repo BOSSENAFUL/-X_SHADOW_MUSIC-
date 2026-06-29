@@ -85,7 +85,7 @@ const UserReviews = () => {
                                         {[1, 2, 3, 4, 5].map((star) => (
                                             <Star
                                                 key={star}
-                                                className={`w-4 h-4 ${rating.rating >= star ? "fill-amber-400 text-amber-400" : "text-muted/20"}`}
+                                                className={`w-4 h-4 ${rating.rating >= star ? "fill-amber-400 text-amber-400" : "text-muted-foreground/25"}`}
                                             />
                                         ))}
                                     </div>

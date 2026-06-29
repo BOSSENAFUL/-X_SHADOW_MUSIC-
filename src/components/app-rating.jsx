@@ -81,7 +81,7 @@ const AppRating = () => {
                         {[1, 2, 3, 4, 5].map((star) => (
                             <Star
                                 key={star}
-                                className={`w-8 h-8 cursor-pointer transition-all duration-200 hover:scale-115 ${rating >= star ? "fill-amber-400 text-amber-400" : "text-muted/30"}`}
+                                className={`w-8 h-8 cursor-pointer transition-all duration-200 hover:scale-115 ${rating >= star ? "fill-amber-400 text-amber-400" : "text-neutral-500 hover:text-amber-300"}`}
                                 onClick={() => setRating(star)}
                             />
                         ))}

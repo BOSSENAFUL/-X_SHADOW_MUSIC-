@@ -81,7 +81,7 @@ export default function ReviewsPage() {
                                 {[1, 2, 3, 4, 5].map((star) => (
                                     <Star
                                         key={star}
-                                        className={`w-5 h-5 ${star <= Math.round(averageRating) ? "fill-amber-400 text-amber-400" : "text-muted/20"}`}
+                                        className={`w-5 h-5 ${star <= Math.round(averageRating) ? "fill-amber-400 text-amber-400" : "text-muted-foreground/25"}`}
                                     />
                                 ))}
                             </div>
@@ -116,7 +116,7 @@ export default function ReviewsPage() {
                                                 {[1, 2, 3, 4, 5].map((star) => (
                                                     <Star
                                                         key={star}
-                                                        className={`w-4 h-4 sm:w-5 sm:h-5 ${rating.rating >= star ? "fill-amber-400 text-amber-400" : "text-muted/30"}`}
+                                                        className={`w-4 h-4 sm:w-5 sm:h-5 ${rating.rating >= star ? "fill-amber-400 text-amber-400" : "text-muted-foreground/25"}`}
                                                     />
                                                 ))}
                                             </div>
@@ -183,7 +183,7 @@ export default function ReviewsPage() {
                                                     {[1, 2, 3, 4, 5].map((star) => (
                                                         <Star
                                                             key={star}
-                                                            className={`w-5 h-5 md:w-6 md:h-6 ${rating.rating >= star ? "fill-amber-400 text-amber-400" : "text-muted/30"}`}
+                                                            className={`w-5 h-5 md:w-6 md:h-6 ${rating.rating >= star ? "fill-amber-400 text-amber-400" : "text-muted-foreground/25"}`}
                                                         />
                                                     ))}
                                                 </div>
