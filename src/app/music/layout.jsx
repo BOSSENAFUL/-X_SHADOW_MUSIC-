@@ -1,5 +1,7 @@
+import { cookies } from "next/headers";
 import MusicLayoutClient from "./layout-client";
 import JsonLd from "@/components/json-ld";
+
 
 export const metadata = {
   alternates: {
@@ -72,9 +74,12 @@ const musicAppSchema = {
   },
 };
 
-export default function MusicLayout({ children }) {
+export default async function MusicLayout({ children }) {
+  const cookieStore = await cookies();
+  const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false";
+
   return (
-    <MusicLayoutClient>
+    <MusicLayoutClient defaultOpen={defaultOpen}>
       <JsonLd data={breadcrumbSchema} />
       <JsonLd data={musicAppSchema} />
       {children}

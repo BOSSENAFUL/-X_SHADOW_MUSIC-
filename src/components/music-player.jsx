@@ -84,6 +84,34 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   const [dominantColor, setDominantColor] = useState("rgb(40, 40, 40)"); // Default dark color
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [wasPlayingBeforeScrub, setWasPlayingBeforeScrub] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      const match = document.cookie.match(/sidebar_state=(true|false)/);
+      if (match) {
+        return match[1] === "true";
+      }
+    }
+    return true;
+  });
+
+  // Sync sidebar open state via custom window event
+  useEffect(() => {
+    setIsMounted(true);
+    if (typeof window === "undefined") return;
+
+    const handleSidebarChange = (e) => {
+      if (e.detail && typeof e.detail.open === "boolean") {
+        setSidebarOpen(e.detail.open);
+      }
+    };
+
+    window.addEventListener("sidebar-state-change", handleSidebarChange);
+    return () => {
+      window.removeEventListener("sidebar-state-change", handleSidebarChange);
+    };
+  }, []);
+
   const audioRef = useRef(null);
   const isScrubbingRef = useRef(false);
   const shuffleOrderRef = useRef([]);
@@ -1287,7 +1315,10 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
       {/* Only show the bottom bar when fullscreen is NOT open */}
       {!isFullscreenOpen && (
-        <div className="fixed bottom-16 left-0 right-0 md:left-64 md:bottom-0 md:border-t md:border-border z-60 md:bg-background">
+        <div 
+          suppressHydrationWarning
+          className={`fixed bottom-16 left-0 right-0 md:bottom-0 md:border-t md:border-border z-60 md:bg-background ${isMounted ? "transition-all duration-300" : ""} ${sidebarOpen ? "md:left-64" : "md:left-12"}`}
+        >
           {/* Mobile background - transparent, the floating card has its own bg */}
           <div
             className="block md:hidden absolute inset-0"

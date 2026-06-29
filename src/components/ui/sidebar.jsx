@@ -32,6 +32,7 @@ const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
 const SidebarContext = React.createContext(null);
+export const SidebarStateContext = React.createContext(undefined);
 
 function useSidebar() {
   const context = React.useContext(SidebarContext);
@@ -53,10 +54,19 @@ function SidebarProvider({
 }) {
   const isMobile = useIsMobile();
   const [openMobile, setOpenMobile] = React.useState(false);
+  const contextDefaultOpen = React.useContext(SidebarStateContext);
+  const resolvedDefaultOpen = contextDefaultOpen ?? defaultOpen;
+
+  const [isMounted, setIsMounted] = React.useState(false);
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
-  const [_open, _setOpen] = React.useState(defaultOpen);
+  const [_open, _setOpen] = React.useState(resolvedDefaultOpen);
+
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const open = openProp ?? _open;
   const setOpen = React.useCallback(
     (value) => {
@@ -94,6 +104,12 @@ function SidebarProvider({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [toggleSidebar]);
 
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("sidebar-state-change", { detail: { open } }));
+    }
+  }, [open]);
+
   // We add a state so that we can do data-state="expanded" or "collapsed".
   // This makes it easier to style the sidebar with Tailwind classes.
   const state = open ? "expanded" : "collapsed";
@@ -116,6 +132,7 @@ function SidebarProvider({
       <TooltipProvider delayDuration={0}>
         <div
           data-slot="sidebar-wrapper"
+          suppressHydrationWarning
           style={{
             "--sidebar-width": SIDEBAR_WIDTH,
             "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
@@ -123,6 +140,7 @@ function SidebarProvider({
           }}
           className={cn(
             "group/sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex min-h-svh w-full",
+            !isMounted && "[&_*]:!transition-none [&_*]:!duration-0",
             className
           )}
           {...props}
@@ -185,6 +203,7 @@ function Sidebar({
   return (
     <div
       className="group peer text-sidebar-foreground hidden md:block"
+      suppressHydrationWarning
       data-state={state}
       data-collapsible={state === "collapsed" ? collapsible : ""}
       data-variant={variant}
