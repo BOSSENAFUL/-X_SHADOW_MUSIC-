@@ -39,6 +39,9 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q');
+    const page = Math.max(0, parseInt(searchParams.get('page')) || 0);
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit')) || 20));
+    const skip = page * limit;
 
     if (!query) {
       return NextResponse.json(
@@ -57,12 +60,11 @@ export async function GET(request) {
     }
 
     // Check cache first
-    const cacheKey = getCacheKey(trimmedQuery);
+    const cacheKey = `${getCacheKey(trimmedQuery)}:${page}:${limit}`;
     const cachedResult = getFromCache(cacheKey);
     if (cachedResult) {
       return NextResponse.json({
-        success: true,
-        data: cachedResult,
+        ...cachedResult,
         cached: true
       });
     }
@@ -71,29 +73,49 @@ export async function GET(request) {
 
     // Try text search first (faster if text index exists)
     let playlists;
+    let total = 0;
+
+    const countQuery = {
+      isPublic: true,
+      $text: { $search: trimmedQuery }
+    };
+
+    // Escape regex special characters to prevent malformed query syntax crashes
+    const escapedQuery = trimmedQuery.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const countQueryFallback = {
+      isPublic: true,
+      $or: [
+        { name: { $regex: escapedQuery, $options: 'i' } },
+        { description: { $regex: escapedQuery, $options: 'i' } }
+      ]
+    };
+
     try {
       // OPTIMIZATION 1: Use MongoDB text search for better performance
-      playlists = await Playlist.find({
-        isPublic: true,
-        $text: { $search: trimmedQuery }
-      })
-        .select('name description songIds image coverImage userId createdAt updatedAt')
-        .sort({ score: { $meta: 'textScore' }, createdAt: -1 })
-        .limit(20)
-        .lean();
+      const [totalCount, foundPlaylists] = await Promise.all([
+        Playlist.countDocuments(countQuery),
+        Playlist.find(countQuery)
+          .select('name description songIds image coverImage userId createdAt updatedAt')
+          .sort({ score: { $meta: 'textScore' }, createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean()
+      ]);
+      total = totalCount;
+      playlists = foundPlaylists;
     } catch (textSearchError) {
       // Fallback to regex if text index doesn't exist yet
-      playlists = await Playlist.find({
-        isPublic: true,
-        $or: [
-          { name: { $regex: trimmedQuery, $options: 'i' } },
-          { description: { $regex: trimmedQuery, $options: 'i' } }
-        ]
-      })
-        .select('name description songIds image coverImage userId createdAt updatedAt')
-        .sort({ createdAt: -1 })
-        .limit(20)
-        .lean();
+      const [totalCount, foundPlaylists] = await Promise.all([
+        Playlist.countDocuments(countQueryFallback),
+        Playlist.find(countQueryFallback)
+          .select('name description songIds image coverImage userId createdAt updatedAt')
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean()
+      ]);
+      total = totalCount;
+      playlists = foundPlaylists;
     }
 
     // OPTIMIZATION 5: Batch fetch user data instead of populate
@@ -126,14 +148,19 @@ export async function GET(request) {
       };
     });
 
-    // Cache the result
-    setCache(cacheKey, transformedPlaylists);
-
-    return NextResponse.json({
+    const responseBody = {
       success: true,
       data: transformedPlaylists,
+      total,
+      page,
+      hasMore: (page + 1) * limit < total,
       cached: false
-    });
+    };
+
+    // Cache the result
+    setCache(cacheKey, responseBody);
+
+    return NextResponse.json(responseBody);
 
   } catch (error) {
     console.error('Public playlists search error:', error);

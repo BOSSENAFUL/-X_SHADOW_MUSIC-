@@ -53,6 +53,22 @@ import { PlaylistCover } from "@/components/ui/playlist-cover";
 import { downloadWithMetadata } from "@/lib/clientDownload";
 
 // --- Helper Components ---
+function Chip({ label, active, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      type="button"
+      className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 cursor-pointer ${
+        active
+          ? "bg-primary text-primary-foreground border-primary"
+          : "bg-muted/30 text-muted-foreground border-border/40 hover:text-foreground hover:bg-muted/50"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
 const SongActionMenu = memo(({
   song,
   onAddToPlaylist,
@@ -324,9 +340,14 @@ function SearchPageContent() {
   const [searchResults, setSearchResults] = useState(null);
   const [lyricsResults, setLyricsResults] = useState(null);
   const [publicPlaylists, setPublicPlaylists] = useState(null);
+  const [publicPlaylistsPage, setPublicPlaylistsPage] = useState(0);
+  const [publicPlaylistsHasMore, setPublicPlaylistsHasMore] = useState(true);
+  const [publicPlaylistsLoading, setPublicPlaylistsLoading] = useState(false);
+  const [publicPlaylistsLoadingMore, setPublicPlaylistsLoadingMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [lyricsLoading, setLyricsLoading] = useState(false);
-  const [publicPlaylistsLoading, setPublicPlaylistsLoading] = useState(false);
+  const [playlistsSubTab, setPlaylistsSubTab] = useState("community");
+  const [hasManuallySwitchedPlaylistsSubTab, setHasManuallySwitchedPlaylistsSubTab] = useState(false);
   const [loadedSearchQuery, setLoadedSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [playingId, setPlayingId] = useState(null);
@@ -344,6 +365,17 @@ function SearchPageContent() {
     artists: { results: [], page: 0, hasMore: true, loading: false },
     playlists: { results: [], page: 0, hasMore: true, loading: false }
   });
+
+  // Auto-switch subtab to featured if community playlists are empty
+  useEffect(() => {
+    if (hasManuallySwitchedPlaylistsSubTab) return;
+
+    if (publicPlaylists && publicPlaylists.length === 0 && categoryData.playlists.results.length > 0) {
+      setPlaylistsSubTab("featured");
+    } else if (publicPlaylists && publicPlaylists.length > 0) {
+      setPlaylistsSubTab("community");
+    }
+  }, [publicPlaylists, categoryData.playlists.results.length, hasManuallySwitchedPlaylistsSubTab]);
 
   // Observer for infinite scroll
   const observerTarget = useRef(null);
@@ -443,6 +475,12 @@ function SearchPageContent() {
     if (saved.results) setSearchResults(saved.results);
     if (saved.lyricsRes) setLyricsResults(saved.lyricsRes);
     if (saved.publicPlaylists) setPublicPlaylists(saved.publicPlaylists);
+    if (typeof saved.publicPlaylistsPage === 'number') setPublicPlaylistsPage(saved.publicPlaylistsPage);
+    if (typeof saved.publicPlaylistsHasMore === 'boolean') setPublicPlaylistsHasMore(saved.publicPlaylistsHasMore);
+    if (saved.playlistsSubTab) setPlaylistsSubTab(saved.playlistsSubTab);
+    if (typeof saved.hasManuallySwitchedPlaylistsSubTab === 'boolean') {
+      setHasManuallySwitchedPlaylistsSubTab(saved.hasManuallySwitchedPlaylistsSubTab);
+    }
     if (saved.tab) setActiveTab(saved.tab);
     if (saved.categoryState) setCategoryData(saved.categoryState);
     if (saved.query) setLoadedSearchQuery(saved.query);
@@ -463,14 +501,19 @@ function SearchPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally empty — runs once after first render
 
-  // --- Utility Functions ---
-  const decodeHtmlEntities = (text) => {
-    if (!text) return text;
-    if (typeof window === 'undefined') return text;
-    const textarea = document.createElement('textarea');
-    textarea.innerHTML = text;
-    return textarea.value;
-  };
+  // Memoized textarea to avoid garbage collection pressure during rendering
+  const decodeHtmlEntities = (() => {
+    let memoizedTextarea = null;
+    return (text) => {
+      if (!text) return text;
+      if (typeof window === 'undefined') return text;
+      if (!memoizedTextarea) {
+        memoizedTextarea = document.createElement('textarea');
+      }
+      memoizedTextarea.innerHTML = text;
+      return memoizedTextarea.value;
+    };
+  })();
 
   const formatDuration = (duration) => {
     if (!duration) return "0:00";
@@ -560,7 +603,8 @@ function SearchPageContent() {
   useEffect(() => {
     latestStateRef.current = {
       searchQuery, activeSearchQuery, searchResults, lyricsResults, publicPlaylists,
-      activeTab, categoryData,
+      activeTab, categoryData, publicPlaylistsPage, publicPlaylistsHasMore,
+      playlistsSubTab, hasManuallySwitchedPlaylistsSubTab,
     };
   });
 
@@ -576,6 +620,8 @@ function SearchPageContent() {
       const {
         searchQuery: q, searchResults: res, lyricsResults: lyr,
         publicPlaylists: pp, activeTab: tab, categoryData: cat,
+        publicPlaylistsPage: ppage, publicPlaylistsHasMore: phasMore,
+        playlistsSubTab: psubTab, hasManuallySwitchedPlaylistsSubTab: pManualSwitched,
       } = latestStateRef.current;
 
 
@@ -607,7 +653,11 @@ function SearchPageContent() {
           query: q,
           results: slimResults,
           lyricsRes: lyr?.slice(0, 20),
-          publicPlaylists: pp?.slice(0, 20),
+          publicPlaylists: pp,
+          publicPlaylistsPage: ppage,
+          publicPlaylistsHasMore: phasMore,
+          playlistsSubTab: psubTab,
+          hasManuallySwitchedPlaylistsSubTab: pManualSwitched,
           tab,
           categoryState: cat,
           scrollPosition: tabScrollPositions.current[tab] || 0,
@@ -765,6 +815,9 @@ function SearchPageContent() {
     setSearchResults(null);
     setLyricsResults(null);
     setPublicPlaylists(null);
+    setPublicPlaylistsPage(0);
+    setPublicPlaylistsHasMore(true);
+    setHasManuallySwitchedPlaylistsSubTab(false);
 
     // Reset category data on new search
     setCategoryData({
@@ -796,10 +849,13 @@ function SearchPageContent() {
               }
 
               // Update both searchResults.playlists and categoryData.playlists
-              setSearchResults(prev => prev ? {
-                ...prev,
-                playlists: data.data
-              } : prev);
+              setSearchResults(prev => {
+                const base = prev || {};
+                return {
+                  ...base,
+                  playlists: data.data
+                };
+              });
 
               setCategoryData(prev => ({
                 ...prev,
@@ -831,10 +887,13 @@ function SearchPageContent() {
               }
 
               // Update both searchResults.albums and categoryData.albums
-              setSearchResults(prev => prev ? {
-                ...prev,
-                albums: data.data
-              } : prev);
+              setSearchResults(prev => {
+                const base = prev || {};
+                return {
+                  ...base,
+                  albums: data.data
+                };
+              });
 
               setCategoryData(prev => ({
                 ...prev,
@@ -1205,6 +1264,20 @@ function SearchPageContent() {
     const observer = new IntersectionObserver(
       entries => {
         if (entries[0].isIntersecting) {
+          if (activeTab === 'playlists') {
+            if (playlistsSubTab === 'community') {
+              if (publicPlaylistsHasMore && !publicPlaylistsLoading && !publicPlaylistsLoadingMore) {
+                performPublicPlaylistsSearch(activeSearchQuery, currentSearchId.current, publicPlaylistsPage + 1, true);
+              }
+            } else {
+              const currentCategory = categoryData[activeTab];
+              if (currentCategory && !currentCategory.loading && currentCategory.hasMore && currentCategory.page > 0) {
+                fetchCategoryResults(activeTab, currentCategory.page + 1);
+              }
+            }
+            return;
+          }
+
           const currentCategory = categoryData[activeTab];
           if (currentCategory && !currentCategory.loading && currentCategory.hasMore && currentCategory.page > 0) {
             fetchCategoryResults(activeTab, currentCategory.page + 1);
@@ -1228,29 +1301,43 @@ function SearchPageContent() {
       }
       observer.disconnect();
     };
-  }, [activeTab, categoryData, fetchCategoryResults]);
+  }, [
+    activeTab,
+    categoryData,
+    fetchCategoryResults,
+    publicPlaylistsHasMore,
+    publicPlaylistsLoading,
+    publicPlaylistsLoadingMore,
+    publicPlaylistsPage,
+    activeSearchQuery,
+    playlistsSubTab
+  ]);
 
   // Public playlists search function
-  const performPublicPlaylistsSearch = async (query, searchId) => {
+  const performPublicPlaylistsSearch = async (query, searchId, pageNum = 0, isLoadMore = false) => {
     if (!query.trim()) {
       setPublicPlaylists(null);
       return;
     }
 
     try {
-      const response = await fetch(`/api/search-public-playlists?q=${encodeURIComponent(query)}`);
+      if (isLoadMore) {
+        setPublicPlaylistsLoadingMore(true);
+      } else {
+        setPublicPlaylistsLoading(true);
+      }
+
+      const response = await fetch(`/api/search-public-playlists?q=${encodeURIComponent(query)}&page=${pageNum}&limit=20`);
       const data = await response.json();
 
       if (searchId !== currentSearchId.current) return;
 
-      if (data.success && data.data.length > 0) {
+      if (data.success && data.data && data.data.length > 0) {
         // Collect first 4 songs for collage from all found playlists
         const allSongIds = new Set();
         data.data.forEach(p => {
           if (p.songIds) p.songIds.slice(0, 4).forEach(sid => allSongIds.add(sid));
         });
-
-
 
         // Batch retrieve all song information in ONE request
         const songCache = {};
@@ -1289,13 +1376,31 @@ function SearchPageContent() {
           };
         });
 
-        setPublicPlaylists(playlistsWithSongs);
+        setPublicPlaylists(prev => {
+          const prevList = isLoadMore ? (prev || []) : [];
+          const combined = [...prevList, ...playlistsWithSongs].filter(Boolean);
+          // De-duplicate using map
+          return Array.from(new Map(combined.map(p => [p.id, p])).values());
+        });
+
+        setPublicPlaylistsPage(pageNum);
+        const hasMoreVal = typeof data.hasMore === 'boolean' ? data.hasMore : data.data.length === 20;
+        setPublicPlaylistsHasMore(hasMoreVal);
       } else {
-        setPublicPlaylists(data.success ? [] : null);
+        if (!isLoadMore) {
+          setPublicPlaylists(data.success ? [] : null);
+        }
+        setPublicPlaylistsHasMore(false);
       }
     } catch (error) {
       console.error('Public playlists search error:', error);
-      setPublicPlaylists([]);
+      if (!isLoadMore) {
+        setPublicPlaylists([]);
+      }
+      setPublicPlaylistsHasMore(false);
+    } finally {
+      setPublicPlaylistsLoading(false);
+      setPublicPlaylistsLoadingMore(false);
     }
   };
 
@@ -1436,15 +1541,15 @@ function SearchPageContent() {
     };
 
     // 2. Hydrate with high-quality specific category fetches
-    if (categoryData.songs?.results?.length > 0) {
-      if (categoryData.songs.results.length > combined.songs.results.length || combined.songs.results.length === 0) {
-        combined.songs.results = categoryData.songs.results;
-      }
+    // If we have category-specific results and we are either on the dedicated tab or the category search has been initiated (page > 0),
+    // we should always use the specific category results instead of getting stuck on the small search preview.
+    if (categoryData.songs?.results?.length > 0 && (activeTab === 'songs' || categoryData.songs.page > 0)) {
+      combined.songs.results = categoryData.songs.results;
     }
-    if (categoryData.albums?.results?.length > combined.albums.results.length) {
+    if (categoryData.albums?.results?.length > 0 && (activeTab === 'albums' || categoryData.albums.page > 0)) {
       combined.albums.results = categoryData.albums.results;
     }
-    if (categoryData.playlists?.results?.length > combined.playlists.results.length) {
+    if (categoryData.playlists?.results?.length > 0 && (activeTab === 'playlists' || categoryData.playlists.page > 0)) {
       combined.playlists.results = categoryData.playlists.results;
     }
 
@@ -1521,9 +1626,16 @@ function SearchPageContent() {
       return true;
     });
 
-    // Sort all artists by relevance
-    uniqueArtists.sort((a, b) => b._index === undefined ? getRelevanceScore(b) - getRelevanceScore(a) : 0);
-    combined.artists.results = uniqueArtists;
+    // Stability Fix for Artists Infinite Scroll:
+    // We only perform the "Smart Ranking" on the "Hero" section (the initial page 1 results).
+    // Results from deeper pages (Page 2+) are kept in their stable API order to prevent the UI from jumping
+    // when more artists load.
+    const heroArtistsThreshold = 40;
+    const heroArtists = uniqueArtists.slice(0, heroArtistsThreshold);
+    const deepArtists = uniqueArtists.slice(heroArtistsThreshold);
+
+    heroArtists.sort((a, b) => getRelevanceScore(b) - getRelevanceScore(a));
+    combined.artists.results = [...heroArtists, ...deepArtists];
 
     // Deduplicate and sort songs
     const uniqueSongs = deduplicateSongs(combined.songs.results);
@@ -2892,8 +3004,32 @@ function SearchPageContent() {
 
                   {(categoryData.playlists.results.length > 0 || combinedSearchResults.playlists?.results?.length > 0 || publicPlaylists?.length > 0) ? (
                     <div className="space-y-8">
+                      {/* Sub-tab selection chips */}
+                      <div className="flex items-center gap-2">
+                        {publicPlaylists && publicPlaylists.length > 0 && (
+                          <Chip
+                            label="Community"
+                            active={playlistsSubTab === "community"}
+                            onClick={() => {
+                              setPlaylistsSubTab("community");
+                              setHasManuallySwitchedPlaylistsSubTab(true);
+                            }}
+                          />
+                        )}
+                        {(categoryData.playlists.results.length > 0 || combinedSearchResults.playlists?.results?.length > 0) && (
+                          <Chip
+                            label="Featured"
+                            active={playlistsSubTab === "featured"}
+                            onClick={() => {
+                              setPlaylistsSubTab("featured");
+                              setHasManuallySwitchedPlaylistsSubTab(true);
+                            }}
+                          />
+                        )}
+                      </div>
+
                       {/* User-created Public Playlists */}
-                      {publicPlaylists?.length > 0 && (
+                      {playlistsSubTab === "community" && publicPlaylists?.length > 0 && (
                         <div>
                           <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-semibold">Community Playlists</h3>
@@ -2967,7 +3103,7 @@ function SearchPageContent() {
                       )}
 
                       {/* JioSaavn Playlists */}
-                      {combinedSearchResults.playlists.results.length > 0 && (
+                      {playlistsSubTab === "featured" && combinedSearchResults.playlists.results.length > 0 && (
                         <div>
                           <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-semibold">Featured Playlists</h3>
@@ -3035,9 +3171,11 @@ function SearchPageContent() {
                       )}
 
                       {/* Playlists loading sentinel */}
-                      {(categoryData.playlists.hasMore && categoryData.playlists.page > 0) && (
+                      {((playlistsSubTab === "community" && publicPlaylistsHasMore) ||
+                        (playlistsSubTab === "featured" && categoryData.playlists.hasMore)) && (
                         <div ref={observerTarget} className="col-span-full flex justify-center py-4 w-full h-10">
-                          {categoryData.playlists.loading && (
+                          {((playlistsSubTab === "community" && publicPlaylistsLoadingMore) ||
+                            (playlistsSubTab === "featured" && categoryData.playlists.loading)) && (
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                           )}
                         </div>

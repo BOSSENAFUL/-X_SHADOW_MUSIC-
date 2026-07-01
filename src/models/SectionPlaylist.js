@@ -25,7 +25,6 @@ const sectionPlaylistSchema = new mongoose.Schema(
 
 // Compound index for fast lookup of a playlist within a section, and sorting
 sectionPlaylistSchema.index({ sectionId: 1, order: 1 });
-sectionPlaylistSchema.index({ playlistId: 1 });
 
 /**
  * Returns the SectionPlaylist model bound to the `playlists` database connection.
