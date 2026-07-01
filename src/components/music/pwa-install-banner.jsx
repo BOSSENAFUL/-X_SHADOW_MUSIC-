@@ -21,7 +21,7 @@ export function PWAInstallBanner() {
 
     // Show banner if it's mobile, not dismissed, and not already installed
     if (isMobile && !dismissed && !isStandalone) {
-      setShow(true);
+      requestAnimationFrame(() => setShow(true));
     }
 
     // Listen for the prompt event to capture it for the actual install

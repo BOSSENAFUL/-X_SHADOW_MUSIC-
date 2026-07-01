@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
@@ -11,8 +12,14 @@ import { AppSidebar } from "@/components/app-sidebar";
 
 /* ── Thumbnail with quality fallback ── */
 function Thumb({ src, fallback, className, rounded = "rounded-xl" }) {
+  const [prevSrc, setPrevSrc] = useState(src);
   const [imgSrc, setImgSrc] = useState(src);
-  useEffect(() => setImgSrc(src), [src]);
+
+  if (src !== prevSrc) {
+    setPrevSrc(src);
+    setImgSrc(src);
+  }
+
   return (
     <img
       src={imgSrc || fallback || "/default-playlist-image.png"}

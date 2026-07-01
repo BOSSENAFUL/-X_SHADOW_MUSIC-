@@ -121,7 +121,7 @@ export default function ReviewsPage() {
                                                 ))}
                                             </div>
                                             <p className="text-sm sm:text-base text-foreground/80 leading-relaxed font-light italic wrap-break-word">
-                                                "{rating.comment || "An incredible experience."}"
+                                                &quot;{rating.comment || "An incredible experience."}&quot;
                                             </p>
                                         </div>
 

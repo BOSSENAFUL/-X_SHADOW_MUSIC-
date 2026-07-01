@@ -311,7 +311,7 @@ export default function GenrePage() {
                 {!hasMore && displayedPlaylists.length > 0 && (
                   <div className="text-center py-8">
                     <p className="text-muted-foreground">
-                      You've reached the end! Showing all {displayedPlaylists.length} playlists.
+                      You&apos;ve reached the end! Showing all {displayedPlaylists.length} playlists.
                     </p>
                   </div>
                 )}

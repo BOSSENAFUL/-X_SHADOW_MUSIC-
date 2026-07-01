@@ -83,6 +83,25 @@ export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
     const { data: session } = useSession();
     const { playSong, currentPlaylistId, isPlaying, togglePlayPause } = useMusicPlayer();
 
+    // Helper: return the URL only if it looks like a real URL, otherwise fallback
+    const safeImageUrl = (url) => {
+        if (!url || typeof url !== 'string') return '/default-playlist-image.png';
+        if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/')) return url;
+        return '/default-playlist-image.png';
+    };
+
+    // Get cover image URL for color extraction
+    const coverImageUrl = playlist ? safeImageUrl(
+        playlist.image?.[2]?.url ||
+        playlist.image?.[1]?.url ||
+        playlist.image?.[0]?.url ||
+        (typeof playlist.image === 'string' ? playlist.image : null)
+    ) : '/default-playlist-image.png';
+
+    const mixColor = useImageColor(playlist && playlist.source === 'mix' ? coverImageUrl : null);
+
+    if (!playlist) return null;
+
     const currentPlayingId = externalPlayingId || localPlayingId;
     const id = playlist.id || playlist.playlistId;
 
@@ -144,29 +163,14 @@ export function PlaylistCard({ playlist, onClick, externalPlayingId, onPlay }) {
     let collageDisplayImages = playlist.collageImages || [];
     if (collageDisplayImages.length < 4 && Array.isArray(playlist.image) && playlist.image.length >= 4) {
         // If it's a user playlist or they all have 'default' quality, it's likely a collage
-        const isLikelyCollage = playlist.source === 'user' || playlist.image.every(img => img.quality === 'default');
+        const isLikelyCollage = playlist.source === 'user' || playlist.image.every(img => img && img.quality === 'default');
         if (isLikelyCollage) {
-            collageDisplayImages = playlist.image.map(img => img.url).filter(url =>
+            collageDisplayImages = playlist.image.map(img => img?.url).filter(url =>
                 typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/'))
             );
         }
     }
 
-    // Helper: return the URL only if it looks like a real URL, otherwise fallback
-    const safeImageUrl = (url) => {
-        if (!url || typeof url !== 'string') return '/default-playlist-image.png';
-        if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/')) return url;
-        return '/default-playlist-image.png';
-    };
-
-    // Get cover image URL for color extraction
-    const coverImageUrl = safeImageUrl(
-        playlist.image?.[2]?.url ||
-        playlist.image?.[1]?.url ||
-        playlist.image?.[0]?.url ||
-        (typeof playlist.image === 'string' ? playlist.image : null)
-    );
-    const mixColor = useImageColor(playlist.source === 'mix' ? coverImageUrl : null);
 
     return (
         <div

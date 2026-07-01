@@ -41,10 +41,10 @@ export default function CommunityPlaylistsPage() {
     if (savedData) {
       try {
         const { playlists: savedPlaylists, page: savedPage, hasMore: savedHasMore, total: savedTotal } = JSON.parse(savedData);
-        setPlaylists(savedPlaylists);
-        setPage(savedPage);
-        setHasMore(savedHasMore);
-        setTotal(savedTotal);
+        setPlaylists(Array.isArray(savedPlaylists) ? savedPlaylists.filter(Boolean) : []);
+        setPage(typeof savedPage === 'number' ? savedPage : 0);
+        setHasMore(typeof savedHasMore === 'boolean' ? savedHasMore : true);
+        setTotal(typeof savedTotal === 'number' ? savedTotal : 0);
         setLoading(false);
         isInitialLoad.current = false;
       } catch (e) {
@@ -86,9 +86,10 @@ export default function CommunityPlaylistsPage() {
 
       if (result.success && result.data) {
         setPlaylists(prev => {
-          const combined = isLoadMore ? [...prev, ...result.data] : result.data;
-          // De-duplicate if necessary
-          const unique = Array.from(new Map(combined.map(p => [p.id, p])).values());
+          const rawList = result.data || [];
+          const combined = (isLoadMore ? [...prev, ...rawList] : rawList).filter(Boolean);
+          // De-duplicate if necessary, ensuring we safely read p.id or p.playlistId
+          const unique = Array.from(new Map(combined.map(p => [p.id || p.playlistId, p])).values());
 
           // Save state to sessionStorage for back-navigation
           sessionStorage.setItem('communityPlaylistsState', JSON.stringify({
@@ -219,9 +220,9 @@ export default function CommunityPlaylistsPage() {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-10 min-[1800px]:grid-cols-11 min-[2100px]:grid-cols-12 gap-x-3 gap-y-6 md:gap-x-4 md:gap-y-8">
-              {playlists.map((playlist) => (
+              {Array.isArray(playlists) && playlists.filter(Boolean).map((playlist) => (
                 <PlaylistCard
-                  key={playlist.id}
+                  key={playlist.id || playlist.playlistId}
                   playlist={playlist}
                   onClick={handleCardClick}
                 />
@@ -245,7 +246,7 @@ export default function CommunityPlaylistsPage() {
               )}
               {!hasMore && playlists.length > 0 && (
                 <p className="text-muted-foreground text-sm font-medium italic">
-                  That's all the community playlists for now!
+                  That&apos;s all the community playlists for now!
                 </p>
               )}
             </div>

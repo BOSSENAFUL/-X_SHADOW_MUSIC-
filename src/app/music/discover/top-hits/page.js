@@ -310,7 +310,7 @@ export default function TopHitsPage() {
                                 {!hasMore && displayedHits.length > 0 && (
                                     <div className="text-center py-8">
                                         <p className="text-muted-foreground">
-                                            You've reached the end! Showing all {displayedHits.length} playlists.
+                                            You&apos;ve reached the end! Showing all {displayedHits.length} playlists.
                                         </p>
                                     </div>
                                 )}
