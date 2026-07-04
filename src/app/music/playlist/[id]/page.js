@@ -68,8 +68,8 @@ const SongActionMenu = memo(({
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
-  const artistNames = song.artists?.primary?.map(a => a.name).join(', ') ||
-    (Array.isArray(song.artists) ? song.artists.map(a => a.name).join(', ') : null) ||
+  const artistNames = song.artists?.primary?.map(a => decodeHtmlEntities(a.name)).join(', ') ||
+    (Array.isArray(song.artists) ? song.artists.map(a => decodeHtmlEntities(a.name)).join(', ') : null) ||
     'Unknown Artist';
   const songImageUrl = song.image?.find(img => img.quality === '150x150')?.url ||
     song.image?.[song.image.length - 1]?.url ||
@@ -466,7 +466,7 @@ const PlaylistActionMenu = memo(({
           <DrawerContent className="bg-[#1F1F1F] border-none text-foreground outline-none focus:outline-none ring-0 focus-visible:ring-0">
             <DrawerHeader className="p-0 text-left">
               <DrawerTitle className="sr-only">Playlist Options</DrawerTitle>
-              <DrawerDescription className="sr-only">Actions for {playlist.name}</DrawerDescription>
+              <DrawerDescription className="sr-only">Actions for {decodeHtmlEntities(playlist.name)}</DrawerDescription>
               <div className="flex items-center gap-4 px-4 py-4 border-b border-border">
                 <div className="w-14 h-14 rounded shadow-lg overflow-hidden shrink-0 bg-muted">
                   <img src={playlistImageUrl} alt={playlist.name} className="w-full h-full object-cover" />
@@ -476,7 +476,7 @@ const PlaylistActionMenu = memo(({
                     {decodeHtmlEntities(playlist.name)}
                   </div>
                   <div className="text-sm text-muted-foreground truncate mt-0.5 text-left">
-                    Playlist • {playlist.subtitle || 'JioSaavn'}
+                    Playlist • {decodeHtmlEntities(playlist.subtitle) || 'JioSaavn'}
                   </div>
                 </div>
               </div>
@@ -1241,7 +1241,7 @@ function PlaylistPageContent() {
                     </div>
                   ) : (
                     <h2 className="text-base font-bold line-clamp-1 animate-in fade-in slide-in-from-bottom-2 duration-300 text-white">
-                      {playlist.name}
+                      {decodeHtmlEntities(playlist.name)}
                     </h2>
                   )}
                 </div>
@@ -1256,7 +1256,7 @@ function PlaylistPageContent() {
                   }}
                 >
                   <h2 className="text-base font-bold line-clamp-1 text-white pr-4">
-                    {playlist.name}
+                    {decodeHtmlEntities(playlist.name)}
                   </h2>
                 </div>
               </div>
@@ -1323,11 +1323,11 @@ function PlaylistPageContent() {
                   </div>
                   <div className="space-y-2 w-full">
                     <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word text-start mt-2 line-clamp-1 w-full">
-                      {playlist.name}
+                      {decodeHtmlEntities(playlist.name)}
                     </h1>
                     {(playlist.subtitle || playlist.header_desc) && (
                       <p className="text-xs text-muted-foreground line-clamp-2 text-start">
-                        {playlist.subtitle || playlist.header_desc}
+                        {decodeHtmlEntities(playlist.subtitle || playlist.header_desc)}
                       </p>
                     )}
                     <div className="flex flex-wrap items-center justify-start gap-x-2 gap-y-1 text-sm text-muted-foreground">
@@ -1367,11 +1367,11 @@ function PlaylistPageContent() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-2 wrap-break-word">
-                    {playlist.name}
+                    {decodeHtmlEntities(playlist.name)}
                   </h1>
                   {(playlist.subtitle || playlist.header_desc) && (
                     <p className="text-base text-muted-foreground mb-4 line-clamp-2 max-w-2xl">
-                      {playlist.subtitle || playlist.header_desc}
+                      {decodeHtmlEntities(playlist.subtitle || playlist.header_desc)}
                     </p>
                   )}
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -1563,7 +1563,7 @@ function PlaylistPageContent() {
                                 song.artists.primary.map((artist, artistIndex) => (
                                   <span key={artist.id || artistIndex}>
                                     <span className="md:hidden">
-                                      {artist.name}
+                                      {decodeHtmlEntities(artist.name)}
                                     </span>
                                     <button
                                       className={`hidden md:inline hover:underline transition-colors ${isCurrentSong ? 'hover:text-green-300' : 'hover:text-foreground'
@@ -1573,7 +1573,7 @@ function PlaylistPageContent() {
                                         router.push(`/music/artist/${artist.id}`);
                                       }}
                                     >
-                                      {artist.name}
+                                      {decodeHtmlEntities(artist.name)}
                                     </button>
                                     {artistIndex < song.artists.primary.length - 1 && ', '}
                                   </span>
@@ -1664,7 +1664,7 @@ function PlaylistPageContent() {
                                         router.push(`/music/artist/${artist.id}`);
                                       }}
                                     >
-                                      {artist.name}
+                                      {decodeHtmlEntities(artist.name)}
                                     </button>
                                     {artistIndex < song.artists.primary.length - 1 && ', '}
                                   </span>

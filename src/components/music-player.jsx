@@ -7,6 +7,7 @@ Unauthorized copying or distribution prohibited.
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useGoogleCast } from "@/hooks/useGoogleCast";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Volume2, VolumeX, Shuffle, Repeat, Repeat1, ListMusic } from "lucide-react";
@@ -15,6 +16,7 @@ import { FullscreenMusicPlayer } from "@/components/fullscreen-music-player";
 import { IoMdPlay } from "react-icons/io";
 import { HiPause } from "react-icons/hi2";
 import { BiSkipNext, BiSkipPrevious } from "react-icons/bi";
+import { toast } from "sonner";
 
 // Module-level color cache — persists across re-renders and survives
 // component unmount/remount. Keyed by song ID for instant lookups.
@@ -85,6 +87,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [wasPlayingBeforeScrub, setWasPlayingBeforeScrub] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window !== "undefined") {
       const match = document.cookie.match(/sidebar_state=(true|false)/);
@@ -139,6 +142,20 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   const repeatModeRef = useRef(repeatMode);
   const silenceAudioRef = useRef(null);
 
+  const { isCasting } = useGoogleCast({
+    currentSong,
+    isPlaying,
+    volume,
+    audioRef,
+    setCurrentTime,
+    setDuration,
+    setContextCurrentTime,
+    setContextDuration,
+    isScrubbingRef,
+    lastContextTimeRef,
+    onEnded: () => handleNext(),
+  });
+
   // Initialize a silent looping audio anchor to prevent Chrome on Android
   // from releasing media focus / collapsing the notification when audio.src changes.
   useEffect(() => {
@@ -189,9 +206,18 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
 
   const decodeHtmlEntities = (text) => {
     if (!text) return text;
-    const textarea = document.createElement("textarea");
-    textarea.innerHTML = text;
-    return textarea.value;
+    const entities = {
+      '&amp;': '&',
+      '&lt;': '<',
+      '&gt;': '>',
+      '&quot;': '"',
+      '&#039;': "'",
+      '&#x27;': "'",
+      '&#x2F;': '/',
+      '&#32;': ' ',
+      '&#160;': ' '
+    };
+    return text.replace(/&[#\w\d]+;/g, (entity) => entities[entity] || entity);
   };
 
   function shuffleArray(arr) {
@@ -297,6 +323,21 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       setCurrentTime(targetTime);
       setContextCurrentTime(targetTime);
       lastContextTimeRef.current = targetTime;
+
+      // Chromecast seek sync
+      if (isCasting && window.chrome && window.cast) {
+        try {
+          const castContext = window.cast.framework.CastContext.getInstance();
+          const session = castContext.getCurrentSession();
+          if (session && session.getMediaSession()) {
+            const seekRequest = new window.chrome.cast.media.SeekRequest();
+            seekRequest.currentTime = targetTime;
+            session.getMediaSession().seek(seekRequest);
+          }
+        } catch (e) {
+          console.error("Error seeking on Chromecast:", e);
+        }
+      }
     }
   };
 
@@ -326,9 +367,27 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       setCurrentTime(targetTime);
       setContextCurrentTime(targetTime);
       lastContextTimeRef.current = targetTime;
+
+      // Chromecast seek sync
+      if (isCasting && window.chrome && window.cast) {
+        try {
+          const castContext = window.cast.framework.CastContext.getInstance();
+          const session = castContext.getCurrentSession();
+          if (session && session.getMediaSession()) {
+            const seekRequest = new window.chrome.cast.media.SeekRequest();
+            seekRequest.currentTime = targetTime;
+            session.getMediaSession().seek(seekRequest);
+          }
+        } catch (e) {
+          console.error("Error seeking on Chromecast:", e);
+        }
+      }
+
       // Resume directly via audioRef — do NOT call setIsPlaying(true).
       if (wasPlayingBeforeScrub) {
-        audioRef.current.play().catch(() => { });
+        if (!isCasting) {
+          audioRef.current.play().catch(() => { });
+        }
       }
     }
   };
@@ -336,6 +395,8 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   const handleVolumeChange = (value) => {
     const newVolume = value[0];
     setVolume(newVolume);
+    // Always keep local audio element volume in sync (it stays muted while casting
+    // but its volume level must be correct for when casting ends)
     if (audioRef.current) {
       audioRef.current.volume = newVolume;
     }
@@ -796,14 +857,14 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
           // 1. Update metadata so the OS already has the new song info
           if (typeof window !== "undefined" && "mediaSession" in navigator) {
             try {
-              const artistName =
+              const artistName = decodeHtmlEntities(
                 currentSong.artists?.primary?.[0]?.name ||
                 (Array.isArray(currentSong.artists) ? currentSong.artists[0]?.name : null) ||
                 currentSong.primaryArtists ||
-                "Unknown Artist";
-              const albumName = currentSong.album?.name || "Unknown Album";
-              const songTitle = (currentSong.name || currentSong.title || "Unknown Song")
-                .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#039;/g, "'");
+                "Unknown Artist"
+              );
+              const albumName = decodeHtmlEntities(currentSong.album?.name || "Unknown Album");
+              const songTitle = decodeHtmlEntities(currentSong.name || currentSong.title || "Unknown Song");
               const artwork = [];
               if (currentSong.image && Array.isArray(currentSong.image)) {
                 currentSong.image.forEach((img, index) => {
@@ -1023,6 +1084,12 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     if (!audio || !currentSong) return;
 
     if (isPlaying) {
+      // If we are casting, keep the local audio paused to save battery/network bandwidth
+      if (isCasting) {
+        audio.pause();
+        return;
+      }
+
       // Play the silence loop to hold the browser's active audio context
       if (silence) {
         silence.play().catch(() => {});
@@ -1052,7 +1119,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     if (typeof window !== "undefined" && "mediaSession" in navigator) {
       navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
     }
-  }, [isPlaying, currentSong, setContextCurrentTime]);
+  }, [isPlaying, currentSong, isCasting, setContextCurrentTime]);
 
   // Media Session API — register action handlers only once, update metadata
   // only when the song ID changes, update playbackState in its own lightweight
@@ -1073,14 +1140,14 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   // Helper: build MediaMetadata from a song object (used for instant pre-update)
   const buildMediaMetadata = (song) => {
     if (!song) return null;
-    const artistName =
+    const artistName = decodeHtmlEntities(
       song.artists?.primary?.[0]?.name ||
       (Array.isArray(song.artists) ? song.artists[0]?.name : null) ||
       song.primaryArtists ||
-      "Unknown Artist";
-    const albumName = song.album?.name || "Unknown Album";
-    const songTitle = (song.name || song.title || "Unknown Song")
-      .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#039;/g, "'");
+      "Unknown Artist"
+    );
+    const albumName = decodeHtmlEntities(song.album?.name || "Unknown Album");
+    const songTitle = decodeHtmlEntities(song.name || song.title || "Unknown Song");
     const artwork = [];
     if (song.image && Array.isArray(song.image)) {
       song.image.forEach((img, index) => {
@@ -1232,12 +1299,13 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     if (!currentSong || typeof window === "undefined" || !("mediaSession" in navigator))
       return;
 
-    const artistName =
+    const artistName = decodeHtmlEntities(
       currentSong.artists?.primary?.[0]?.name ||
       (Array.isArray(currentSong.artists) ? currentSong.artists[0]?.name : null) ||
       currentSong.primaryArtists ||
-      "Unknown Artist";
-    const albumName = currentSong.album?.name || "Unknown Album";
+      "Unknown Artist"
+    );
+    const albumName = decodeHtmlEntities(currentSong.album?.name || "Unknown Album");
     const songTitle = decodeHtmlEntities(
       currentSong.name || currentSong.title || "Unknown Song"
     );
@@ -1280,12 +1348,14 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     if (currentPath.includes("/search")) {
       return "Search Results";
     } else if (currentPath.includes("/album/")) {
-      return currentSong?.album?.name || "Album";
+      return decodeHtmlEntities(currentSong?.album?.name || "Album");
     } else if (currentPath.includes("/artist/")) {
-      const artistName = currentSong?.artists?.primary?.[0]?.name ||
+      const artistName = decodeHtmlEntities(
+        currentSong?.artists?.primary?.[0]?.name ||
         (Array.isArray(currentSong?.artists) ? currentSong.artists[0]?.name : null) ||
         currentSong?.primaryArtists ||
-        "Artist";
+        "Artist"
+      );
       return `${artistName}`;
     } else if (currentPath.includes("/playlist/")) {
       return "Playlist";
@@ -1311,7 +1381,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   return (
     <>
       {/* Audio element - always present */}
-      <audio ref={audioRef} />
+      <audio ref={audioRef} x-webkit-airplay="allow" />
 
       {/* Only show the bottom bar when fullscreen is NOT open */}
       {!isFullscreenOpen && (
@@ -1375,12 +1445,12 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                       </p>
                       <p className="text-xs text-white/70 truncate drop-shadow-md leading-tight">
                         {currentSong.artists?.primary
-                          ?.map((a) => a.name)
+                          ?.map((a) => decodeHtmlEntities(a.name))
                           .join(", ") ||
                           (Array.isArray(currentSong.artists)
-                            ? currentSong.artists.map((a) => a.name).join(", ")
+                            ? currentSong.artists.map((a) => decodeHtmlEntities(a.name)).join(", ")
                             : null) ||
-                          currentSong.primaryArtists ||
+                          decodeHtmlEntities(currentSong.primaryArtists) ||
                           "Unknown Artist"}
                       </p>
                     </div>
@@ -1476,10 +1546,12 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
                       {decodeHtmlEntities(currentSong.name)}
                     </p>
                     <p className="text-xs text-muted-foreground truncate">
-                      {currentSong.artists?.primary?.[0]?.name ||
+                      {decodeHtmlEntities(
+                        currentSong.artists?.primary?.[0]?.name ||
                         (Array.isArray(currentSong.artists) ? currentSong.artists[0]?.name : null) ||
                         currentSong.primaryArtists ||
-                        "Unknown Artist"}
+                        "Unknown Artist"
+                      )}
                     </p>
                   </div>
                 </div>

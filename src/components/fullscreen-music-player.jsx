@@ -572,6 +572,7 @@ import {
   Video,
   Maximize2,
   Minimize2,
+  Cast,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -685,9 +686,12 @@ const decodeHtmlEntities = (text) => {
 const getArtistNames = (song) => {
   if (!song) return "Unknown Artist";
   if (song.artists?.primary && Array.isArray(song.artists.primary)) {
-    return song.artists.primary.map((artist) => artist.name).join(", ");
+    return song.artists.primary.map((artist) => decodeHtmlEntities(artist.name)).join(", ");
   }
-  if (song.primaryArtists) return song.primaryArtists;
+  if (Array.isArray(song.artists)) {
+    return song.artists.map((artist) => decodeHtmlEntities(artist.name)).join(", ");
+  }
+  if (song.primaryArtists) return decodeHtmlEntities(song.primaryArtists);
   return "Unknown Artist";
 };
 
@@ -986,11 +990,116 @@ export function FullscreenMusicPlayer({
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => {
     setIsMounted(true);
-  }, []);
+
+    if (typeof window === 'undefined') return;
+
+    // Listen for AirPlay availability in Safari / WebKit (required for webkitShowPlaybackTargetPicker)
+    const audio = audioRef?.current;
+    const handleAvailabilityChanged = (event) => {
+      console.log("AirPlay target availability:", event.availability);
+    };
+
+    if (audio && 'addEventListener' in audio) {
+      audio.addEventListener('webkitplaybacktargetavailabilitychanged', handleAvailabilityChanged);
+    }
+
+    const initCastOptions = () => {
+      if (window.cast && window.cast.framework && window.chrome && window.chrome.cast) {
+        try {
+          const castContext = window.cast.framework.CastContext.getInstance();
+          castContext.setOptions({
+            receiverApplicationId: window.chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+            autoJoinPolicy: window.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+          });
+        } catch (e) {
+          console.error("Cast SDK init error:", e);
+        }
+      }
+    };
+
+    const handleCastApiAvailable = () => {
+      initCastOptions();
+    };
+
+    if (window.chrome && window.chrome.cast && window.cast && window.cast.framework) {
+      initCastOptions();
+    } else {
+      window.addEventListener('gcastapiavailable', handleCastApiAvailable);
+
+      if (!document.querySelector('script[src*="cast_sender.js"]')) {
+        const script = document.createElement('script');
+        script.src = 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1';
+        script.async = true;
+        document.head.appendChild(script);
+
+        window.__onGCastApiAvailable = (isAvailable) => {
+          if (isAvailable) {
+            window.__gCastApiAvailable = true;
+            window.dispatchEvent(new CustomEvent('gcastapiavailable'));
+          }
+        };
+      } else if (window.__gCastApiAvailable) {
+        // If script is already loaded and marked available by another component
+        initCastOptions();
+      }
+    }
+
+    return () => {
+      if (audio && 'removeEventListener' in audio) {
+        audio.removeEventListener('webkitplaybacktargetavailabilitychanged', handleAvailabilityChanged);
+      }
+      window.removeEventListener('gcastapiavailable', handleCastApiAvailable);
+    };
+  }, [audioRef]);
   const [lyrics, setLyrics] = useState(null);
   const [canvasUrl, setCanvasUrl] = useState(null);
   const [showCanvas, setShowCanvas] = useState(false);
   const [hideControls, setHideControls] = useState(false);
+
+  const handleCastClick = async () => {
+    try {
+      const audio = audioRef?.current;
+      if (!audio) {
+        toast.error("Audio player is not initialized.");
+        return;
+      }
+
+      // 1. Try Safari/iOS WebKit AirPlay Picker (critical for iOS Safari and PWA)
+      if (typeof audio.webkitShowPlaybackTargetPicker === 'function') {
+        audio.webkitShowPlaybackTargetPicker();
+        return;
+      }
+
+      // 2. Try Google Cast SDK if available (desktop Chrome - handles media options/metadata perfectly)
+      if (window.chrome && window.chrome.cast && window.cast && window.cast.framework) {
+        const castContext = window.cast.framework.CastContext.getInstance();
+        await castContext.requestSession();
+        const session = castContext.getCurrentSession();
+        if (session) {
+          toast.success("Casting to device!");
+          return;
+        }
+      }
+
+      // 3. Try native HTML5 Remote Playback API (Android PWA / Chrome Mobile fallback)
+      if (audio.remote && typeof audio.remote.prompt === 'function') {
+        await audio.remote.prompt();
+        return;
+      }
+    } catch (error) {
+      const isCancel =
+        error === "cancel" ||
+        error?.message === "cancel" ||
+        error?.name === "NotAllowedError" ||
+        error?.name === "AbortError" ||
+        (typeof error === 'string' && error.toLowerCase().includes('cancel'));
+
+      if (!isCancel) {
+        console.error("Error casting:", error);
+        toast.error("Failed to initialize casting.");
+      }
+    }
+  };
 
   useEffect(() => {
     if (!currentSong || !isMobile || disableSpotifyCanvas) {
@@ -3330,8 +3439,8 @@ export function FullscreenMusicPlayer({
                           const shareUrl = `${window.location.origin}/music/song/${currentSong.id}`;
                           if (navigator.share) {
                             navigator.share({
-                              title: currentSong.name || currentSong.title,
-                              text: `Check out "${currentSong.name || currentSong.title}" by ${getArtistNames(currentSong)}`,
+                              title: decodeHtmlEntities(currentSong.name || currentSong.title),
+                              text: `Check out "${decodeHtmlEntities(currentSong.name || currentSong.title)}" by ${getArtistNames(currentSong)}`,
                               url: shareUrl
                             });
                           } else {
@@ -3368,26 +3477,36 @@ export function FullscreenMusicPlayer({
                   </DrawerContent>
                 </Drawer>
               ) : (
-                /* Desktop/Tablet: Switch to video / audio toggle in header */
-                hasPerfectVideo && (
-                  <button
-                    onClick={() => setShowVideoMode(v => !v)}
-                    className="flex items-center gap-2 px-3.5 py-1.5 rounded-full active:scale-95 transition-all duration-200 select-none cursor-pointer hover:bg-white/10"
-                    style={{
-                      background: 'rgba(255,255,255,0.08)',
-                      border: '1px solid rgba(255,255,255,0.13)',
-                    }}
-                  >
-                    {showVideoMode ? (
-                      <Music2 style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
-                    ) : (
-                      <Video style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
-                    )}
-                    <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.90)', letterSpacing: '0.01em' }}>
-                      {showVideoMode ? 'Switch to audio' : 'Switch to video'}
-                    </span>
-                  </button>
-                )
+                <div className="flex items-center gap-2">
+                  {!showVideoMode && (
+                    <button
+                      onClick={handleCastClick}
+                      className="flex items-center justify-center active:scale-95 transition-all duration-200 select-none cursor-pointer text-white/75 hover:text-white p-1"
+                      title="Cast"
+                    >
+                      <Cast className="w-5 h-5" />
+                    </button>
+                  )}
+                  {hasPerfectVideo && (
+                    <button
+                      onClick={() => setShowVideoMode(v => !v)}
+                      className="flex items-center gap-2 px-3.5 py-1.5 rounded-full active:scale-95 transition-all duration-200 select-none cursor-pointer hover:bg-white/10"
+                      style={{
+                        background: 'rgba(255,255,255,0.08)',
+                        border: '1px solid rgba(255,255,255,0.13)',
+                      }}
+                    >
+                      {showVideoMode ? (
+                        <Music2 style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
+                      ) : (
+                        <Video style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.90)' }} />
+                      )}
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.90)', letterSpacing: '0.01em' }}>
+                        {showVideoMode ? 'Switch to audio' : 'Switch to video'}
+                      </span>
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -3541,9 +3660,18 @@ export function FullscreenMusicPlayer({
 
               {/* Bottom controls wrapper for mobile layout */}
               <div className="w-full shrink-0 relative z-10">
-                {/* Switch to video / audio — above the song title, Spotify-style */}
-                {hasPerfectVideo && (
-                  <div className="flex justify-start px-1 sm:px-2 mb-2" onClick={(e) => e.stopPropagation()}>
+                {/* Switch to video / audio & Cast — above the song title, Spotify-style */}
+                <div className="flex justify-start items-center gap-2 px-1 sm:px-2 mb-2" onClick={(e) => e.stopPropagation()}>
+                  {!showVideoMode && (
+                    <button
+                      onClick={handleCastClick}
+                      className="flex items-center justify-center active:scale-95 transition-all duration-200 select-none cursor-pointer text-white/75 hover:text-white p-1"
+                      title="Cast"
+                    >
+                      <Cast className="w-5 h-5" />
+                    </button>
+                  )}
+                  {hasPerfectVideo && (
                     <button
                       onClick={() => setShowVideoMode(v => !v)}
                       className="flex items-center gap-2 px-3.5 py-1.5 rounded-full active:scale-95 transition-all duration-200 select-none"
@@ -3561,8 +3689,8 @@ export function FullscreenMusicPlayer({
                         {showVideoMode ? 'Switch to audio' : 'Switch to video'}
                       </span>
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {/* Song Info - Compact for small screens */}
                 <div className="px-1 sm:px-2 pb-4 shrink-0">
@@ -3856,12 +3984,21 @@ export function FullscreenMusicPlayer({
 
                 {/* Right Side - Apple Music style controls panel */}
                 <div className={`flex-1 flex flex-col justify-center w-full ${showVideoMode ? "mx-auto" : ""}`} style={{ maxWidth: '520px', gap: '0px' }}>
-                  {/* Switch to video / audio */}
-                  {hasPerfectVideo && (
-                    <div className="flex mb-3 justify-start">
+                  {/* Switch to video / audio & Cast */}
+                  <div className="flex mb-3 justify-start items-center gap-2">
+                    {!showVideoMode && (
+                      <button
+                        onClick={handleCastClick}
+                        className="flex items-center justify-center active:scale-95 transition-all duration-200 select-none cursor-pointer text-white/75 hover:text-white p-1"
+                        title="Cast"
+                      >
+                        <Cast className="w-5 h-5" />
+                      </button>
+                    )}
+                    {hasPerfectVideo && (
                       <button
                         onClick={() => setShowVideoMode(v => !v)}
-                        className="flex items-center gap-2 px-3.5 py-1.5 rounded-full active:scale-95 transition-all duration-200 select-none cursor-pointer"
+                        className="flex items-center gap-2 px-3.5 py-1.5 rounded-full active:scale-95 transition-all duration-200 select-none cursor-pointer hover:bg-white/10"
                         style={{
                           background: 'rgba(255,255,255,0.08)',
                           border: '1px solid rgba(255,255,255,0.13)',
@@ -3876,8 +4013,8 @@ export function FullscreenMusicPlayer({
                           {showVideoMode ? 'Switch to audio' : 'Switch to video'}
                         </span>
                       </button>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {/* Row 1: Song title/artist + like + menu */}
                   <div className="flex gap-3 mb-4 items-start justify-between">
@@ -3955,8 +4092,8 @@ export function FullscreenMusicPlayer({
                                   const shareUrl = `${window.location.origin}/music/song/${currentSong.id}`;
                                   if (navigator.share) {
                                     navigator.share({
-                                      title: currentSong.name || currentSong.title,
-                                      text: `Check out "${currentSong.name || currentSong.title}" by ${getArtistNames(currentSong)}`,
+                                      title: decodeHtmlEntities(currentSong.name || currentSong.title),
+                                      text: `Check out "${decodeHtmlEntities(currentSong.name || currentSong.title)}" by ${getArtistNames(currentSong)}`,
                                       url: shareUrl
                                     });
                                   } else {
@@ -4670,8 +4807,8 @@ export function FullscreenMusicPlayer({
                                     const shareUrl = `${window.location.origin}/music/song/${currentSong.id}`;
                                     if (navigator.share) {
                                       navigator.share({
-                                        title: currentSong.name || currentSong.title,
-                                        text: `Check out "${currentSong.name || currentSong.title}" by ${getArtistNames(currentSong)}`,
+                                        title: decodeHtmlEntities(currentSong.name || currentSong.title),
+                                        text: `Check out "${decodeHtmlEntities(currentSong.name || currentSong.title)}" by ${decodeHtmlEntities(getArtistNames(currentSong))}`,
                                         url: shareUrl
                                       });
                                     } else {

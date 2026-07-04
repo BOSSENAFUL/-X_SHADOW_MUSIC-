@@ -116,8 +116,8 @@ const SongActionMenu = memo(({
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
-  const artistNames = song.artists?.primary?.map(a => a.name).join(', ') ||
-    (Array.isArray(song.artists) ? song.artists.map(a => a.name).join(', ') : null) ||
+  const artistNames = song.artists?.primary?.map(a => decodeHtmlEntities(a.name)).join(', ') ||
+    (Array.isArray(song.artists) ? song.artists.map(a => decodeHtmlEntities(a.name)).join(', ') : null) ||
     'Unknown Artist';
   const songImageUrl = song.image?.find(img => img.quality === '150x150')?.url ||
     song.image?.[song.image.length - 1]?.url ||
@@ -488,10 +488,10 @@ const PlaylistActionMenu = memo(({
                 </div>
                 <div className="flex-1 min-w-0 flex flex-col justify-center text-left">
                   <DrawerTitle className="text-base font-bold truncate text-foreground text-left">
-                    {playlist.name}
+                    {decodeHtmlEntities(playlist.name)}
                   </DrawerTitle>
                   <DrawerDescription className="text-sm text-muted-foreground truncate mt-0.5 text-left">
-                    Playlist • {playlist.ownerName || 'Unknown User'}
+                    Playlist • {decodeHtmlEntities(playlist.ownerName) || 'Unknown User'}
                   </DrawerDescription>
                 </div>
               </div>
@@ -739,7 +739,7 @@ const SongRow = React.memo(function SongRow({
             </p>
             <p className="text-sm truncate text-muted-foreground">
               {song.artists?.primary?.length > 0
-                ? song.artists.primary.map((a, ai) => <span key={a.id || ai}>{a.name}{ai < song.artists.primary.length - 1 && ', '}</span>)
+                ? song.artists.primary.map((a, ai) => <span key={a.id || ai}>{decodeHtmlEntities(a.name)}{ai < song.artists.primary.length - 1 && ', '}</span>)
                 : 'Unknown Artist'}
             </p>
           </div>
@@ -2268,14 +2268,14 @@ export default function PlaylistDetailPage({ params }) {
                           </BreadcrumbItem>
                           <BreadcrumbSeparator className="hidden lg:block" />
                           <BreadcrumbItem>
-                            <BreadcrumbPage className="truncate max-w-[150px] md:max-w-none">{playlist.name}</BreadcrumbPage>
+                            <BreadcrumbPage className="truncate max-w-[150px] md:max-w-none">{decodeHtmlEntities(playlist.name)}</BreadcrumbPage>
                           </BreadcrumbItem>
                         </BreadcrumbList>
                       </Breadcrumb>
                     </div>
                   ) : (
                     <h2 className="text-base font-bold line-clamp-1 animate-in fade-in slide-in-from-bottom-2 duration-300 text-white">
-                      {playlist.name}
+                      {decodeHtmlEntities(playlist.name)}
                     </h2>
                   )}
                 </div>
@@ -2290,7 +2290,7 @@ export default function PlaylistDetailPage({ params }) {
                   }}
                 >
                   <h2 className="text-base font-bold line-clamp-1 text-white pr-4">
-                    {playlist.name}
+                    {decodeHtmlEntities(playlist.name)}
                   </h2>
                 </div>
               </div>
@@ -2380,7 +2380,7 @@ export default function PlaylistDetailPage({ params }) {
                   <div className="space-y-2 w-full">
 
                     <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word text-start mt-2 line-clamp-1 w-full">
-                      {playlist.name}
+                      {decodeHtmlEntities(playlist.name)}
                     </h1>
                     {playlist.description && (
                       <p className="text-xs text-muted-foreground line-clamp-2 text-start">
@@ -2398,7 +2398,7 @@ export default function PlaylistDetailPage({ params }) {
                             <User className="w-3 h-3" />
                           </div>
                         )}
-                        <span className="font-semibold text-foreground truncate max-w-[150px]">{playlist.ownerName || 'Unknown User'}</span>
+                        <span className="font-semibold text-foreground truncate max-w-[150px]">{decodeHtmlEntities(playlist.ownerName) || 'Unknown User'}</span>
                       </div>
                       <span className="text-muted-foreground/60">•</span>
                       <span className="whitespace-nowrap">{playlist.songIds?.length || 0} songs</span>
@@ -2463,7 +2463,7 @@ export default function PlaylistDetailPage({ params }) {
                   {playlist.isPublic ? 'Public' : 'Private'}
                 </Badge> */}
                   <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-2 wrap-break-word">
-                    {playlist.name}
+                    {decodeHtmlEntities(playlist.name)}
                   </h1>
                   {playlist.description && (
                     <p className="text-base text-muted-foreground mb-4 xl:line-clamp-none line-clamp-2 max-w-6xl">
@@ -2480,7 +2480,7 @@ export default function PlaylistDetailPage({ params }) {
                         <User className="w-3 h-3 text-muted-foreground" />
                       </div>
                     )}
-                    <span className="font-semibold">{playlist.ownerName || 'Unknown User'}</span>
+                    <span className="font-semibold">{decodeHtmlEntities(playlist.ownerName) || 'Unknown User'}</span>
                     <span>•</span>
                     <span>{playlist.songIds?.length || 0} songs</span>
                     {totalDuration && (
