@@ -54,8 +54,11 @@ function SidebarProvider({
 }) {
   const isMobile = useIsMobile();
   const [openMobile, setOpenMobile] = React.useState(false);
-  const contextDefaultOpen = React.useContext(SidebarStateContext);
-  const resolvedDefaultOpen = contextDefaultOpen ?? defaultOpen;
+  const sidebarContextState = React.useContext(SidebarStateContext);
+
+  // Check if state is shared from the root layout client context
+  const isStateShared = sidebarContextState && typeof sidebarContextState === "object" && "open" in sidebarContextState;
+  const resolvedDefaultOpen = isStateShared ? sidebarContextState.open : (sidebarContextState ?? defaultOpen);
 
   const [isMounted, setIsMounted] = React.useState(false);
 
@@ -67,7 +70,8 @@ function SidebarProvider({
     setIsMounted(true);
   }, []);
 
-  const open = openProp ?? _open;
+  const open = openProp ?? (isStateShared ? sidebarContextState.open : _open);
+  
   const setOpen = React.useCallback(
     (value) => {
       const openState = typeof value === "function" ? value(open) : value;
@@ -76,11 +80,14 @@ function SidebarProvider({
       } else {
         _setOpen(openState);
       }
+      if (isStateShared) {
+        sidebarContextState.setOpen(openState);
+      }
 
       // This sets the cookie to keep the sidebar state.
       document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
     },
-    [setOpenProp, open]
+    [setOpenProp, open, isStateShared, sidebarContextState]
   );
 
   // Helper to toggle the sidebar.
