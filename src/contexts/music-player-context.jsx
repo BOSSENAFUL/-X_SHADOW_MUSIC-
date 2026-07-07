@@ -20,6 +20,7 @@ export function MusicPlayerProvider({ children }) {
   const [disableLyricsBg, setDisableLyricsBg] = useState(true);
   const [disableHaptic, setDisableHaptic] = useState(false);
   const [roundedSongCoverMobile, setRoundedSongCoverMobile] = useState(false);
+  const [enableMusicVideos, setEnableMusicVideos] = useState(false);
   const [restoredTime, setRestoredTime] = useState(null);
   const [isRestored, setIsRestored] = useState(false);
 
@@ -169,6 +170,17 @@ export function MusicPlayerProvider({ children }) {
     }
   }, []);
 
+  // Load enable music videos setting on mount (defer to prevent synchronous setState warning)
+  useEffect(() => {
+    const stored = localStorage.getItem("enable_music_videos");
+    if (stored === "true") {
+      const timeout = setTimeout(() => {
+        setEnableMusicVideos(true);
+      }, 0);
+      return () => clearTimeout(timeout);
+    }
+  }, []);
+
   // Helper function to check if current song is a radio station
   const isRadioPlaying = currentSong?.isRadio === true;
 
@@ -242,6 +254,8 @@ export function MusicPlayerProvider({ children }) {
         setDisableHaptic,
         roundedSongCoverMobile,
         setRoundedSongCoverMobile,
+        enableMusicVideos,
+        setEnableMusicVideos,
         restoredTime,
         setRestoredTime,
         isFullscreenOpen,

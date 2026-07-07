@@ -948,6 +948,7 @@ export function FullscreenMusicPlayer({
     disableLyricsBg,
     disableHaptic,
     roundedSongCoverMobile,
+    enableMusicVideos,
   } = useMusicPlayer();
   const { toggleLike, isLiked } = useLikedSongs(session?.user?.id);
   const router = useRouter();
@@ -1330,6 +1331,14 @@ export function FullscreenMusicPlayer({
       return;
     }
 
+    if (!enableMusicVideos) {
+      setHasPerfectVideo(false);
+      setYtVideoId(null);
+      setYtError(null);
+      setShowVideoMode(false);
+      return;
+    }
+
     if (!showVideoMode) {
       // Switching back to audio — restore playback if it was playing
       if (wasPlayingRef.current && !isPlaying) {
@@ -1429,7 +1438,7 @@ export function FullscreenMusicPlayer({
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showVideoMode, currentSong?.id]);
+  }, [showVideoMode, currentSong?.id, enableMusicVideos]);
 
   // Sync volume to video and YouTube player elements
   useEffect(() => {
@@ -1471,7 +1480,7 @@ export function FullscreenMusicPlayer({
 
   // Background prefetch for next song's video ID to enable instant transition/streaming
   useEffect(() => {
-    if (!showVideoMode || !currentSong) return;
+    if (!enableMusicVideos || !showVideoMode || !currentSong) return;
 
     const currentPlaylist = getCurrentPlaylist();
     if (!currentPlaylist || currentPlaylist.length === 0) return;
@@ -1516,7 +1525,7 @@ export function FullscreenMusicPlayer({
     }, 2500); // 2.5s delay to let current video buffer first
 
     return () => clearTimeout(timeoutId);
-  }, [currentSong?.id, showVideoMode, repeatMode, localPlaylist, shuffledPlaylist, isShuffle]);
+  }, [currentSong?.id, showVideoMode, repeatMode, localPlaylist, shuffledPlaylist, isShuffle, enableMusicVideos]);
   /* ─────────────────────────────────────────────────────────────────── */
 
   // Helper to draw a video frame onto the ambient background canvas

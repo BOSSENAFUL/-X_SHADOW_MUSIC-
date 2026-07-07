@@ -160,7 +160,9 @@ export default function SettingsPage() {
         disableHaptic,
         setDisableHaptic,
         roundedSongCoverMobile,
-        setRoundedSongCoverMobile
+        setRoundedSongCoverMobile,
+        enableMusicVideos,
+        setEnableMusicVideos
     } = useMusicPlayer();
 
     const [notifNewFeatures, setNotifNewFeatures] = useState(() => {
@@ -326,6 +328,19 @@ export default function SettingsPage() {
                                     onCheckedChange={(val) => {
                                         setRoundedSongCoverMobile(val);
                                         localStorage.setItem("rounded_song_cover_mobile", String(val));
+                                    }}
+                                />
+                            </SettingsRow>
+                            <SettingsRow
+                                icon={Video}
+                                label="Enable music videos"
+                                description="Watch YouTube music videos in the fullscreen player"
+                            >
+                                <Switch
+                                    checked={enableMusicVideos}
+                                    onCheckedChange={(val) => {
+                                        setEnableMusicVideos(val);
+                                        localStorage.setItem("enable_music_videos", String(val));
                                     }}
                                 />
                             </SettingsRow>
