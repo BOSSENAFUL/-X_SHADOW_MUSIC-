@@ -2403,7 +2403,7 @@ export default function PlaylistDetailPage({ params }) {
                 >
                   <div
                     className={isGif ? "w-full h-auto shrink-0 transition-transform duration-75 ease-out relative min-h-[200px] overflow-hidden" : "w-64 h-64 rounded-lg overflow-hidden shadow-2xl transition-transform duration-75 ease-out"}
-                    style={{
+                    style={isGif ? undefined : {
                       transform: 'scale(calc(1 - (var(--scroll-progress, 0) * 0.35)))',
                       willChange: 'transform'
                     }}
