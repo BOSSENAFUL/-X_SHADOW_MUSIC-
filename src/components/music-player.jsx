@@ -7,7 +7,6 @@ Unauthorized copying or distribution prohibited.
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useGoogleCast } from "@/hooks/useGoogleCast";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Volume2, VolumeX, Shuffle, Repeat, Repeat1, ListMusic } from "lucide-react";
@@ -16,7 +15,6 @@ import { FullscreenMusicPlayer } from "@/components/fullscreen-music-player";
 import { IoMdPlay } from "react-icons/io";
 import { HiPause } from "react-icons/hi2";
 import { BiSkipNext, BiSkipPrevious } from "react-icons/bi";
-import { toast } from "sonner";
 
 // Module-level color cache — persists across re-renders and survives
 // component unmount/remount. Keyed by song ID for instant lookups.
@@ -141,20 +139,6 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   const isShuffleRef = useRef(isShuffle);
   const repeatModeRef = useRef(repeatMode);
   const silenceAudioRef = useRef(null);
-
-  const { isCasting } = useGoogleCast({
-    currentSong,
-    isPlaying,
-    volume,
-    audioRef,
-    setCurrentTime,
-    setDuration,
-    setContextCurrentTime,
-    setContextDuration,
-    isScrubbingRef,
-    lastContextTimeRef,
-    onEnded: () => handleNext(),
-  });
 
   // Initialize a silent looping audio anchor to prevent Chrome on Android
   // from releasing media focus / collapsing the notification when audio.src changes.
@@ -323,21 +307,6 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       setCurrentTime(targetTime);
       setContextCurrentTime(targetTime);
       lastContextTimeRef.current = targetTime;
-
-      // Chromecast seek sync
-      if (isCasting && window.chrome && window.cast) {
-        try {
-          const castContext = window.cast.framework.CastContext.getInstance();
-          const session = castContext.getCurrentSession();
-          if (session && session.getMediaSession()) {
-            const seekRequest = new window.chrome.cast.media.SeekRequest();
-            seekRequest.currentTime = targetTime;
-            session.getMediaSession().seek(seekRequest);
-          }
-        } catch (e) {
-          console.error("Error seeking on Chromecast:", e);
-        }
-      }
     }
   };
 
@@ -368,26 +337,9 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
       setContextCurrentTime(targetTime);
       lastContextTimeRef.current = targetTime;
 
-      // Chromecast seek sync
-      if (isCasting && window.chrome && window.cast) {
-        try {
-          const castContext = window.cast.framework.CastContext.getInstance();
-          const session = castContext.getCurrentSession();
-          if (session && session.getMediaSession()) {
-            const seekRequest = new window.chrome.cast.media.SeekRequest();
-            seekRequest.currentTime = targetTime;
-            session.getMediaSession().seek(seekRequest);
-          }
-        } catch (e) {
-          console.error("Error seeking on Chromecast:", e);
-        }
-      }
-
       // Resume directly via audioRef — do NOT call setIsPlaying(true).
       if (wasPlayingBeforeScrub) {
-        if (!isCasting) {
-          audioRef.current.play().catch(() => { });
-        }
+        audioRef.current.play().catch(() => { });
       }
     }
   };
@@ -1084,12 +1036,6 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     if (!audio || !currentSong) return;
 
     if (isPlaying) {
-      // If we are casting, keep the local audio paused to save battery/network bandwidth
-      if (isCasting) {
-        audio.pause();
-        return;
-      }
-
       // Play the silence loop to hold the browser's active audio context
       if (silence) {
         silence.play().catch(() => {});
@@ -1119,7 +1065,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     if (typeof window !== "undefined" && "mediaSession" in navigator) {
       navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
     }
-  }, [isPlaying, currentSong, isCasting, setContextCurrentTime]);
+  }, [isPlaying, currentSong, setContextCurrentTime]);
 
   // Media Session API — register action handlers only once, update metadata
   // only when the song ID changes, update playbackState in its own lightweight
@@ -1381,7 +1327,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
   return (
     <>
       {/* Audio element - always present */}
-      <audio ref={audioRef} x-webkit-airplay="allow" />
+      <audio ref={audioRef} />
 
       {/* Only show the bottom bar when fullscreen is NOT open */}
       {!isFullscreenOpen && (

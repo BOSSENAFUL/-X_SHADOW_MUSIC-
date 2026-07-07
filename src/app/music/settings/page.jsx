@@ -158,7 +158,9 @@ export default function SettingsPage() {
         disableLyricsBg,
         setDisableLyricsBg,
         disableHaptic,
-        setDisableHaptic
+        setDisableHaptic,
+        roundedSongCoverMobile,
+        setRoundedSongCoverMobile
     } = useMusicPlayer();
 
     const [notifNewFeatures, setNotifNewFeatures] = useState(() => {
@@ -311,6 +313,19 @@ export default function SettingsPage() {
                                     onCheckedChange={(val) => {
                                         setDisableHaptic(!val);
                                         localStorage.setItem("disable_haptic", String(!val));
+                                    }}
+                                />
+                            </SettingsRow>
+                            <SettingsRow
+                                icon={Smartphone}
+                                label="Rounded song cover on mobile"
+                                description="Make the song cover slightly rounded in the mobile fullscreen player"
+                            >
+                                <Switch
+                                    checked={roundedSongCoverMobile}
+                                    onCheckedChange={(val) => {
+                                        setRoundedSongCoverMobile(val);
+                                        localStorage.setItem("rounded_song_cover_mobile", String(val));
                                     }}
                                 />
                             </SettingsRow>

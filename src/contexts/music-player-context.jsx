@@ -19,6 +19,7 @@ export function MusicPlayerProvider({ children }) {
   const [disableSpotifyCanvas, setDisableSpotifyCanvas] = useState(false);
   const [disableLyricsBg, setDisableLyricsBg] = useState(true);
   const [disableHaptic, setDisableHaptic] = useState(false);
+  const [roundedSongCoverMobile, setRoundedSongCoverMobile] = useState(false);
   const [restoredTime, setRestoredTime] = useState(null);
   const [isRestored, setIsRestored] = useState(false);
 
@@ -157,6 +158,17 @@ export function MusicPlayerProvider({ children }) {
     }
   }, []);
 
+  // Load mobile rounded song cover setting on mount (defer to prevent synchronous setState warning)
+  useEffect(() => {
+    const stored = localStorage.getItem("rounded_song_cover_mobile");
+    if (stored === "true") {
+      const timeout = setTimeout(() => {
+        setRoundedSongCoverMobile(true);
+      }, 0);
+      return () => clearTimeout(timeout);
+    }
+  }, []);
+
   // Helper function to check if current song is a radio station
   const isRadioPlaying = currentSong?.isRadio === true;
 
@@ -228,6 +240,8 @@ export function MusicPlayerProvider({ children }) {
         setDisableLyricsBg,
         disableHaptic,
         setDisableHaptic,
+        roundedSongCoverMobile,
+        setRoundedSongCoverMobile,
         restoredTime,
         setRestoredTime,
         isFullscreenOpen,

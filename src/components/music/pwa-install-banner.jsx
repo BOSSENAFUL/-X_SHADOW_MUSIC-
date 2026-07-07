@@ -6,35 +6,58 @@ import { X } from "lucide-react";
 export function PWAInstallBanner() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [show, setShow] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
-    // 1. Basic Mobile Detection
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
-    
-    // 2. Check if already dismissed
-    const dismissed = sessionStorage.getItem("pwa-banner-dismissed");
-    
-    // 3. Check if already installed/standalone
+    if (typeof window === "undefined") return;
+
+    // 1. Standalone check
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       window.navigator.standalone === true;
 
-    // Show banner if it's mobile, not dismissed, and not already installed
-    if (isMobile && !dismissed && !isStandalone) {
-      requestAnimationFrame(() => setShow(true));
+    if (isStandalone) return;
+
+    // 2. Dismissed check
+    const dismissed = sessionStorage.getItem("pwa-banner-dismissed");
+    if (dismissed) return;
+
+    // 3. iOS Detection
+    const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    setIsIOS(ios);
+
+    // 4. Capture any existing global deferredPrompt (captured by layout.js script)
+    if (window.deferredPrompt) {
+      setDeferredPrompt(window.deferredPrompt);
+      setShow(true);
     }
 
-    // Listen for the prompt event to capture it for the actual install
-    const handler = (e) => {
+    // 5. Event listener for new prompt events
+    const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      // We already called setShow(true) above, but this ensures we have the prompt
+      setShow(true);
     };
 
-    window.addEventListener("beforeinstallprompt", handler);
+    // Custom event dispatched from layout.js if it captured the prompt early
+    const handleCustomPrompt = (e) => {
+      if (e.detail) {
+        setDeferredPrompt(e.detail);
+        setShow(true);
+      }
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("pwa-prompt-available", handleCustomPrompt);
+
+    // 6. For iOS, we show the banner immediately to explain Safari guidelines
+    if (ios) {
+      setShow(true);
+    }
 
     return () => {
-      window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("pwa-prompt-available", handleCustomPrompt);
     };
   }, []);
 
@@ -45,15 +68,14 @@ export function PWAInstallBanner() {
       if (outcome === "accepted") {
         setShow(false);
         setDeferredPrompt(null);
+        window.deferredPrompt = null;
       }
-    } else {
-      // Logic for when prompt isn't available (iOS or Insecure HTTP)
-      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-      if (isIOS) {
-        alert('To install Jammify on iOS, tap the Share button and select "Add to Home Screen".');
-      } else {
-        alert('To install Jammify, you need to use HTTPS or localhost. If you are on a phone, try once the app is deployed!');
-      }
+    } else if (isIOS) {
+      alert(
+        "To install Jammify on iOS:\n\n" +
+        "1. Tap the 'Share' button at the bottom of Safari.\n" +
+        "2. Scroll down and tap 'Add to Home Screen'."
+      );
     }
   };
 
@@ -70,27 +92,29 @@ export function PWAInstallBanner() {
       role="banner"
     >
       <button
-        className="absolute top-4 right-4 p-1 text-muted-foreground hover:text-foreground transition-colors z-10 flex items-center justify-center"
+        className="absolute top-4 right-4 p-1 text-muted-foreground hover:text-foreground transition-colors z-10 flex items-center justify-center cursor-pointer"
         onClick={handleDismiss}
         aria-label="Dismiss install banner"
       >
         <X size={18} />
       </button>
 
-      <div className="flex flex-col gap-1 pr-6">
+      <div className="flex flex-col gap-1 pr-6 text-left">
         <h2 className="text-lg font-bold text-foreground leading-tight">
           Install Jammify
         </h2>
         <p className="text-xs text-muted-foreground leading-normal">
-          Install Jammify on your home screen for fast, seamless access to your music.
+          {isIOS
+            ? "Add Jammify to your Home Screen for full-screen playback and instant access."
+            : "Install Jammify as a web app on your device for high-fidelity playback and seamless access."}
         </p>
       </div>
-      
-      <button 
-        className="inline-flex items-center justify-center w-full h-9 rounded-lg bg-primary hover:bg-primary/95 text-primary-foreground text-xs font-bold cursor-pointer active:scale-95 transition-transform" 
+
+      <button
+        className="inline-flex items-center justify-center w-full h-9 rounded-lg bg-primary hover:bg-primary/95 text-primary-foreground text-xs font-bold cursor-pointer active:scale-95 transition-transform"
         onClick={handleInstall}
       >
-        Install
+        {isIOS ? "How to Install" : "Install App"}
       </button>
     </div>
   );

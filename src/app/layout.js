@@ -159,6 +159,17 @@ export default function RootLayout({ children }) {
     <html lang="en" suppressHydrationWarning className="overflow-x-hidden">
       <head>
         <link rel="preconnect" href="https://lh3.googleusercontent.com" crossOrigin="anonymous" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.addEventListener('beforeinstallprompt', function(e) {
+                e.preventDefault();
+                window.deferredPrompt = e;
+                window.dispatchEvent(new CustomEvent('pwa-prompt-available', { detail: e }));
+              });
+            `
+          }}
+        />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-x-hidden`}
@@ -171,6 +182,20 @@ export default function RootLayout({ children }) {
           data-cf-beacon='{"token": "5699a040a3d94fbebfc78ad146ca67b8"}'
           strategy="afterInteractive"
         />
+        {/* Register PWA Service Worker */}
+        <Script id="register-sw" strategy="afterInteractive">
+          {`
+            if ('serviceWorker' in navigator) {
+              window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js').then(function(reg) {
+                  console.log('Service Worker registered with scope:', reg.scope);
+                }).catch(function(err) {
+                  console.error('Service Worker registration failed:', err);
+                });
+              });
+            }
+          `}
+        </Script>
         {/* Sitewide structured data — WebApplication schema */}
         <JsonLd data={webAppSchema} />
         <AuthProvider>
