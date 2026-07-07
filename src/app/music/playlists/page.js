@@ -195,7 +195,6 @@ export default function PlaylistsPage() {
   const [importStage, setImportStage] = useState(0); // 0: input, 1: processing, 2: success
   const [importMessage, setImportMessage] = useState("");
   const [refreshKey, setRefreshKey] = useState(0); // bumped to force re-fetch
-  const [scrollRestored, setScrollRestored] = useState(false);
   const scrollContainerRef = useRef(null);
 
   // Handle auto-import trigger from query parameters (coming from Library page mobile drawer)
@@ -253,7 +252,6 @@ export default function PlaylistsPage() {
       }
 
       const cacheKey = `user_playlists_page_${session.user.id}`;
-      const scrollKey = `user_playlists_scroll_${session.user.id}`;
 
       // Check session cache for "back" navigation
       const cached = sessionStorage.getItem(cacheKey);
@@ -358,34 +356,26 @@ export default function PlaylistsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.id, status, refreshKey, safeSessionStorageSet]);
 
-  // Robust scroll restoration
+  // Restore scroll position
   useEffect(() => {
-    if (!loading && playlists.length > 0 && scrollContainerRef.current && !scrollRestored && session?.user?.id) {
-      const scrollKey = `user_playlists_scroll_${session.user.id}`;
+    if (!loading && playlists.length > 0 && scrollContainerRef.current) {
+      const scrollKey = "user_playlists_scroll";
       const savedPosition = sessionStorage.getItem(scrollKey);
-
       if (savedPosition) {
         const pos = parseInt(savedPosition);
-        let frames = 0;
-        const attemptScroll = () => {
+        scrollContainerRef.current.scrollTop = pos;
+        
+        // Multi-frame fallback in case DOM takes a frame to lay out
+        const timer = setTimeout(() => {
           if (scrollContainerRef.current) {
             scrollContainerRef.current.scrollTop = pos;
-            if (scrollContainerRef.current.scrollTop >= pos || frames > 5) {
-              setScrollRestored(true);
-            } else {
-              frames++;
-              requestAnimationFrame(attemptScroll);
-            }
           }
-        };
-        requestAnimationFrame(attemptScroll);
-      } else {
-        setScrollRestored(true);
+        }, 50);
+        
+        return () => clearTimeout(timer);
       }
-    } else if (!loading && playlists.length === 0) {
-      setScrollRestored(true);
     }
-  }, [loading, playlists.length, scrollRestored, session?.user?.id]);
+  }, [loading, playlists.length]);
 
   // Filter playlists based on search query
   const filteredPlaylists = useMemo(() => {
@@ -414,7 +404,7 @@ export default function PlaylistsPage() {
     if (songs.length > 0) {
       playSong(songs[0], songs, playlist._id, 0);
     }
-  }, [currentPlaylistId, isPlaying, togglePlayPause, playSong]);
+  }, [currentPlaylistId, togglePlayPause, playSong]);
 
 
   const handleCreatePlaylist = useCallback(async () => {
@@ -435,10 +425,12 @@ export default function PlaylistsPage() {
       const result = await response.json();
 
       if (result.success) {
+        // Clear cache and scroll position so the list refreshes from top
         if (session?.user?.id) {
           sessionStorage.removeItem(`user_playlists_page_${session.user.id}`);
           sessionStorage.removeItem(`created_playlists_${session.user.id}`);
         }
+        sessionStorage.removeItem("user_playlists_scroll");
         router.push(`/music/playlists/${result.data._id}`);
       } else {
         console.error('Failed to create playlist:', result.error);
@@ -487,7 +479,7 @@ export default function PlaylistsPage() {
 
       if (result.success) {
         setImportStage(2);
-        toast.success(`Playlist imported successfully! Added ${result.data.songIds.length} songs.`);
+        toast.success(`Playlist imported successfully! Added ${result.data?.songIds?.length ?? 0} songs.`);
 
         // Clear the cache NOW (before the dialog closes) so the next fetch is fresh
         if (session?.user?.id) {
@@ -560,12 +552,15 @@ export default function PlaylistsPage() {
   return (
     <SidebarProvider>
       <AppSidebar className="hidden md:flex" />
-      <SidebarInset className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col" onScroll={(e) => {
-        if (session?.user?.id && !loading && scrollRestored) {
-          const scrollKey = `user_playlists_scroll_${session.user.id}`;
-          safeSessionStorageSet(scrollKey, e.currentTarget.scrollTop.toString());
-        }
-      }} ref={scrollContainerRef}>
+      <SidebarInset
+        className="md:ml-0 overflow-y-auto overflow-x-hidden h-svh relative flex flex-col"
+        ref={scrollContainerRef}
+        onScroll={(e) => {
+          if (!loading) {
+            sessionStorage.setItem("user_playlists_scroll", e.currentTarget.scrollTop.toString());
+          }
+        }}
+      >
         <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center justify-between gap-2 border-b bg-background/95 backdrop-blur px-4 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2">
             <SidebarTrigger className="-ml-1 hidden md:flex" />
@@ -702,7 +697,7 @@ export default function PlaylistsPage() {
                 }
               }}>
                 <DialogContent className="sm:max-w-[450px] max-w-[95vw] overflow-hidden p-0 border-border bg-popover">
-                  <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-green-500 via-emerald-500 to-teal-500 opacity-50" />
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 opacity-50" />
 
                   {importStage === 0 && importSource && (
                     <>
@@ -910,7 +905,9 @@ export default function PlaylistsPage() {
             </div>
           </div>
         </header>
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-40">
+        <div
+          className="flex-1 p-4 md:p-6 pb-40"
+        >
           {loading ? (
             <PlaylistSkeleton />
           ) : playlists.length === 0 ? (
@@ -944,6 +941,11 @@ export default function PlaylistsPage() {
                   href={`/music/playlists/${playlist._id}`}
                   className="group relative rounded-md hover:bg-muted/30 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   aria-label={`View playlist ${playlist.name}`}
+                  onClick={() => {
+                    if (scrollContainerRef.current) {
+                      sessionStorage.setItem("user_playlists_scroll", scrollContainerRef.current.scrollTop.toString());
+                    }
+                  }}
                 >
                   <PlaylistCard
                     playlist={playlist}
