@@ -21,6 +21,8 @@ export function MusicPlayerProvider({ children }) {
   const [disableHaptic, setDisableHaptic] = useState(false);
   const [roundedSongCoverMobile, setRoundedSongCoverMobile] = useState(false);
   const [enableMusicVideos, setEnableMusicVideos] = useState(false);
+  const [enablePlaylistBgColor, setEnablePlaylistBgColor] = useState(false);
+  const [enableFullWidthCover, setEnableFullWidthCover] = useState(false);
   const [restoredTime, setRestoredTime] = useState(null);
   const [isRestored, setIsRestored] = useState(false);
 
@@ -181,6 +183,28 @@ export function MusicPlayerProvider({ children }) {
     }
   }, []);
 
+  // Load playlist background color setting on mount (defer to prevent synchronous setState warning)
+  useEffect(() => {
+    const stored = localStorage.getItem("enable_playlist_bg_color");
+    if (stored === "true") {
+      const timeout = setTimeout(() => {
+        setEnablePlaylistBgColor(true);
+      }, 0);
+      return () => clearTimeout(timeout);
+    }
+  }, []);
+
+  // Load full-width cover setting on mount (defer to prevent synchronous setState warning)
+  useEffect(() => {
+    const stored = localStorage.getItem("enable_full_width_cover");
+    if (stored === "true") {
+      const timeout = setTimeout(() => {
+        setEnableFullWidthCover(true);
+      }, 0);
+      return () => clearTimeout(timeout);
+    }
+  }, []);
+
   // Helper function to check if current song is a radio station
   const isRadioPlaying = currentSong?.isRadio === true;
 
@@ -256,6 +280,10 @@ export function MusicPlayerProvider({ children }) {
         setRoundedSongCoverMobile,
         enableMusicVideos,
         setEnableMusicVideos,
+        enablePlaylistBgColor,
+        setEnablePlaylistBgColor,
+        enableFullWidthCover,
+        setEnableFullWidthCover,
         restoredTime,
         setRestoredTime,
         isFullscreenOpen,

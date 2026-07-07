@@ -39,6 +39,7 @@ import {
     Check,
     Video,
     Mic,
+    Palette,
 } from "lucide-react";
 
 // ── Section wrapper ──────────────────────────────────────────────────────────
@@ -162,7 +163,11 @@ export default function SettingsPage() {
         roundedSongCoverMobile,
         setRoundedSongCoverMobile,
         enableMusicVideos,
-        setEnableMusicVideos
+        setEnableMusicVideos,
+        enablePlaylistBgColor,
+        setEnablePlaylistBgColor,
+        enableFullWidthCover,
+        setEnableFullWidthCover
     } = useMusicPlayer();
 
     const [notifNewFeatures, setNotifNewFeatures] = useState(() => {
@@ -341,6 +346,32 @@ export default function SettingsPage() {
                                     onCheckedChange={(val) => {
                                         setEnableMusicVideos(val);
                                         localStorage.setItem("enable_music_videos", String(val));
+                                    }}
+                                />
+                            </SettingsRow>
+                            <SettingsRow
+                                icon={Palette}
+                                label="Playlist background color matching"
+                                description="Use the cover image's bottom color as the song list background"
+                            >
+                                <Switch
+                                    checked={enablePlaylistBgColor}
+                                    onCheckedChange={(val) => {
+                                        setEnablePlaylistBgColor(val);
+                                        localStorage.setItem("enable_playlist_bg_color", String(val));
+                                    }}
+                                />
+                            </SettingsRow>
+                            <SettingsRow
+                                icon={Layers}
+                                label="Edge-to-edge playlist covers"
+                                description="Display all single playlist covers full-width with a faded bottom, like GIFs"
+                            >
+                                <Switch
+                                    checked={enableFullWidthCover}
+                                    onCheckedChange={(val) => {
+                                        setEnableFullWidthCover(val);
+                                        localStorage.setItem("enable_full_width_cover", String(val));
                                     }}
                                 />
                             </SettingsRow>

@@ -1021,7 +1021,7 @@ export default function PlaylistDetailPage({ params }) {
   }, [dominantColors]);
 
   // Initialize music player
-  const { playSong, currentSong, currentIndex, isPlaying, togglePlayPause, currentPlaylistId: activePlaylistId, isShuffle, setIsShuffle } = useMusicPlayer();
+  const { playSong, currentSong, currentIndex, isPlaying, togglePlayPause, currentPlaylistId: activePlaylistId, isShuffle, setIsShuffle, enablePlaylistBgColor, enableFullWidthCover } = useMusicPlayer();
 
   // Initialize liked songs hook
   const { toggleLike: toggleSongLike, isLiked: isSongLiked } = useLikedSongs(session?.user?.id);
@@ -1044,12 +1044,21 @@ export default function PlaylistDetailPage({ params }) {
 
   // Extract dominant colors from image and make them darker for ambient effect
   const extractColorsFromImage = (imageSrc) => {
+    if (!imageSrc || typeof imageSrc !== 'string') {
+      return Promise.resolve('rgb(80, 80, 80)');
+    }
     if (globalColorCache && globalColorCache.has(imageSrc)) {
       return Promise.resolve(globalColorCache.get(imageSrc));
     }
 
     // Use proxy for external images to bypass CORS issues during color extraction
-    const finalSrc = imageSrc.startsWith('http')
+    const isSameOrigin = typeof window !== 'undefined' && (
+      imageSrc.startsWith(window.location.origin) ||
+      imageSrc.startsWith('/') ||
+      imageSrc.includes('localhost') ||
+      imageSrc.includes('127.0.0.1')
+    );
+    const finalSrc = imageSrc.startsWith('http') && !isSameOrigin
       ? `/api/proxy/image?url=${encodeURIComponent(imageSrc)}`
       : imageSrc;
 
@@ -2271,6 +2280,13 @@ export default function PlaylistDetailPage({ params }) {
     );
   }
 
+  const cover = getPlaylistCover();
+  const isGif = (cover.type === 'single' && cover.src && (
+    cover.src.split('?')[0].toLowerCase().endsWith('.gif') ||
+    cover.src.toLowerCase().includes('.gif') ||
+    cover.src.toLowerCase().includes('/gif')
+  )) || (enableFullWidthCover && cover.type !== 'collage');
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -2354,6 +2370,9 @@ export default function PlaylistDetailPage({ params }) {
 
         <div
           className="flex-1 relative transition-colors duration-300 bg-background"
+          style={enablePlaylistBgColor && dominantColors ? {
+            backgroundColor: `color-mix(in srgb, ${dominantColors}, black 82%)`
+          } : undefined}
         >
           {/* Main Ambient Gradient Layer - Creates the deep Spotify-like fade */}
           <div
@@ -2371,7 +2390,7 @@ export default function PlaylistDetailPage({ params }) {
 
           <div className="relative z-10">
             {/* Playlist Header */}
-            <div className="p-4 pt-12 pb-2 md:p-8 md:pt-20 md:pb-4 text-foreground">
+            <div className={isGif ? "pb-2 md:p-8 md:pt-20 md:pb-4 text-foreground" : "p-4 pt-12 pb-2 md:p-8 md:pt-20 md:pb-4 text-foreground"}>
               {/* Mobile Layout */}
               <div className="block md:hidden">
                 <div
@@ -2383,21 +2402,23 @@ export default function PlaylistDetailPage({ params }) {
                   }}
                 >
                   <div
-                    className="w-64 h-64 rounded-lg overflow-hidden shadow-2xl transition-transform duration-75 ease-out"
+                    className={isGif ? "w-full h-auto shrink-0 transition-transform duration-75 ease-out relative min-h-[200px] overflow-hidden" : "w-64 h-64 rounded-lg overflow-hidden shadow-2xl transition-transform duration-75 ease-out"}
                     style={{
                       transform: 'scale(calc(1 - (var(--scroll-progress, 0) * 0.35)))',
                       willChange: 'transform'
                     }}
                   >
                     {(() => {
-                      const cover = getPlaylistCover();
-
                       if (cover.type === 'single') {
                         return (
                           <img
                             src={cover.src}
                             alt={playlist.name}
-                            className="w-full h-full object-cover"
+                            className={isGif ? "w-full h-auto min-h-[200px] object-cover" : "w-full h-full object-cover"}
+                            style={isGif ? {
+                              maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 40%, rgba(0,0,0,0.85) 60%, rgba(0,0,0,0.5) 75%, rgba(0,0,0,0.15) 90%, rgba(0,0,0,0) 100%)',
+                              WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 40%, rgba(0,0,0,0.85) 60%, rgba(0,0,0,0.5) 75%, rgba(0,0,0,0.15) 90%, rgba(0,0,0,0) 100%)'
+                            } : undefined}
                             onError={(e) => {
                               e.target.src = '/default-playlist-image.png';
                             }}
@@ -2431,7 +2452,7 @@ export default function PlaylistDetailPage({ params }) {
                       }
                     })()}
                   </div>
-                  <div className="space-y-2 w-full">
+                  <div className={`space-y-2 w-full ${isGif ? 'px-4' : ''}`}>
 
                     <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word text-start mt-2 line-clamp-1 w-full">
                       {decodeHtmlEntities(playlist.name)}
@@ -2469,16 +2490,14 @@ export default function PlaylistDetailPage({ params }) {
 
               {/* Desktop Layout */}
               <div className="hidden md:flex gap-6 items-end">
-                <div className="w-64 h-64 rounded-lg overflow-hidden shrink-0 shadow-2xl">
+                <div className={isGif ? "w-64 h-auto shrink-0 relative min-h-[180px] overflow-hidden" : "w-64 h-64 rounded-lg overflow-hidden shrink-0 shadow-2xl"}>
                   {(() => {
-                    const cover = getPlaylistCover();
-
                     if (cover.type === 'single') {
                       return (
                         <img
                           src={cover.src}
                           alt={playlist.name}
-                          className="w-full h-full object-cover"
+                          className={isGif ? "w-full h-auto min-h-[180px] object-cover" : "w-full h-full object-cover"}
                           onError={(e) => {
                             e.target.src = '/default-playlist-image.png';
                           }}
