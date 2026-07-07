@@ -910,7 +910,7 @@ export default function PlaylistsPage() {
             </div>
           </div>
         </header>
-        <div className="flex-1 p-4 md:p-6 pb-24">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-40">
           {loading ? (
             <PlaylistSkeleton />
           ) : playlists.length === 0 ? (
@@ -956,6 +956,7 @@ export default function PlaylistsPage() {
               ))}
             </div>
           )}
+          <div className="pb-32 md:pb-40" />
         </div>
       </SidebarInset>
     </SidebarProvider>

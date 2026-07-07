@@ -18,7 +18,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Search, X } from "lucide-react";
 import { PlaylistCard } from "@/components/music/playlist-card";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +31,8 @@ export default function CommunityPlaylistsPage() {
   const [hasMore, setHasMore] = useState(true);
   const [total, setTotal] = useState(0);
   const [scrollRestored, setScrollRestored] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const scrollContainerRef = useRef(null);
   const loadingRef = useRef(null);
   const isInitialLoad = useRef(true);
@@ -38,6 +40,11 @@ export default function CommunityPlaylistsPage() {
   // Restore state from sessionStorage on mount
   useEffect(() => {
     const savedData = sessionStorage.getItem('communityPlaylistsState');
+    const savedQuery = sessionStorage.getItem('communityPlaylistsSearchQuery');
+    if (savedQuery) {
+      setSearchQuery(savedQuery);
+      setDebouncedSearchQuery(savedQuery);
+    }
     if (savedData) {
       try {
         const { playlists: savedPlaylists, page: savedPage, hasMore: savedHasMore, total: savedTotal } = JSON.parse(savedData);
@@ -55,6 +62,18 @@ export default function CommunityPlaylistsPage() {
       setScrollRestored(true);
     }
   }, []);
+
+  // Debounce search input changes
+  useEffect(() => {
+    if (isInitialLoad.current && sessionStorage.getItem('communityPlaylistsState')) {
+      return;
+    }
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
   // Restore scroll position
   useEffect(() => {
@@ -75,12 +94,13 @@ export default function CommunityPlaylistsPage() {
     }
   }, [loading, playlists.length, scrollRestored]);
 
-  const fetchPlaylists = useCallback(async (pageNum, isLoadMore = false) => {
+  const fetchPlaylists = useCallback(async (pageNum, isLoadMore = false, searchVal = debouncedSearchQuery) => {
     try {
       if (isLoadMore) setLoadingMore(true);
       else setLoading(true);
 
-      const res = await fetch(`/api/playlists/community?page=${pageNum}&limit=20`);
+      const qParam = searchVal ? `&q=${encodeURIComponent(searchVal)}` : '';
+      const res = await fetch(`/api/playlists/community?page=${pageNum}&limit=20${qParam}`);
       if (!res.ok) throw new Error('Failed to fetch community playlists');
       const result = await res.json();
 
@@ -112,14 +132,29 @@ export default function CommunityPlaylistsPage() {
       setLoadingMore(false);
       isInitialLoad.current = false;
     }
-  }, []);
+  }, [debouncedSearchQuery]);
+
+  // Trigger search fetch when debounced query changes
+  useEffect(() => {
+    if (isInitialLoad.current && sessionStorage.getItem('communityPlaylistsState')) {
+      return;
+    }
+    sessionStorage.setItem('communityPlaylistsSearchQuery', debouncedSearchQuery);
+    fetchPlaylists(0, false, debouncedSearchQuery);
+  }, [debouncedSearchQuery, fetchPlaylists]);
 
   // Initial fetch only if no saved state
   useEffect(() => {
     if (isInitialLoad.current && !sessionStorage.getItem('communityPlaylistsState')) {
-      fetchPlaylists(0);
+      fetchPlaylists(0, false, "");
     }
   }, [fetchPlaylists]);
+
+  const handleClearSearch = () => {
+    setSearchQuery("");
+    setDebouncedSearchQuery("");
+    sessionStorage.removeItem('communityPlaylistsSearchQuery');
+  };
 
   // Infinite scroll observer
   useEffect(() => {
@@ -216,6 +251,26 @@ export default function CommunityPlaylistsPage() {
                     playlists
                   </p>
                 </div>
+              )}
+            </div>
+
+            {/* Search Bar */}
+            <div className="relative max-w-md w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search community playlists..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-10 py-2 bg-card border border-border rounded-full text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all"
+              />
+              {searchQuery && (
+                <button
+                  onClick={handleClearSearch}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               )}
             </div>
 

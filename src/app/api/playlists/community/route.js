@@ -65,10 +65,11 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page')) || 0;
     const limitNum = parseInt(searchParams.get('limit')) || 20;
+    const q = searchParams.get('q') || '';
     const skip = page * limitNum;
 
     // Check cache first
-    const cacheKey = `${page}:${limitNum}`;
+    const cacheKey = `${page}:${limitNum}:${q}`;
     const cached = getCached(cacheKey);
     if (cached) {
       return NextResponse.json(cached, {
@@ -82,6 +83,13 @@ export async function GET(request) {
       isPublic: true,
       'songIds.0': { $exists: true } // Only non-empty playlists
     };
+
+    if (q) {
+      query.$or = [
+        { name: { $regex: q, $options: 'i' } },
+        { description: { $regex: q, $options: 'i' } }
+      ];
+    }
 
     // Fetch total count and paginated playlists in parallel
     const [total, playlists] = await Promise.all([

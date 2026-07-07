@@ -946,6 +946,18 @@ function VirtualSongList({
 }
 
 
+const isLightColor = (rgbString) => {
+  if (!rgbString || !rgbString.startsWith('rgb')) return true;
+  const match = rgbString.match(/\d+/g);
+  if (!match || match.length < 3) return true;
+  const r = parseInt(match[0], 10);
+  const g = parseInt(match[1], 10);
+  const b = parseInt(match[2], 10);
+  const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+  return brightness > 128;
+};
+
+
 export default function PlaylistDetailPage({ params }) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -966,6 +978,7 @@ export default function PlaylistDetailPage({ params }) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [showHeaderTitle, setShowHeaderTitle] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
+  const isBgLight = useMemo(() => isLightColor(dominantColors), [dominantColors]);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("custom");
   const [viewAs, setViewAs] = useState("list");
@@ -1045,59 +1058,100 @@ export default function PlaylistDetailPage({ params }) {
       img.crossOrigin = 'anonymous';
 
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+        const tryExtraction = (retries = 2) => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
 
-        // Set canvas size
-        canvas.width = img.width;
-        canvas.height = img.height;
+          // Set canvas size
+          canvas.width = img.width || 100;
+          canvas.height = img.height || 100;
 
-        // Draw image
-        ctx.drawImage(img, 0, 0);
+          try {
+            // Draw image
+            ctx.drawImage(img, 0, 0);
 
-        // Get image data
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
+            // Get image data
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
 
-        const colorCounts = {};
+            const colorCounts = {};
+            let hasVisiblePixels = false;
 
-        // Sample every 10th pixel for performance
-        for (let i = 0; i < data.length; i += 40) {
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
+            // First pass: try to get a nice, vibrant color (standard rules)
+            for (let i = 0; i < data.length; i += 40) {
+              const r = data[i];
+              const g = data[i + 1];
+              const b = data[i + 2];
+              const a = data[i + 3];
 
-          // Skip very light or very dark colors
-          const brightness = (r + g + b) / 3;
-          if (brightness < 40 || brightness > 220) continue;
+              // Skip mostly transparent pixels (important for GIFs)
+              if (a < 50) continue;
+              hasVisiblePixels = true;
 
-          // Calculate saturation (simplified)
-          const max = Math.max(r, g, b);
-          const min = Math.min(r, g, b);
-          const saturation = max - min;
+              // Skip very light or very dark colors
+              const brightness = (r + g + b) / 3;
+              if (brightness < 40 || brightness > 220) continue;
 
-          // Skip very desaturated (grayish) colors
-          if (saturation < 30) continue;
+              // Calculate saturation (simplified)
+              const max = Math.max(r, g, b);
+              const min = Math.min(r, g, b);
+              const saturation = max - min;
 
-          const color = `${Math.floor(r / 10) * 10},${Math.floor(g / 10) * 10},${Math.floor(b / 10) * 10}`;
-          // Weight by saturation to favor vibrant colors
-          colorCounts[color] = (colorCounts[color] || 0) + (1 + saturation / 50);
-        }
+              // Skip very desaturated (grayish) colors
+              if (saturation < 30) continue;
 
-        // Find the most common color
-        let dominantColor = '80,80,80'; // Default dark gray
-        let maxWeight = 0;
+              const color = `${Math.floor(r / 10) * 10},${Math.floor(g / 10) * 10},${Math.floor(b / 10) * 10}`;
+              // Weight by saturation to favor vibrant colors
+              colorCounts[color] = (colorCounts[color] || 0) + (1 + saturation / 50);
+            }
 
-        for (const [color, weight] of Object.entries(colorCounts)) {
-          if (weight > maxWeight) {
-            maxWeight = weight;
-            dominantColor = color;
+            // Second pass: if no vibrant colors found but we have visible pixels, accept any non-transparent pixel
+            if (Object.keys(colorCounts).length === 0 && hasVisiblePixels) {
+              for (let i = 0; i < data.length; i += 40) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                const a = data[i + 3];
+
+                if (a < 50) continue;
+
+                const color = `${Math.floor(r / 10) * 10},${Math.floor(g / 10) * 10},${Math.floor(b / 10) * 10}`;
+                colorCounts[color] = (colorCounts[color] || 0) + 1;
+              }
+            }
+
+            // Find the most common color
+            let dominantColor = null;
+            let maxWeight = 0;
+
+            for (const [color, weight] of Object.entries(colorCounts)) {
+              if (weight > maxWeight) {
+                maxWeight = weight;
+                dominantColor = color;
+              }
+            }
+
+            if (dominantColor) {
+              const resultColor = `rgb(${dominantColor})`;
+              if (globalColorCache) globalColorCache.set(imageSrc, resultColor);
+              resolve(resultColor);
+              return;
+            }
+          } catch (e) {
+            console.warn("Color extraction error:", e);
           }
-        }
 
-        const resultColor = `rgb(${dominantColor})`;
-        if (globalColorCache) globalColorCache.set(imageSrc, resultColor);
-        resolve(resultColor);
+          // If blank/failed extraction and we have retries left (common for animated GIFs on load), retry
+          if (retries > 0) {
+            setTimeout(() => tryExtraction(retries - 1), 150);
+          } else {
+            const fallback = 'rgb(80, 80, 80)';
+            if (globalColorCache) globalColorCache.set(imageSrc, fallback);
+            resolve(fallback);
+          }
+        };
+
+        tryExtraction();
       };
 
       img.onerror = () => {
@@ -2504,7 +2558,8 @@ export default function PlaylistDetailPage({ params }) {
               <div className="flex items-center gap-0.5 md:gap-1">
                 <Button
                   size="lg"
-                  className="rounded-full w-12 h-12 md:w-14 md:h-14 text-black hover:scale-105 transition-all duration-500 cursor-pointer"
+                  className={`rounded-full w-12 h-12 md:w-14 md:h-14 hover:scale-105 transition-all duration-500 cursor-pointer ${isBgLight ? 'text-black' : 'text-white/80'
+                    }`}
                   style={{
                     backgroundColor: dominantColors || '#ffffff',
                     boxShadow: dominantColors
