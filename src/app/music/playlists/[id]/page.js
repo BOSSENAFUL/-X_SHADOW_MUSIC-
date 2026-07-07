@@ -580,7 +580,7 @@ const PlaylistActionMenu = memo(({
 PlaylistActionMenu.displayName = "PlaylistActionMenu";
 
 // --- Sort and View Menu ---
-const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }) => {
+const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile, enablePlaylistBgColor, dominantColors }) => {
   const sortOptions = [
     { id: 'custom', label: 'Custom order' },
     { id: 'title', label: 'Title' },
@@ -641,7 +641,13 @@ const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }
     return (
       <Drawer open={sortDrawerOpen} onOpenChange={setSortDrawerOpen}>
         <DrawerTrigger asChild>
-          <button className="flex items-center gap-1.5 text-xs font-medium text-foreground/80 hover:text-foreground transition-colors py-1.5 px-3 bg-muted/50 rounded-full border border-border shrink-0">
+          <button 
+            className={`flex items-center gap-1.5 text-xs font-medium text-foreground/80 hover:text-foreground transition-colors py-1.5 px-3 rounded-full border border-border shrink-0 ${enablePlaylistBgColor && dominantColors ? '' : 'bg-muted/50'}`}
+            style={enablePlaylistBgColor && dominantColors ? {
+              backgroundColor: `color-mix(in srgb, ${dominantColors}, black 65%)`,
+              borderColor: `color-mix(in srgb, ${dominantColors}, black 50%)`
+            } : undefined}
+          >
             <span className={sortBy !== 'custom' ? 'text-[#1ed760]' : ''}>Sort</span>
             <List className="w-3.5 h-3.5 opacity-80" />
           </button>
@@ -663,7 +669,12 @@ const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile }
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex items-center justify-center gap-2 text-sm font-medium text-foreground/80 hover:text-foreground transition-colors h-9 px-3 hover:bg-accent/50 rounded-md">
+        <button 
+          className={`flex items-center justify-center gap-2 text-sm font-medium text-foreground/80 hover:text-foreground transition-colors h-9 px-3 rounded-md ${enablePlaylistBgColor && dominantColors ? '' : 'hover:bg-accent/50 bg-transparent'}`}
+          style={enablePlaylistBgColor && dominantColors ? {
+            backgroundColor: `color-mix(in srgb, ${dominantColors}, black 65%)`
+          } : undefined}
+        >
           <span className={sortBy !== 'custom' ? 'text-[#1ed760]' : ''}>{currentSortLabel}</span>
           <List className="w-4 h-4" />
         </button>
@@ -2631,7 +2642,11 @@ export default function PlaylistDetailPage({ params }) {
                   {/* Search Bar - Far Right side */}
                   <div ref={searchContainerRef}>
                     <div
-                      className={`flex items-center transition-colors duration-300 ease-in-out ${isSearchVisible ? 'w-40 md:w-56 h-9 px-2.5 rounded-md border border-border bg-muted/50 justify-start' : 'w-9 h-9 justify-center rounded-full bg-muted/50 hover:bg-muted cursor-pointer border-none'}`}
+                      className={`flex items-center transition-colors duration-300 ease-in-out ${isSearchVisible ? 'w-40 md:w-56 h-9 px-2.5 rounded-md border border-border justify-start' : 'w-9 h-9 justify-center rounded-full hover:bg-muted cursor-pointer border-none'} ${enablePlaylistBgColor && dominantColors ? '' : 'bg-muted/50'}`}
+                      style={enablePlaylistBgColor && dominantColors ? {
+                        backgroundColor: `color-mix(in srgb, ${dominantColors}, black 65%)`,
+                        borderColor: isSearchVisible ? `color-mix(in srgb, ${dominantColors}, black 50%)` : undefined
+                      } : undefined}
                       onClick={() => !isSearchVisible && setIsSearchVisible(true)}
                     >
                       <Search className={`w-4 h-4 text-muted-foreground shrink-0 transition-colors ${isSearchVisible ? 'text-foreground/70' : ''}`} />
@@ -2661,6 +2676,8 @@ export default function PlaylistDetailPage({ params }) {
                       viewAs={viewAs}
                       setViewAs={setViewAs}
                       isMobile={isMobile}
+                      enablePlaylistBgColor={enablePlaylistBgColor}
+                      dominantColors={dominantColors}
                     />
                   )}
                 </div>
