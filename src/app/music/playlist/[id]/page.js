@@ -1322,21 +1322,21 @@ function PlaylistPageContent() {
                     )}
                   </div>
                   <div className="space-y-2 w-full">
-                    <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word text-start mt-2 line-clamp-1 w-full">
+                    <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word text-start mt-2 line-clamp-1 w-full text-foreground/90">
                       {decodeHtmlEntities(playlist.name)}
                     </h1>
                     {(playlist.subtitle || playlist.header_desc) && (
-                      <p className="text-xs text-muted-foreground line-clamp-2 text-start">
+                      <p className="text-xs text-muted-foreground/75 line-clamp-2 text-start">
                         {decodeHtmlEntities(playlist.subtitle || playlist.header_desc)}
                       </p>
                     )}
-                    <div className="flex flex-wrap items-center justify-start gap-x-2 gap-y-1 text-sm text-muted-foreground">
-                      <span className="font-semibold text-foreground whitespace-nowrap">JioSaavn</span>
-                      <span className="text-muted-foreground/60">•</span>
+                    <div className="flex flex-wrap items-center justify-start gap-x-2 gap-y-1 text-sm text-muted-foreground/70">
+                      <span className="font-semibold text-foreground/80 whitespace-nowrap">JioSaavn</span>
+                      <span className="text-muted-foreground/50">•</span>
                       <span className="whitespace-nowrap">{playlist.songCount || songs.length} songs</span>
                       {playlist.follower_count && (
                         <>
-                          <span className="text-muted-foreground/60">•</span>
+                          <span className="text-muted-foreground/50">•</span>
                           <span className="whitespace-nowrap">{playlist.follower_count} saves</span>
                         </>
                       )}
@@ -1366,16 +1366,16 @@ function PlaylistPageContent() {
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-2 wrap-break-word">
+                  <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-2 wrap-break-word text-foreground/90">
                     {decodeHtmlEntities(playlist.name)}
                   </h1>
                   {(playlist.subtitle || playlist.header_desc) && (
-                    <p className="text-base text-muted-foreground mb-4 line-clamp-2 max-w-2xl">
+                    <p className="text-base text-muted-foreground/75 mb-4 line-clamp-2 max-w-2xl">
                       {decodeHtmlEntities(playlist.subtitle || playlist.header_desc)}
                     </p>
                   )}
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span className="font-semibold">JioSaavn</span>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground/70">
+                    <span className="font-semibold text-foreground/80">JioSaavn</span>
                     <span>•</span>
                     <span>{playlist.songCount || songs.length} songs</span>
                     {playlist.follower_count && (

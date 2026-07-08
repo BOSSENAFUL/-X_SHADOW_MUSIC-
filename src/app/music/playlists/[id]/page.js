@@ -641,7 +641,7 @@ const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile, 
     return (
       <Drawer open={sortDrawerOpen} onOpenChange={setSortDrawerOpen}>
         <DrawerTrigger asChild>
-          <button 
+          <button
             className={`flex items-center gap-1.5 text-xs font-medium text-foreground/80 hover:text-foreground transition-colors py-1.5 px-3 rounded-full border border-border shrink-0 ${enablePlaylistBgColor && dominantColors ? '' : 'bg-muted/50'}`}
             style={enablePlaylistBgColor && dominantColors ? {
               backgroundColor: `color-mix(in srgb, ${dominantColors}, black 65%)`,
@@ -669,7 +669,7 @@ const SortAndViewMenu = memo(({ sortBy, setSortBy, viewAs, setViewAs, isMobile, 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button 
+        <button
           className={`flex items-center justify-center gap-2 text-sm font-medium text-foreground/80 hover:text-foreground transition-colors h-9 px-3 rounded-md ${enablePlaylistBgColor && dominantColors ? '' : 'hover:bg-accent/50 bg-transparent'}`}
           style={enablePlaylistBgColor && dominantColors ? {
             backgroundColor: `color-mix(in srgb, ${dominantColors}, black 65%)`
@@ -2465,32 +2465,30 @@ export default function PlaylistDetailPage({ params }) {
                   </div>
                   <div className={`space-y-2 w-full ${isGif ? 'px-4' : ''}`}>
 
-                    <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word text-start mt-2 line-clamp-1 w-full">
+                    <h1 ref={mobileTitleRef} className="text-2xl font-bold wrap-break-word text-start mt-2 line-clamp-1 w-full text-foreground/90">
                       {decodeHtmlEntities(playlist.name)}
                     </h1>
                     {playlist.description && (
-                      <p className="text-xs text-muted-foreground line-clamp-2 text-start">
+                      <p className="text-xs text-muted-foreground/80 line-clamp-2 text-start">
                         {decodeHtmlEntities(playlist.description)}
                       </p>
                     )}
-                    <div className="flex flex-wrap items-center justify-start gap-x-2 gap-y-1 text-sm text-muted-foreground">
+                    <div className="flex flex-wrap items-center justify-start gap-x-2 gap-y-1 text-sm text-muted-foreground/70">
                       <div className="flex items-center gap-1.5 shrink-0">
                         {playlist.ownerImage ? (
                           <img src={playlist.ownerImage} alt={playlist.ownerName} className="w-6 h-6 rounded-full object-cover" />
                         ) : playlist.ownerName === 'Spotify' ? (
                           <img src="https://i.postimg.cc/g25JqFyg/icon-192.png" alt="Jammify" className="w-6 h-6 rounded-full object-cover" />
                         ) : (
-                          <div className="w-6 h-6 rounded-full bg-muted/30 flex items-center justify-center">
-                            <User className="w-3 h-3" />
-                          </div>
+                          <img src="/user-avatar.png" alt={playlist.ownerName || 'User'} className="w-6 h-6 rounded-full object-cover" />
                         )}
-                        <span className="font-semibold text-foreground truncate max-w-[150px]">{decodeHtmlEntities(playlist.ownerName) || 'Unknown User'}</span>
+                        <span className="font-semibold text-foreground/80 truncate max-w-[150px]">{decodeHtmlEntities(playlist.ownerName) || 'Unknown User'}</span>
                       </div>
-                      <span className="text-muted-foreground/60">•</span>
+                      <span className="text-muted-foreground/50">•</span>
                       <span className="whitespace-nowrap">{playlist.songIds?.length || 0} songs</span>
                       {totalDuration && (
                         <>
-                          <span className="text-muted-foreground/60">•</span>
+                          <span className="text-muted-foreground/50">•</span>
                           <span className="whitespace-nowrap">{totalDuration}</span>
                         </>
                       )}
@@ -2501,14 +2499,14 @@ export default function PlaylistDetailPage({ params }) {
 
               {/* Desktop Layout */}
               <div className="hidden md:flex gap-6 items-end">
-                <div className={isGif ? "w-64 h-auto shrink-0 relative min-h-[180px] overflow-hidden" : "w-64 h-64 rounded-lg overflow-hidden shrink-0 shadow-2xl"}>
+                <div className="w-64 h-64 rounded-lg overflow-hidden shrink-0 shadow-2xl">
                   {(() => {
                     if (cover.type === 'single') {
                       return (
                         <img
                           src={cover.src}
                           alt={playlist.name}
-                          className={isGif ? "w-full h-auto min-h-[180px] object-cover" : "w-full h-full object-cover"}
+                          className="w-full h-full object-cover"
                           onError={(e) => {
                             e.target.src = '/default-playlist-image.png';
                           }}
@@ -2546,25 +2544,23 @@ export default function PlaylistDetailPage({ params }) {
                   {/* <Badge variant="secondary" className="mb-2">
                   {playlist.isPublic ? 'Public' : 'Private'}
                 </Badge> */}
-                  <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-2 wrap-break-word">
+                  <h1 ref={desktopTitleRef} className="text-4xl md:text-6xl font-bold mb-2 wrap-break-word text-foreground/90">
                     {decodeHtmlEntities(playlist.name)}
                   </h1>
                   {playlist.description && (
-                    <p className="text-base text-muted-foreground mb-4 xl:line-clamp-none line-clamp-2 max-w-6xl">
+                    <p className="text-base text-muted-foreground/75 mb-4 xl:line-clamp-none line-clamp-2 max-w-6xl">
                       {decodeHtmlEntities(playlist.description)}
                     </p>
                   )}
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground/70">
                     {playlist.ownerImage ? (
                       <img src={playlist.ownerImage} alt={playlist.ownerName} className="w-6 h-6 rounded-full object-cover" />
                     ) : playlist.ownerName === 'Spotify' ? (
                       <img src="https://i.postimg.cc/g25JqFyg/icon-192.png" alt="Jammify" className="w-6 h-6 rounded-full object-cover" />
                     ) : (
-                      <div className="w-6 h-6 rounded-full bg-muted/30 flex items-center justify-center">
-                        <User className="w-3 h-3 text-muted-foreground" />
-                      </div>
+                      <img src="/user-avatar.png" alt={playlist.ownerName || 'User'} className="w-6 h-6 rounded-full object-cover" />
                     )}
-                    <span className="font-semibold">{decodeHtmlEntities(playlist.ownerName) || 'Unknown User'}</span>
+                    <span className="font-semibold text-foreground/80">{decodeHtmlEntities(playlist.ownerName) || 'Unknown User'}</span>
                     <span>•</span>
                     <span>{playlist.songIds?.length || 0} songs</span>
                     {totalDuration && (
