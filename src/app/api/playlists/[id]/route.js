@@ -93,6 +93,8 @@ export async function GET(request, { params }) {
       );
     }
 
+    const isAdmin = session?.user?.role === 'admin';
+
     return NextResponse.json({
       success: true,
       data: {
@@ -102,7 +104,7 @@ export async function GET(request, { params }) {
         image: spotifyPlaylist.image ?? '',
         songIds: spotifyPlaylist.songIds ?? [],
         isPublic: true,
-        isOwner: false,
+        isOwner: isAdmin,
         ownerName: 'Spotify',
         ownerImage: null,
         createdAt: spotifyPlaylist.createdAt,

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import connectDB from '@/lib/mongodb';
 import Playlist from '@/models/Playlist';
+import { getSpotifyPlaylistModel } from '@/models/SpotifyPlaylist';
 import mongoose from 'mongoose';
 
 // POST - Add song to playlist
@@ -108,36 +109,95 @@ export async function DELETE(request, { params }) {
 
     await connectDB();
     
-    const playlist = await Playlist.findOne({
-      _id: id,
-      userId: new mongoose.Types.ObjectId(session.user.id)
-    });
+    // Find the playlist in main database
+    const playlist = await Playlist.findById(id);
     
-    if (!playlist) {
-      return NextResponse.json(
-        { success: false, error: 'Playlist not found' },
-        { status: 404 }
-      );
+    if (playlist) {
+      // Verify ownership
+      if (playlist.userId.toString() !== session.user.id) {
+        return NextResponse.json(
+          { success: false, error: 'You do not have permission to modify this playlist' },
+          { status: 403 }
+        );
+      }
+
+      // Check if song is in playlist
+      const songIndex = playlist.songIds.indexOf(songId);
+      if (songIndex === -1) {
+        return NextResponse.json(
+          { success: false, error: 'Song not found in playlist' },
+          { status: 400 }
+        );
+      }
+      
+      // Remove song from playlist
+      playlist.songIds.splice(songIndex, 1);
+      await playlist.save();
+      
+      return NextResponse.json({
+        success: true,
+        data: playlist,
+        message: `Song removed from "${playlist.name}"`
+      });
     }
-    
-    // Check if song is in playlist
-    const songIndex = playlist.songIds.indexOf(songId);
-    if (songIndex === -1) {
-      return NextResponse.json(
-        { success: false, error: 'Song not found in playlist' },
-        { status: 400 }
+
+    // Fallback: Check Spotify playlist DB
+    const SpotifyPlaylist = await getSpotifyPlaylistModel();
+    const spotifyPlaylist = await SpotifyPlaylist.findById(id);
+
+    if (spotifyPlaylist) {
+      // Verify admin role
+      if (session.user.role !== 'admin') {
+        return NextResponse.json(
+          { success: false, error: 'Admin access required to modify Spotify playlists' },
+          { status: 403 }
+        );
+      }
+
+      // Check if song is in playlist
+      const songIndex = spotifyPlaylist.songIds.indexOf(songId);
+      if (songIndex === -1) {
+        return NextResponse.json(
+          { success: false, error: 'Song not found in playlist' },
+          { status: 400 }
+        );
+      }
+      
+      // Remove song from playlist
+      spotifyPlaylist.songIds.splice(songIndex, 1);
+      spotifyPlaylist.songCount = spotifyPlaylist.songIds.length;
+
+      // Clean up trackMap if it exists
+      if (spotifyPlaylist.trackMap) {
+        for (const [key, value] of spotifyPlaylist.trackMap.entries()) {
+          if (value === songId) {
+            spotifyPlaylist.trackMap.delete(key);
+          }
+        }
+      }
+
+      await SpotifyPlaylist.updateOne(
+        { _id: id },
+        {
+          $set: {
+            songIds: spotifyPlaylist.songIds,
+            songCount: spotifyPlaylist.songCount,
+            trackMap: spotifyPlaylist.trackMap
+          }
+        }
       );
+      
+      return NextResponse.json({
+        success: true,
+        data: spotifyPlaylist,
+        message: `Song removed from "${spotifyPlaylist.name}"`
+      });
     }
-    
-    // Remove song from playlist
-    playlist.songIds.splice(songIndex, 1);
-    await playlist.save();
-    
-    return NextResponse.json({
-      success: true,
-      data: playlist,
-      message: `Song removed from "${playlist.name}"`
-    });
+
+    return NextResponse.json(
+      { success: false, error: 'Playlist not found' },
+      { status: 404 }
+    );
     
   } catch (error) {
     console.error('Error removing song from playlist:', error);
@@ -147,3 +207,4 @@ export async function DELETE(request, { params }) {
     );
   }
 }
+
