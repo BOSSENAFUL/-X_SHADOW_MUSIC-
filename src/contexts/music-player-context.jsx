@@ -1,10 +1,12 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useRef } from "react";
+import { useSession } from "next-auth/react";
 
 const MusicPlayerContext = createContext();
 
 export function MusicPlayerProvider({ children }) {
+  const { status } = useSession();
   const [currentSong, setCurrentSong] = useState(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [playlist, setPlaylist] = useState([]);
@@ -232,6 +234,30 @@ export function MusicPlayerProvider({ children }) {
     setCurrentTime(0);
     setDuration(0);
   };
+
+  // Clear player state and localStorage on logout
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      const timer = setTimeout(() => {
+        clearPlayer();
+      }, 0);
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.removeItem("jammify_player_song");
+          localStorage.removeItem("jammify_player_index");
+          localStorage.removeItem("jammify_player_playlist");
+          localStorage.removeItem("jammify_player_playlist_id");
+          localStorage.removeItem("jammify_player_visible");
+          localStorage.removeItem("jammify_player_current_time");
+        } catch (e) {
+          console.error("Failed to clear player storage on logout", e);
+        }
+      }
+
+      return () => clearTimeout(timer);
+    }
+  }, [status]);
 
   const togglePlayPause = () => {
     setIsPlaying(!isPlaying);
