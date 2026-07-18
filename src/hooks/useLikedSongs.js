@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 
 export function useLikedSongs(userId) {
   const [likedSongs, setLikedSongs] = useState([]);
@@ -208,6 +209,46 @@ export function useLikedSongs(userId) {
     return likedSongs.length;
   }, [likedSongs]);
 
+  // Reorder liked songs
+  const reorderSongs = useCallback(async (newOrderedSongs) => {
+    if (!userId) return;
+
+    // Optimistically update states
+    setLikedSongs(newOrderedSongs);
+    setLikedSongIds(new Set(newOrderedSongs.map(song => song.songId)));
+
+    // Save to sessionStorage cache immediately for instant persistence
+    try {
+      sessionStorage.setItem(`jammify_favorites_${userId}`, JSON.stringify({
+        data: newOrderedSongs,
+        timestamp: Date.now()
+      }));
+    } catch (e) { }
+
+    try {
+      const response = await fetch('/api/liked-songs', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          songIds: newOrderedSongs.map(song => song.songId)
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        toast.error('Failed to save new song order');
+        // Fetch original songs again to revert
+        fetchLikedSongs();
+      }
+    } catch (err) {
+      toast.error('Failed to save new song order due to network error');
+      fetchLikedSongs();
+    }
+  }, [userId, fetchLikedSongs]);
+
   // Initialize - fetch liked songs when userId changes
   useEffect(() => {
     fetchLikedSongs();
@@ -220,6 +261,8 @@ export function useLikedSongs(userId) {
     toggleLike,
     isLiked,
     getLikedCount,
+    reorderSongs,
     refetch: fetchLikedSongs
   };
 }
+

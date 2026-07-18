@@ -104,3 +104,58 @@ export async function POST(request) {
     );
   }
 }
+
+// PUT - Reorder liked songs
+export async function PUT(request) {
+  try {
+    await connectDB();
+
+    const body = await request.json();
+    const { userId, songIds } = body;
+
+    if (!userId || !songIds || !Array.isArray(songIds)) {
+      return NextResponse.json(
+        { success: false, error: 'User ID and songIds array are required' },
+        { status: 400 }
+      );
+    }
+
+    // Validate and convert userId to ObjectId
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid user ID format' },
+        { status: 400 }
+      );
+    }
+
+    const now = new Date();
+    // Reorder liked songs by adjusting likedAt values
+    const bulkOps = songIds.map((songId, index) => ({
+      updateOne: {
+        filter: { userId: new mongoose.Types.ObjectId(userId), songId },
+        update: { $set: { likedAt: new Date(now.getTime() - index * 1000) } }
+      }
+    }));
+
+    await LikedSong.bulkWrite(bulkOps);
+
+    // Invalidate cache
+    cache.delete(`liked-songs:${userId}`);
+
+    // Mark liked songs mix as stale
+    markMixStale(userId, 'liked_songs').catch(() => {});
+
+    return NextResponse.json({
+      success: true,
+      message: 'Liked songs order updated successfully'
+    });
+
+  } catch (error) {
+    console.error('Error reordering liked songs:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to reorder liked songs' },
+      { status: 500 }
+    );
+  }
+}
+

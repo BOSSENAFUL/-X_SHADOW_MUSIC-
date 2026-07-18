@@ -293,7 +293,12 @@ export default function FavoritesPage() {
   const desktopTitleRef = useRef(null);
 
   // Initialize liked songs hook
-  const { likedSongs, loading, toggleLike, getLikedCount } = useLikedSongs(session?.user?.id);
+  const { likedSongs, loading, toggleLike, getLikedCount, reorderSongs } = useLikedSongs(session?.user?.id);
+
+  // Drag and drop states
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Effect to handle scroll and show/hide title in header
   useEffect(() => {
@@ -666,6 +671,72 @@ export default function FavoritesPage() {
     console.log(result.message);
   }, [toggleLike]);
 
+  // ─── Drag and Drop Handlers ───────────────────────────────────────────────
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    setIsDragging(true);
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/html", e.target);
+    }
+  };
+
+  const handleDragEnter = (e, index) => {
+    e.preventDefault();
+    setDragOverIndex(index);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "move";
+    }
+
+    // Auto-scroll logic
+    const scrollContainer = document.getElementById('favorites-scroll-container');
+    if (scrollContainer) {
+      const scrollThreshold = 100; // pixels from edge to trigger scroll
+      const scrollSpeed = 15; // pixels to adjust per calculation
+
+      const rect = scrollContainer.getBoundingClientRect();
+      const clientY = e.clientY;
+
+      // Check proximity to top edge
+      if (clientY - rect.top < scrollThreshold) {
+        scrollContainer.scrollTop -= scrollSpeed;
+      }
+      // Check proximity to bottom edge
+      else if (rect.bottom - clientY < scrollThreshold) {
+        scrollContainer.scrollTop += scrollSpeed;
+      }
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e, dropIndex) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      handleDragEnd();
+      return;
+    }
+
+    const newSongs = [...likedSongs];
+    const draggedItem = newSongs[draggedIndex];
+    newSongs.splice(draggedIndex, 1);
+
+    // Adjust insert index
+    const insertIndex = draggedIndex < dropIndex ? dropIndex - 1 : dropIndex;
+    newSongs.splice(insertIndex, 0, draggedItem);
+
+    reorderSongs(newSongs);
+    handleDragEnd();
+  };
+
   if (loading || status === "loading") {
     return (
       <SidebarProvider>
@@ -879,7 +950,19 @@ export default function FavoritesPage() {
                     const isCurrentSong = currentSong?.id === likedSong.songId &&
                       currentPlaylistId === 'favorites';
                     return (
-                      <div key={likedSong.songId || index} >
+                      <div
+                        key={likedSong.songId || index}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, index)}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={handleDragOver}
+                        onDragEnter={(e) => handleDragEnter(e, index)}
+                        onDrop={(e) => handleDrop(e, index)}
+                        className={`cursor-grab transition-all duration-200 select-none ${dragOverIndex === index && draggedIndex !== index
+                          ? "border-t-2 border-green-400"
+                          : ""
+                          } ${draggedIndex === index ? "opacity-50 scale-[0.99]" : ""}`}
+                      >
                         {/* Mobile Layout */}
                         <div
                           className={`md:hidden flex items-center gap-2 pl-1 pr-0 py-2 rounded hover:bg-muted/50 group cursor-pointer ${isCurrentSong ? '' : ''
