@@ -170,23 +170,49 @@ export default function RadioPage() {
         
         setStations(validStations);
 
-        // Fetch countries
-        const validCountries = countriesData.filter(
-          country => country && typeof country.name === 'string' && country.name.trim() !== ""
-        );
-        const sortedCountries = validCountries.sort((a, b) => a.name.localeCompare(b.name));
+        // Fetch countries and remove duplicates by name
+        const seenCountries = new Set();
+        const uniqueCountries = [];
+        for (const country of countriesData) {
+          if (country && typeof country.name === 'string') {
+            const cleanName = country.name.trim();
+            if (cleanName !== "" && !seenCountries.has(cleanName)) {
+              seenCountries.add(cleanName);
+              uniqueCountries.push({ ...country, name: cleanName });
+            }
+          }
+        }
+        const sortedCountries = uniqueCountries.sort((a, b) => a.name.localeCompare(b.name));
         setCountries(sortedCountries); // Show all countries, sorted alphabetically
 
-        // Filter for clean language names and sort by popularity
-        const topLanguages = languagesData
-          .filter(lang => lang && typeof lang.name === 'string' && /^[a-zA-Z\s-]+$/.test(lang.name)) // Only alphabetic names
-          .slice(0, 80);
+        // Filter for clean language names, remove duplicates, and sort by popularity
+        const seenLanguages = new Set();
+        const uniqueLanguages = [];
+        for (const lang of languagesData) {
+          if (lang && typeof lang.name === 'string' && /^[a-zA-Z\s-]+$/.test(lang.name)) {
+            const cleanName = lang.name.trim();
+            if (cleanName !== "" && !seenLanguages.has(cleanName)) {
+              seenLanguages.add(cleanName);
+              uniqueLanguages.push({ ...lang, name: cleanName });
+            }
+          }
+        }
+        const topLanguages = uniqueLanguages.slice(0, 80);
         setLanguages(topLanguages); 
 
-        // Filter for clean genre names
-        const topTags = tagsData
-          .filter(tag => tag && typeof tag.name === 'string' && tag.name.length > 2 && /^[a-zA-Z\s-]+$/.test(tag.name))
-          .slice(0, 80);
+        // Filter for clean genre names, remove duplicates
+        const seenTags = new Set();
+        const uniqueTags = [];
+        for (const tag of tagsData) {
+          if (tag && typeof tag.name === 'string' && tag.name.length > 2 && /^[a-zA-Z\s-]+$/.test(tag.name)) {
+            const cleanName = tag.name.trim();
+            if (cleanName !== "" && !seenTags.has(cleanName)) {
+              seenTags.add(cleanName);
+              uniqueTags.push({ ...tag, name: cleanName });
+            }
+          }
+        }
+        const topTags = uniqueTags.slice(0, 80);
         setTags(topTags); 
 
         try {
