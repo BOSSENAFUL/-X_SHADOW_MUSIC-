@@ -73,9 +73,10 @@ const UserSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-// Performance optimization: Index for online user queries
+// Performance optimization: Index for online user queries and signup analytics
 UserSchema.index({ lastActive: -1 });
 UserSchema.index({ email: 1, lastActive: -1 });
+UserSchema.index({ createdAt: -1 });
 
 // Hash password before saving
 UserSchema.pre('save', async function () {

@@ -14,8 +14,10 @@ import {
   TrendingUp,
   MessageSquare,
   Youtube,
+  Shield,
 } from "lucide-react"
 
+import { useSession } from "next-auth/react"
 import { NavMain } from "@/components/nav-main"
 import { NavProjects } from "@/components/nav-projects"
 import { NavUser } from "@/components/nav-user"
@@ -103,13 +105,25 @@ const data = {
 export function AppSidebar({
   ...props
 }) {
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === 'admin';
+
+  const navMainItems = [...data.navMain];
+  if (isAdmin && !navMainItems.some(item => item.url === '/music/admin')) {
+    navMainItems.push({
+      title: "Admin Panel",
+      url: "/music/admin",
+      icon: Shield,
+    });
+  }
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         <TeamSwitcher teams={data.teams} />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={navMainItems} />
         <NavProjects projects={data.projects} />
       </SidebarContent>
       <SidebarFooter>
