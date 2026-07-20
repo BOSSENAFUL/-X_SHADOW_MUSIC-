@@ -40,6 +40,7 @@ import {
     Video,
     Mic,
     Palette,
+    Shield,
 } from "lucide-react";
 
 // ── Section wrapper ──────────────────────────────────────────────────────────
@@ -247,6 +248,18 @@ export default function SettingsPage() {
                                 onClick={() => router.push("/music/profile")}
                             />
                         </SettingsSection>
+
+                        {/* Administration Section (only for Admin users) */}
+                        {session?.user?.role === "admin" && (
+                            <SettingsSection title="Administration">
+                                <SettingsRow
+                                    icon={Shield}
+                                    label="Admin Panel"
+                                    description="View daily user signups, geolocations & analytics"
+                                    onClick={() => router.push("/music/admin")}
+                                />
+                            </SettingsSection>
+                        )}
 
                         {/* Home Feed */}
                         <SettingsSection title="Home Feed">

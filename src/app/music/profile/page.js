@@ -25,7 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { useLikedPlaylists } from "@/hooks/useLikedPlaylists";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useRouter } from "next/navigation";
-import { Music, Disc, LogOut, Edit2, MessageCircle, Settings } from "lucide-react";
+import { Music, Disc, LogOut, Edit2, MessageCircle, Settings, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeSelector } from "@/components/theme-selector";
 
@@ -369,10 +369,30 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="mt-2 flex flex-wrap gap-3">
+                  {session?.user?.role === 'admin' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full font-semibold tracking-wide px-5 cursor-pointer gap-2 border-amber-500/40 text-amber-500 hover:bg-amber-500/10"
+                      onClick={() => router.push("/music/admin")}
+                    >
+                      <Shield className="w-4 h-4 text-amber-500" />
+                      Admin Panel
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
-                    className="rounded-full font-semibold tracking-wide px-6 cursor-pointer gap-2"
+                    className="rounded-full font-semibold tracking-wide px-5 cursor-pointer gap-2"
+                    onClick={() => router.push("/music/settings")}
+                  >
+                    <Settings className="w-4 h-4" />
+                    Settings
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full font-semibold tracking-wide px-5 cursor-pointer gap-2"
                     onClick={() => router.push("/music/chat")}
                   >
                     <MessageCircle className="w-4 h-4" />
@@ -382,7 +402,7 @@ export default function ProfilePage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="rounded-full font-semibold tracking-wide px-6 cursor-pointer"
+                    className="rounded-full font-semibold tracking-wide px-5 cursor-pointer"
                     onClick={() => signOut({ callbackUrl: "/login" })}
                   >
                     Sign out

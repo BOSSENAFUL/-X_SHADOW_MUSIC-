@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { AppSidebar } from '@/components/app-sidebar';
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 import {
   SidebarInset,
   SidebarProvider,
@@ -23,6 +25,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Shield,
   Users,
@@ -33,7 +39,9 @@ import {
   UserCheck,
   Clock,
   RefreshCw,
-  X
+  X,
+  Calendar as CalendarIcon,
+  MapPin
 } from 'lucide-react';
 
 export default function AdminPage() {
@@ -43,12 +51,19 @@ export default function AdminPage() {
   const [loadingStats, setLoadingStats] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  const fetchStats = useCallback(async () => {
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const fetchStats = useCallback(async (date) => {
     try {
       setRefreshing(true);
-      const res = await fetch('/api/admin/new-users');
+      const url = date ? `/api/admin/new-users?date=${date}` : '/api/admin/new-users';
+      const res = await fetch(url);
       if (!res.ok) {
         throw new Error('Failed to fetch admin statistics');
       }
@@ -66,12 +81,13 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (status === 'authenticated' && session?.user?.role === 'admin') {
-      fetchStats();
+      fetchStats(selectedDate);
     }
-  }, [status, session, fetchStats]);
+  }, [status, session, selectedDate, fetchStats]);
 
   // Client-side date formatting helper to avoid hydration mismatches
   const formatDateTime = (dateString) => {
+    if (!mounted) return '...';
     if (!dateString) return 'Never';
     const date = new Date(dateString);
     return date.toLocaleString(undefined, {
@@ -83,12 +99,12 @@ export default function AdminPage() {
   };
 
   const getRelativeTime = (dateString) => {
+    if (!mounted) return '...';
     if (!dateString) return '';
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now - date;
     
-    // Guard against client clock drift
     if (diffMs <= 0) return 'just now';
     
     const diffMins = Math.floor(diffMs / 60000);
@@ -102,333 +118,632 @@ export default function AdminPage() {
 
   // ── Render States ──────────────────────────────────────────────────────────
 
-  // 1. Session Loading
   if (status === 'loading') {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background text-foreground">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground animate-pulse">Loading dashboard session...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground font-medium">Loading session...</p>
         </div>
       </div>
     );
   }
 
-  // 2. Access Denied (Not logged in or not Admin)
   const isAuthorized = status === 'authenticated' && session?.user?.role === 'admin';
   if (!isAuthorized) {
     return (
       <div className="flex h-screen w-screen flex-col items-center justify-center bg-background text-foreground px-4">
-        <div className="max-w-md w-full text-center space-y-6 bg-card border border-border rounded-2xl p-8 shadow-2xl backdrop-blur-md relative overflow-hidden">
-          <div className="absolute -top-12 -left-12 w-32 h-32 bg-destructive/10 rounded-full blur-3xl" />
-          <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-primary/10 rounded-full blur-3xl" />
-          
-          <div className="mx-auto w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center text-destructive border border-destructive/20 shadow-lg">
-            <Lock className="w-8 h-8" />
+        <Card className="max-w-md w-full text-center p-6 sm:p-8 border border-border shadow-sm">
+          <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-4">
+            <Lock className="w-6 h-6" />
           </div>
           
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold tracking-tight">Access Denied</h1>
-            <p className="text-sm text-muted-foreground">
-              This page contains administration metrics and is strictly restricted to authorized administrator accounts.
-            </p>
+          <div className="space-y-1 mb-6">
+            <CardTitle className="text-xl font-semibold">Access Restricted</CardTitle>
+            <CardDescription className="text-sm">
+              You must be logged in as an administrator to access this area.
+            </CardDescription>
           </div>
 
-          <div className="pt-2 flex flex-col gap-2">
-            <Button className="w-full" onClick={() => router.push('/music')}>
-              <ArrowLeft className="w-4 h-4 mr-2" /> Back to Web Player
-            </Button>
-          </div>
-        </div>
+          <Button variant="default" className="w-full" onClick={() => router.push('/music')}>
+            <ArrowLeft className="w-4 h-4 mr-2" /> Return to App
+          </Button>
+        </Card>
       </div>
     );
   }
 
-  // Filtered users list based on search query
   const usersList = data?.users || [];
   const filteredUsers = usersList.filter(u => 
     u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.email?.toLowerCase().includes(searchQuery.toLowerCase())
+    u.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    u.location?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
     <SidebarProvider>
       <AppSidebar className="hidden md:flex" />
-      <SidebarInset className="md:ml-0 overflow-x-hidden h-svh flex flex-col">
-        {/* Header */}
-        <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background/95 backdrop-blur px-4 transition-[width,height] ease-linear">
-          <div className="flex items-center gap-2 w-full">
-            <SidebarTrigger className="-ml-1 hidden md:flex" />
-            <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 hidden md:block" />
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => router.push('/music')}>
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
+      <SidebarInset className="md:ml-0 overflow-x-hidden h-svh flex flex-col bg-background">
+        {/* Header Navigation (Desktop) */}
+        <header className="sticky top-0 z-40 hidden md:flex h-14 shrink-0 items-center justify-between border-b bg-background/95 backdrop-blur px-4">
+          <div className="flex items-center gap-2">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-2 h-4" />
             <Breadcrumb>
               <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
+                <BreadcrumbItem>
                   <BreadcrumbLink href="/music">Music</BreadcrumbLink>
                 </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
+                <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Admin Panel</BreadcrumbPage>
+                  <BreadcrumbPage className="font-medium">Admin Panel</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-            <div className="ml-auto">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-2 shrink-0" 
-                onClick={fetchStats}
-                disabled={refreshing}
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
-            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-8 gap-1.5 text-xs font-medium" 
+              onClick={() => fetchStats(selectedDate)}
+              disabled={refreshing}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
           </div>
         </header>
 
-        {/* Content */}
-        <ScrollArea className="flex-1 bg-background">
-          <div className="max-w-6xl mx-auto px-4 py-8 space-y-8 pb-32">
+        {/* Page Content */}
+        <ScrollArea className="flex-1">
+          <div className="max-w-7xl mx-auto px-3.5 sm:px-6 py-3.5 sm:py-8 space-y-3.5 sm:space-y-6 pb-36">
             
-            {/* Title & Description */}
-            <div className="flex flex-col gap-1">
-              <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-                Admin Overview
-              </h1>
-              <p className="text-muted-foreground text-sm">
-                Real-time user registration tracking and analytics metrics.
-              </p>
+            {/* Mobile Header Bar (< 640px) */}
+            <div className="flex sm:hidden items-center justify-between pb-2 border-b border-border/40">
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 rounded-full shrink-0" 
+                  onClick={() => router.push('/music')}
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </Button>
+                <div>
+                  <h1 className="text-base font-bold text-foreground leading-none">Admin Overview</h1>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">User Signups & Analytics</p>
+                </div>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 rounded-full shrink-0 text-muted-foreground hover:text-foreground" 
+                onClick={() => fetchStats(selectedDate)}
+                disabled={refreshing}
+              >
+                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              </Button>
             </div>
 
-            {/* Stat Cards */}
+            {/* Desktop Title Header (>= 640px) */}
+            <div className="hidden sm:flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                  User Signups Overview
+                </h1>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Track daily user registrations, locations, and historical growth metrics.
+                </p>
+              </div>
+            </div>
+
+            {/* Mobile KPI Summary (Compact 3-Column Strip on Mobile < 640px) */}
             {loadingStats ? (
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-2 grid-cols-3 sm:hidden">
                 {[1, 2, 3].map((n) => (
-                  <div key={n} className="h-28 bg-card border border-border rounded-xl animate-pulse" />
+                  <div key={n} className="h-14 bg-muted/20 rounded-xl animate-pulse" />
                 ))}
               </div>
-            ) : error ? (
-              <div className="p-4 rounded-xl border border-destructive/20 bg-destructive/10 text-destructive text-sm">
-                Error loading metrics: {error}
-              </div>
             ) : (
-              <div className="grid gap-4 md:grid-cols-3">
-                {/* 24h Signups */}
-                <div className="relative overflow-hidden bg-card border border-border rounded-2xl p-6 shadow-md hover:shadow-lg transition-all duration-300 group">
-                  <div className="absolute -right-8 -bottom-8 w-24 h-24 bg-primary/5 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">Daily Signups</span>
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary relative">
-                      <Users className="w-5 h-5" />
-                      {data?.count > 0 && (
-                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
-                      )}
-                    </div>
+              <div className="grid grid-cols-3 gap-2 sm:hidden">
+                <div className="bg-card/70 border border-border/60 rounded-xl p-2.5 flex flex-col justify-between">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">Signups</span>
+                  <div className="mt-1 flex items-baseline gap-1">
+                    <span className="text-lg font-bold text-foreground">{data?.count ?? 0}</span>
+                    <span className="text-[10px] text-muted-foreground">24h</span>
                   </div>
-                  <div className="mt-4 flex items-baseline gap-2">
-                    <span className="text-4xl font-extrabold tracking-tight">{data?.count}</span>
-                    <span className="text-xs text-muted-foreground">new users (24h)</span>
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground flex items-center gap-1">
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    Live counter updating automatically
-                  </p>
                 </div>
 
-                {/* Total Registered Users */}
-                <div className="relative overflow-hidden bg-card border border-border rounded-2xl p-6 shadow-md hover:shadow-lg transition-all duration-300 group">
-                  <div className="absolute -right-8 -bottom-8 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">Total Users</span>
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
-                      <UserCheck className="w-5 h-5" />
-                    </div>
+                <div className="bg-card/70 border border-border/60 rounded-xl p-2.5 flex flex-col justify-between">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">Total</span>
+                  <div className="mt-1 flex items-baseline gap-1">
+                    <span className="text-lg font-bold text-foreground">{data?.totalUsers ? data.totalUsers.toLocaleString() : 0}</span>
                   </div>
-                  <div className="mt-4 flex items-baseline gap-2">
-                    <span className="text-4xl font-extrabold tracking-tight">{data?.totalUsers}</span>
-                    <span className="text-xs text-muted-foreground">total accounts</span>
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-muted-foreground" />
-                    Historical signups database
-                  </p>
                 </div>
 
-                {/* Horizon Detail */}
-                <div className="relative overflow-hidden bg-card border border-border rounded-2xl p-6 shadow-md hover:shadow-lg transition-all duration-300 group">
-                  <div className="absolute -right-8 -bottom-8 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">Active Window</span>
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
-                      <Shield className="w-5 h-5" />
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <span className="text-sm font-bold block text-foreground">Last 24 Hours</span>
-                    <span className="text-xs text-muted-foreground block mt-1">
-                      Tracking signups starting from:<br />
-                      <strong className="text-foreground">{formatDateTime(new Date(Date.now() - 24 * 60 * 60 * 1000))}</strong>
-                    </span>
-                  </div>
+                <div className="bg-card/70 border border-border/60 rounded-xl p-2.5 flex flex-col justify-between">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">Range</span>
+                  <span className="text-xs font-semibold text-foreground truncate mt-1">
+                    {selectedDate ? selectedDate : 'Last 24h'}
+                  </span>
                 </div>
               </div>
             )}
 
-            {/* Users List Section */}
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex flex-col gap-1">
-                  <h2 className="text-xl font-bold tracking-tight">Daily New User Registrations</h2>
-                  <p className="text-xs text-muted-foreground">
-                    Detailed lookup for all users that created accounts in the previous 24 hour window.
-                  </p>
-                </div>
-                
-                {/* Search query input */}
-                <div className="relative max-w-sm w-full">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            {/* Desktop KPI Cards Grid (>= 640px) */}
+            {loadingStats ? (
+              <div className="hidden sm:grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {[1, 2, 3].map((n) => (
+                  <Card key={n} className="h-24 animate-pulse bg-muted/20" />
+                ))}
+              </div>
+            ) : error ? (
+              <Card className="border-destructive/30 bg-destructive/5">
+                <CardContent className="p-4 text-destructive text-xs sm:text-sm font-medium">
+                  {error}
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="hidden sm:grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {/* Daily / Selected Date Signups */}
+                <Card className="border border-border/80 shadow-none bg-card/60">
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        {selectedDate ? 'Signups on Date' : 'New Signups'}
+                      </span>
+                      <Users className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                    <div className="mt-3 flex items-baseline gap-2">
+                      <span className="text-3xl font-bold tracking-tight text-foreground">{data?.count ?? 0}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {selectedDate ? `users` : `in 24h`}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground flex items-center gap-1.5 truncate">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                      <span className="truncate">{selectedDate ? `Filter: ${selectedDate}` : 'Rolling 24-hour window'}</span>
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {/* Total System Users */}
+                <Card className="border border-border/80 shadow-none bg-card/60">
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Accounts</span>
+                      <UserCheck className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                    <div className="mt-3 flex items-baseline gap-2">
+                      <span className="text-3xl font-bold tracking-tight text-foreground">
+                        {data?.totalUsers ? data.totalUsers.toLocaleString() : 0}
+                      </span>
+                      <span className="text-xs text-muted-foreground">registered</span>
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground flex items-center gap-1.5 truncate">
+                      <Clock className="w-3 h-3 text-muted-foreground shrink-0" />
+                      <span className="truncate">All-time database records</span>
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {/* Query Horizon */}
+                <Card className="border border-border/80 shadow-none bg-card/60 sm:col-span-2 lg:col-span-1">
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Query Window</span>
+                      <Shield className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                    <div className="mt-3 space-y-1 min-w-0">
+                      <span className="text-sm font-semibold text-foreground block truncate">
+                        {selectedDate ? selectedDate : 'Last 24 Hours'}
+                      </span>
+                      <span className="text-xs text-muted-foreground block truncate">
+                        {selectedDate ? (
+                          `Starting ${formatDateTime(new Date(selectedDate))}`
+                        ) : (
+                          `From ${formatDateTime(new Date(Date.now() - 24 * 60 * 60 * 1000))}`
+                        )}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Mobile Toolbar & Filter Actions (< 640px) */}
+            <div className="flex sm:hidden flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                   <Input 
                     type="text" 
-                    placeholder="Search name or email..." 
-                    className="pl-9 pr-8"
+                    placeholder="Search user, email, city..." 
+                    className="pl-8 pr-7 h-9 text-xs bg-card/60 border-border/80 rounded-xl"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                   {searchQuery && (
                     <button 
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
-                      <X className="w-4 h-4" />
+                      <X className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className={cn(
+                        "h-9 w-9 rounded-xl shrink-0 bg-card/60 border-border/80 relative",
+                        selectedDate && "text-primary border-primary/50 bg-primary/10"
+                      )}
+                      title="Filter by date"
+                    >
+                      <CalendarIcon className="h-4 w-4" />
+                      {selectedDate && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-primary" />}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 z-50 bg-popover border-border" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate ? new Date(selectedDate) : undefined}
+                      onSelect={(d) => {
+                        if (d) {
+                          const year = d.getFullYear();
+                          const month = String(d.getMonth() + 1).padStart(2, '0');
+                          const day = String(d.getDate()).padStart(2, '0');
+                          setSelectedDate(`${year}-${month}-${day}`);
+                        } else {
+                          setSelectedDate('');
+                        }
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
 
-              {/* Users Table / List */}
+              {/* Active Filter Chips (Mobile) */}
+              {selectedDate && (
+                <div className="flex items-center gap-1.5">
+                  <Badge variant="secondary" className="text-[11px] gap-1 bg-primary/10 text-primary border border-primary/20 py-0.5 px-2 rounded-lg">
+                    <span>Date: {format(new Date(selectedDate), "MMM d, yyyy")}</span>
+                    <X className="w-3 h-3 cursor-pointer hover:text-foreground" onClick={() => setSelectedDate('')} />
+                  </Badge>
+                </div>
+              )}
+            </div>
+
+            {/* Mobile Data List View (< 640px) */}
+            <div className="block sm:hidden">
               {loadingStats ? (
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   {[1, 2, 3, 4].map((n) => (
-                    <div key={n} className="h-16 bg-card border border-border rounded-xl animate-pulse" />
+                    <div key={n} className="h-20 bg-muted/20 rounded-2xl animate-pulse" />
                   ))}
                 </div>
               ) : filteredUsers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 px-4 bg-card border border-border border-dashed rounded-2xl text-center space-y-4">
-                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
-                    <Users className="w-6 h-6" />
+                <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-3 bg-card/40 border border-border/60 rounded-2xl">
+                  <div className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground">
+                    <Users className="w-5 h-5" />
                   </div>
                   <div className="space-y-1">
-                    <h3 className="text-base font-semibold">No users found</h3>
-                    <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                    <p className="text-sm font-medium text-foreground">No registrations found</p>
+                    <p className="text-xs text-muted-foreground max-w-xs">
                       {searchQuery 
-                        ? `No signups found matching search string "${searchQuery}".` 
-                        : "No new accounts have been registered within the last 24 hours."}
+                        ? `No signups matching "${searchQuery}".` 
+                        : selectedDate 
+                          ? `No user accounts registered on ${selectedDate}.` 
+                          : "No new user accounts registered in the last 24 hours."}
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="rounded-xl border border-border bg-card overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse text-left text-sm">
-                      <thead>
-                        <tr className="border-b border-border bg-muted/30 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          <th className="px-6 py-4">User</th>
-                          <th className="px-6 py-4">Role</th>
-                          <th className="px-6 py-4">Status</th>
-                          <th className="px-6 py-4">Signed Up</th>
-                          <th className="px-6 py-4">Last Active</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {filteredUsers.map((user) => (
-                          <tr 
-                            key={user.id} 
-                            className="hover:bg-accent/40 transition-colors duration-150 group"
-                          >
-                            {/* Profile details */}
-                            <td className="px-6 py-4 flex items-center gap-3">
-                              <Avatar className="h-9 w-9 rounded-lg border border-border/80">
-                                <AvatarImage src={user.image} alt={user.name} />
-                                <AvatarFallback className="rounded-lg bg-accent text-accent-foreground font-semibold">
-                                  {user.name ? user.name.substring(0, 2).toUpperCase() : 'U'}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="flex flex-col">
-                                <span className="font-semibold text-foreground leading-snug group-hover:text-primary transition-colors">
-                                  {user.name || 'Anonymous User'}
-                                </span>
-                                <span className="text-xs text-muted-foreground leading-normal">
-                                  {user.email}
-                                </span>
-                              </div>
-                            </td>
-
-                            {/* User Role Badge */}
-                            <td className="px-6 py-4">
-                              {user.role === 'admin' ? (
-                                <Badge variant="default" className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between px-1 text-[11px] font-medium text-muted-foreground">
+                    <span>Registrations ({filteredUsers.length})</span>
+                    <span>Sorted by newest</span>
+                  </div>
+                  {filteredUsers.map((user) => (
+                    <div 
+                      key={user.id} 
+                      className="p-3.5 rounded-2xl bg-card/70 border border-border/70 shadow-xs space-y-2.5"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Avatar className="h-10 w-10 rounded-full border border-border/80 shrink-0">
+                            <AvatarImage src={user.image} alt={user.name} />
+                            <AvatarFallback className="text-xs bg-muted font-medium text-muted-foreground">
+                              {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm font-semibold text-foreground truncate">
+                                {user.name || 'Anonymous User'}
+                              </span>
+                              {user.role === 'admin' && (
+                                <Badge variant="outline" className="text-[9px] font-medium border-amber-500/30 text-amber-500 bg-amber-500/10 py-0 px-1.5 h-4 shrink-0">
                                   Admin
                                 </Badge>
-                              ) : (
-                                <Badge variant="secondary" className="bg-secondary/80 text-secondary-foreground border border-border">
-                                  User
-                                </Badge>
                               )}
-                            </td>
+                            </div>
+                            <span className="text-xs text-muted-foreground truncate">
+                              {user.email}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
 
-                            {/* Verification status */}
-                            <td className="px-6 py-4">
-                              {user.isVerified ? (
-                                <span className="inline-flex items-center gap-1 text-xs text-emerald-500 font-medium">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                  Verified
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground font-medium">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/45" />
-                                  Unverified
-                                </span>
-                              )}
-                            </td>
+                      <div className="flex items-center justify-between text-xs pt-1.5 border-t border-border/40">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {user.isVerified ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-500 font-medium shrink-0">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              Verified
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground font-medium shrink-0">
+                              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />
+                              Unverified
+                            </span>
+                          )}
 
-                            {/* Signup Timestamp */}
-                            <td className="px-6 py-4">
-                              <div className="flex flex-col">
-                                <span className="text-foreground font-medium">
-                                  {getRelativeTime(user.createdAt)}
-                                </span>
-                                <span className="text-xxs text-muted-foreground">
-                                  {formatDateTime(user.createdAt)}
-                                </span>
-                              </div>
-                            </td>
+                          {user.location && user.location !== 'Unknown' && (
+                            <div className="flex items-center gap-1 text-[11px] text-muted-foreground truncate max-w-[130px]" title={user.location}>
+                              <MapPin className="w-3 h-3 shrink-0" />
+                              <span className="truncate">{user.location}</span>
+                            </div>
+                          )}
+                        </div>
 
-                            {/* Last Active Timestamp */}
-                            <td className="px-6 py-4 text-muted-foreground">
-                              {getRelativeTime(user.lastActive) ? (
-                                <div className="flex flex-col">
-                                  <span className="text-foreground">
-                                    {getRelativeTime(user.lastActive)}
-                                  </span>
-                                  <span className="text-xxs text-muted-foreground">
-                                    {formatDateTime(user.lastActive)}
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className="text-xs italic">Never</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        <span className="text-[10px] text-muted-foreground font-medium shrink-0">
+                          {getRelativeTime(user.createdAt)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
+
+            {/* Desktop Section Card & Full Table (>= 640px) */}
+            <Card className="hidden sm:block border border-border/80 shadow-none bg-card/60 overflow-hidden">
+              <CardHeader className="p-5 border-b border-border/60 bg-muted/10 space-y-0">
+                <div className="flex flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="text-base font-semibold tracking-tight text-foreground">
+                      {selectedDate ? `Registrations (${selectedDate})` : 'Recent Registrations'}
+                    </h2>
+                    {data?.count !== undefined && (
+                      <Badge variant="secondary" className="font-medium text-xs px-2 py-0.5 rounded-full">
+                        {filteredUsers.length} {filteredUsers.length === 1 ? 'user' : 'users'}
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* Desktop Toolbar Filter controls */}
+                  <div className="flex flex-row items-center gap-2.5">
+                    {/* Date Picker Popover */}
+                    <div className="relative w-44">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className={cn(
+                              "h-8 text-xs font-normal justify-start w-full bg-background border-border pr-8",
+                              !selectedDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            <span className="truncate">
+                              {selectedDate ? format(new Date(selectedDate), "MMM d, yyyy") : "Pick a date"}
+                            </span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0 z-50 bg-popover border-border" align="end">
+                          <Calendar
+                            mode="single"
+                            selected={selectedDate ? new Date(selectedDate) : undefined}
+                            onSelect={(d) => {
+                              if (d) {
+                                const year = d.getFullYear();
+                                const month = String(d.getMonth() + 1).padStart(2, '0');
+                                const day = String(d.getDate()).padStart(2, '0');
+                                setSelectedDate(`${year}-${month}-${day}`);
+                              } else {
+                                setSelectedDate('');
+                              }
+                            }}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+
+                      {selectedDate && (
+                        <button
+                          onClick={() => setSelectedDate('')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground z-10 p-0.5 rounded-full hover:bg-muted transition-colors"
+                          title="Clear date filter"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Search Input */}
+                    <div className="relative w-60">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                      <Input 
+                        type="text" 
+                        placeholder="Search user, email, city..." 
+                        className="pl-8 pr-7 h-8 text-xs bg-background border-border"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                      {searchQuery && (
+                        <button 
+                          onClick={() => setSearchQuery('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="p-0">
+                {loadingStats ? (
+                  <div className="p-6 space-y-3">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <div key={n} className="h-10 bg-muted/20 rounded-md animate-pulse" />
+                    ))}
+                  </div>
+                ) : filteredUsers.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 px-4 text-center space-y-3">
+                    <div className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-foreground">No registrations found</p>
+                      <p className="text-xs text-muted-foreground max-w-sm">
+                        {searchQuery 
+                          ? `No signups matching "${searchQuery}".` 
+                          : selectedDate 
+                            ? `No user accounts registered on ${selectedDate}.` 
+                            : "No new user accounts registered in the last 24 hours."}
+                      </p>
+                    </div>
+                    {(searchQuery || selectedDate) && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 text-xs mt-2"
+                        onClick={() => {
+                          setSearchQuery('');
+                          setSelectedDate('');
+                        }}
+                      >
+                        Reset filters
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <Table className="w-full">
+                    <TableHeader className="bg-muted/20 border-b border-border/60">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="py-3 px-5 text-xs font-medium text-muted-foreground whitespace-nowrap">User</TableHead>
+                        <TableHead className="py-3 px-5 text-xs font-medium text-muted-foreground whitespace-nowrap">Role</TableHead>
+                        <TableHead className="py-3 px-5 text-xs font-medium text-muted-foreground whitespace-nowrap">Status</TableHead>
+                        <TableHead className="py-3 px-5 text-xs font-medium text-muted-foreground whitespace-nowrap">Location</TableHead>
+                        <TableHead className="py-3 px-5 text-xs font-medium text-muted-foreground whitespace-nowrap">Joined</TableHead>
+                        <TableHead className="py-3 px-5 text-xs font-medium text-muted-foreground whitespace-nowrap">Last Active</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredUsers.map((user) => (
+                        <TableRow 
+                          key={user.id} 
+                          className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+                        >
+                          <TableCell className="py-3 px-5 whitespace-nowrap">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-8 w-8 rounded-full border border-border/60 shrink-0">
+                                <AvatarImage src={user.image} alt={user.name} />
+                                <AvatarFallback className="text-xs bg-muted font-medium text-muted-foreground">
+                                  {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-sm font-medium text-foreground truncate max-w-[180px] lg:max-w-[220px]">
+                                  {user.name || 'Anonymous User'}
+                                </span>
+                                <span className="text-xs text-muted-foreground truncate max-w-[180px] lg:max-w-[220px]">
+                                  {user.email}
+                                </span>
+                              </div>
+                            </div>
+                          </TableCell>
+                          
+                          <TableCell className="py-3 px-5 whitespace-nowrap">
+                            {user.role === 'admin' ? (
+                              <Badge variant="outline" className="text-[11px] font-medium border-amber-500/30 text-amber-500 bg-amber-500/10 py-0 h-5">
+                                Admin
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[11px] font-medium border-border/80 text-muted-foreground py-0 h-5">
+                                User
+                              </Badge>
+                            )}
+                          </TableCell>
+                          
+                          <TableCell className="py-3 px-5 whitespace-nowrap">
+                            {user.isVerified ? (
+                              <span className="inline-flex items-center gap-1.5 text-xs text-emerald-500 font-medium">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                Verified
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
+                                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />
+                                Unverified
+                              </span>
+                            )}
+                          </TableCell>
+
+                          <TableCell className="py-3 px-5 whitespace-nowrap">
+                            {user.location && user.location !== 'Unknown' ? (
+                              <div className="flex items-center gap-1.5 text-xs text-foreground/90 max-w-[160px] truncate" title={user.location}>
+                                <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                <span className="truncate">{user.location}</span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground font-mono">—</span>
+                            )}
+                          </TableCell>
+                          
+                          <TableCell className="py-3 px-5 whitespace-nowrap">
+                            <div className="flex flex-col">
+                              <span className="text-xs font-medium text-foreground">
+                                {getRelativeTime(user.createdAt)}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">
+                                {formatDateTime(user.createdAt)}
+                              </span>
+                            </div>
+                          </TableCell>
+                          
+                          <TableCell className="py-3 px-5 whitespace-nowrap">
+                            {getRelativeTime(user.lastActive) ? (
+                              <div className="flex flex-col">
+                                <span className="text-xs font-medium text-foreground">
+                                  {getRelativeTime(user.lastActive)}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {formatDateTime(user.lastActive)}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground font-mono">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
 
           </div>
         </ScrollArea>
