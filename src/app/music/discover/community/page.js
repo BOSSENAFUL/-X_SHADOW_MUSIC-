@@ -35,39 +35,47 @@ export default function CommunityPlaylistsPage() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const scrollContainerRef = useRef(null);
   const loadingRef = useRef(null);
-  const isInitialLoad = useRef(true);
+
+  const isRestoredFromSession = useRef(false);
+  const isMounted = useRef(false);
 
   // Restore state from sessionStorage on mount
   useEffect(() => {
     const savedData = sessionStorage.getItem('communityPlaylistsState');
     const savedQuery = sessionStorage.getItem('communityPlaylistsSearchQuery');
+
     if (savedQuery) {
       setSearchQuery(savedQuery);
       setDebouncedSearchQuery(savedQuery);
     }
+
     if (savedData) {
       try {
         const { playlists: savedPlaylists, page: savedPage, hasMore: savedHasMore, total: savedTotal } = JSON.parse(savedData);
-        setPlaylists(Array.isArray(savedPlaylists) ? savedPlaylists.filter(Boolean) : []);
-        setPage(typeof savedPage === 'number' ? savedPage : 0);
-        setHasMore(typeof savedHasMore === 'boolean' ? savedHasMore : true);
-        setTotal(typeof savedTotal === 'number' ? savedTotal : 0);
-        setLoading(false);
-        isInitialLoad.current = false;
+        if (Array.isArray(savedPlaylists) && savedPlaylists.length > 0) {
+          setPlaylists(savedPlaylists.filter(Boolean));
+          setPage(typeof savedPage === 'number' ? savedPage : 0);
+          setHasMore(typeof savedHasMore === 'boolean' ? savedHasMore : true);
+          setTotal(typeof savedTotal === 'number' ? savedTotal : 0);
+          setLoading(false);
+          isRestoredFromSession.current = true;
+        } else {
+          fetchPlaylists(0, false, savedQuery || "");
+        }
       } catch (e) {
         console.error("Failed to restore community playlists state:", e);
+        fetchPlaylists(0, false, savedQuery || "");
       }
     } else {
-      // If no saved state, we don't need to wait for scroll restoration
-      setScrollRestored(true);
+      fetchPlaylists(0, false, "");
     }
+    isMounted.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Debounce search input changes
   useEffect(() => {
-    if (isInitialLoad.current && sessionStorage.getItem('communityPlaylistsState')) {
-      return;
-    }
+    if (!isMounted.current) return;
     const handler = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
     }, 300);
@@ -80,14 +88,26 @@ export default function CommunityPlaylistsPage() {
     if (!loading && playlists.length > 0 && scrollContainerRef.current && !scrollRestored) {
       const savedPosition = sessionStorage.getItem('communityPlaylistsScrollPosition');
       if (savedPosition) {
-        // Use requestAnimationFrame for smoother and faster execution than setTimeout
-        requestAnimationFrame(() => {
-          if (scrollContainerRef.current) {
-            scrollContainerRef.current.scrollTop = parseInt(savedPosition);
-            // Mark as restored so we can show the content
-            setScrollRestored(true);
-          }
-        });
+        const targetY = parseInt(savedPosition, 10);
+        if (targetY > 0) {
+          let attempts = 0;
+          const restoreScroll = () => {
+            const container = scrollContainerRef.current;
+            if (!container) return;
+            container.scrollTop = targetY;
+            const isScrollApplied = Math.abs(container.scrollTop - targetY) < 10 || 
+                                    container.scrollTop >= (container.scrollHeight - container.clientHeight - 5);
+            if (isScrollApplied || attempts >= 10) {
+              setScrollRestored(true);
+            } else {
+              attempts++;
+              setTimeout(restoreScroll, 40);
+            }
+          };
+          requestAnimationFrame(restoreScroll);
+        } else {
+          setScrollRestored(true);
+        }
       } else {
         setScrollRestored(true);
       }
@@ -108,10 +128,8 @@ export default function CommunityPlaylistsPage() {
         setPlaylists(prev => {
           const rawList = result.data || [];
           const combined = (isLoadMore ? [...prev, ...rawList] : rawList).filter(Boolean);
-          // De-duplicate if necessary, ensuring we safely read p.id or p.playlistId
           const unique = Array.from(new Map(combined.map(p => [p.id || p.playlistId, p])).values());
 
-          // Save state to sessionStorage for back-navigation
           sessionStorage.setItem('communityPlaylistsState', JSON.stringify({
             playlists: unique,
             page: result.page,
@@ -130,25 +148,19 @@ export default function CommunityPlaylistsPage() {
     } finally {
       setLoading(false);
       setLoadingMore(false);
-      isInitialLoad.current = false;
     }
   }, [debouncedSearchQuery]);
 
-  // Trigger search fetch when debounced query changes
+  // Trigger search fetch when debounced query changes (only when user actively changes search query)
   useEffect(() => {
-    if (isInitialLoad.current && sessionStorage.getItem('communityPlaylistsState')) {
+    if (!isMounted.current) return;
+    if (isRestoredFromSession.current) {
+      isRestoredFromSession.current = false;
       return;
     }
     sessionStorage.setItem('communityPlaylistsSearchQuery', debouncedSearchQuery);
     fetchPlaylists(0, false, debouncedSearchQuery);
   }, [debouncedSearchQuery, fetchPlaylists]);
-
-  // Initial fetch only if no saved state
-  useEffect(() => {
-    if (isInitialLoad.current && !sessionStorage.getItem('communityPlaylistsState')) {
-      fetchPlaylists(0, false, "");
-    }
-  }, [fetchPlaylists]);
 
   const handleClearSearch = () => {
     setSearchQuery("");
@@ -160,7 +172,7 @@ export default function CommunityPlaylistsPage() {
   useEffect(() => {
     const observer = new IntersectionObserver(
       entries => {
-        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore && !isInitialLoad.current) {
+        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore && isMounted.current) {
           fetchPlaylists(page + 1, true);
         }
       },
@@ -306,7 +318,7 @@ export default function CommunityPlaylistsPage() {
               )}
             </div>
 
-            {!isInitialLoad.current && !loading && playlists.length === 0 && (
+            {!loading && playlists.length === 0 && (
               <div className="text-center py-12">
                 <p className="text-muted-foreground">No community playlists found yet. Be the first to share one!</p>
               </div>
