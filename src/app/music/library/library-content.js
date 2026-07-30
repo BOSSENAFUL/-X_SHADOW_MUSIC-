@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Heart, Loader2, Search, Plus, Grid, List, ArrowDownUp, Music } from "lucide-react"
 import { FaSpotify, FaYoutube } from "react-icons/fa"
+import { SiApplemusic } from "react-icons/si"
 import { IoMdPlay } from "react-icons/io"
 import { HiPause } from "react-icons/hi2"
 import { useLikedPlaylists } from "@/hooks/useLikedPlaylists"
@@ -855,6 +856,22 @@ export default function LibraryContent() {
                             <div className="flex-1 min-w-0">
                               <div className="text-white font-bold text-[15px] leading-snug">Import from YouTube Music</div>
                               <div className="text-zinc-400 text-xs font-medium mt-0.5">Sync your public YouTube Music playlists</div>
+                            </div>
+                          </button>
+                        </DrawerClose>
+
+                        {/* Option 4: Import from Apple Music */}
+                        <DrawerClose asChild>
+                          <button
+                            onClick={() => router.push('/music/playlists?import=apple')}
+                            className="flex items-center gap-4 text-left w-full hover:bg-white/5 p-2 rounded-xl transition-colors outline-none"
+                          >
+                            <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center text-[#FC3C44] shrink-0">
+                              <SiApplemusic className="w-6 h-6" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-white font-bold text-[15px] leading-snug">Import from Apple Music</div>
+                              <div className="text-zinc-400 text-xs font-medium mt-0.5">Transfer your public Apple Music playlists</div>
                             </div>
                           </button>
                         </DrawerClose>

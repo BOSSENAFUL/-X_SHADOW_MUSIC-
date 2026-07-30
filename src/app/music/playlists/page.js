@@ -26,6 +26,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Plus, Loader2, Music, Lock, Unlock, Search, Download } from "lucide-react"
 import { IoMdPlay } from "react-icons/io"
 import { HiPause } from "react-icons/hi2"
+import { SiApplemusic } from "react-icons/si"
 import { useMusicPlayer } from "@/contexts/music-player-context"
 import {
   Dialog,
@@ -210,6 +211,12 @@ export default function PlaylistsPage() {
         router.replace("/music/playlists");
       } else if (importParam === "youtube") {
         setImportSource("youtube");
+        setImportUrl("");
+        setImportStage(0);
+        setShowImportDialog(true);
+        router.replace("/music/playlists");
+      } else if (importParam === "apple") {
+        setImportSource("apple");
         setImportUrl("");
         setImportStage(0);
         setShowImportDialog(true);
@@ -461,6 +468,11 @@ export default function PlaylistsPage() {
       return;
     }
 
+    if (importSource === "apple" && (!importUrl.includes('music.apple.com/') || !importUrl.includes('/playlist/'))) {
+      toast.error("Please enter a valid Apple Music playlist URL");
+      return;
+    }
+
     setIsImporting(true);
 
     try {
@@ -524,7 +536,8 @@ export default function PlaylistsPage() {
         { time: 40000, msg: "Finalizing your new playlist..." },
         { time: 55000, msg: "Almost there, wrapping up..." },
       ]
-      : [
+      : importSource === "youtube"
+      ? [
         { time: 0, msg: "Connecting to YouTube Music..." },
         { time: 2000, msg: "Fetching playlist information..." },
         { time: 5000, msg: "Extracting track details..." },
@@ -532,6 +545,15 @@ export default function PlaylistsPage() {
         { time: 25000, msg: "Verifying audio quality..." },
         { time: 40000, msg: "Creating your playlist..." },
         { time: 55000, msg: "Almost done, finalizing..." },
+      ]
+      : [
+        { time: 0, msg: "Connecting to Apple Music API..." },
+        { time: 2000, msg: "Fetching Apple Music playlist metadata..." },
+        { time: 5000, msg: "Extracting track details..." },
+        { time: 10000, msg: "Matching songs in Jammify..." },
+        { time: 25000, msg: "Optimizing track accuracy..." },
+        { time: 40000, msg: "Finalizing your new playlist..." },
+        { time: 55000, msg: "Almost done, wrapping up..." },
       ];
 
     let currentStage = 0;
@@ -600,7 +622,7 @@ export default function PlaylistsPage() {
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[480px] max-w-[95vw] overflow-hidden p-0 border-border bg-popover">
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 via-red-500 to-blue-500 opacity-50" />
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#1DB954] via-red-500 to-[#FC3C44] opacity-50" />
 
                   <DialogHeader className="p-4 sm:p-6 pb-3 sm:pb-4">
                     <div className="flex items-center gap-3 mb-1">
@@ -670,6 +692,29 @@ export default function PlaylistsPage() {
                         </svg>
                       </div>
                     </button>
+
+                    {/* Apple Music Option */}
+                    <button
+                      onClick={() => {
+                        setImportSource("apple");
+                        setShowImportOptions(false);
+                        setShowImportDialog(true);
+                      }}
+                      className="w-full group relative overflow-hidden rounded-xl border-2 border-border bg-card hover:bg-accent hover:border-[#FC3C44] active:scale-[0.98] transition-all p-4 sm:p-5 text-left"
+                    >
+                      <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-[#FA243C] to-[#FC3C44] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-lg shadow-[#FC3C44]/20">
+                          <SiApplemusic className="w-8 h-8 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-foreground text-base sm:text-lg mb-0.5 sm:mb-1">Apple Music</h3>
+                          <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1">Import Apple Music playlists</p>
+                        </div>
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                    </button>
                   </div>
 
                   <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-0">
@@ -697,13 +742,19 @@ export default function PlaylistsPage() {
                 }
               }}>
                 <DialogContent className="sm:max-w-[450px] max-w-[95vw] overflow-hidden p-0 border-border bg-popover">
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 opacity-50" />
+                  <div className={`absolute top-0 left-0 w-full h-1 opacity-50 ${
+                    importSource === "spotify"
+                      ? "bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500"
+                      : importSource === "youtube"
+                      ? "bg-gradient-to-r from-red-600 via-red-500 to-orange-500"
+                      : "bg-gradient-to-r from-[#FA243C] via-[#FC3C44] to-pink-500"
+                  }`} />
 
                   {importStage === 0 && importSource && (
                     <>
                       <DialogHeader className="p-4 sm:p-6 pb-3 sm:pb-4">
                         <div className="flex items-center gap-3 mb-1">
-                          <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 ${importSource === "spotify" ? "bg-[#1DB954]" : "bg-red-500"
+                          <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 ${importSource === "spotify" ? "bg-[#1DB954]" : importSource === "youtube" ? "bg-red-500" : "bg-gradient-to-br from-[#FA243C] to-[#FC3C44]"
                             }`}>
                             {importSource === "spotify" ? (
                               <img
@@ -711,22 +762,26 @@ export default function PlaylistsPage() {
                                 alt="Spotify"
                                 className="w-7 h-7 sm:w-8 sm:h-8 object-contain"
                               />
-                            ) : (
+                            ) : importSource === "youtube" ? (
                               <img
                                 src="/Youtube_Music_icon.svg"
                                 alt="YouTube Music"
                                 className="w-7 h-7 sm:w-8 sm:h-8"
                               />
+                            ) : (
+                              <SiApplemusic className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
                             )}
                           </div>
                           <div className="min-w-0">
                             <DialogTitle className="text-lg sm:text-xl font-bold leading-tight">
-                              Import from {importSource === "spotify" ? "Spotify" : "YouTube Music"}
+                              Import from {importSource === "spotify" ? "Spotify" : importSource === "youtube" ? "YouTube Music" : "Apple Music"}
                             </DialogTitle>
                             <DialogDescription className="text-xs sm:text-sm text-muted-foreground mt-0.5">
                               {importSource === "spotify"
                                 ? "Bring your favorite playlists to Jammify"
-                                : "Transfer your YouTube Music playlists"
+                                : importSource === "youtube"
+                                ? "Transfer your YouTube Music playlists"
+                                : "Transfer your Apple Music playlists"
                               }
                             </DialogDescription>
                           </div>
@@ -744,17 +799,22 @@ export default function PlaylistsPage() {
                               placeholder={
                                 importSource === "spotify"
                                   ? "https://open.spotify.com/playlist/..."
-                                  : "https://music.youtube.com/playlist?list=..."
+                                  : importSource === "youtube"
+                                  ? "https://music.youtube.com/playlist?list=..."
+                                  : "https://music.apple.com/us/playlist/..."
                               }
                               className={`h-11 sm:h-12 text-sm bg-background border-border pr-10 ${importSource === "spotify"
                                 ? "focus:border-[#1DB954]/50 focus:ring-[#1DB954]/20"
-                                : "focus:border-red-500/50 focus:ring-red-500/20"
+                                : importSource === "youtube"
+                                ? "focus:border-red-500/50 focus:ring-red-500/20"
+                                : "focus:border-[#FC3C44]/50 focus:ring-[#FC3C44]/20"
                                 }`}
                               value={importUrl}
                               onChange={(e) => setImportUrl(e.target.value)}
                             />
                             {((importSource === "spotify" && importUrl.includes('spotify.com/playlist/')) ||
-                              (importSource === "youtube" && importUrl.includes('music.youtube.com/playlist'))) && (
+                              (importSource === "youtube" && importUrl.includes('music.youtube.com/playlist')) ||
+                              (importSource === "apple" && importUrl.includes('music.apple.com/') && importUrl.includes('/playlist/'))) && (
                                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
                                   <div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center">
                                     <svg className="w-3 h-3 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -765,7 +825,7 @@ export default function PlaylistsPage() {
                               )}
                           </div>
                           <p className="text-[10px] sm:text-[11px] text-muted-foreground px-1">
-                            Make sure the playlist is set to <span className="text-foreground font-medium">Public</span> on {importSource === "spotify" ? "Spotify" : "YouTube Music"}.
+                            Make sure the playlist is set to <span className="text-foreground font-medium">Public</span> on {importSource === "spotify" ? "Spotify" : importSource === "youtube" ? "YouTube Music" : "Apple Music"}.
                           </p>
                         </div>
 
@@ -779,11 +839,17 @@ export default function PlaylistsPage() {
                                   <p className="text-xs text-foreground">2. Click <span className="font-bold">...</span> → <span className="font-bold">Share</span></p>
                                   <p className="text-xs text-foreground">3. Select <span className="font-bold">Copy link to playlist</span></p>
                                 </>
-                              ) : (
+                              ) : importSource === "youtube" ? (
                                 <>
                                   <p className="text-xs text-foreground">1. Open YouTube Music playlist</p>
                                   <p className="text-xs text-foreground">2. Click <span className="font-bold">⋮</span> → <span className="font-bold">Share</span></p>
                                   <p className="text-xs text-foreground">3. Select <span className="font-bold">Copy link</span></p>
+                                </>
+                              ) : (
+                                <>
+                                  <p className="text-xs text-foreground">1. Open Apple Music playlist</p>
+                                  <p className="text-xs text-foreground">2. Click <span className="font-bold">...</span> → <span className="font-bold">Share Playlist</span></p>
+                                  <p className="text-xs text-foreground">3. Select <span className="font-bold">Copy Link</span></p>
                                 </>
                               )}
                             </div>
@@ -794,7 +860,9 @@ export default function PlaylistsPage() {
                                 size="sm"
                                 className={`h-8 text-[11px] w-full sm:w-auto ${importSource === "spotify"
                                   ? "text-[#1DB954] hover:text-[#1DB954] hover:bg-[#1DB954]/10"
-                                  : "text-red-500 hover:text-red-500 hover:bg-red-500/10"
+                                  : importSource === "youtube"
+                                  ? "text-red-500 hover:text-red-500 hover:bg-red-500/10"
+                                  : "text-[#FC3C44] hover:text-[#FC3C44] hover:bg-[#FC3C44]/10"
                                   }`}
                                 onClick={async () => {
                                   try {
@@ -802,6 +870,8 @@ export default function PlaylistsPage() {
                                     if (importSource === "spotify" && text.includes('spotify.com')) {
                                       setImportUrl(text);
                                     } else if (importSource === "youtube" && text.includes('music.youtube.com')) {
+                                      setImportUrl(text);
+                                    } else if (importSource === "apple" && text.includes('music.apple.com')) {
                                       setImportUrl(text);
                                     }
                                   } catch (e) {
@@ -820,13 +890,16 @@ export default function PlaylistsPage() {
                         <Button
                           className={`w-full h-11 font-bold transition-all shadow-lg ${importSource === "spotify"
                             ? "bg-[#1DB954] hover:bg-[#1ed760] text-black shadow-[#1DB954]/10"
-                            : "bg-red-500 hover:bg-red-600 text-white shadow-red-500/10"
+                            : importSource === "youtube"
+                            ? "bg-red-500 hover:bg-red-600 text-white shadow-red-500/10"
+                            : "bg-[#FC3C44] hover:bg-[#FA243C] text-white shadow-[#FC3C44]/10"
                             }`}
                           onClick={handleImportPlaylist}
                           disabled={
                             isImporting ||
                             (importSource === "spotify" && !importUrl.includes('spotify.com/playlist/')) ||
-                            (importSource === "youtube" && !importUrl.includes('music.youtube.com/playlist'))
+                            (importSource === "youtube" && !importUrl.includes('music.youtube.com/playlist')) ||
+                            (importSource === "apple" && (!importUrl.includes('music.apple.com/') || !importUrl.includes('/playlist/')))
                           }
                         >
                           Import Playlist
@@ -839,7 +912,13 @@ export default function PlaylistsPage() {
                     <div className="p-10 flex flex-col items-center justify-center space-y-6 min-h-[300px]">
                       <div className="relative">
                         <div className="w-20 h-20 rounded-full border-2 border-border flex items-center justify-center">
-                          <Loader2 className="w-8 h-8 text-[#1DB954] animate-spin" />
+                          <Loader2 className={`w-8 h-8 animate-spin ${
+                            importSource === "spotify"
+                              ? "text-[#1DB954]"
+                              : importSource === "youtube"
+                              ? "text-red-500"
+                              : "text-[#FC3C44]"
+                          }`} />
                         </div>
                         <div className="absolute -bottom-2 -right-2">
                           <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center">
@@ -854,7 +933,13 @@ export default function PlaylistsPage() {
                       </div>
 
                       <div className="w-full max-w-[240px] h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full bg-[#1DB954] animate-progress" />
+                        <div className={`h-full animate-progress ${
+                          importSource === "spotify"
+                            ? "bg-[#1DB954]"
+                            : importSource === "youtube"
+                            ? "bg-red-500"
+                            : "bg-[#FC3C44]"
+                        }`} />
                       </div>
 
                       <p className="text-[10px] text-muted-foreground text-center max-w-[280px]">

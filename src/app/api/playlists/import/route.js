@@ -70,6 +70,73 @@ const fetchYouTubeMusicPlaylist = async (playlistId) => {
 };
 
 // ---------------------------------------------------------------------------
+// APPLE MUSIC FETCHER
+// ---------------------------------------------------------------------------
+const fetchAppleMusicPlaylist = async (url) => {
+    try {
+        console.log(`[Apple Music] Fetching playlist: ${url}`);
+        const res = await fetch(
+            `https://apple-music-api-server.vercel.app/api/playlist?url=${encodeURIComponent(url)}`
+        );
+
+        if (!res.ok) {
+            console.error(`[Apple Music] API returned ${res.status}`);
+            return null;
+        }
+
+        const data = await res.json();
+        if (!data.success || !data.data) {
+            console.error('[Apple Music] Invalid response structure');
+            return null;
+        }
+
+        const playlistInfo = data.data;
+        const songsList = playlistInfo.tracks || [];
+        console.log(`[Apple Music] Found ${songsList.length} songs`);
+
+        const tracks = songsList.map((song, index) => {
+            const rawArtist = (song.artistName || '').trim();
+            const artistNames = rawArtist
+                .split(/,|\s+&\s+|\s+feat\.\s+|\s+ft\.\s+/i)
+                .map((a) => a.trim())
+                .filter((a) => a.length > 0 && a !== rawArtist);
+
+            // First entry is full raw artist string, followed by individual parsed artists
+            const allArtistNames = rawArtist ? [rawArtist, ...artistNames] : artistNames;
+            const artists = allArtistNames.length > 0
+                ? allArtistNames.map((name) => ({ name }))
+                : [{ name: 'Unknown Artist' }];
+
+            if (index < 3) {
+                console.log(
+                    `[Apple Music] Song ${index + 1}: "${song.name}" by "${artists.map((a) => a.name).join(', ')}"`
+                );
+            }
+
+            return {
+                name: song.name || '',
+                artists,
+                duration_ms: song.durationInMillis || 0,
+                external_ids: {},
+                appleMusicId: song.id,
+            };
+        });
+
+        return {
+            details: {
+                name: playlistInfo.playlistName || 'Imported Playlist',
+                description: playlistInfo.description || 'Imported from Apple Music',
+                images: playlistInfo.artworkUrl ? [{ url: playlistInfo.artworkUrl }] : [],
+            },
+            tracks,
+        };
+    } catch (err) {
+        console.error('[Apple Music] Fetch error:', err.message);
+        return null;
+    }
+};
+
+// ---------------------------------------------------------------------------
 // ROUTE HANDLER
 // ---------------------------------------------------------------------------
 export async function POST(request) {
@@ -82,13 +149,16 @@ export async function POST(request) {
             );
         }
 
-        const { url } = await request.json();
-        if (!url) {
+        const body = await request.json();
+        const rawUrl = body?.url;
+        if (!rawUrl || typeof rawUrl !== 'string') {
             return NextResponse.json(
                 { success: false, error: 'URL is required' },
                 { status: 400 }
             );
         }
+
+        const url = rawUrl.trim();
 
         // ── Detect source & extract playlist ID ──────────────────────────────
         let sourceName = null;
@@ -100,12 +170,15 @@ export async function POST(request) {
         } else if (url.includes('music.youtube.com/playlist')) {
             sourceName = 'youtube';
             playlistId = new URLSearchParams(url.split('?')[1]).get('list');
+        } else if (url.includes('music.apple.com/') && url.includes('/playlist/')) {
+            sourceName = 'apple';
+            playlistId = url; // Pass full URL for Apple Music
         } else {
             return NextResponse.json(
                 {
                     success: false,
                     error:
-                        'Invalid playlist URL. Please provide a Spotify or YouTube Music playlist URL.',
+                        'Invalid playlist URL. Please provide a Spotify, YouTube Music, or Apple Music playlist URL.',
                 },
                 { status: 400 }
             );
@@ -121,16 +194,22 @@ export async function POST(request) {
         console.log(`[Import] Source: ${sourceName}, ID: ${playlistId}`);
 
         // ── Fetch source playlist ─────────────────────────────────────────────
-        const playlistData =
-            sourceName === 'spotify'
-                ? await getPlaylistData(playlistId)
-                : await fetchYouTubeMusicPlaylist(playlistId);
+        let playlistData = null;
+        if (sourceName === 'spotify') {
+            playlistData = await getPlaylistData(playlistId);
+        } else if (sourceName === 'youtube') {
+            playlistData = await fetchYouTubeMusicPlaylist(playlistId);
+        } else if (sourceName === 'apple') {
+            playlistData = await fetchAppleMusicPlaylist(url);
+        }
 
         if (!playlistData) {
             const msg =
                 sourceName === 'spotify'
                     ? 'Failed to fetch playlist from Spotify. Make sure the playlist is public.'
-                    : 'Failed to fetch playlist from YouTube Music. Make sure the playlist is public.';
+                    : sourceName === 'youtube'
+                    ? 'Failed to fetch playlist from YouTube Music. Make sure the playlist is public.'
+                    : 'Failed to fetch playlist from Apple Music. Make sure the playlist is public.';
             return NextResponse.json({ success: false, error: msg }, { status: 404 });
         }
 
@@ -140,7 +219,9 @@ export async function POST(request) {
             const msg =
                 sourceName === 'spotify'
                     ? 'No tracks found in the Spotify playlist.'
-                    : 'No tracks found in the YouTube Music playlist. Note: Radio/Mix playlists (starting with "RD") may not be supported.';
+                    : sourceName === 'youtube'
+                    ? 'No tracks found in the YouTube Music playlist. Note: Radio/Mix playlists (starting with "RD") may not be supported.'
+                    : 'No tracks found in the Apple Music playlist.';
             return NextResponse.json({ success: false, error: msg }, { status: 404 });
         }
 
@@ -176,7 +257,12 @@ export async function POST(request) {
         await newPlaylist.save();
 
         const elapsed = ((Date.now() - importStart) / 1000).toFixed(1);
-        const sourceLabel = sourceName === 'spotify' ? 'Spotify' : 'YouTube Music';
+        const sourceLabel =
+            sourceName === 'spotify'
+                ? 'Spotify'
+                : sourceName === 'youtube'
+                ? 'YouTube Music'
+                : 'Apple Music';
         console.log(
             `[Import] ✅ Done: ${jammifySongIds.length}/${sourceTracks.length} songs matched in ${elapsed}s (${sourceLabel})`
         );
