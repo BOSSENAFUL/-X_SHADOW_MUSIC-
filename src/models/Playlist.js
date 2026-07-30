@@ -29,6 +29,11 @@ const playlistSchema = new mongoose.Schema({
     type: String,
     default: '',
     trim: true
+  },
+  animatedArtworkUrl: {
+    type: String,
+    default: '',
+    trim: true
   }
 }, {
   timestamps: true
@@ -107,6 +112,9 @@ playlistSchema.statics.findByUser = async function(userId) {
     .lean();
 };
 
-const Playlist = mongoose.models.Playlist || mongoose.model('Playlist', playlistSchema);
+if (mongoose.models && mongoose.models.Playlist) {
+  delete mongoose.models.Playlist;
+}
+const Playlist = mongoose.model('Playlist', playlistSchema);
 
 export default Playlist;

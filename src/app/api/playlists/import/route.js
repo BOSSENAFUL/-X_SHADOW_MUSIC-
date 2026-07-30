@@ -122,11 +122,22 @@ const fetchAppleMusicPlaylist = async (url) => {
             };
         });
 
+        const animatedArtworkUrl =
+            playlistInfo.animatedArtworkUrl ||
+            playlistInfo.animatedArtwork ||
+            playlistInfo.videoUrl ||
+            data.animatedArtworkUrl ||
+            data.animatedArtwork ||
+            '';
+
+        console.log(`[Apple Music] Animated Artwork URL: ${animatedArtworkUrl || 'None'}`);
+
         return {
             details: {
                 name: playlistInfo.playlistName || 'Imported Playlist',
                 description: playlistInfo.description || 'Imported from Apple Music',
                 images: playlistInfo.artworkUrl ? [{ url: playlistInfo.artworkUrl }] : [],
+                animatedArtworkUrl,
             },
             tracks,
         };
@@ -252,6 +263,7 @@ export async function POST(request) {
             isPublic: true,
             description: details.description || '',
             image: details.images?.[0]?.url || '',
+            animatedArtworkUrl: details.animatedArtworkUrl || '',
         });
 
         await newPlaylist.save();
