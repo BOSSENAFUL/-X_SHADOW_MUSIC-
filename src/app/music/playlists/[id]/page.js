@@ -2441,7 +2441,7 @@ export default function PlaylistDetailPage({ params }) {
                   }}
                 >
                   <div
-                    className={hasAnimatedHero ? "w-full shrink-0 transition-transform duration-75 ease-out relative overflow-hidden" : isGif ? "w-full h-auto shrink-0 transition-transform duration-75 ease-out relative min-h-[240px] max-h-[380px] overflow-hidden" : "w-64 h-64 rounded-lg overflow-hidden shadow-2xl transition-transform duration-75 ease-out relative"}
+                    className={hasAnimatedHero ? "w-full shrink-0 transition-transform duration-75 ease-out relative overflow-hidden max-h-[380px] sm:max-h-[420px]" : isGif ? "w-full h-auto shrink-0 transition-transform duration-75 ease-out relative min-h-[240px] max-h-[380px] overflow-hidden" : "w-64 h-64 rounded-lg overflow-hidden shadow-2xl transition-transform duration-75 ease-out relative"}
                     style={hasAnimatedHero ? { aspectRatio: '1199 / 1600' } : isGif ? undefined : {
                       transform: 'scale(calc(1 - (var(--scroll-progress, 0) * 0.35)))',
                       willChange: 'transform'
@@ -2454,7 +2454,7 @@ export default function PlaylistDetailPage({ params }) {
                             <img
                               src={cover.src}
                               alt={playlist.name}
-                              className={isGif && !hasAnimatedHero ? "w-full h-auto min-h-[240px] max-h-[380px] object-cover transition-opacity duration-500" : `w-full h-full object-cover transition-opacity duration-500 ${(showAnimatedVideo && isVideoReady) ? 'opacity-0' : 'opacity-100'}`}
+                              className={isGif && !hasAnimatedHero ? "w-full h-auto min-h-[240px] max-h-[380px] object-cover object-top transition-opacity duration-500" : `w-full h-full object-cover object-top transition-opacity duration-500 ${(showAnimatedVideo && isVideoReady) ? 'opacity-0' : 'opacity-100'}`}
                               style={heroMaskStyle}
                               onError={(e) => {
                                 e.target.src = '/default-playlist-image.png';
@@ -2470,7 +2470,7 @@ export default function PlaylistDetailPage({ params }) {
                                 preload="auto"
                                 onLoadedData={() => setIsVideoReady(true)}
                                 onCanPlay={() => setIsVideoReady(true)}
-                                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${(showAnimatedVideo && isVideoReady) ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                                className={`absolute inset-0 w-full h-full object-cover object-top transition-opacity duration-500 ${(showAnimatedVideo && isVideoReady) ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                                 style={heroMaskStyle}
                                 onError={() => setShowAnimatedVideo(false)}
                               />
@@ -2549,7 +2549,7 @@ export default function PlaylistDetailPage({ params }) {
                           <img
                             src={cover.src}
                             alt={playlist.name}
-                            className={`w-full h-full object-cover transition-opacity duration-500 ${(showAnimatedVideo && isVideoReady) ? 'opacity-0' : 'opacity-100'}`}
+                            className={`w-full h-full object-cover object-top transition-opacity duration-500 ${(showAnimatedVideo && isVideoReady) ? 'opacity-0' : 'opacity-100'}`}
                             onError={(e) => {
                               e.target.src = '/default-playlist-image.png';
                             }}
@@ -2564,7 +2564,7 @@ export default function PlaylistDetailPage({ params }) {
                               preload="auto"
                               onLoadedData={() => setIsVideoReady(true)}
                               onCanPlay={() => setIsVideoReady(true)}
-                              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${(showAnimatedVideo && isVideoReady) ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                              className={`absolute inset-0 w-full h-full object-cover object-top transition-opacity duration-500 ${(showAnimatedVideo && isVideoReady) ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                               onError={() => setShowAnimatedVideo(false)}
                             />
                           )}
