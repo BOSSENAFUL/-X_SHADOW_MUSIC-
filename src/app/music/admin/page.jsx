@@ -30,6 +30,13 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Shield,
   Users,
   Search,
@@ -41,7 +48,11 @@ import {
   RefreshCw,
   X,
   Calendar as CalendarIcon,
-  MapPin
+  MapPin,
+  TrendingUp,
+  TrendingDown,
+  BarChart3,
+  Sparkles
 } from 'lucide-react';
 
 export default function AdminPage() {
@@ -52,6 +63,7 @@ export default function AdminPage() {
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -59,10 +71,16 @@ export default function AdminPage() {
     setMounted(true);
   }, []);
 
-  const fetchStats = useCallback(async (date) => {
+  const fetchStats = useCallback(async (dateFilter = '', monthFilter = '') => {
     try {
       setRefreshing(true);
-      const url = date ? `/api/admin/new-users?date=${date}` : '/api/admin/new-users';
+      let url = '/api/admin/new-users';
+      if (monthFilter) {
+        url = `/api/admin/new-users?month=${monthFilter}`;
+      } else if (dateFilter) {
+        url = `/api/admin/new-users?date=${dateFilter}`;
+      }
+      
       const res = await fetch(url);
       if (!res.ok) {
         throw new Error('Failed to fetch admin statistics');
@@ -81,9 +99,29 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (status === 'authenticated' && session?.user?.role === 'admin') {
-      fetchStats(selectedDate);
+      fetchStats(selectedDate, selectedMonth);
     }
-  }, [status, session, selectedDate, fetchStats]);
+  }, [status, session, selectedDate, selectedMonth, fetchStats]);
+
+  const handleSelectDate = (dateStr) => {
+    setSelectedMonth(''); // Mutually exclusive filter for clarity
+    setSelectedDate(dateStr);
+  };
+
+  const handleSelectMonth = (monthStr) => {
+    setSelectedDate(''); // Mutually exclusive filter for clarity
+    if (monthStr === '24h_reset' || !monthStr) {
+      setSelectedMonth('');
+    } else {
+      setSelectedMonth(monthStr);
+    }
+  };
+
+  const handleClearFilters = () => {
+    setSelectedDate('');
+    setSelectedMonth('');
+    setSearchQuery('');
+  };
 
   // Client-side date formatting helper to avoid hydration mismatches
   const formatDateTime = (dateString) => {
@@ -116,14 +154,14 @@ export default function AdminPage() {
     return date.toLocaleDateString();
   };
 
-  // ── Render States ──────────────────────────────────────────────────────────
+  // ── Render Access Restrictions ─────────────────────────────────────────────
 
   if (status === 'loading') {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background text-foreground">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground font-medium">Loading session...</p>
+          <p className="text-sm text-muted-foreground font-medium">Loading admin session...</p>
         </div>
       </div>
     );
@@ -160,6 +198,9 @@ export default function AdminPage() {
     u.location?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const stats = data?.stats || {};
+  const monthlyBreakdown = data?.monthlyBreakdown || [];
+
   return (
     <SidebarProvider>
       <AppSidebar className="hidden md:flex" />
@@ -187,18 +228,18 @@ export default function AdminPage() {
               variant="outline" 
               size="sm" 
               className="h-8 gap-1.5 text-xs font-medium" 
-              onClick={() => fetchStats(selectedDate)}
+              onClick={() => fetchStats(selectedDate, selectedMonth)}
               disabled={refreshing}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-              Refresh
+              Refresh Analytics
             </Button>
           </div>
         </header>
 
-        {/* Page Content */}
+        {/* Main Page Scroll Content */}
         <ScrollArea className="flex-1">
-          <div className="max-w-7xl mx-auto px-3.5 sm:px-6 py-3.5 sm:py-8 space-y-3.5 sm:space-y-6 pb-36">
+          <div className="max-w-7xl mx-auto px-3.5 sm:px-6 py-3.5 sm:py-8 space-y-4 sm:space-y-6 pb-36">
             
             {/* Mobile Header Bar (< 640px) */}
             <div className="flex sm:hidden items-center justify-between pb-2 border-b border-border/40">
@@ -212,15 +253,15 @@ export default function AdminPage() {
                   <ArrowLeft className="w-4 h-4" />
                 </Button>
                 <div>
-                  <h1 className="text-base font-bold text-foreground leading-none">Admin Overview</h1>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">User Signups & Analytics</p>
+                  <h1 className="text-base font-bold text-foreground leading-none">Admin Control</h1>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Monthly User Signups & Analytics</p>
                 </div>
               </div>
               <Button 
                 variant="ghost" 
                 size="icon" 
                 className="h-8 w-8 rounded-full shrink-0 text-muted-foreground hover:text-foreground" 
-                onClick={() => fetchStats(selectedDate)}
+                onClick={() => fetchStats(selectedDate, selectedMonth)}
                 disabled={refreshing}
               >
                 <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -230,138 +271,312 @@ export default function AdminPage() {
             {/* Desktop Title Header (>= 640px) */}
             <div className="hidden sm:flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                  User Signups Overview
-                </h1>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  Track daily user registrations, locations, and historical growth metrics.
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                    User Analytics & Registration Stats
+                  </h1>
+                  <Badge variant="outline" className="text-xs bg-primary/10 border-primary/20 text-primary px-2 py-0.5">
+                    Live Database Metrics
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Accurately track monthly signups, rolling 30-day user growth, daily registrations, and user locations.
                 </p>
               </div>
             </div>
 
-            {/* Mobile KPI Summary (Compact 3-Column Strip on Mobile < 640px) */}
-            {loadingStats ? (
-              <div className="grid gap-2 grid-cols-3 sm:hidden">
-                {[1, 2, 3].map((n) => (
-                  <div key={n} className="h-14 bg-muted/20 rounded-xl animate-pulse" />
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-2 sm:hidden">
-                <div className="bg-card/70 border border-border/60 rounded-xl p-2.5 flex flex-col justify-between">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">Signups</span>
-                  <div className="mt-1 flex items-baseline gap-1">
-                    <span className="text-lg font-bold text-foreground">{data?.count ?? 0}</span>
-                    <span className="text-[10px] text-muted-foreground">24h</span>
-                  </div>
-                </div>
-
-                <div className="bg-card/70 border border-border/60 rounded-xl p-2.5 flex flex-col justify-between">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">Total</span>
-                  <div className="mt-1 flex items-baseline gap-1">
-                    <span className="text-lg font-bold text-foreground">{data?.totalUsers ? data.totalUsers.toLocaleString() : 0}</span>
-                  </div>
-                </div>
-
-                <div className="bg-card/70 border border-border/60 rounded-xl p-2.5 flex flex-col justify-between">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">Range</span>
-                  <span className="text-xs font-semibold text-foreground truncate mt-1">
-                    {selectedDate ? selectedDate : 'Last 24h'}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Desktop KPI Cards Grid (>= 640px) */}
-            {loadingStats ? (
-              <div className="hidden sm:grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {[1, 2, 3].map((n) => (
-                  <Card key={n} className="h-24 animate-pulse bg-muted/20" />
-                ))}
-              </div>
-            ) : error ? (
+            {/* ERROR DISPLAY */}
+            {error && (
               <Card className="border-destructive/30 bg-destructive/5">
-                <CardContent className="p-4 text-destructive text-xs sm:text-sm font-medium">
-                  {error}
+                <CardContent className="p-4 text-destructive text-xs sm:text-sm font-medium flex items-center gap-2">
+                  <X className="w-4 h-4 shrink-0" />
+                  <span>{error}</span>
                 </CardContent>
               </Card>
+            )}
+
+            {/* KPI CARDS GRID (4 Cards) */}
+            {loadingStats ? (
+              <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+                {[1, 2, 3, 4].map((n) => (
+                  <Card key={n} className="h-28 animate-pulse bg-muted/20 border-border/40" />
+                ))}
+              </div>
             ) : (
-              <div className="hidden sm:grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {/* Daily / Selected Date Signups */}
-                <Card className="border border-border/80 shadow-none bg-card/60">
-                  <CardContent className="p-5">
+              <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+                {/* 1. Monthly New Users (CURRENT CALENDAR MONTH) */}
+                <Card className="border border-border/80 shadow-none bg-gradient-to-br from-card/80 via-card/50 to-primary/5 relative overflow-hidden">
+                  <CardContent className="p-4 sm:p-5">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        {selectedDate ? 'Signups on Date' : 'New Signups'}
+                      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                        New Users This Month
                       </span>
-                      <Users className="w-4 h-4 text-muted-foreground" />
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
                     </div>
-                    <div className="mt-3 flex items-baseline gap-2">
-                      <span className="text-3xl font-bold tracking-tight text-foreground">{data?.count ?? 0}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {selectedDate ? `users` : `in 24h`}
+                    <div className="mt-2.5 flex items-baseline gap-2">
+                      <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+                        {stats.thisMonthCount !== undefined ? stats.thisMonthCount.toLocaleString() : 0}
                       </span>
+                      <span className="text-xs font-medium text-muted-foreground truncate">
+                        {stats.currentMonthLabel || 'this month'}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-xs flex items-center gap-1.5 truncate">
+                      {stats.monthGrowthPercent !== undefined && stats.monthGrowthPercent !== 0 ? (
+                        stats.monthGrowthPercent > 0 ? (
+                          <span className="inline-flex items-center text-emerald-500 font-medium gap-0.5">
+                            <TrendingUp className="w-3.5 h-3.5" />
+                            +{stats.monthGrowthPercent}%
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center text-amber-500 font-medium gap-0.5">
+                            <TrendingDown className="w-3.5 h-3.5" />
+                            {stats.monthGrowthPercent}%
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-muted-foreground">Month-to-date total</span>
+                      )}
+                      <span className="text-muted-foreground/70 text-[11px] truncate">
+                        (vs {stats.lastMonthCount?.toLocaleString() || 0} last mo)
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* 2. Rolling 30-Day Signups */}
+                <Card className="border border-border/80 shadow-none bg-card/60">
+                  <CardContent className="p-4 sm:p-5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                        Last 30 Days Signups
+                      </span>
+                      <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0">
+                        <Users className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="mt-2.5 flex items-baseline gap-2">
+                      <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+                        {stats.last30DaysCount !== undefined ? stats.last30DaysCount.toLocaleString() : 0}
+                      </span>
+                      <span className="text-xs text-muted-foreground truncate">users</span>
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground flex items-center gap-1 truncate">
+                      <Clock className="w-3 h-3 text-muted-foreground shrink-0" />
+                      <span className="truncate">Rolling 30-day window</span>
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {/* 3. Total Registered Accounts */}
+                <Card className="border border-border/80 shadow-none bg-card/60">
+                  <CardContent className="p-4 sm:p-5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                        Total Registered
+                      </span>
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500 shrink-0">
+                        <UserCheck className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="mt-2.5 flex items-baseline gap-2">
+                      <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+                        {data?.totalUsers ? data.totalUsers.toLocaleString() : 0}
+                      </span>
+                      <span className="text-xs text-muted-foreground truncate">accounts</span>
                     </div>
                     <p className="mt-2 text-xs text-muted-foreground flex items-center gap-1.5 truncate">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                      <span className="truncate">{selectedDate ? `Filter: ${selectedDate}` : 'Rolling 24-hour window'}</span>
+                      <span className="truncate">All-time MongoDB database total</span>
                     </p>
                   </CardContent>
                 </Card>
 
-                {/* Total System Users */}
+                {/* 4. Active Selection Count */}
                 <Card className="border border-border/80 shadow-none bg-card/60">
-                  <CardContent className="p-5">
+                  <CardContent className="p-4 sm:p-5">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Accounts</span>
-                      <UserCheck className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                    <div className="mt-3 flex items-baseline gap-2">
-                      <span className="text-3xl font-bold tracking-tight text-foreground">
-                        {data?.totalUsers ? data.totalUsers.toLocaleString() : 0}
+                      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                        Query Range Results
                       </span>
-                      <span className="text-xs text-muted-foreground">registered</span>
+                      <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-500 shrink-0">
+                        <BarChart3 className="w-4 h-4" />
+                      </div>
                     </div>
-                    <p className="mt-2 text-xs text-muted-foreground flex items-center gap-1.5 truncate">
-                      <Clock className="w-3 h-3 text-muted-foreground shrink-0" />
-                      <span className="truncate">All-time database records</span>
+                    <div className="mt-2.5 flex items-baseline gap-2">
+                      <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+                        {data?.count ?? 0}
+                      </span>
+                      <span className="text-xs text-muted-foreground truncate">signups</span>
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground truncate font-medium">
+                      Filter: <span className="text-foreground">{data?.timeLabel || 'Last 24 Hours'}</span>
                     </p>
-                  </CardContent>
-                </Card>
-
-                {/* Query Horizon */}
-                <Card className="border border-border/80 shadow-none bg-card/60 sm:col-span-2 lg:col-span-1">
-                  <CardContent className="p-5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Query Window</span>
-                      <Shield className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                    <div className="mt-3 space-y-1 min-w-0">
-                      <span className="text-sm font-semibold text-foreground block truncate">
-                        {selectedDate ? selectedDate : 'Last 24 Hours'}
-                      </span>
-                      <span className="text-xs text-muted-foreground block truncate">
-                        {selectedDate ? (
-                          `Starting ${formatDateTime(new Date(selectedDate))}`
-                        ) : (
-                          `From ${formatDateTime(new Date(Date.now() - 24 * 60 * 60 * 1000))}`
-                        )}
-                      </span>
-                    </div>
                   </CardContent>
                 </Card>
               </div>
             )}
 
-            {/* Mobile Toolbar & Filter Actions (< 640px) */}
-            <div className="flex sm:hidden flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
+            {/* MONTHLY REGISTRATION TRENDS CARD & MONTH SELECTOR PILLS */}
+            {!loadingStats && monthlyBreakdown.length > 0 && (
+              <Card className="border border-border/80 shadow-none bg-card/50 overflow-hidden">
+                <CardHeader className="p-4 sm:p-5 pb-3 border-b border-border/40">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <CardTitle className="text-sm sm:text-base font-semibold flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4 text-primary" />
+                        Monthly User Registrations Breakdown
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        Click on any month to filter the detailed signups list below.
+                      </CardDescription>
+                    </div>
+                    {(selectedMonth || selectedDate) && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 text-xs gap-1.5 self-start sm:self-auto text-primary hover:text-primary"
+                        onClick={handleClearFilters}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        Show Default (24h)
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                    {monthlyBreakdown.map((item) => {
+                      const isSelected = selectedMonth === item.monthKey;
+                      const isCurrent = stats.currentMonthKey === item.monthKey;
+                      return (
+                        <button
+                          key={item.monthKey}
+                          onClick={() => handleSelectMonth(item.monthKey)}
+                          className={cn(
+                            "flex flex-col items-start px-3 py-2 rounded-xl border text-left transition-all shrink-0 min-w-[110px]",
+                            isSelected 
+                              ? "bg-primary text-primary-foreground border-primary shadow-sm" 
+                              : "bg-background/80 hover:bg-muted border-border/70 text-foreground"
+                          )}
+                        >
+                          <div className="flex items-center justify-between w-full gap-1">
+                            <span className={cn("text-[11px] font-medium truncate", isSelected ? "text-primary-foreground/90" : "text-muted-foreground")}>
+                              {item.label}
+                            </span>
+                            {isCurrent && (
+                              <span className={cn("w-1.5 h-1.5 rounded-full", isSelected ? "bg-primary-foreground" : "bg-primary")} />
+                            )}
+                          </div>
+                          <span className="text-base font-bold tracking-tight mt-0.5">
+                            {item.count.toLocaleString()} <span className="text-[10px] font-normal opacity-80">users</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* FILTER & SEARCH TOOLBAR */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-card/40 border border-border/70 rounded-2xl p-3">
+              {/* Left: Active Filter Indicators */}
+              <div className="flex items-center gap-2 flex-wrap min-w-0">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider shrink-0">
+                  Filters:
+                </span>
+                
+                {selectedMonth ? (
+                  <Badge variant="secondary" className="text-xs gap-1.5 bg-primary/10 text-primary border border-primary/20 py-1 px-2.5 rounded-lg">
+                    <span>Month: {data?.timeLabel || selectedMonth}</span>
+                    <X className="w-3.5 h-3.5 cursor-pointer hover:text-foreground" onClick={() => setSelectedMonth('')} />
+                  </Badge>
+                ) : selectedDate ? (
+                  <Badge variant="secondary" className="text-xs gap-1.5 bg-primary/10 text-primary border border-primary/20 py-1 px-2.5 rounded-lg">
+                    <span>Date: {format(new Date(selectedDate), "MMM d, yyyy")}</span>
+                    <X className="w-3.5 h-3.5 cursor-pointer hover:text-foreground" onClick={() => setSelectedDate('')} />
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-xs text-muted-foreground border-border/80 py-1 px-2.5 rounded-lg">
+                    <span>Range: Last 24 Hours</span>
+                  </Badge>
+                )}
+
+                {searchQuery && (
+                  <Badge variant="secondary" className="text-xs gap-1.5 bg-muted text-foreground border border-border/80 py-1 px-2.5 rounded-lg">
+                    <span>Search: "{searchQuery}"</span>
+                    <X className="w-3.5 h-3.5 cursor-pointer hover:text-foreground" onClick={() => setSearchQuery('')} />
+                  </Badge>
+                )}
+              </div>
+
+              {/* Right: Controls (Month Select, Date Picker, Search) */}
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                {/* Month Dropdown Selector */}
+                {monthlyBreakdown.length > 0 && (
+                  <div className="w-36 shrink-0">
+                    <Select value={selectedMonth || "24h_reset"} onValueChange={(val) => handleSelectMonth(val)}>
+                      <SelectTrigger className="h-8 text-xs bg-background border-border">
+                        <SelectValue placeholder="Select Month" />
+                      </SelectTrigger>
+                      <SelectContent className="z-50 bg-popover border-border">
+                        <SelectItem value="24h_reset">Rolling 24h</SelectItem>
+                        {monthlyBreakdown.map((m) => (
+                          <SelectItem key={m.monthKey} value={m.monthKey}>
+                            {m.label} ({m.count})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Specific Date Picker Popover */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "h-8 text-xs font-normal justify-start bg-background border-border shrink-0",
+                        selectedDate && "text-primary border-primary/50 bg-primary/10"
+                      )}
+                    >
+                      <CalendarIcon className="mr-1.5 h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span className="truncate">
+                        {selectedDate ? format(new Date(selectedDate), "MMM d, yyyy") : "Pick Date"}
+                      </span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 z-50 bg-popover border-border" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate ? new Date(selectedDate) : undefined}
+                      onSelect={(d) => {
+                        if (d) {
+                          const year = d.getFullYear();
+                          const month = String(d.getMonth() + 1).padStart(2, '0');
+                          const day = String(d.getDate()).padStart(2, '0');
+                          handleSelectDate(`${year}-${month}-${day}`);
+                        } else {
+                          setSelectedDate('');
+                        }
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                {/* Search Box */}
+                <div className="relative flex-1 sm:w-56">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                   <Input 
                     type="text" 
-                    placeholder="Search user, email, city..." 
-                    className="pl-8 pr-7 h-9 text-xs bg-card/60 border-border/80 rounded-xl"
+                    placeholder="Search name, email, location..." 
+                    className="pl-8 pr-7 h-8 text-xs bg-background border-border"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
@@ -374,54 +589,10 @@ export default function AdminPage() {
                     </button>
                   )}
                 </div>
-
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className={cn(
-                        "h-9 w-9 rounded-xl shrink-0 bg-card/60 border-border/80 relative",
-                        selectedDate && "text-primary border-primary/50 bg-primary/10"
-                      )}
-                      title="Filter by date"
-                    >
-                      <CalendarIcon className="h-4 w-4" />
-                      {selectedDate && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-primary" />}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 z-50 bg-popover border-border" align="end">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate ? new Date(selectedDate) : undefined}
-                      onSelect={(d) => {
-                        if (d) {
-                          const year = d.getFullYear();
-                          const month = String(d.getMonth() + 1).padStart(2, '0');
-                          const day = String(d.getDate()).padStart(2, '0');
-                          setSelectedDate(`${year}-${month}-${day}`);
-                        } else {
-                          setSelectedDate('');
-                        }
-                      }}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
               </div>
-
-              {/* Active Filter Chips (Mobile) */}
-              {selectedDate && (
-                <div className="flex items-center gap-1.5">
-                  <Badge variant="secondary" className="text-[11px] gap-1 bg-primary/10 text-primary border border-primary/20 py-0.5 px-2 rounded-lg">
-                    <span>Date: {format(new Date(selectedDate), "MMM d, yyyy")}</span>
-                    <X className="w-3 h-3 cursor-pointer hover:text-foreground" onClick={() => setSelectedDate('')} />
-                  </Badge>
-                </div>
-              )}
             </div>
 
-            {/* Mobile Data List View (< 640px) */}
+            {/* MOBILE REGISTRATION LIST (< 640px) */}
             <div className="block sm:hidden">
               {loadingStats ? (
                 <div className="space-y-2.5">
@@ -439,11 +610,16 @@ export default function AdminPage() {
                     <p className="text-xs text-muted-foreground max-w-xs">
                       {searchQuery 
                         ? `No signups matching "${searchQuery}".` 
-                        : selectedDate 
-                          ? `No user accounts registered on ${selectedDate}.` 
-                          : "No new user accounts registered in the last 24 hours."}
+                        : data?.timeLabel 
+                          ? `No user accounts registered during ${data.timeLabel}.` 
+                          : "No new user accounts registered in this period."}
                     </p>
                   </div>
+                  {(selectedDate || selectedMonth || searchQuery) && (
+                    <Button variant="outline" size="sm" className="h-8 text-xs mt-1" onClick={handleClearFilters}>
+                      Clear all filters
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -514,13 +690,13 @@ export default function AdminPage() {
               )}
             </div>
 
-            {/* Desktop Section Card & Full Table (>= 640px) */}
+            {/* DESKTOP DATA TABLE (>= 640px) */}
             <Card className="hidden sm:block border border-border/80 shadow-none bg-card/60 overflow-hidden">
-              <CardHeader className="p-5 border-b border-border/60 bg-muted/10 space-y-0">
+              <CardHeader className="p-4 sm:p-5 border-b border-border/60 bg-muted/10">
                 <div className="flex flex-row items-center justify-between gap-4">
                   <div className="flex items-center gap-2.5">
                     <h2 className="text-base font-semibold tracking-tight text-foreground">
-                      {selectedDate ? `Registrations (${selectedDate})` : 'Recent Registrations'}
+                      User Registrations ({data?.timeLabel || 'Last 24 Hours'})
                     </h2>
                     {data?.count !== undefined && (
                       <Badge variant="secondary" className="font-medium text-xs px-2 py-0.5 rounded-full">
@@ -528,77 +704,16 @@ export default function AdminPage() {
                       </Badge>
                     )}
                   </div>
-
-                  {/* Desktop Toolbar Filter controls */}
-                  <div className="flex flex-row items-center gap-2.5">
-                    {/* Date Picker Popover */}
-                    <div className="relative w-44">
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className={cn(
-                              "h-8 text-xs font-normal justify-start w-full bg-background border-border pr-8",
-                              !selectedDate && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                            <span className="truncate">
-                              {selectedDate ? format(new Date(selectedDate), "MMM d, yyyy") : "Pick a date"}
-                            </span>
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 z-50 bg-popover border-border" align="end">
-                          <Calendar
-                            mode="single"
-                            selected={selectedDate ? new Date(selectedDate) : undefined}
-                            onSelect={(d) => {
-                              if (d) {
-                                const year = d.getFullYear();
-                                const month = String(d.getMonth() + 1).padStart(2, '0');
-                                const day = String(d.getDate()).padStart(2, '0');
-                                setSelectedDate(`${year}-${month}-${day}`);
-                              } else {
-                                setSelectedDate('');
-                              }
-                            }}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-
-                      {selectedDate && (
-                        <button
-                          onClick={() => setSelectedDate('')}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground z-10 p-0.5 rounded-full hover:bg-muted transition-colors"
-                          title="Clear date filter"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Search Input */}
-                    <div className="relative w-60">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                      <Input 
-                        type="text" 
-                        placeholder="Search user, email, city..." 
-                        className="pl-8 pr-7 h-8 text-xs bg-background border-border"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                      {searchQuery && (
-                        <button 
-                          onClick={() => setSearchQuery('')}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                  {(selectedMonth || selectedDate || searchQuery) && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                      onClick={handleClearFilters}
+                    >
+                      Reset filters
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
 
@@ -615,26 +730,23 @@ export default function AdminPage() {
                       <Users className="w-5 h-5" />
                     </div>
                     <div className="space-y-1">
-                      <p className="text-sm font-medium text-foreground">No registrations found</p>
+                      <p className="text-sm font-medium text-foreground">No user registrations found</p>
                       <p className="text-xs text-muted-foreground max-w-sm">
                         {searchQuery 
                           ? `No signups matching "${searchQuery}".` 
-                          : selectedDate 
-                            ? `No user accounts registered on ${selectedDate}.` 
-                            : "No new user accounts registered in the last 24 hours."}
+                          : data?.timeLabel 
+                            ? `No user accounts registered during ${data.timeLabel}.` 
+                            : "No new user accounts registered in this period."}
                       </p>
                     </div>
-                    {(searchQuery || selectedDate) && (
+                    {(searchQuery || selectedDate || selectedMonth) && (
                       <Button 
                         variant="ghost" 
                         size="sm" 
                         className="h-8 text-xs mt-2"
-                        onClick={() => {
-                          setSearchQuery('');
-                          setSelectedDate('');
-                        }}
+                        onClick={handleClearFilters}
                       >
-                        Reset filters
+                        Reset active filters
                       </Button>
                     )}
                   </div>
