@@ -1008,11 +1008,13 @@ export default function PlaylistDetailPage({ params }) {
   const [sharePreviewOpen, setSharePreviewOpen] = useState(false);
   const [showAnimatedVideo, setShowAnimatedVideo] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
+  const [videoError, setVideoError] = useState(false);
 
   // Apple Music animated artwork: on mobile show video directly when ready, on desktop show image for 3 sec then fade in video
   useEffect(() => {
+    setVideoError(false);
+    setIsVideoReady(false);
     if (playlist?.animatedArtworkUrl) {
-      setIsVideoReady(false);
       const isMobileView = typeof window !== 'undefined' && window.innerWidth < 768;
       if (isMobileView) {
         setShowAnimatedVideo(true);
@@ -1023,6 +1025,8 @@ export default function PlaylistDetailPage({ params }) {
         }, 3000);
         return () => clearTimeout(timer);
       }
+    } else {
+      setShowAnimatedVideo(false);
     }
   }, [playlist?.animatedArtworkUrl]);
 
@@ -2311,7 +2315,7 @@ export default function PlaylistDetailPage({ params }) {
   }
 
   const cover = getPlaylistCover();
-  const hasAnimatedHero = Boolean(playlist?.animatedArtworkUrl);
+  const hasAnimatedHero = Boolean(playlist?.animatedArtworkUrl) && !videoError;
   const isGif = (cover.type === 'single' && cover.src && (
     cover.src.split('?')[0].toLowerCase().endsWith('.gif') ||
     cover.src.toLowerCase().includes('.gif') ||
@@ -2448,37 +2452,33 @@ export default function PlaylistDetailPage({ params }) {
                     }}
                   >
                     {(() => {
+                      const handleVideoReady = (e) => {
+                        const v = e.currentTarget || e.target;
+                        if (v && v.videoWidth > 0 && v.videoHeight > 0 && v.duration > 0) {
+                          setIsVideoReady(true);
+                        } else if (v && (v.videoWidth === 0 || v.duration === 0)) {
+                          setVideoError(true);
+                          setIsVideoReady(false);
+                        }
+                      };
+
+                      const isVideoActive = showAnimatedVideo && isVideoReady && !videoError;
+                      let coverElement = null;
+
                       if (cover.type === 'single') {
-                        return (
-                          <>
-                            <img
-                              src={cover.src}
-                              alt={playlist.name}
-                              className={isGif && !hasAnimatedHero ? "w-full h-auto min-h-[240px] max-h-[380px] object-cover object-top transition-opacity duration-500" : `w-full h-full object-cover object-top transition-opacity duration-500 ${(showAnimatedVideo && isVideoReady) ? 'opacity-0' : 'opacity-100'}`}
-                              style={heroMaskStyle}
-                              onError={(e) => {
-                                e.target.src = '/default-playlist-image.png';
-                              }}
-                            />
-                            {playlist?.animatedArtworkUrl && (
-                              <video
-                                src={playlist.animatedArtworkUrl}
-                                autoPlay
-                                loop
-                                muted
-                                playsInline
-                                preload="auto"
-                                onLoadedData={() => setIsVideoReady(true)}
-                                onCanPlay={() => setIsVideoReady(true)}
-                                className={`absolute inset-0 w-full h-full object-cover object-top transition-opacity duration-500 ${(showAnimatedVideo && isVideoReady) ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-                                style={heroMaskStyle}
-                                onError={() => setShowAnimatedVideo(false)}
-                              />
-                            )}
-                          </>
+                        coverElement = (
+                          <img
+                            src={cover.src}
+                            alt={playlist.name}
+                            className={isGif && !hasAnimatedHero ? "w-full h-auto min-h-[240px] max-h-[380px] object-cover object-top" : "w-full h-full object-cover object-top"}
+                            style={heroMaskStyle}
+                            onError={(e) => {
+                              e.target.src = '/default-playlist-image.png';
+                            }}
+                          />
                         );
                       } else if (cover.type === 'collage') {
-                        return (
+                        coverElement = (
                           <div className="w-full h-full grid grid-cols-2 gap-0">
                             {cover.images.map((imageSrc, index) => (
                               <div key={index} className="w-full h-full overflow-hidden">
@@ -2495,7 +2495,7 @@ export default function PlaylistDetailPage({ params }) {
                           </div>
                         );
                       } else {
-                        return (
+                        coverElement = (
                           <img
                             src="/default-playlist-image.png"
                             alt={playlist.name}
@@ -2503,6 +2503,33 @@ export default function PlaylistDetailPage({ params }) {
                           />
                         );
                       }
+
+                      return (
+                        <>
+                          {coverElement}
+                          {playlist?.animatedArtworkUrl && !videoError && (
+                            <video
+                              src={playlist.animatedArtworkUrl}
+                              autoPlay
+                              loop
+                              muted
+                              playsInline
+                              preload="auto"
+                              onLoadedData={handleVideoReady}
+                              onLoadedMetadata={handleVideoReady}
+                              onCanPlay={handleVideoReady}
+                              onPlaying={handleVideoReady}
+                              className={`absolute inset-0 w-full h-full object-cover object-top transition-opacity duration-500 ${isVideoActive ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                              style={heroMaskStyle}
+                              onError={() => {
+                                setVideoError(true);
+                                setShowAnimatedVideo(false);
+                                setIsVideoReady(false);
+                              }}
+                            />
+                          )}
+                        </>
+                      );
                     })()}
                   </div>
                   <div className={`space-y-2 w-full ${isGif ? 'px-4' : ''} ${hasAnimatedHero ? '-mt-16 relative z-20' : ''}`}>
@@ -2543,35 +2570,32 @@ export default function PlaylistDetailPage({ params }) {
               <div className="hidden md:flex gap-6 items-end">
                 <div className="w-64 h-64 rounded-lg overflow-hidden shrink-0 shadow-2xl relative">
                   {(() => {
+                    const handleVideoReady = (e) => {
+                      const v = e.currentTarget || e.target;
+                      if (v && v.videoWidth > 0 && v.videoHeight > 0 && v.duration > 0) {
+                        setIsVideoReady(true);
+                      } else if (v && (v.videoWidth === 0 || v.duration === 0)) {
+                        setVideoError(true);
+                        setIsVideoReady(false);
+                      }
+                    };
+
+                    const isVideoActive = showAnimatedVideo && isVideoReady && !videoError;
+                    let coverElement = null;
+
                     if (cover.type === 'single') {
-                      return (
-                        <>
-                          <img
-                            src={cover.src}
-                            alt={playlist.name}
-                            className={`w-full h-full object-cover object-top transition-opacity duration-500 ${(showAnimatedVideo && isVideoReady) ? 'opacity-0' : 'opacity-100'}`}
-                            onError={(e) => {
-                              e.target.src = '/default-playlist-image.png';
-                            }}
-                          />
-                          {playlist?.animatedArtworkUrl && (
-                            <video
-                              src={playlist.animatedArtworkUrl}
-                              autoPlay
-                              loop
-                              muted
-                              playsInline
-                              preload="auto"
-                              onLoadedData={() => setIsVideoReady(true)}
-                              onCanPlay={() => setIsVideoReady(true)}
-                              className={`absolute inset-0 w-full h-full object-cover object-top transition-opacity duration-500 ${(showAnimatedVideo && isVideoReady) ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-                              onError={() => setShowAnimatedVideo(false)}
-                            />
-                          )}
-                        </>
+                      coverElement = (
+                        <img
+                          src={cover.src}
+                          alt={playlist.name}
+                          className="w-full h-full object-cover object-top"
+                          onError={(e) => {
+                            e.target.src = '/default-playlist-image.png';
+                          }}
+                        />
                       );
                     } else if (cover.type === 'collage') {
-                      return (
+                      coverElement = (
                         <div className="w-full h-full grid grid-cols-2 gap-0.5">
                           {cover.images.map((imageSrc, index) => (
                             <div key={index} className="w-full h-full overflow-hidden">
@@ -2588,7 +2612,7 @@ export default function PlaylistDetailPage({ params }) {
                         </div>
                       );
                     } else {
-                      return (
+                      coverElement = (
                         <img
                           src="/default-playlist-image.png"
                           alt={playlist.name}
@@ -2596,6 +2620,32 @@ export default function PlaylistDetailPage({ params }) {
                         />
                       );
                     }
+
+                    return (
+                      <>
+                        {coverElement}
+                        {playlist?.animatedArtworkUrl && !videoError && (
+                          <video
+                            src={playlist.animatedArtworkUrl}
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            preload="auto"
+                            onLoadedData={handleVideoReady}
+                            onLoadedMetadata={handleVideoReady}
+                            onCanPlay={handleVideoReady}
+                            onPlaying={handleVideoReady}
+                            className={`absolute inset-0 w-full h-full object-cover object-top transition-opacity duration-500 ${isVideoActive ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                            onError={() => {
+                              setVideoError(true);
+                              setShowAnimatedVideo(false);
+                              setIsVideoReady(false);
+                            }}
+                          />
+                        )}
+                      </>
+                    );
                   })()}
                 </div>
                 <div className="flex-1 min-w-0">
