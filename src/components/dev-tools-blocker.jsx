@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { signOut } from "next-auth/react";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 
 export function DevToolsBlocker({ allowLocal = true }) {
@@ -19,6 +18,18 @@ export function DevToolsBlocker({ allowLocal = true }) {
       console.log("DevToolsBlocker: Local environment detected, skipping protection.");
       return;
     }
+
+    // Helper to detect mobile/tablet devices where docked DevTools do not exist
+    const isMobileOrTablet = () => {
+      if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+      const ua = navigator.userAgent || navigator.vendor || window.opera || "";
+      const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS|FxiOS/i.test(ua);
+      const hasTouch = ("ontouchstart" in window) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
+      const isCoarsePointer = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+      const isSmallScreen = window.innerWidth <= 1024 || window.outerWidth <= 1024;
+
+      return isMobileUA || (hasTouch && isSmallScreen) || (isCoarsePointer && isSmallScreen);
+    };
 
     const preventDefault = (e) => e.preventDefault();
 
@@ -50,14 +61,24 @@ export function DevToolsBlocker({ allowLocal = true }) {
       }
     };
 
-    document.addEventListener("contextmenu", preventDefault);
+    const isMobile = isMobileOrTablet();
+    if (!isMobile) {
+      document.addEventListener("contextmenu", preventDefault);
+    }
     document.addEventListener("keydown", handleKeyDown);
 
     // DevTools Detection logic (docked panel sizing thresholds)
     const checkDevTools = () => {
-      const threshold = 160;
-      const widthDiff = window.outerWidth - window.innerWidth;
-      const heightDiff = window.outerHeight - window.innerHeight;
+      // Mobile and tablet browsers do not dock DevTools, and browser address/status bars cause dimension diffs
+      if (isMobileOrTablet()) {
+        return false;
+      }
+
+      // Threshold for docked DevTools panel on desktop (220px accounts for toolbars and screen scale)
+      const threshold = 220;
+      const widthDiff = Math.abs(window.outerWidth - window.innerWidth);
+      const heightDiff = Math.abs(window.outerHeight - window.innerHeight);
+
       return widthDiff > threshold || heightDiff > threshold;
     };
 
@@ -68,21 +89,12 @@ export function DevToolsBlocker({ allowLocal = true }) {
 
       if (isOpen) {
         if (!wasOpen) {
-          console.warn("DevTools detected! Blocking UI and logging out user.");
+          console.warn("DevTools detected! Blocking UI.");
           setIsBlocked(true);
           
           // Pause playback if context is available
           if (musicPlayer && musicPlayer.setIsPlaying) {
             musicPlayer.setIsPlaying(false);
-          }
-          
-          // Clear credentials/sessions and log out
-          try {
-            localStorage.clear();
-            sessionStorage.clear();
-            signOut({ redirect: false });
-          } catch (err) {
-            console.error("Logout failed during blocker actions:", err);
           }
           wasOpen = true;
         }
@@ -103,7 +115,9 @@ export function DevToolsBlocker({ allowLocal = true }) {
     handleDetection();
 
     return () => {
-      document.removeEventListener("contextmenu", preventDefault);
+      if (!isMobile) {
+        document.removeEventListener("contextmenu", preventDefault);
+      }
       document.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("resize", handleDetection);
       clearInterval(intervalId);
@@ -132,3 +146,4 @@ export function DevToolsBlocker({ allowLocal = true }) {
 
   return null;
 }
+
