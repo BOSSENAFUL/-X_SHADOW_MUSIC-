@@ -2470,7 +2470,7 @@ export default function PlaylistDetailPage({ params }) {
                           <img
                             src={cover.src}
                             alt={playlist.name}
-                            className={isGif && !hasAnimatedHero ? "w-full h-auto min-h-[240px] max-h-[380px] object-cover object-top" : "w-full h-full object-cover object-top"}
+                            className={`${isGif && !hasAnimatedHero ? "w-full h-auto min-h-[240px] max-h-[380px] object-cover object-top" : "w-full h-full object-cover object-top"} transition-opacity duration-500 ${isVideoActive ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
                             style={heroMaskStyle}
                             onError={(e) => {
                               e.target.src = '/default-playlist-image.png';
@@ -2479,7 +2479,7 @@ export default function PlaylistDetailPage({ params }) {
                         );
                       } else if (cover.type === 'collage') {
                         coverElement = (
-                          <div className="w-full h-full grid grid-cols-2 gap-0">
+                          <div className={`w-full h-full grid grid-cols-2 gap-0 transition-opacity duration-500 ${isVideoActive ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                             {cover.images.map((imageSrc, index) => (
                               <div key={index} className="w-full h-full overflow-hidden">
                                 <img
@@ -2499,7 +2499,7 @@ export default function PlaylistDetailPage({ params }) {
                           <img
                             src="/default-playlist-image.png"
                             alt={playlist.name}
-                            className="w-full h-full object-cover"
+                            className={`w-full h-full object-cover transition-opacity duration-500 ${isVideoActive ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
                           />
                         );
                       }
@@ -2588,7 +2588,7 @@ export default function PlaylistDetailPage({ params }) {
                         <img
                           src={cover.src}
                           alt={playlist.name}
-                          className="w-full h-full object-cover object-top"
+                          className={`w-full h-full object-cover object-top transition-opacity duration-500 ${isVideoActive ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
                           onError={(e) => {
                             e.target.src = '/default-playlist-image.png';
                           }}
@@ -2596,7 +2596,7 @@ export default function PlaylistDetailPage({ params }) {
                       );
                     } else if (cover.type === 'collage') {
                       coverElement = (
-                        <div className="w-full h-full grid grid-cols-2 gap-0.5">
+                        <div className={`w-full h-full grid grid-cols-2 gap-0.5 transition-opacity duration-500 ${isVideoActive ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                           {cover.images.map((imageSrc, index) => (
                             <div key={index} className="w-full h-full overflow-hidden">
                               <img
@@ -2616,7 +2616,7 @@ export default function PlaylistDetailPage({ params }) {
                         <img
                           src="/default-playlist-image.png"
                           alt={playlist.name}
-                          className="w-full h-full object-cover"
+                          className={`w-full h-full object-cover transition-opacity duration-500 ${isVideoActive ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
                         />
                       );
                     }
