@@ -15,6 +15,7 @@ import { FullscreenMusicPlayer } from "@/components/fullscreen-music-player";
 import { IoMdPlay } from "react-icons/io";
 import { HiPause } from "react-icons/hi2";
 import { BiSkipNext, BiSkipPrevious } from "react-icons/bi";
+import { decodeHtmlEntities } from "@/lib/utils";
 
 // Module-level color cache — persists across re-renders and survives
 // component unmount/remount. Keyed by song ID for instant lookups.
@@ -188,21 +189,7 @@ export function MusicPlayer({ currentSong, playlist = [], onSongChange }) {
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   };
 
-  const decodeHtmlEntities = (text) => {
-    if (!text) return text;
-    const entities = {
-      '&amp;': '&',
-      '&lt;': '<',
-      '&gt;': '>',
-      '&quot;': '"',
-      '&#039;': "'",
-      '&#x27;': "'",
-      '&#x2F;': '/',
-      '&#32;': ' ',
-      '&#160;': ' '
-    };
-    return text.replace(/&[#\w\d]+;/g, (entity) => entities[entity] || entity);
-  };
+
 
   function shuffleArray(arr) {
     const shuffled = [...arr];

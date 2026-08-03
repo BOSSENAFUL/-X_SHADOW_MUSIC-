@@ -27,17 +27,35 @@ function spotifyRequest(url, options) {
     });
 }
 
+const HTML_ENTITY_MAP = {
+    amp: '&', lt: '<', gt: '>', quot: '"', apos: "'",
+    nbsp: ' ', mdash: '—', ndash: '–', copy: '©', reg: '®', trade: '™',
+    hellip: '…', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”'
+};
+
 function decodeEntities(text) {
-    if (!text) return '';
-    return text
-        .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(dec))
-        .replace(/&amp;/g, '&')
-        .replace(/&quot;/g, '"')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&apos;/g, "'")
-        .trim();
+    if (!text || typeof text !== 'string') return text || '';
+    let str = text;
+    let prev = '';
+    let count = 0;
+    while (str !== prev && str.includes('&') && count < 3) {
+        prev = str;
+        str = str.replace(/&(#(?:x[0-9a-fA-F]+|[0-9]+)|[a-zA-Z]+);/g, (match, entity) => {
+            if (entity.startsWith('#x') || entity.startsWith('#X')) {
+                const code = parseInt(entity.slice(2), 16);
+                return !isNaN(code) ? String.fromCharCode(code) : match;
+            }
+            if (entity.startsWith('#')) {
+                const code = parseInt(entity.slice(1), 10);
+                return !isNaN(code) ? String.fromCharCode(code) : match;
+            }
+            return HTML_ENTITY_MAP[entity.toLowerCase()] || match;
+        });
+        count++;
+    }
+    return str.trim();
 }
+
 
 function splitArtists(artistData) {
     if (!artistData) return [{ name: 'Unknown Artist' }];

@@ -46,7 +46,7 @@ import {
 } from "@/components/ui/drawer";
 import { downloadWithMetadata } from "@/lib/clientDownload";
 import { triggerSmartlink } from "@/lib/smartlink";
-import { applyThemeColor } from "@/lib/utils";
+import { applyThemeColor, decodeHtmlEntities as decodeHtmlEntitiesUtil } from "@/lib/utils";
 
 // --- Helper Components ---
 const SongActionMenu = memo(({
@@ -428,18 +428,8 @@ export default function FavoritesPage() {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }, []);
 
-  // Use a faster decoding method that doesn't create DOM elements on every call
   const decodeHtmlEntities = useCallback((text) => {
-    if (!text || !text.includes('&')) return text;
-    const entities = {
-      '&amp;': '&',
-      '&lt;': '<',
-      '&gt;': '>',
-      '&quot;': '"',
-      '&#39;': "'",
-      '&apos;': "'"
-    };
-    return text.replace(/&amp;|&lt;|&gt;|&quot;|&#39;|&apos;/g, m => entities[m]);
+    return decodeHtmlEntitiesUtil(text);
   }, []);
 
   const formatDate = useCallback((dateString) => {

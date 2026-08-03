@@ -46,7 +46,7 @@ import {
 } from "@/components/ui/drawer";
 import { toast } from "sonner";
 import { downloadWithMetadata } from "@/lib/clientDownload";
-import { applyThemeColor, getThemeColorForScroll } from "@/lib/utils";
+import { applyThemeColor, getThemeColorForScroll, decodeHtmlEntities as decodeHtmlEntitiesUtil } from "@/lib/utils";
 import { triggerSmartlink } from "@/lib/smartlink";
 
 const formatDuration = (duration) => {
@@ -86,17 +86,7 @@ const decodeHtmlEntities = (text) => {
     cleanedText = cleanedText.split(bad).join(good);
   }
 
-  if (!cleanedText.includes('&')) return cleanedText;
-
-  const htmlEntities = {
-    '&amp;': '&',
-    '&lt;': '<',
-    '&gt;': '>',
-    '&quot;': '"',
-    '&#39;': "'",
-    '&apos;': "'"
-  };
-  return cleanedText.replace(/&(?:amp|lt|gt|quot|#39|apos);/g, m => htmlEntities[m]);
+  return decodeHtmlEntitiesUtil(cleanedText);
 };
 
 const getSongImageUrl = (song) => {

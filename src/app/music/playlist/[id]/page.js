@@ -51,7 +51,7 @@ import { memo } from "react";
 import { Share, Search, Check, List, LayoutList } from "lucide-react";
 import { downloadWithMetadata } from "@/lib/clientDownload";
 import { triggerSmartlink } from "@/lib/smartlink";
-import { applyThemeColor, getThemeColorForScroll } from "@/lib/utils";
+import { applyThemeColor, getThemeColorForScroll, decodeHtmlEntities } from "@/lib/utils";
 
 // --- Helper Components ---
 const SongActionMenu = memo(({
@@ -938,19 +938,7 @@ function PlaylistPageContent() {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  const decodeHtmlEntities = (text) => {
-    if (!text) return text;
-    const entities = {
-      '&amp;': '&',
-      '&lt;': '<',
-      '&gt;': '>',
-      '&quot;': '"',
-      '&#39;': "'",
-      '&apos;': "'"
-    };
-    if (!text.includes('&')) return text;
-    return text.replace(/&amp;|&lt;|&gt;|&quot;|&#39;|&apos;/g, m => entities[m]);
-  };
+
 
   const handleAddToPlaylist = (e, song) => {
     e.stopPropagation();

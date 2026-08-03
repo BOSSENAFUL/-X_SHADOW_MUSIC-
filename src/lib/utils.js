@@ -53,3 +53,33 @@ export function getThemeColorForScroll(colorStr, progress, defaultThemeColor = "
   return `#${toHex(mixedR)}${toHex(mixedG)}${toHex(mixedB)}`;
 }
 
+const HTML_ENTITY_MAP = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'",
+  nbsp: ' ', mdash: '—', ndash: '–', copy: '©', reg: '®', trade: '™',
+  hellip: '…', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”'
+};
+
+export function decodeHtmlEntities(text) {
+  if (!text || typeof text !== 'string') return text || '';
+  let str = text;
+  let prev = '';
+  let count = 0;
+  while (str !== prev && str.includes('&') && count < 3) {
+    prev = str;
+    str = str.replace(/&(#(?:x[0-9a-fA-F]+|[0-9]+)|[a-zA-Z]+);/g, (match, entity) => {
+      if (entity.startsWith('#x') || entity.startsWith('#X')) {
+        const code = parseInt(entity.slice(2), 16);
+        return !isNaN(code) ? String.fromCharCode(code) : match;
+      }
+      if (entity.startsWith('#')) {
+        const code = parseInt(entity.slice(1), 10);
+        return !isNaN(code) ? String.fromCharCode(code) : match;
+      }
+      return HTML_ENTITY_MAP[entity.toLowerCase()] || match;
+    });
+    count++;
+  }
+  return str;
+}
+
+

@@ -37,7 +37,7 @@ import { PlaylistSection } from "@/components/music/playlist-section";
 import { toast } from "sonner";
 import Link from "next/link";
 import { downloadWithMetadata } from "@/lib/clientDownload";
-import { applyThemeColor, getThemeColorForScroll } from "@/lib/utils";
+import { applyThemeColor, getThemeColorForScroll, decodeHtmlEntities } from "@/lib/utils";
 
 const TAILWIND_COLORS = {
     slate: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a' },
@@ -508,12 +508,7 @@ export default function GenreDetailPage() {
         return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     };
 
-    const decodeHtmlEntities = (text) => {
-        if (!text) return text;
-        const textarea = document.createElement('textarea');
-        textarea.innerHTML = text;
-        return textarea.value;
-    };
+
 
     // Load more songs function using seed queries
     const loadMoreSongs = async () => {

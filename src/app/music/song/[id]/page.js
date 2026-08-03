@@ -51,7 +51,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { memo } from "react";
 import { downloadWithMetadata } from "@/lib/clientDownload";
-import { applyThemeColor, getThemeColorForScroll } from "@/lib/utils";
+import { applyThemeColor, getThemeColorForScroll, decodeHtmlEntities as decodeHtmlEntitiesUtil } from "@/lib/utils";
 
 // --- Action Menu ---
 const SongDetailActionMenu = memo(({
@@ -309,11 +309,7 @@ export default function SongPage() {
             .replace(/â€˜/g, "\u2018").replace(/â€™/g, "\u2019")
             .replace(/â€"/g, "\u2014").replace(/â€"/g, "\u2013")
             .replace(/â€¦/g, "\u2026").replace(/Â/g, "");
-        if (!t.includes("&")) return t;
-        return t.replace(/&amp;|&lt;|&gt;|&quot;|&#39;|&apos;/g, m => ({
-            "&amp;": "&", "&lt;": "<", "&gt;": ">",
-            "&quot;": '"', "&#39;": "'", "&apos;": "'"
-        }[m]));
+        return decodeHtmlEntitiesUtil(t);
     }, []);
 
     const formatDuration = useCallback((secs) => {

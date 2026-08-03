@@ -54,17 +54,8 @@ import {
   Heart,
   ExternalLink,
 } from "lucide-react";
-import { useMusicPlayer } from "@/contexts/music-player-context";
-import dynamic from "next/dynamic";
+import { decodeHtmlEntities } from "@/lib/utils";
 
-// Dynamically import the map component to avoid SSR issues
-// Function to decode HTML entities
-const decodeHtmlEntities = (text) => {
-  if (typeof document === 'undefined') return text;
-  const textarea = document.createElement('textarea');
-  textarea.innerHTML = text;
-  return textarea.value;
-};
 
 const RADIO_API_SERVERS = [
   "https://de1.api.radio-browser.info",

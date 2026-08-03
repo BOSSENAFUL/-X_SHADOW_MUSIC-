@@ -583,6 +583,7 @@ import {
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useSession } from "next-auth/react";
+import { decodeHtmlEntities } from "@/lib/utils";
 import { AddToPlaylistDialog } from "@/components/playlists/AddToPlaylistDialog";
 import { toast } from "sonner";
 import { IoMdPlay } from "react-icons/io";
@@ -666,21 +667,7 @@ const formatTime = (time) => {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 };
 
-const decodeHtmlEntities = (text) => {
-  if (!text) return text;
-  const entities = {
-    '&amp;': '&',
-    '&lt;': '<',
-    '&gt;': '>',
-    '&quot;': '"',
-    '&#039;': "'",
-    '&#x27;': "'",
-    '&#x2F;': '/',
-    '&#32;': ' ',
-    '&#160;': ' '
-  };
-  return text.replace(/&[#\w\d]+;/g, (entity) => entities[entity] || entity);
-};
+
 
 const getArtistNames = (song) => {
   if (!song) return "Unknown Artist";

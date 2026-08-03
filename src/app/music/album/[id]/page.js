@@ -48,7 +48,7 @@ import {
 import { toast } from "sonner";
 import { memo } from "react";
 import { downloadWithMetadata } from "@/lib/clientDownload";
-import { applyThemeColor, getThemeColorForScroll } from "@/lib/utils";
+import { applyThemeColor, getThemeColorForScroll, decodeHtmlEntities as decodeHtmlEntitiesUtil } from "@/lib/utils";
 import { triggerSmartlink } from "@/lib/smartlink";
 
 
@@ -679,16 +679,7 @@ export default function AlbumPage() {
   }, [album?.songs]);
 
   const decodeHtmlEntities = useCallback((text) => {
-    if (!text || !text.includes('&')) return text;
-    const entities = {
-      '&amp;': '&',
-      '&lt;': '<',
-      '&gt;': '>',
-      '&quot;': '"',
-      '&#39;': "'",
-      '&apos;': "'"
-    };
-    return text.replace(/&amp;|&lt;|&gt;|&quot;|&#39;|&apos;/g, m => entities[m]);
+    return decodeHtmlEntitiesUtil(text);
   }, []);
 
   const truncateTitle = useCallback((title, maxLength = 50) => {

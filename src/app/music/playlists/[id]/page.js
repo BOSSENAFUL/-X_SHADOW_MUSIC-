@@ -94,7 +94,7 @@ import { HiPause } from "react-icons/hi2";
 import { IoMdPlay } from "react-icons/io";
 import { ShareStoryPreview } from "@/components/share-story-preview";
 import { downloadWithMetadata } from "@/lib/clientDownload";
-import { applyThemeColor, getThemeColorForScroll } from "@/lib/utils";
+import { applyThemeColor, getThemeColorForScroll, decodeHtmlEntities as decodeHtmlEntitiesUtil } from "@/lib/utils";
 
 // --- In-Memory Global Color Cache ---
 const globalColorCache = typeof window !== 'undefined' ? new Map() : null;
@@ -1065,13 +1065,7 @@ export default function PlaylistDetailPage({ params }) {
   const decodeHtmlEntities = useCallback((text) => {
     if (!text) return text;
     if (htmlEntityCache.current.has(text)) return htmlEntityCache.current.get(text);
-    const entities = {
-      '&amp;': '&', '&lt;': '<', '&gt;': '>',
-      '&quot;': '"', '&#39;': "'", '&apos;': "'"
-    };
-    const result = text.includes('&')
-      ? text.replace(/&amp;|&lt;|&gt;|&quot;|&#39;|&apos;/g, m => entities[m])
-      : text;
+    const result = decodeHtmlEntitiesUtil(text);
     htmlEntityCache.current.set(text, result);
     return result;
   }, []);

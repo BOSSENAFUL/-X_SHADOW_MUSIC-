@@ -39,6 +39,7 @@ import { toast } from "sonner";
 import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { AddToPlaylistDialog } from "@/components/playlists/AddToPlaylistDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { decodeHtmlEntities } from "@/lib/utils";
 import {
   Drawer,
   DrawerContent,
@@ -501,19 +502,8 @@ function SearchPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally empty — runs once after first render
 
-  // Memoized textarea to avoid garbage collection pressure during rendering
-  const decodeHtmlEntities = (() => {
-    let memoizedTextarea = null;
-    return (text) => {
-      if (!text) return text;
-      if (typeof window === 'undefined') return text;
-      if (!memoizedTextarea) {
-        memoizedTextarea = document.createElement('textarea');
-      }
-      memoizedTextarea.innerHTML = text;
-      return memoizedTextarea.value;
-    };
-  })();
+  // Use robust decodeHtmlEntities helper
+
 
   const formatDuration = (duration) => {
     if (!duration) return "0:00";
