@@ -10,7 +10,7 @@ async function getLiveRatingData() {
       return { ratingValue: "4.4", reviewCount: "86" };
     }
     const avg =
-      ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length;
+      ratings.reduce((sum, r) => sum + Number(r.rating || 0), 0) / ratings.length;
     return {
       ratingValue: avg.toFixed(1),
       reviewCount: String(ratings.length),

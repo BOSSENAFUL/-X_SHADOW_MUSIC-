@@ -33,7 +33,7 @@ export default function ReviewsPage() {
     const longReviews = ratings.filter(r => (r.comment?.length || 0) > SHORTER_REVIEWS_THRESHOLD);
 
     const averageRating = ratings.length > 0
-        ? ratings.reduce((acc, r) => acc + r.rating, 0) / ratings.length
+        ? ratings.reduce((acc, r) => acc + Number(r.rating || 0), 0) / ratings.length
         : 0;
 
     // Formatter to make long text much easier to read by detecting numbers or respecting newlines

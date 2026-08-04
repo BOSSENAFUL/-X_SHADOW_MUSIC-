@@ -31,7 +31,7 @@ export default function Home() {
   }, []);
 
   const averageRating = ratings.length > 0
-    ? ratings.reduce((acc, r) => acc + r.rating, 0) / ratings.length
+    ? ratings.reduce((acc, r) => acc + Number(r.rating || 0), 0) / ratings.length
     : 0;
 
   const fadeUpVariants = {
