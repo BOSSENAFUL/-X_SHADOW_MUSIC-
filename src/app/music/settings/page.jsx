@@ -23,11 +23,23 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
     ArrowLeft,
     User,
     Bell,
     LogOut,
+    Trash2,
     ChevronRight,
     Music,
     Music2,
@@ -177,6 +189,29 @@ export default function SettingsPage() {
     });
 
     const [feedPreference, setFeedPreference] = useState('all');
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+    const handleDeleteAccount = async () => {
+        setIsDeleting(true);
+        try {
+            const res = await fetch("/api/user/delete-account", {
+                method: "DELETE",
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                toast.success("Account and listening data permanently deleted.");
+                signOut({ callbackUrl: "/login" });
+            } else {
+                toast.error(data.error || "Failed to delete account.");
+                setIsDeleting(false);
+            }
+        } catch (error) {
+            console.error("Account deletion error:", error);
+            toast.error("An error occurred while deleting your account.");
+            setIsDeleting(false);
+        }
+    };
 
     // Read from localStorage after mount to avoid SSR/client mismatch (defer to prevent synchronous setState warning)
     useEffect(() => {
@@ -433,10 +468,54 @@ export default function SettingsPage() {
                                 danger
                                 onClick={() => signOut({ callbackUrl: "/login" })}
                             />
+                            <SettingsRow
+                                icon={Trash2}
+                                label="Delete My Account"
+                                description="Permanently remove your profile, saved music, and listening history"
+                                danger
+                                onClick={() => setShowDeleteDialog(true)}
+                            />
                         </SettingsSection>
 
                     </div>
                 </ScrollArea>
+
+                {/* Account Deletion Confirmation Modal */}
+                <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                    <AlertDialogContent className="bg-zinc-950 border-white/10 text-foreground max-w-md">
+                        <AlertDialogHeader>
+                            <AlertDialogTitle className="text-red-500 flex items-center gap-2 text-xl font-bold">
+                                <Trash2 className="w-5 h-5" /> Delete Account & Personal Data?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription className="text-zinc-400 space-y-3 pt-2 text-sm leading-relaxed">
+                                <span className="block font-semibold text-zinc-200">
+                                    You are in full control of your data.
+                                </span>
+                                <span className="block">
+                                    Clicking &quot;Delete Permanently&quot; will permanently remove your account profile, saved tracks, custom playlists, and listening history from Jammify. Once deleted, your data cannot be recovered.
+                                </span>
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="mt-4">
+                            <AlertDialogCancel 
+                                disabled={isDeleting}
+                                className="border-white/10 hover:bg-white/5 hover:text-foreground text-zinc-300"
+                            >
+                                Cancel
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                                disabled={isDeleting}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    handleDeleteAccount();
+                                }}
+                                className="bg-red-600 hover:bg-red-700 text-white font-semibold flex items-center gap-2"
+                            >
+                                {isDeleting ? "Deleting..." : "Delete Permanently"}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </SidebarInset>
         </SidebarProvider>
     );

@@ -30,22 +30,58 @@ function VerifyEmailFormContent() {
     resolver: zodResolver(verifyEmailSchema),
   });
 
-  const handleCodeChange = (index, value) => {
-    if (value.length > 1) return;
-    
-    const newCode = [...code];
-    newCode[index] = value;
+  const handlePaste = (e) => {
+    e.preventDefault();
+    const pastedText = e.clipboardData.getData("text").trim().replace(/\D/g, "");
+    if (!pastedText) return;
+
+    const digits = pastedText.slice(0, 6).split("");
+    const newCode = ["", "", "", "", "", ""];
+
+    digits.forEach((digit, idx) => {
+      newCode[idx] = digit;
+    });
+
     setCode(newCode);
-    
-    // Update form value
-    setValue("code", newCode.join(""));
-    
-    // Move to next input
-    if (value && index < 5) {
+    const fullCode = newCode.join("");
+    setValue("code", fullCode);
+    trigger("code");
+
+    const focusIndex = Math.min(digits.length, 5);
+    inputRefs.current[focusIndex]?.focus();
+  };
+
+  const handleCodeChange = (index, value) => {
+    const digitsOnly = value.replace(/\D/g, "");
+
+    // Handle multi-character paste / mobile auto-fill
+    if (digitsOnly.length > 1) {
+      const digits = digitsOnly.slice(0, 6).split("");
+      const newCode = [...code];
+      digits.forEach((d, i) => {
+        newCode[i] = d;
+      });
+      setCode(newCode);
+      const fullCode = newCode.join("");
+      setValue("code", fullCode);
+      trigger("code");
+      const focusIndex = Math.min(digits.length, 5);
+      inputRefs.current[focusIndex]?.focus();
+      return;
+    }
+
+    const newCode = [...code];
+    newCode[index] = digitsOnly;
+    setCode(newCode);
+
+    const fullCode = newCode.join("");
+    setValue("code", fullCode);
+
+    // Move to next input if single digit typed
+    if (digitsOnly && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
-    
-    // Trigger validation
+
     trigger("code");
   };
 
@@ -132,10 +168,11 @@ function VerifyEmailFormContent() {
               ref={(el) => (inputRefs.current[index] = el)}
               type="text"
               inputMode="numeric"
-              maxLength={1}
+              maxLength={6}
               value={digit}
               onChange={(e) => handleCodeChange(index, e.target.value)}
               onKeyDown={(e) => handleKeyDown(index, e)}
+              onPaste={handlePaste}
               className="w-12 h-12 text-center text-lg font-semibold"
               aria-label={`Digit ${index + 1}`}
             />
