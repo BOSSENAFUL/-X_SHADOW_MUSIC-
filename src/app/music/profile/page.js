@@ -27,7 +27,7 @@ import { useLikedSongs } from "@/hooks/useLikedSongs";
 import { useRouter } from "next/navigation";
 import { Music, Disc, LogOut, Edit2, MessageCircle, Settings, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ThemeSelector } from "@/components/theme-selector";
+
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -398,7 +398,6 @@ export default function ProfilePage() {
                     <MessageCircle className="w-4 h-4" />
                     Chat
                   </Button>
-                  <ThemeSelector variant="outline" size="sm" />
                   <Button
                     variant="outline"
                     size="sm"
